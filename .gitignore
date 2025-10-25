@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/project.xcworkspace
+!*.xcodeproj/xcshareddata
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserdata
+*.xcuserstate
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Build
+build/
+DerivedData/
+
+# Configuration files with secrets
+Config.plist
+*.secrets.plist
+
+# Temporary files
+*.swp
+*~.nib
+*.tmp
+
+# Swift Package Manager
+.swiftpm
+.build
+.build/
+
+# Package resolved
+*.resolved
+
+# Test results
+*.test_result
+
+# App-specific
+*.app
+

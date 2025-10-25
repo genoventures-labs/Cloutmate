@@ -6,6 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		342C0B222EAB0AE50033973B /* Algorithms in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B212EAB0AE50033973B /* Algorithms */; };
+		342C0B252EAB0B110033973B /* BasicContainers in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B242EAB0B110033973B /* BasicContainers */; };
+		342C0B272EAB0B110033973B /* BitCollections in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B262EAB0B110033973B /* BitCollections */; };
+		342C0B292EAB0B110033973B /* Collections in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B282EAB0B110033973B /* Collections */; };
+		342C0B2B2EAB0B110033973B /* ContainersPreview in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B2A2EAB0B110033973B /* ContainersPreview */; };
+		342C0B2D2EAB0B110033973B /* DequeModule in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B2C2EAB0B110033973B /* DequeModule */; };
+		342C0B2F2EAB0B110033973B /* HashTreeCollections in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B2E2EAB0B110033973B /* HashTreeCollections */; };
+		342C0B312EAB0B110033973B /* HeapModule in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B302EAB0B110033973B /* HeapModule */; };
+		342C0B332EAB0B110033973B /* OrderedCollections in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B322EAB0B110033973B /* OrderedCollections */; };
+		342C0B352EAB0B110033973B /* TrailingElementsModule in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B342EAB0B110033973B /* TrailingElementsModule */; };
+		342C0B372EAB0B110033973B /* _RopeModule in Frameworks */ = {isa = PBXBuildFile; productRef = 342C0B362EAB0B110033973B /* _RopeModule */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		342C0B042EAB088E0033973B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,17 +35,64 @@
 			remoteGlobalIDString = 342C0AF32EAB088C0033973B;
 			remoteInfo = Cloutmate;
 		};
+		342C0BDA2EAB1E390033973B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 342C0AEC2EAB088C0033973B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 342C0BCA2EAB1E370033973B;
+			remoteInfo = CloudmateHelper;
+		};
+		342C0BE42EAB1E390033973B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 342C0AEC2EAB088C0033973B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 342C0BCA2EAB1E370033973B;
+			remoteInfo = CloudmateHelper;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		342C0AF42EAB088C0033973B /* Cloutmate.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Cloutmate.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		342C0B032EAB088E0033973B /* CloutmateTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CloutmateTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		342C0B0D2EAB088E0033973B /* CloutmateUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CloutmateUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		342C0BAC2EAB1DA30033973B /* CloudmateHelperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CloudmateHelperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		342C0BB62EAB1DA30033973B /* CloudmateHelperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CloudmateHelperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		342C0BCB2EAB1E370033973B /* CloudmateHelper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CloudmateHelper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		342C0BD92EAB1E390033973B /* CloudmateHelperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CloudmateHelperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		342C0BE32EAB1E390033973B /* CloudmateHelperUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CloudmateHelperUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		342C0B972EAB1A510033973B /* Exceptions for "Cloutmate" folder in "Cloutmate" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 342C0AF32EAB088C0033973B /* Cloutmate */;
+		};
+		342C0BF52EAB20B10033973B /* Exceptions for "Cloutmate" folder in "CloudmateHelper" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/APIModels.swift,
+				Models/Platform.swift,
+				Services/FacebookService.swift,
+				Services/KeychainService.swift,
+				Services/MetaAPIService.swift,
+				Services/ThreadsService.swift,
+				Shared/XPCProtocol.swift,
+				Utilities/Logger.swift,
+			);
+			target = 342C0BCA2EAB1E370033973B /* CloudmateHelper */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		342C0AF62EAB088C0033973B /* Cloutmate */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				342C0B972EAB1A510033973B /* Exceptions for "Cloutmate" folder in "Cloutmate" target */,
+				342C0BF52EAB20B10033973B /* Exceptions for "Cloutmate" folder in "CloudmateHelper" target */,
+			);
 			path = Cloutmate;
 			sourceTree = "<group>";
 		};
@@ -45,6 +106,21 @@
 			path = CloutmateUITests;
 			sourceTree = "<group>";
 		};
+		342C0BCC2EAB1E380033973B /* CloudmateHelper */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CloudmateHelper;
+			sourceTree = "<group>";
+		};
+		342C0BDC2EAB1E390033973B /* CloudmateHelperTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CloudmateHelperTests;
+			sourceTree = "<group>";
+		};
+		342C0BE62EAB1E390033973B /* CloudmateHelperUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CloudmateHelperUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -52,6 +128,17 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				342C0B222EAB0AE50033973B /* Algorithms in Frameworks */,
+				342C0B252EAB0B110033973B /* BasicContainers in Frameworks */,
+				342C0B292EAB0B110033973B /* Collections in Frameworks */,
+				342C0B2F2EAB0B110033973B /* HashTreeCollections in Frameworks */,
+				342C0B372EAB0B110033973B /* _RopeModule in Frameworks */,
+				342C0B272EAB0B110033973B /* BitCollections in Frameworks */,
+				342C0B352EAB0B110033973B /* TrailingElementsModule in Frameworks */,
+				342C0B332EAB0B110033973B /* OrderedCollections in Frameworks */,
+				342C0B2B2EAB0B110033973B /* ContainersPreview in Frameworks */,
+				342C0B312EAB0B110033973B /* HeapModule in Frameworks */,
+				342C0B2D2EAB0B110033973B /* DequeModule in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,6 +156,41 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		342C0BA92EAB1DA30033973B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BB32EAB1DA30033973B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BC82EAB1E370033973B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BD62EAB1E390033973B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BE02EAB1E390033973B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -78,6 +200,9 @@
 				342C0AF62EAB088C0033973B /* Cloutmate */,
 				342C0B062EAB088E0033973B /* CloutmateTests */,
 				342C0B102EAB088E0033973B /* CloutmateUITests */,
+				342C0BCC2EAB1E380033973B /* CloudmateHelper */,
+				342C0BDC2EAB1E390033973B /* CloudmateHelperTests */,
+				342C0BE62EAB1E390033973B /* CloudmateHelperUITests */,
 				342C0AF52EAB088C0033973B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +213,11 @@
 				342C0AF42EAB088C0033973B /* Cloutmate.app */,
 				342C0B032EAB088E0033973B /* CloutmateTests.xctest */,
 				342C0B0D2EAB088E0033973B /* CloutmateUITests.xctest */,
+				342C0BAC2EAB1DA30033973B /* CloudmateHelperTests.xctest */,
+				342C0BB62EAB1DA30033973B /* CloudmateHelperUITests.xctest */,
+				342C0BCB2EAB1E370033973B /* CloudmateHelper.app */,
+				342C0BD92EAB1E390033973B /* CloudmateHelperTests.xctest */,
+				342C0BE32EAB1E390033973B /* CloudmateHelperUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -112,6 +242,17 @@
 			);
 			name = Cloutmate;
 			packageProductDependencies = (
+				342C0B212EAB0AE50033973B /* Algorithms */,
+				342C0B242EAB0B110033973B /* BasicContainers */,
+				342C0B262EAB0B110033973B /* BitCollections */,
+				342C0B282EAB0B110033973B /* Collections */,
+				342C0B2A2EAB0B110033973B /* ContainersPreview */,
+				342C0B2C2EAB0B110033973B /* DequeModule */,
+				342C0B2E2EAB0B110033973B /* HashTreeCollections */,
+				342C0B302EAB0B110033973B /* HeapModule */,
+				342C0B322EAB0B110033973B /* OrderedCollections */,
+				342C0B342EAB0B110033973B /* TrailingElementsModule */,
+				342C0B362EAB0B110033973B /* _RopeModule */,
 			);
 			productName = Cloutmate;
 			productReference = 342C0AF42EAB088C0033973B /* Cloutmate.app */;
@@ -163,6 +304,112 @@
 			productReference = 342C0B0D2EAB088E0033973B /* CloutmateUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		342C0BAB2EAB1DA30033973B /* CloudmateHelperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 342C0BC12EAB1DA30033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperTests" */;
+			buildPhases = (
+				342C0BA82EAB1DA30033973B /* Sources */,
+				342C0BA92EAB1DA30033973B /* Frameworks */,
+				342C0BAA2EAB1DA30033973B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CloudmateHelperTests;
+			packageProductDependencies = (
+			);
+			productName = CloudmateHelperTests;
+			productReference = 342C0BAC2EAB1DA30033973B /* CloudmateHelperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		342C0BB52EAB1DA30033973B /* CloudmateHelperUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 342C0BC42EAB1DA30033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperUITests" */;
+			buildPhases = (
+				342C0BB22EAB1DA30033973B /* Sources */,
+				342C0BB32EAB1DA30033973B /* Frameworks */,
+				342C0BB42EAB1DA30033973B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CloudmateHelperUITests;
+			packageProductDependencies = (
+			);
+			productName = CloudmateHelperUITests;
+			productReference = 342C0BB62EAB1DA30033973B /* CloudmateHelperUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		342C0BCA2EAB1E370033973B /* CloudmateHelper */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 342C0BEB2EAB1E390033973B /* Build configuration list for PBXNativeTarget "CloudmateHelper" */;
+			buildPhases = (
+				342C0BC72EAB1E370033973B /* Sources */,
+				342C0BC82EAB1E370033973B /* Frameworks */,
+				342C0BC92EAB1E370033973B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				342C0BCC2EAB1E380033973B /* CloudmateHelper */,
+			);
+			name = CloudmateHelper;
+			packageProductDependencies = (
+			);
+			productName = CloudmateHelper;
+			productReference = 342C0BCB2EAB1E370033973B /* CloudmateHelper.app */;
+			productType = "com.apple.product-type.application";
+		};
+		342C0BD82EAB1E390033973B /* CloudmateHelperTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 342C0BEE2EAB1E390033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperTests" */;
+			buildPhases = (
+				342C0BD52EAB1E390033973B /* Sources */,
+				342C0BD62EAB1E390033973B /* Frameworks */,
+				342C0BD72EAB1E390033973B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				342C0BDB2EAB1E390033973B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				342C0BDC2EAB1E390033973B /* CloudmateHelperTests */,
+			);
+			name = CloudmateHelperTests;
+			packageProductDependencies = (
+			);
+			productName = CloudmateHelperTests;
+			productReference = 342C0BD92EAB1E390033973B /* CloudmateHelperTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		342C0BE22EAB1E390033973B /* CloudmateHelperUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 342C0BF12EAB1E390033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperUITests" */;
+			buildPhases = (
+				342C0BDF2EAB1E390033973B /* Sources */,
+				342C0BE02EAB1E390033973B /* Frameworks */,
+				342C0BE12EAB1E390033973B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				342C0BE52EAB1E390033973B /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				342C0BE62EAB1E390033973B /* CloudmateHelperUITests */,
+			);
+			name = CloudmateHelperUITests;
+			packageProductDependencies = (
+			);
+			productName = CloudmateHelperUITests;
+			productReference = 342C0BE32EAB1E390033973B /* CloudmateHelperUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +431,25 @@
 						CreatedOnToolsVersion = 26.0.1;
 						TestTargetID = 342C0AF32EAB088C0033973B;
 					};
+					342C0BAB2EAB1DA30033973B = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 342C0B9D2EAB1DA10033973B;
+					};
+					342C0BB52EAB1DA30033973B = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 342C0B9D2EAB1DA10033973B;
+					};
+					342C0BCA2EAB1E370033973B = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					342C0BD82EAB1E390033973B = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 342C0BCA2EAB1E370033973B;
+					};
+					342C0BE22EAB1E390033973B = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 342C0BCA2EAB1E370033973B;
+					};
 				};
 			};
 			buildConfigurationList = 342C0AEF2EAB088C0033973B /* Build configuration list for PBXProject "Cloutmate" */;
@@ -195,6 +461,10 @@
 			);
 			mainGroup = 342C0AEB2EAB088C0033973B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				342C0B202EAB0AE50033973B /* XCRemoteSwiftPackageReference "swift-algorithms" */,
+				342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 342C0AF52EAB088C0033973B /* Products */;
 			projectDirPath = "";
@@ -203,6 +473,11 @@
 				342C0AF32EAB088C0033973B /* Cloutmate */,
 				342C0B022EAB088E0033973B /* CloutmateTests */,
 				342C0B0C2EAB088E0033973B /* CloutmateUITests */,
+				342C0BAB2EAB1DA30033973B /* CloudmateHelperTests */,
+				342C0BB52EAB1DA30033973B /* CloudmateHelperUITests */,
+				342C0BCA2EAB1E370033973B /* CloudmateHelper */,
+				342C0BD82EAB1E390033973B /* CloudmateHelperTests */,
+				342C0BE22EAB1E390033973B /* CloudmateHelperUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -223,6 +498,41 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		342C0B0B2EAB088E0033973B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BAA2EAB1DA30033973B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BB42EAB1DA30033973B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BC92EAB1E370033973B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BD72EAB1E390033973B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BE12EAB1E390033973B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -253,6 +563,41 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		342C0BA82EAB1DA30033973B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BB22EAB1DA30033973B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BC72EAB1E370033973B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BD52EAB1E390033973B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		342C0BDF2EAB1E390033973B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +610,16 @@
 			isa = PBXTargetDependency;
 			target = 342C0AF32EAB088C0033973B /* Cloutmate */;
 			targetProxy = 342C0B0E2EAB088E0033973B /* PBXContainerItemProxy */;
+		};
+		342C0BDB2EAB1E390033973B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 342C0BCA2EAB1E370033973B /* CloudmateHelper */;
+			targetProxy = 342C0BDA2EAB1E390033973B /* PBXContainerItemProxy */;
+		};
+		342C0BE52EAB1E390033973B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 342C0BCA2EAB1E370033973B /* CloudmateHelper */;
+			targetProxy = 342C0BE42EAB1E390033973B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -394,15 +749,29 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Cloutmate/Cloutmate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7YM9QZK5PS;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Cloutmate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Cloutmate;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -426,15 +795,29 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Cloutmate/Cloutmate.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7YM9QZK5PS;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Cloutmate/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Cloutmate;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -533,6 +916,236 @@
 			};
 			name = Release;
 		};
+		342C0BC22EAB1DA30033973B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CloudmateHelper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CloudmateHelper";
+			};
+			name = Debug;
+		};
+		342C0BC32EAB1DA30033973B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CloudmateHelper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CloudmateHelper";
+			};
+			name = Release;
+		};
+		342C0BC52EAB1DA30033973B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = CloudmateHelper;
+			};
+			name = Debug;
+		};
+		342C0BC62EAB1DA30033973B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = CloudmateHelper;
+			};
+			name = Release;
+		};
+		342C0BEC2EAB1E390033973B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CloudmateHelper/CloudmateHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.Cloutmate.Helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		342C0BED2EAB1E390033973B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CloudmateHelper/CloudmateHelper.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSBackgroundOnly = YES;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.Cloutmate.Helper;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		342C0BEF2EAB1E390033973B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CloudmateHelper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CloudmateHelper";
+			};
+			name = Debug;
+		};
+		342C0BF02EAB1E390033973B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CloudmateHelper.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CloudmateHelper";
+			};
+			name = Release;
+		};
+		342C0BF22EAB1E390033973B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = CloudmateHelper;
+			};
+			name = Debug;
+		};
+		342C0BF32EAB1E390033973B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 7YM9QZK5PS;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kosmicapps.CloudmateHelperUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TEST_TARGET_NAME = CloudmateHelper;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -572,7 +1185,129 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		342C0BC12EAB1DA30033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				342C0BC22EAB1DA30033973B /* Debug */,
+				342C0BC32EAB1DA30033973B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		342C0BC42EAB1DA30033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				342C0BC52EAB1DA30033973B /* Debug */,
+				342C0BC62EAB1DA30033973B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		342C0BEB2EAB1E390033973B /* Build configuration list for PBXNativeTarget "CloudmateHelper" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				342C0BEC2EAB1E390033973B /* Debug */,
+				342C0BED2EAB1E390033973B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		342C0BEE2EAB1E390033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				342C0BEF2EAB1E390033973B /* Debug */,
+				342C0BF02EAB1E390033973B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		342C0BF12EAB1E390033973B /* Build configuration list for PBXNativeTarget "CloudmateHelperUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				342C0BF22EAB1E390033973B /* Debug */,
+				342C0BF32EAB1E390033973B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		342C0B202EAB0AE50033973B /* XCRemoteSwiftPackageReference "swift-algorithms" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-algorithms.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.2.1;
+			};
+		};
+		342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-collections.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.3.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		342C0B212EAB0AE50033973B /* Algorithms */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B202EAB0AE50033973B /* XCRemoteSwiftPackageReference "swift-algorithms" */;
+			productName = Algorithms;
+		};
+		342C0B242EAB0B110033973B /* BasicContainers */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = BasicContainers;
+		};
+		342C0B262EAB0B110033973B /* BitCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = BitCollections;
+		};
+		342C0B282EAB0B110033973B /* Collections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = Collections;
+		};
+		342C0B2A2EAB0B110033973B /* ContainersPreview */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = ContainersPreview;
+		};
+		342C0B2C2EAB0B110033973B /* DequeModule */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = DequeModule;
+		};
+		342C0B2E2EAB0B110033973B /* HashTreeCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = HashTreeCollections;
+		};
+		342C0B302EAB0B110033973B /* HeapModule */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = HeapModule;
+		};
+		342C0B322EAB0B110033973B /* OrderedCollections */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = OrderedCollections;
+		};
+		342C0B342EAB0B110033973B /* TrailingElementsModule */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = TrailingElementsModule;
+		};
+		342C0B362EAB0B110033973B /* _RopeModule */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 342C0B232EAB0B110033973B /* XCRemoteSwiftPackageReference "swift-collections" */;
+			productName = _RopeModule;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 342C0AEC2EAB088C0033973B /* Project object */;
 }

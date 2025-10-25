@@ -1,0 +1,91 @@
+//
+//  ReflectionSummary.swift
+//  Cloutmate
+//
+//  Created by Mike Letts on 10/23/25.
+//
+
+import SwiftUI
+
+struct ReflectionSummary: View {
+    let posts: [Post]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let summary = generateSummary() {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "lightbulb.fill")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.yellow, .orange],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 32, height: 32)
+                        .background(
+                            Circle()
+                                .fill(Color.yellow.opacity(0.15))
+                        )
+                    
+                    Text(summary)
+                        .font(.system(size: 15, weight: .regular))
+                        .lineSpacing(6)
+                        .foregroundColor(.primary)
+                }
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(.secondary)
+                    
+                    Text("Post content to see insights and reflections.")
+                        .font(.system(size: 15, weight: .regular))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
+        )
+    }
+    
+    private func generateSummary() -> String? {
+        guard !posts.isEmpty else { return nil }
+        
+        let postsWithMetrics = posts.filter { $0.engagementRate != nil }
+        guard !postsWithMetrics.isEmpty else { return nil }
+        
+        let totalPosts = posts.count
+        let avgEngagement = postsWithMetrics.reduce(0) { $0 + ($1.engagementRate ?? 0) } / Double(postsWithMetrics.count)
+        let bestPerforming = postsWithMetrics.max(by: { ($0.engagementRate ?? 0) < ($1.engagementRate ?? 0) })
+        
+        var summary = "Over the past period, you've published \(totalPosts) posts with an average engagement rate of \(String(format: "%.1f", avgEngagement))%."
+        
+        if let best = bestPerforming, let engagement = best.engagementRate {
+            summary += " Your best-performing post achieved \(String(format: "%.1f", engagement))% engagement."
+        }
+        
+        let threadsPosts = posts.filter { $0.postPlatforms.contains(.threads) }
+        let facebookPosts = posts.filter { $0.postPlatforms.contains(.facebook) }
+        
+        if threadsPosts.count > facebookPosts.count {
+            summary += " You've been posting more frequently on Threads."
+        } else if facebookPosts.count > threadsPosts.count {
+            summary += " You've been posting more frequently on Facebook."
+        }
+        
+        return summary
+    }
+}
+
+#Preview {
+    ReflectionSummary(posts: [])
+        .padding()
+}
+

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>MetaAppID</key>
+	<string>1321509432781143</string>
+	<key>MetaAppSecret</key>
+	<string>139e514b760dd135c65195793e62d091</string>
+	<key>MetaRedirectURI</key>
+	<string>https://oauth.kosmicapps.com/auth/callback</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>cloutmate</string>
+			</array>
+			<key>CFBundleURLName</key>
+			<string>com.kosmicapps.Cloutmate</string>
+		</dict>
+	</array>
+</dict>
+</plist>
