@@ -23,5 +23,9 @@
 			<string>com.kosmicapps.Cloutmate</string>
 		</dict>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Cloutmate uses the microphone to record and transcribe your voice into journal entries.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Cloutmate uses on-device speech recognition to transcribe your voice. Audio is not stored.</string>
 </dict>
 </plist>

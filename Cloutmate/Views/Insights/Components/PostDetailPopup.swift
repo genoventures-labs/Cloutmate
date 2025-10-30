@@ -120,5 +120,5 @@ struct PostDetailMetricRow: View {
 }
 
 #Preview {
-    PostDetailPopup(post: Post(caption: "Sample post caption"))
+    PostDetailPopup(post: CloutmateShared.Post(caption: "Sample post caption"))
 }

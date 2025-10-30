@@ -75,7 +75,7 @@ struct ContentPerformanceChart: View {
         }
     }
     
-    private func averageEngagement(for posts: [Post]) -> Double {
+    private func averageEngagement(for posts: [CloutmateShared.Post]) -> Double {
         let postsWithMetrics = posts.filter { $0.engagementRate != nil }
         guard !postsWithMetrics.isEmpty else { return 0 }
         return postsWithMetrics.reduce(0) { $0 + ($1.engagementRate ?? 0) } / Double(postsWithMetrics.count)

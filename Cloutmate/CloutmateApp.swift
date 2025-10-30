@@ -19,54 +19,13 @@ struct CloutmateApp: App {
     @State private var publishingTimer: Timer?
     @StateObject private var glassColorSystem = GlassColorSystem()
     @StateObject private var accessibilityGlassManager = AccessibilityGlassManager()
-    @StateObject private var distributedNotificationManager = DistributedNotificationManager()
+    @StateObject private var distributedNotificationManager: DistributedNotificationManager
     
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            // New PARA models
-            Project.self,
-            Area.self,
-            Task.self,
-            Note.self,
-            Journal.self,
-            InboxItem.self,
-            DashboardCard.self,
-            PARATemplate.self,
-            Campaign.self,
-            // Existing models
-            Post.self,
-            Draft.self,
-            Template.self,
-            PlatformAccount.self,
-            InsightSnapshot.self,
-            AIMessage.self,
-            // Notion integration
-            NotionSyncConfig.self,
-            // Content Intelligence models
-            PerformancePrediction.self,
-            RecyclablePost.self,
-            ContentTopic.self,
-            ContentBalance.self,
-            PostingTimeTest.self,
-            OptimalPostingTime.self,
-            CustomPostProperty.self,
-            PostView.self,
-            HashtagPerformance.self,
-            HashtagSet.self
-        ])
-        
-        let modelConfiguration = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .automatic
-        )
+    static let sharedModelContainer: ModelContainer = CloutmateApp.createAppModelContainer()
 
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    init() {
+        _distributedNotificationManager = StateObject(wrappedValue: DistributedNotificationManager(modelContainer: CloutmateApp.sharedModelContainer))
+    }
 
     var body: some Scene {
             WindowGroup {
@@ -82,7 +41,7 @@ struct CloutmateApp: App {
                         registerGlobalHotkey()
                     }
             }
-            .modelContainer(sharedModelContainer)
+            .modelContainer(CloutmateApp.sharedModelContainer)
             .defaultSize(width: 900, height: 650)
         .commands {
             CommandGroup(replacing: .newItem) {
@@ -141,7 +100,7 @@ struct CloutmateApp: App {
     
     private func checkAndPublishScheduledPosts() {
         _Concurrency.Task { @MainActor in
-            let context = sharedModelContainer.mainContext
+            let context = CloutmateApp.sharedModelContainer.mainContext
             let descriptor = FetchDescriptor<Post>(
                 predicate: #Predicate { 
                     $0.status == "scheduled" 
@@ -163,7 +122,7 @@ struct CloutmateApp: App {
             if !UserDefaults.standard.bool(forKey: "phase3_migrated") {
                 do {
                     try await MigrationService.shared.migrateExistingData(
-                        context: sharedModelContainer.mainContext
+                        context: CloutmateApp.sharedModelContainer.mainContext
                     )
                     UserDefaults.standard.set(true, forKey: "phase3_migrated")
                     os_log("Phase 3 migration completed successfully", log: .default, type: .info)
@@ -223,14 +182,62 @@ struct CloutmateApp: App {
     }
 }
 
+extension CloutmateApp {
+    static func createAppModelContainer() -> ModelContainer {
+        let schema = Schema([
+            // Shared models used in the app (publicly accessible)
+            CloutmateShared.Post.self,
+            CloutmateShared.Draft.self,
+            CloutmateShared.Template.self,
+            CloutmateShared.PlatformAccount.self,
+            CloutmateShared.PerformancePrediction.self,
+            CloutmateShared.RecyclablePost.self,
+            CloutmateShared.ContentTopic.self,
+            CloutmateShared.ContentBalance.self,
+            CloutmateShared.PostingTimeTest.self,
+            CloutmateShared.OptimalPostingTime.self,
+            CloutmateShared.CustomPostProperty.self,
+            CloutmateShared.PostView.self,
+            CloutmateShared.HashtagPerformance.self,
+            CloutmateShared.HashtagSet.self,
+            // App-local PARA models for dashboard cards
+            Note.self,
+            Task.self,
+            Project.self,
+            InboxItem.self,
+            // App-specific models
+            DashboardCard.self
+        ])
+        
+        let appGroupID = "group.kosmicapps.cloutmate"
+        guard let appGroupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) else {
+            fatalError("Unable to access app group container")
+        }
+        // Bump the store filename to force schema recreation after adding new models
+        let storeURL = appGroupURL.appendingPathComponent("Cloutmate_v2.sqlite")
+        
+        let config = ModelConfiguration(
+            schema: schema,
+            url: storeURL,
+            cloudKitDatabase: .none
+        )
+        
+        do {
+            return try ModelContainer(for: schema, configurations: [config])
+        } catch {
+            fatalError("Could not create ModelContainer: \(error)")
+        }
+    }
+}
+
 // Manager to handle distributed notifications from menu bar
 class DistributedNotificationManager: ObservableObject {
     private var observer: NSObjectProtocol?
     let modelContainer: ModelContainer
     
-    init() {
-        // Get the model container - we'll need to pass this from the App
-        self.modelContainer = SharedDataManager.createSharedModelContainer()
+    init(modelContainer: ModelContainer) {
+        // Use the app's container to ensure schema/file match
+        self.modelContainer = modelContainer
         setupNotifications()
     }
     

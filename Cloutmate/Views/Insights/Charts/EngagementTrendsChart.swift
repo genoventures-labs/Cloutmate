@@ -100,7 +100,7 @@ struct EngagementTrendsChart: View {
         }
     }
     
-    private func findNearestPost(at location: CGPoint) -> Post? {
+    private func findNearestPost(at location: CGPoint) -> CloutmateShared.Post? {
         // Simple implementation - returns first post for now
         // Could be enhanced to calculate actual nearest point
         return sortedPosts.first

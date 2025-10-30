@@ -118,7 +118,7 @@ struct MainWindowView: View {
     private var contentView: some View {
         switch selectedTab {
         case .home:
-            HomeView()
+            CustomizableDashboardView()
         case .inbox:
             InboxView()
         case .notes:

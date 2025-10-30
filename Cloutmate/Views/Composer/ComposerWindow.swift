@@ -48,188 +48,209 @@ struct ComposerWindow: View {
     
     @State private var showMorphIn = false
     
-    var body: some View {
-        Form {
-            // Content with Glass Editor
-            Section {
-                let characterCount = caption.count
-                
-                HStack {
-                    Text("Content")
-                        .font(.headline)
-                    
-                    Spacer()
-                    
-                    // AI Assistant Button (only show if AI is enabled)
-                    if AISettings.shared.isAIEnabled {
-                        let platforms = selectedPlatforms
-                        let aiTool = selectedAITool
-                        
-                        Button(action: {
-                            if !isAIGenerating {
-                                showAIPopover.toggle()
-                            }
-                        }) {
-                            HStack(spacing: 4) {
-                                if isAIGenerating {
-                                    ProgressView()
-                                        .scaleEffect(0.5)
-                                }
-                                Image(systemName: "sparkles")
-                                    .foregroundColor(.blue)
-                                    .font(.caption)
-                                    .symbolEffect(.pulse.byLayer, options: .repeating, isActive: isAIGenerating)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(isAIGenerating)
-                        .popover(isPresented: $showAIPopover) {
-                            AIAssistantPopover(
-                                onToolSelected: { tool in
-                                    showAIPopover = false
-                                    selectedAITool = tool
-                                    showAIPromptDialog = true
-                                },
-                                platform: platforms.first ?? CloutmateShared.Platform.facebook
-                            )
-                        }
-                    }
-                    
-                    Text("\(characterCount) characters")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                GlassPanel(tier: .overlay, cornerRadius: 12) {
-                    TextEditor(text: $caption)
-                        .frame(minHeight: 150)
-                        .scrollContentBackground(.hidden)
-                        .padding(8)
-                }
+    private var contentSectionHeader: some View {
+        HStack {
+            Text("Content")
+                .font(.headline)
+            
+            Spacer()
+            
+            // AI Assistant Button (only show if AI is enabled)
+            if AISettings.shared.isAIEnabled {
+                AIAssistantButton
             }
             
-            // Platform selection with Glass Cards
-            Section("Platforms") {
-                ForEach(Platform.allCases, id: \.self) { platform in
-                    GlassPanel(tier: .overlay, cornerRadius: 10, showInnerStroke: false) {
-                        Toggle(platform.displayName, isOn: Binding(
-                            get: { selectedPlatforms.contains(platform) },
-                            set: { isOn in
-                                if isOn {
-                                    selectedPlatforms.insert(platform)
-                                } else {
-                                    selectedPlatforms.remove(platform)
-                                }
-                            }
-                        ))
-                        .padding(4)
-                    }
-                }
+            Text("\(caption.count) characters")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var AIAssistantButton: some View {
+        Button(action: {
+            if !isAIGenerating {
+                showAIPopover.toggle()
             }
+        }) {
+            HStack(spacing: 4) {
+                if isAIGenerating {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                }
+                Image(systemName: "sparkles")
+                    .foregroundColor(.blue)
+                    .font(.caption)
+                    .symbolEffect(.pulse.byLayer, options: .repeating, isActive: isAIGenerating)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isAIGenerating)
+        .popover(isPresented: $showAIPopover) {
+            AIAssistantPopover(
+                onToolSelected: { tool in
+                    showAIPopover = false
+                    selectedAITool = tool
+                    showAIPromptDialog = true
+                },
+                platform: selectedPlatforms.first ?? CloutmateShared.Platform.facebook
+            )
+        }
+    }
+    
+    private var contentSection: some View {
+        Section {
+            contentSectionHeader
             
-            // Schedule
-            Section("Schedule") {
-                Toggle("Schedule for later", isOn: $isScheduled)
-                
-                if isScheduled {
-                    DatePicker("Scheduled Date & Time", selection: Binding(
-                        get: { scheduledDate ?? Date() },
-                        set: { scheduledDate = $0 }
+            GlassPanel(tier: .overlay, cornerRadius: 12) {
+                TextEditor(text: $caption)
+                    .frame(minHeight: 150)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+            }
+        }
+    }
+    
+    private var platformsSection: some View {
+        Section("Platforms") {
+            ForEach(CloutmateShared.Platform.allCases, id: \.self) { platform in
+                GlassPanel(tier: .overlay, cornerRadius: 10, showInnerStroke: false) {
+                    Toggle(platform.displayName, isOn: Binding(
+                        get: { selectedPlatforms.contains(platform) },
+                        set: { isOn in
+                            if isOn {
+                                selectedPlatforms.insert(platform)
+                            } else {
+                                selectedPlatforms.remove(platform)
+                            }
+                        }
                     ))
-                    .datePickerStyle(.compact)
+                    .padding(4)
                 }
             }
+        }
+    }
+    
+    private var scheduleSection: some View {
+        Section("Schedule") {
+            Toggle("Schedule for later", isOn: $isScheduled)
             
-            // Media Attachments
-            Section("Media Attachments") {
-                if !mediaURLs.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 16) {
-                            ForEach(mediaURLs, id: \.self) { url in
-                                MediaPreviewView(url: url, onRemove: {
-                                    mediaURLs.removeAll { $0 == url }
-                                })
-                            }
+            if isScheduled {
+                DatePicker("Scheduled Date & Time", selection: Binding(
+                    get: { scheduledDate ?? Date() },
+                    set: { scheduledDate = $0 }
+                ))
+                .datePickerStyle(.compact)
+            }
+        }
+    }
+    
+    private var mediaSection: some View {
+        Section("Media Attachments") {
+            if !mediaURLs.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(mediaURLs, id: \.self) { url in
+                            MediaPreviewView(url: url, onRemove: {
+                                mediaURLs.removeAll { $0 == url }
+                            })
                         }
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 4)
                     }
-                    .frame(height: 140)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 4)
                 }
-                
-                Button(action: {
-                    showingMediaPicker = true
-                }) {
-                    Label("Add Media", systemImage: "photo.badge.plus")
-                        .frame(maxWidth: .infinity)
+                .frame(height: 140)
+            }
+            
+            Button(action: {
+                showingMediaPicker = true
+            }) {
+                Label("Add Media", systemImage: "photo.badge.plus")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .fileImporter(
+                isPresented: $showingMediaPicker,
+                allowedContentTypes: [.image, .movie],
+                allowsMultipleSelection: true
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    mediaURLs.append(contentsOf: urls)
+                case .failure(let error):
+                    validationError = "Failed to add media: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private var tagsSection: some View {
+        Section("Tags") {
+            TagsView(tags: $tags)
+        }
+    }
+    
+    @ViewBuilder
+    private var aiSuggestionsSection: some View {
+        if !caption.isEmpty && !selectedPlatforms.isEmpty {
+            Section {
+                PerformancePredictorPanel(post: createPreviewPost())
+            }
+        }
+        
+        if !selectedPlatforms.isEmpty {
+            Section("Hashtag Suggestions") {
+                HashtagSuggestionPanel(
+                    caption: caption,
+                    platform: Cloutmate.Platform(rawValue: (selectedPlatforms.first ?? CloutmateShared.Platform.facebook).rawValue) ?? .facebook,
+                    selectedHashtags: $tags
+                )
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var errorSection: some View {
+        if let error = validationError {
+            Section {
+                Text(error)
+                    .foregroundColor(.red)
+                    .font(.caption)
+            }
+        }
+    }
+    
+    private var actionsSection: some View {
+        Section {
+            HStack {
+                Button("Cancel") {
+                    dismiss()
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.large)
-                .fileImporter(
-                    isPresented: $showingMediaPicker,
-                    allowedContentTypes: [.image, .movie],
-                    allowsMultipleSelection: true
-                ) { result in
-                    switch result {
-                    case .success(let urls):
-                        mediaURLs.append(contentsOf: urls)
-                    case .failure(let error):
-                        validationError = "Failed to add media: \(error.localizedDescription)"
+                
+                Spacer()
+                
+                Button(isScheduled ? "Schedule" : "Publish Now") {
+                    if validateInput() {
+                        savePost()
                     }
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(isPublishing)
             }
-            
-            // Tags
-            Section("Tags") {
-                TagsView(tags: $tags)
-            }
-            
-            // Performance Predictor
-            if !caption.isEmpty && !selectedPlatforms.isEmpty {
-                Section {
-                    PerformancePredictorPanel(post: createPreviewPost())
-                }
-            }
-            
-            // Hashtag Suggestions
-            if !selectedPlatforms.isEmpty {
-                Section("Hashtag Suggestions") {
-                    HashtagSuggestionPanel(
-                        caption: caption,
-                                    platform: selectedPlatforms.first ?? CloutmateShared.Platform.facebook,
-                        selectedHashtags: $tags
-                    )
-                }
-            }
-            
-            // Error display
-            if let error = validationError {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
-            }
-            
-            // Actions
-            Section {
-                HStack {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                    .buttonStyle(.bordered)
-                    
-                    Spacer()
-                    
-                    Button(isScheduled ? "Schedule" : "Publish Now") {
-                        if validateInput() {
-                            savePost()
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isPublishing)
-                }
-            }
+        }
+    }
+    
+    var body: some View {
+        Form {
+            contentSection
+            platformsSection
+            scheduleSection
+            mediaSection
+            tagsSection
+            aiSuggestionsSection
+            errorSection
+            actionsSection
         }
         .formStyle(.grouped)
         .frame(minWidth: 600, idealWidth: 700, minHeight: 600, idealHeight: 700)

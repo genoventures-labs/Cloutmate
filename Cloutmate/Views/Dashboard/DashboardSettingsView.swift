@@ -14,8 +14,6 @@ struct DashboardSettingsView: View {
     
     @Query private var allCards: [DashboardCard]
     
-    @State private var availableCards: [DashboardCardType] = DashboardCardType.allCases
-    
     // Computed properties to reflect actual state
     private var visibleCards: [DashboardCard] {
         allCards.filter { $0.isVisible }
@@ -29,61 +27,124 @@ struct DashboardSettingsView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Available Cards Section
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Available Cards")
-                            .font(.system(size: 17, weight: .semibold))
-                        
-                        ForEach(availableCards, id: \.self) { cardType in
-                            Toggle(
-                                cardType.rawValue,
-                                isOn: Binding(
-                                    get: { isCardVisible(cardType) },
-                                    set: { enabled in
-                                        toggleCard(cardType, enabled: enabled)
-                                    }
-                                )
-                            )
-                            .toggleStyle(.checkbox)
-                            .padding(.vertical, 4)
-                        }
-                    }
-                    
-                    Divider()
-                        .padding(.vertical, 8)
-                    
-                    // Card Sizes Section
-                    if !visibleCards.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Card Sizes")
-                                .font(.system(size: 17, weight: .semibold))
-                            
-                            ForEach(visibleCards, id: \.id) { card in
-                                HStack {
-                                    Text(card.type.rawValue)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    Spacer()
-                                    Picker("Size", selection: Binding(
-                                        get: { card.cardSize },
-                                        set: { newSize in
-                                            updateCardSize(card, size: newSize)
-                                        }
-                                    )) {
-                                        ForEach([DashboardCardSize.small, .medium, .large], id: \.self) { size in
-                                            Text(size.rawValue.capitalized).tag(size)
-                                        }
-                                    }
-                                    .pickerStyle(.menu)
-                                    .frame(width: 120)
-                                }
-                                .padding(.vertical, 4)
+            List {
+                // Main Workflow
+                Section("Main Workflow") {
+                    ForEach(categorizedCards.workflow, id: \.self) { cardType in
+                        Toggle(isOn: bindingFor(cardType)) {
+                            HStack {
+                                Image(systemName: cardType.icon)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text(cardType.rawValue)
                             }
+                        }
+                        .toggleStyle(.switch)
+                    }
+                }
+                
+                // Projects
+                Section("Projects") {
+                    ForEach(categorizedCards.projects, id: \.self) { cardType in
+                        Toggle(isOn: bindingFor(cardType)) {
+                            HStack {
+                                Image(systemName: cardType.icon)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text(cardType.rawValue)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                    }
+                }
+                
+                // Areas & Resources
+                Section("Areas & Resources") {
+                    ForEach(categorizedCards.resources, id: \.self) { cardType in
+                        Toggle(isOn: bindingFor(cardType)) {
+                            HStack {
+                                Image(systemName: cardType.icon)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text(cardType.rawValue)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                    }
+                }
+                
+                Section("Social Media") {
+                    ForEach(categorizedCards.social, id: \.self) { cardType in
+                        if cardType == .socialOverview {
+                            HStack {
+                                Image(systemName: cardType.icon)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text("Social Overview (Always On)")
+                                Spacer()
+                                Image(systemName: "lock.fill").foregroundColor(.secondary)
+                            }
+                        } else {
+                            Toggle(isOn: bindingFor(cardType)) {
+                                HStack {
+                                    Image(systemName: cardType.icon)
+                                        .foregroundColor(.blue)
+                                        .frame(width: 20)
+                                    Text(cardType.rawValue)
+                                }
+                            }
+                            .toggleStyle(.switch)
                         }
                     }
                 }
-                .padding(20)
+                
+                Section {
+                    ForEach(categorizedCards.facebook, id: \.self) { cardType in
+                        Toggle(isOn: bindingFor(cardType)) {
+                            HStack {
+                                Image(systemName: cardType.icon)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text(cardType.rawValue)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                    }
+                } header: {
+                    Text("Facebook Page Insights")
+                }
+                
+                // Visible Cards with Size Settings
+                if !visibleCards.isEmpty {
+                    Section {
+                        ForEach(visibleCards, id: \.id) { card in
+                            HStack {
+                                Image(systemName: card.type.icon)
+                                    .foregroundColor(.blue)
+                                    .frame(width: 20)
+                                Text(card.type.rawValue)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Spacer()
+                                Picker("Size", selection: Binding(
+                                    get: { card.cardSize },
+                                    set: { newSize in
+                                        updateCardSize(card, size: newSize)
+                                    }
+                                )) {
+                                    ForEach([DashboardCardSize.small, .medium, .large], id: \.self) { size in
+                                        Text(size.rawValue.capitalized).tag(size)
+                                    }
+                                }
+                                .pickerStyle(.menu)
+                                .frame(width: 120)
+                            }
+                        }
+                    } header: {
+                        Text("Card Sizes")
+                    } footer: {
+                        Text("Adjust the size of cards that are currently visible on your dashboard")
+                    }
+                }
             }
             .navigationTitle("Dashboard Settings")
             .toolbar {
@@ -94,10 +155,30 @@ struct DashboardSettingsView: View {
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 500)
+        .frame(minWidth: 600, minHeight: 600)
+    }
+    
+    private func bindingFor(_ cardType: DashboardCardType) -> Binding<Bool> {
+        Binding<Bool>(
+            get: { isCardVisible(cardType) },
+            set: { newValue in
+                toggleCard(cardType, enabled: newValue)
+            }
+        )
+    }
+
+    private var categorizedCards: (workflow: [DashboardCardType], projects: [DashboardCardType], resources: [DashboardCardType], social: [DashboardCardType], facebook: [DashboardCardType]) {
+        let workflow: [DashboardCardType] = [.todayOverview, .inboxCount, .upcomingTasks, .upcomingDeadlines]
+        let projects: [DashboardCardType] = [.activeProjects, .projectsOverview, .tasksOverview, .completionRate]
+        let resources: [DashboardCardType] = [.areasHealth, .notesActivity, .recentNotes]
+        let social: [DashboardCardType] = [.scheduledPosts, .draftCount, .recentInsights, .postingStreak, .topPerformingPost, .socialOverview, .contentPerformance, .platformComparison]
+        let facebook: [DashboardCardType] = [.facebookPageInsightsOverview, .facebookPageViews, .facebookPageFans, .facebookPageReach, .facebookPageImpressions, .facebookEngagedUsers, .facebookPostEngagements]
+        return (workflow, projects, resources, social, facebook)
     }
     
     private func toggleCard(_ cardType: DashboardCardType, enabled: Bool) {
+        // Lock Social Overview as mandatory hero card
+        if cardType == .socialOverview { return }
         if enabled {
             // Add card if it doesn't exist
             if !allCards.contains(where: { $0.type == cardType }) {
@@ -130,8 +211,32 @@ struct DashboardSettingsView: View {
     }
 }
 
+struct CardToggleRow: View {
+    let cardType: DashboardCardType
+    let isVisible: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: cardType.icon)
+                    .foregroundColor(.blue)
+                    .frame(width: 20)
+                Text(cardType.rawValue)
+                    .foregroundColor(.primary)
+                Spacer()
+                if isVisible {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(.blue)
+                        .font(.caption)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 #Preview {
     DashboardSettingsView()
         .modelContainer(for: [DashboardCard.self])
 }
-

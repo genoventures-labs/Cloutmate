@@ -11,13 +11,11 @@ import SwiftData
 public final class SharedDataManager {
     public static func createSharedModelContainer() -> ModelContainer {
         let schema = Schema([
+            // Shared models
             Post.self,
             Draft.self,
             Template.self,
             PlatformAccount.self,
-            InsightSnapshot.self,
-            AIMessage.self,
-            AIConversation.self,
             PerformancePrediction.self,
             RecyclablePost.self,
             ContentTopic.self,
@@ -27,7 +25,12 @@ public final class SharedDataManager {
             CustomPostProperty.self,
             PostView.self,
             HashtagPerformance.self,
-            HashtagSet.self
+            HashtagSet.self,
+            // PARA models used by dashboard cards
+            Note.self,
+            Task.self,
+            Project.self,
+            InboxItem.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"
@@ -36,11 +39,13 @@ public final class SharedDataManager {
             fatalError("Unable to access app group container")
         }
         
-        let storeURL = appGroupURL.appendingPathComponent("Cloutmate.sqlite")
+        // Use the v2 store filename to match the main app schema
+        let storeURL = appGroupURL.appendingPathComponent("Cloutmate_v2.sqlite")
         
         let config = ModelConfiguration(
             schema: schema,
-            url: storeURL
+            url: storeURL,
+            cloudKitDatabase: .none
         )
         
         do {

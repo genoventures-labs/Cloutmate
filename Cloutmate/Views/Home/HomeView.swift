@@ -322,196 +322,182 @@ struct DashboardCardContent: View {
     @Query private var allDrafts: [Draft]
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
     
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: card.type.icon)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(.blue.opacity(0.8))
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(Color.blue.opacity(0.08))
-                    )
-                
-                Text(card.type.rawValue)
-                    .font(.system(size: 17, weight: .semibold))
-                
-                Spacer()
-                
-                if card.isPinned {
-                    Image(systemName: "pin.fill")
-                        .foregroundColor(.orange)
-                        .font(.caption)
-                }
-            }
+    private var headerView: some View {
+        HStack {
+            Image(systemName: card.type.icon)
+                .font(.system(size: 24, weight: .medium))
+                .foregroundColor(.blue.opacity(0.8))
+                .frame(width: 40, height: 40)
+                .background(
+                    Circle()
+                        .fill(Color.blue.opacity(0.08))
+                )
+            
+            Text(card.type.rawValue)
+                .font(.system(size: 17, weight: .semibold))
             
             Spacer()
             
-            Group {
-                switch card.type {
-                case .todayOverview:
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "tray.fill")
-                                .foregroundColor(.orange)
-                            Text("\(inbox.filter { $0.convertedAt == nil }.count) inbox items")
-                                .font(.body)
-                        }
-                        HStack {
-                            Image(systemName: "checkmark.circle")
-                                .foregroundColor(.blue)
-                            Text("\(tasks.filter { $0.status != .done }.count) active tasks")
-                                .font(.body)
-                        }
-                    }
-                        
-                case .inboxCount:
-                    VStack(spacing: 4) {
-                        Text("\(allInboxItems.filter { $0.convertedAt == nil }.count)")
-                            .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(.orange)
-                        Text(allInboxItems.filter { $0.convertedAt == nil }.count == 1 ? "item waiting" : "items waiting")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .tracking(0.2)
-                    }
-                    
-                case .activeProjects:
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(projects.prefix(3)) { project in
-                            HStack {
-                                Circle()
-                                    .fill(.blue)
-                                    .frame(width: 8, height: 8)
-                                Text(project.title)
-                                    .font(.body)
-                                Spacer()
-                            }
-                        }
-                        if projects.isEmpty {
-                            Text("No active projects")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                case .upcomingTasks:
-                    let tomorrow = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-                    let upcoming = allTasks.filter { task in
-                        guard let due = task.dueDate else { return false }
-                        return due <= tomorrow && task.status != .done
-                    }
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(upcoming.prefix(3)) { task in
-                            HStack {
-                                Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(task.status == .done ? .green : .secondary)
-                                Text(task.title)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                Spacer()
-                            }
-                        }
-                        if upcoming.isEmpty {
-                            Text("No tasks due")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                case .scheduledPosts:
-                    let scheduledToday = allPosts.filter { post in
-                        guard let scheduled = post.scheduledDate else { return false }
-                        return Calendar.current.isDateInToday(scheduled)
-                    }.count
-                    VStack(spacing: 4) {
-                        Text("\(scheduledToday)")
-                            .font(.system(size: 48, weight: .bold))
-                        Text(scheduledToday == 1 ? "post today" : "posts today")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .tracking(0.2)
-                    }
-                    
-                case .draftCount:
-                    let activeCount = allDrafts.filter { !$0.isArchived }.count
-                    VStack(spacing: 4) {
-                        Text("\(activeCount)")
-                            .font(.system(size: 48, weight: .bold))
-                        Text(activeCount == 1 ? "draft" : "drafts")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .tracking(0.2)
-                    }
-                    
-                case .recentNotes:
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(notes.prefix(3)) { note in
-                            HStack {
-                                Image(systemName: "doc.text")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                                Text(note.title)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                                Spacer()
-                            }
-                        }
-                        if notes.isEmpty {
-                            Text("No notes yet")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                case .areasOverview:
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Areas Overview")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                case .recentInsights:
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Recent Insights")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                case .postingStreak:
-                    VStack(spacing: 4) {
-                        Text("0")
-                            .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(.orange)
-                        Text("day streak")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .tracking(0.2)
-                    }
-                    
-                case .topPerformingPost:
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Top Performing Post")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                case .quickCapture:
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Quick Capture")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                case .aiSuggestions:
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("AI Suggestions")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+            if card.isPinned {
+                Image(systemName: "pin.fill")
+                    .foregroundColor(.orange)
+                    .font(.caption)
+            }
+        }
+    }
+    
+    // MARK: - Small builders to ease type-checker
+    private func todayOverviewView(inboxPendingCount: Int, activeTasksCount: Int) -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Image(systemName: "tray.fill").foregroundColor(.orange)
+                Text("\(inboxPendingCount) inbox items").font(.body)
+                Spacer()
+            }
+            HStack {
+                Image(systemName: "checkmark.circle").foregroundColor(.blue)
+                Text("\(activeTasksCount) active tasks").font(.body)
+                Spacer()
+            }
+        })
+    }
+    
+    private func inboxCountView(waitingInboxCount: Int) -> AnyView {
+        AnyView(VStack(spacing: 4) {
+            Text("\(waitingInboxCount)")
+                .font(.system(size: 48, weight: .bold))
+                .foregroundColor(.orange)
+            Text(waitingInboxCount == 1 ? "item waiting" : "items waiting")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .tracking(0.2)
+        })
+    }
+    
+    private func activeProjectsView() -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 8) {
+            ForEach(projects.prefix(3)) { project in
+                HStack {
+                    Circle().fill(.blue).frame(width: 8, height: 8)
+                    Text(project.title).font(.body)
+                    Spacer()
                 }
             }
+            if projects.isEmpty {
+                Text("No active projects").font(.caption).foregroundColor(.secondary)
+            }
+        })
+    }
+    
+    private func upcomingTasksView() -> AnyView {
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        let upcoming = allTasks.filter { task in
+            guard let due = task.dueDate else { return false }
+            return due <= tomorrow && task.status != .done
+        }
+        return AnyView(VStack(alignment: .leading, spacing: 6) {
+            ForEach(upcoming.prefix(3)) { task in
+                HStack {
+                    Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(task.status == .done ? .green : .secondary)
+                    Text(task.title).font(.caption).lineLimit(1)
+                    Spacer()
+                }
+            }
+            if upcoming.isEmpty {
+                Text("No tasks due").font(.caption).foregroundColor(.secondary)
+            }
+        })
+    }
+    
+    private func scheduledPostsView() -> AnyView {
+        let scheduledToday = allPosts.filter { post in
+            guard let scheduled = post.scheduledDate else { return false }
+            return Calendar.current.isDateInToday(scheduled)
+        }.count
+        return AnyView(VStack(spacing: 4) {
+            Text("\(scheduledToday)").font(.system(size: 48, weight: .bold))
+            Text(scheduledToday == 1 ? "post today" : "posts today")
+                .font(.caption).foregroundColor(.secondary).tracking(0.2)
+        })
+    }
+    
+    private func draftCountView() -> AnyView {
+        let activeCount = allDrafts.filter { !$0.isArchived }.count
+        return AnyView(VStack(spacing: 4) {
+            Text("\(activeCount)").font(.system(size: 48, weight: .bold))
+            Text(activeCount == 1 ? "draft" : "drafts")
+                .font(.caption).foregroundColor(.secondary).tracking(0.2)
+        })
+    }
+    
+    private func recentNotesView() -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 6) {
+            ForEach(notes.prefix(3)) { note in
+                HStack {
+                    Image(systemName: "doc.text").foregroundColor(.secondary).font(.caption)
+                    Text(note.title).font(.caption).lineLimit(1)
+                    Spacer()
+                }
+            }
+            if notes.isEmpty {
+                Text("No notes yet").font(.caption).foregroundColor(.secondary)
+            }
+        })
+    }
+    
+    private func textOnlyView(_ text: String) -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 8) {
+            Text(text).font(.caption).foregroundColor(.secondary)
+        })
+    }
+    
+    private func postingStreakView() -> AnyView {
+        AnyView(VStack(spacing: 4) {
+            Text("0").font(.system(size: 48, weight: .bold)).foregroundColor(.orange)
+            Text("day streak").font(.caption).foregroundColor(.secondary).tracking(0.2)
+        })
+    }
+    
+    private func defaultView() -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 8) {
+            Text(card.type.rawValue).font(.caption).foregroundColor(.secondary)
+            Text("Not implemented yet").font(.caption2).foregroundColor(.secondary)
+        })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            headerView
+            
+            Spacer()
+            
+            // Precompute simple counts to aid type-checker
+            let inboxPendingCount = inbox.filter { $0.convertedAt == nil }.count
+            let activeTasksCount = tasks.filter { $0.status != .done }.count
+            let waitingInboxCount = allInboxItems.filter { $0.convertedAt == nil }.count
+            
+            // Build content in a local variable to simplify the ViewBuilder
+            let content: AnyView = {
+                switch card.type {
+                case .todayOverview: return todayOverviewView(inboxPendingCount: inboxPendingCount, activeTasksCount: activeTasksCount)
+                case .inboxCount: return inboxCountView(waitingInboxCount: waitingInboxCount)
+                case .activeProjects: return activeProjectsView()
+                case .upcomingTasks: return upcomingTasksView()
+                case .scheduledPosts: return scheduledPostsView()
+                case .draftCount: return draftCountView()
+                case .recentNotes: return recentNotesView()
+                case .areasOverview: return textOnlyView("Areas Overview")
+                case .recentInsights: return textOnlyView("Recent Insights")
+                case .postingStreak: return postingStreakView()
+                case .topPerformingPost: return textOnlyView("Top Performing Post")
+                case .quickCapture: return textOnlyView("Quick Capture")
+                case .aiSuggestions: return textOnlyView("AI Suggestions")
+                default: return defaultView()
+                }
+            }()
+
+            Group { content }
             .frame(minHeight: 60)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

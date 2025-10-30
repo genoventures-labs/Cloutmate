@@ -69,7 +69,7 @@ struct InsightsView: View {
                 // Key Metrics Grid - 8 cards in 4 columns
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Key Metrics")
-                        .font(.system(size: 20, weight: .semibold))
+                        .sectionTitleStyle()
                     
                     LazyVGrid(columns: [
                         GridItem(.flexible()),
@@ -82,7 +82,7 @@ struct InsightsView: View {
                             title: "Total Posts",
                             value: "\(filteredPosts.count)",
                             icon: "doc.text.fill",
-                            color: .blue
+                            color: KosmicPalette.cyan
                         )
                         .id("total_posts_\(selectedTimeRange.rawValue)_\(filteredPosts.count)")
                         .transition(.opacity)
@@ -91,7 +91,7 @@ struct InsightsView: View {
                             title: "Avg Engagement",
                             value: String(format: "%.1f%%", averageEngagement),
                             icon: "heart.fill",
-                            color: .pink
+                            color: KosmicPalette.violet
                         )
                         .id("avg_engagement_\(selectedTimeRange.rawValue)_\(averageEngagement)")
                         .transition(.opacity)
@@ -100,7 +100,7 @@ struct InsightsView: View {
                             title: "Total Reach",
                             value: "\(totalReach)",
                             icon: "eye.fill",
-                            color: .purple
+                            color: KosmicPalette.cyan
                         )
                         .id("total_reach_\(selectedTimeRange.rawValue)_\(totalReach)")
                         .transition(.opacity)
@@ -109,7 +109,7 @@ struct InsightsView: View {
                             title: "Total Likes",
                             value: "\(totalLikes)",
                             icon: "hand.thumbsup.fill",
-                            color: .orange
+                            color: KosmicPalette.violet
                         )
                         .id("total_likes_\(selectedTimeRange.rawValue)_\(totalLikes)")
                         .transition(.opacity)
@@ -119,7 +119,7 @@ struct InsightsView: View {
                             title: "Best Posting Time",
                             value: String(format: "%d:00", bestPostingHour),
                             icon: "clock.fill",
-                            color: .orange
+                            color: KosmicPalette.violet
                         )
                         .id("best_posting_time_\(selectedTimeRange.rawValue)_\(bestPostingHour)")
                         .transition(.opacity)
@@ -128,7 +128,7 @@ struct InsightsView: View {
                             title: "Top Content Type",
                             value: topContentType,
                             icon: "star.fill",
-                            color: .yellow
+                            color: KosmicPalette.cyan
                         )
                         .id("top_content_\(selectedTimeRange.rawValue)")
                         .transition(.opacity)
@@ -137,7 +137,7 @@ struct InsightsView: View {
                             title: "Growth Rate",
                             value: String(format: "%.1f%%", growthRate),
                             icon: "chart.line.uptrend.xyaxis",
-                            color: .green
+                            color: KosmicPalette.violet
                         )
                         .id("growth_rate_\(selectedTimeRange.rawValue)_\(growthRate)")
                         .transition(.opacity)
@@ -146,7 +146,7 @@ struct InsightsView: View {
                             title: "Platform Leader",
                             value: leadingPlatform.rawValue.capitalized,
                             icon: "trophy.fill",
-                            color: .indigo
+                            color: KosmicPalette.cyan
                         )
                         .id("platform_leader_\(selectedTimeRange.rawValue)")
                         .transition(.opacity)
@@ -156,7 +156,7 @@ struct InsightsView: View {
                 // Interactive Charts Section
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Performance Analytics")
-                        .font(.system(size: 20, weight: .semibold))
+                        .sectionTitleStyle()
                     
                     InteractiveChartsView(posts: filteredPosts)
                         .id("charts_\(selectedTimeRange.rawValue)_\(filteredPosts.count)")
@@ -178,7 +178,7 @@ struct InsightsView: View {
                 // Detailed Analytics Section
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Detailed Analytics")
-                        .font(.system(size: 20, weight: .semibold))
+                        .sectionTitleStyle()
                     
                     GlassPanel(tier: .contentCard, cornerRadius: 16) {
                         VStack(spacing: 20) {
@@ -186,9 +186,9 @@ struct InsightsView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Image(systemName: "square.stack.3d.up.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(KosmicPalette.cyan)
                                     Text("Platform Performance")
-                                        .font(.headline)
+                                        .sectionTitleStyle()
                                     Spacer()
                                 }
                                 PlatformComparisonView(posts: filteredPosts)
@@ -200,9 +200,9 @@ struct InsightsView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
                                     Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(.orange)
+                                        .foregroundColor(KosmicPalette.violet)
                                     Text("Insights Summary")
-                                        .font(.headline)
+                                        .sectionTitleStyle()
                                     Spacer()
                                 }
                                 ReflectionSummary(posts: filteredPosts)
@@ -331,8 +331,7 @@ struct InsightsView: View {
                     .foregroundColor(.primary)
                 
                 Text("Track your content performance")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .metricLabelStyle()
             }
             
             Spacer()
@@ -349,21 +348,21 @@ struct InsightsView: View {
                     "Week",
                     style: .pill,
                     tier: selectedTimeRange == .week ? .overlay : .contentCard,
-                    tintColor: .blue,
+                    tintColor: KosmicPalette.violet,
                     action: { selectedTimeRange = .week }
                 )
                 GlassButton(
                     "Month",
                     style: .pill,
                     tier: selectedTimeRange == .month ? .overlay : .contentCard,
-                    tintColor: .blue,
+                    tintColor: KosmicPalette.violet,
                     action: { selectedTimeRange = .month }
                 )
                 GlassButton(
                     "Year",
                     style: .pill,
                     tier: selectedTimeRange == .year ? .overlay : .contentCard,
-                    tintColor: .blue,
+                    tintColor: KosmicPalette.violet,
                     action: { selectedTimeRange = .year }
                 )
             }
@@ -373,7 +372,7 @@ struct InsightsView: View {
                 icon: "arrow.clockwise",
                 style: .standard,
                 tier: .contentCard,
-                tintColor: .blue,
+                tintColor: KosmicPalette.cyan,
                 action: refreshInsights
             )
             .disabled(isRefreshing)
@@ -384,30 +383,28 @@ struct InsightsView: View {
     private var dataBanner: some View {
         HStack(spacing: 12) {
             Image(systemName: "info.circle.fill")
-                .foregroundColor(.blue)
+                .foregroundColor(KosmicPalette.violet)
             VStack(alignment: .leading, spacing: 4) {
                 Text("Limited data available")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .sectionTitleStyle()
                 Text("Connect platforms to see full insights and engagement metrics.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .metricLabelStyle()
             }
             Spacer()
         }
         .padding(16)
-        .background(Color.blue.opacity(0.1))
+        .background(KosmicPalette.violet.opacity(0.08))
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                .stroke(KosmicPalette.violet.opacity(0.2), lineWidth: 1)
         )
     }
     
     private var facebookPageInsightsSection: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Facebook Page Insights")
-                .font(.system(size: 20, weight: .semibold))
+                .sectionTitleStyle()
             
             FacebookPageSelector(
                 pages: facebookPages,
@@ -490,11 +487,12 @@ struct InsightsView: View {
                         platform: nativePlatform
                     )
                     
+                    // Apply mutations on main thread
+                    await MainActor.run {
                     // Update post with insights (accumulate across platforms)
                     for data in insights.data {
                         guard let value = data.values.first?.value,
                               let doubleValue = Double(value) else { continue }
-                        
                         switch data.name {
                         case "likes", "reactions", "post_reactions_by_type_total":
                             post.likes = (post.likes ?? 0) + Int(doubleValue)
@@ -508,15 +506,14 @@ struct InsightsView: View {
                             break
                         }
                     }
-                    
                     // Calculate engagement rate
                     if let impressions = post.impressions, impressions > 0 {
                         let likes = post.likes ?? 0
                         let comments = post.comments ?? 0
                         post.engagementRate = Double(likes + comments) / Double(impressions) * 100
                     }
-                    
                     try? modelContext.save()
+                    }
                     // Skip ContentIntelligenceService call since it expects Cloutmate.Post
                     
             } catch {
@@ -755,17 +752,16 @@ struct FacebookPageSelector: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "square.stack.3d.up.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(KosmicPalette.cyan)
                 Text(selectedPageName)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .sectionTitleStyle()
                 Spacer()
                 Image(systemName: "chevron.down")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             .padding(12)
-            .glassPanel(tier: .contentCard, cornerRadius: 12, tintColor: .blue.opacity(0.1))
+            .glassPanel(tier: .contentCard, cornerRadius: 12, tintColor: KosmicPalette.cyan.opacity(0.1))
         }
         .buttonStyle(.plain)
     }
@@ -799,14 +795,12 @@ struct FacebookPageInsightsSection: View {
         } else if let error = error {
             HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(KosmicPalette.violet)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Failed to load insights")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                        .sectionTitleStyle()
                     Text(error)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .metricLabelStyle()
                 }
                 Spacer()
             }
@@ -815,8 +809,12 @@ struct FacebookPageInsightsSection: View {
         } else if periodInsights == nil && lifetimeInsights == nil {
             HStack {
                 Spacer()
-                Text("No insights data available")
-                    .foregroundColor(.secondary)
+                VStack(spacing: 6) {
+                    Text("Awaiting insights")
+                        .sectionTitleStyle()
+                    Text("Post or connect a page to see metrics here.")
+                        .metricLabelStyle()
+                }
                     .padding(40)
                 Spacer()
             }
@@ -828,9 +826,9 @@ struct FacebookPageInsightsSection: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "clock.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(KosmicPalette.cyan)
                             Text("Current Period")
-                                .font(.headline)
+                                .sectionTitleStyle()
                             Spacer()
                         }
                         
@@ -844,49 +842,49 @@ struct FacebookPageInsightsSection: View {
                                 title: "Page Views",
                                 value: formatNumber(period.pageViewsTotal),
                                 icon: "eye.fill",
-                                color: .blue
+                                color: KosmicPalette.cyan
                             )
                             
                             GlassMetricCard(
                                 title: "Page Fans",
                                 value: formatNumber(period.pageFans),
                                 icon: "person.3.fill",
-                                color: .purple
+                                color: KosmicPalette.violet
                             )
                             
                             GlassMetricCard(
                                 title: "Page Reach",
                                 value: formatNumber(period.pageReach),
                                 icon: "arrow.up.right.circle.fill",
-                                color: .orange
+                                color: KosmicPalette.violet
                             )
                             
                             GlassMetricCard(
                                 title: "Impressions",
                                 value: formatNumber(period.pageImpressions),
                                 icon: "chart.bar.fill",
-                                color: .green
+                                color: KosmicPalette.cyan
                             )
                             
                             GlassMetricCard(
                                 title: "Engaged Users",
                                 value: formatNumber(period.pageEngagedUsers),
                                 icon: "heart.fill",
-                                color: .pink
+                                color: KosmicPalette.violet
                             )
                             
                             GlassMetricCard(
                                 title: "Post Engagements",
                                 value: formatNumber(period.pagePostEngagements),
                                 icon: "hand.thumbsup.fill",
-                                color: .yellow
+                                color: KosmicPalette.cyan
                             )
                             
                             GlassMetricCard(
                                 title: "Consumptions",
                                 value: formatNumber(period.pageConsumptions),
                                 icon: "play.circle.fill",
-                                color: .indigo
+                                color: KosmicPalette.cyan
                             )
                         }
                     }
@@ -897,9 +895,9 @@ struct FacebookPageInsightsSection: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "infinity.circle.fill")
-                                .foregroundColor(.orange)
+                                .foregroundColor(KosmicPalette.violet)
                             Text("Lifetime")
-                                .font(.headline)
+                                .sectionTitleStyle()
                             Spacer()
                         }
                         
@@ -913,49 +911,49 @@ struct FacebookPageInsightsSection: View {
                                 title: "Total Page Views",
                                 value: formatNumber(lifetime.pageViewsTotal),
                                 icon: "eye.fill",
-                                color: .blue
+                                color: KosmicPalette.cyan
                             )
                             
                             GlassMetricCard(
                                 title: "Total Fans",
                                 value: formatNumber(lifetime.pageFans),
                                 icon: "person.3.fill",
-                                color: .purple
+                                color: KosmicPalette.violet
                             )
                             
                             GlassMetricCard(
                                 title: "Total Reach",
                                 value: formatNumber(lifetime.pageReach),
                                 icon: "arrow.up.right.circle.fill",
-                                color: .orange
+                                color: KosmicPalette.violet
                             )
                             
                             GlassMetricCard(
                                 title: "Total Impressions",
                                 value: formatNumber(lifetime.pageImpressions),
                                 icon: "chart.bar.fill",
-                                color: .green
+                                color: KosmicPalette.cyan
                             )
                             
                             GlassMetricCard(
                                 title: "Total Engaged Users",
                                 value: formatNumber(lifetime.pageEngagedUsers),
                                 icon: "heart.fill",
-                                color: .pink
+                                color: KosmicPalette.violet
                             )
                             
                             GlassMetricCard(
                                 title: "Total Post Engagements",
                                 value: formatNumber(lifetime.pagePostEngagements),
                                 icon: "hand.thumbsup.fill",
-                                color: .yellow
+                                color: KosmicPalette.cyan
                             )
                             
                             GlassMetricCard(
                                 title: "Total Consumptions",
                                 value: formatNumber(lifetime.pageConsumptions),
                                 icon: "play.circle.fill",
-                                color: .indigo
+                                color: KosmicPalette.cyan
                             )
                         }
                     }

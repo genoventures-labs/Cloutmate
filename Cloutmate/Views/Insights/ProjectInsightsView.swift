@@ -89,7 +89,7 @@ struct ProjectInsightsView: View {
 
 struct ActiveProjectsSummary: View {
     let projects: [Project]
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let tasks: [Task]
     
     var totalPostsCount: Int {
@@ -163,7 +163,7 @@ struct SummaryCard: View {
 
 struct ProjectPerformanceCard: View {
     let project: Project
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let tasks: [Task]
     let onTap: () -> Void
     
@@ -266,12 +266,12 @@ struct CompletedProjectCard: View {
 
 struct ProjectDetailInsightsSheet: View {
     let project: Project
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let tasks: [Task]
     let insights: [InsightSnapshot]
     @Environment(\.dismiss) private var dismiss
     
-    var projectPosts: [Post] {
+    var projectPosts: [CloutmateShared.Post] {
         posts.filter { project.postIds.contains($0.id) }
     }
     

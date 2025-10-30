@@ -79,10 +79,10 @@ struct AreaInsightsView: View {
 
 struct AreaHealthCard: View {
     let area: Area
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let tasks: [Task]
     
-    var areaPosts: [Post] {
+    var areaPosts: [CloutmateShared.Post] {
         // Posts linked to this area (if we had area post linkage)
         posts.filter { _ in true } // Placeholder - would filter by area
     }

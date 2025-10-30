@@ -24,6 +24,7 @@ struct JournalView: View {
     @State private var selectedJournals = Set<UUID>()
     @State private var showCreateSheet = false
     @State private var showJournalSheet = false
+    @State private var showRecordingModal = false
     @State private var selectedJournal: Journal?
     
     var filteredJournals: [Journal] {
@@ -274,6 +275,12 @@ struct JournalView: View {
                     }
                 }
                 
+                Button {
+                    showRecordingModal = true
+                } label: {
+                    Label("Record Entry", systemImage: "mic")
+                }
+                
                 Button("New Entry") {
                     showCreateSheet = true
                 }
@@ -281,6 +288,9 @@ struct JournalView: View {
         }
         .sheet(isPresented: $showCreateSheet) {
             CreateJournalEntrySheet()
+        }
+        .sheet(isPresented: $showRecordingModal) {
+            VoiceRecordModal(mode: .newEntry)
         }
         .sheet(isPresented: $showJournalSheet) {
             if let journal = selectedJournal {
@@ -401,6 +411,7 @@ struct JournalDetailView: View {
     @State private var editingContent = ""
     @State private var editingTitle = ""
     @State private var showAIPanel = false
+    @State private var showRecordToAppend = false
     
     var body: some View {
         ScrollView {
@@ -501,10 +512,16 @@ struct JournalDetailView: View {
                 Button(action: { showAIPanel.toggle() }) {
                     Label("AI Assistant", systemImage: "sparkles")
                 }
+                Button(action: { showRecordToAppend.toggle() }) {
+                    Label("Voice", systemImage: "mic")
+                }
             }
         }
         .sheet(isPresented: $showAIPanel) {
             JournalAIPanel(journal: journal)
+        }
+        .sheet(isPresented: $showRecordToAppend) {
+            VoiceRecordModal(mode: .append(existing: journal))
         }
         .onAppear {
             editingContent = journal.content

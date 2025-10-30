@@ -9,13 +9,19 @@ import Foundation
 import SwiftData
 
 enum DashboardCardType: String, Codable, CaseIterable {
-    // PARA Cards
+    // PARA Workflow Cards
     case todayOverview = "Today Overview"
     case inboxCount = "Inbox"
     case activeProjects = "Active Projects"
     case upcomingTasks = "Upcoming Tasks"
     case recentNotes = "Recent Notes"
     case areasOverview = "Areas"
+    
+    // PARA Workflow Insights
+    case projectsOverview = "Projects Overview"
+    case tasksOverview = "Tasks Overview"
+    case areasHealth = "Areas Health"
+    case notesActivity = "Notes Activity"
     
     // Social Publishing Cards
     case scheduledPosts = "Scheduled Posts"
@@ -24,7 +30,27 @@ enum DashboardCardType: String, Codable, CaseIterable {
     case postingStreak = "Posting Streak"
     case topPerformingPost = "Top Post"
     
-    // Combined Cards
+    // Social Media Insights
+    case socialOverview = "Social Overview"
+    case contentPerformance = "Content Performance"
+    case platformComparison = "Platform Comparison"
+    
+    // Facebook Page Insights (Individual)
+    case facebookPageViews = "Page Views"
+    case facebookPageFans = "Page Fans"
+    case facebookPageReach = "Page Reach"
+    case facebookPageImpressions = "Page Impressions"
+    case facebookEngagedUsers = "Engaged Users"
+    case facebookPostEngagements = "Post Engagements"
+    case facebookPageInsightsOverview = "Facebook Insights"
+    
+    // Productivity Insights
+    case upcomingDeadlines = "Upcoming Deadlines"
+    case workloadBalance = "Workload Balance"
+    case completionRate = "Completion Rate"
+    case inboxTrend = "Inbox Trend"
+    
+    // Quick Actions
     case quickCapture = "Quick Capture"
     case aiSuggestions = "AI Suggestions"
     
@@ -36,11 +62,29 @@ enum DashboardCardType: String, Codable, CaseIterable {
         case .upcomingTasks: return "checkmark.circle"
         case .recentNotes: return "doc.text"
         case .areasOverview: return "rectangle.stack.fill"
+        case .projectsOverview: return "chart.bar.doc.horizontal.fill"
+        case .tasksOverview: return "list.clipboard.fill"
+        case .areasHealth: return "heart.circle.fill"
+        case .notesActivity: return "book.fill"
         case .scheduledPosts: return "calendar"
         case .draftCount: return "doc.text.fill"
         case .recentInsights: return "chart.line.uptrend.xyaxis"
         case .postingStreak: return "flame.fill"
         case .topPerformingPost: return "star.fill"
+        case .socialOverview: return "chart.bar.fill"
+        case .contentPerformance: return "trophy.fill"
+        case .platformComparison: return "square.grid.2x2.fill"
+        case .facebookPageViews: return "eye.fill"
+        case .facebookPageFans: return "person.3.fill"
+        case .facebookPageReach: return "arrow.up.right.circle.fill"
+        case .facebookPageImpressions: return "chart.bar.fill"
+        case .facebookEngagedUsers: return "heart.fill"
+        case .facebookPostEngagements: return "hand.thumbsup.fill"
+        case .facebookPageInsightsOverview: return "chart.line.uptrend.xyaxis.circle.fill"
+        case .upcomingDeadlines: return "clock.badge.fill"
+        case .workloadBalance: return "scalemass.fill"
+        case .completionRate: return "chart.pie.fill"
+        case .inboxTrend: return "chart.line.uptrend.xyaxis"
         case .quickCapture: return "plus.circle.fill"
         case .aiSuggestions: return "sparkles"
         }
@@ -48,8 +92,13 @@ enum DashboardCardType: String, Codable, CaseIterable {
     
     var defaultSize: DashboardCardSize {
         switch self {
-        case .todayOverview, .activeProjects: return .large
-        case .quickCapture, .aiSuggestions: return .medium
+        // Large cards - detailed overviews
+        case .todayOverview, .activeProjects, .projectsOverview, .socialOverview, .facebookPageInsightsOverview: return .large
+        
+        // Medium cards - moderate detail
+        case .quickCapture, .aiSuggestions, .tasksOverview, .areasHealth, .contentPerformance, .workloadBalance, .completionRate: return .medium
+        
+        // Small cards - quick metrics
         default: return .small
         }
     }
