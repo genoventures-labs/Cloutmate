@@ -6,43 +6,95 @@
 //
 
 import Foundation
+import SwiftData
+import CloutmateShared
+import os.log
+
+// Extension to access pageIDs property that may not be visible due to SwiftData module issues
+extension Post {
+    func helperGetPageID(platform: String) -> String? {
+        // Use reflection to access the pageIDs dictionary property
+        let mirror = Mirror(reflecting: self)
+        if let pageIDsProperty = mirror.children.first(where: { $0.label == "pageIDs" }),
+           let pageIDsDict = pageIDsProperty.value as? [String: String] {
+            return pageIDsDict[platform]
+        }
+        return nil
+    }
+}
 
 final class PostPublisher {
     static let shared = PostPublisher()
     
     private init() {}
     
-    func publish(_ scheduledPost: BackgroundScheduler.ScheduledPost) async {
-        Logger.publishing.info("Publishing post \(scheduledPost.postID)")
+    func publish(_ post: Post, context: ModelContext) async {
+        os_log("Publishing post %@", log: .default, type: .info, post.id.uuidString)
         
-        // Retrieve access tokens from Keychain
-        for platformString in scheduledPost.platforms {
-            guard let platform = Platform(rawValue: platformString) else { continue }
-            
+        post.postStatus = .publishing
+        try? context.save()
+        
+        var publishedPlatforms: [String] = []
+        
+        for platform in post.postPlatforms {
             do {
-                let accountKey = "\(platform.rawValue)_access_token"
-                let accessToken = try KeychainService.shared.getToken(forAccount: accountKey)
-                
                 let postID: String
+                
                 if platform == .threads {
+                    let accountKey = "threads_access_token"
+                    let accessToken = try KeychainService.shared.getToken(forAccount: accountKey)
+                    
                     postID = try await ThreadsService.shared.publishPost(
-                        caption: scheduledPost.caption,
-                        mediaURLs: scheduledPost.mediaURLs.isEmpty ? nil : scheduledPost.mediaURLs,
+                        caption: post.caption,
+                        mediaURLs: post.mediaURLs.isEmpty ? nil : post.mediaURLs,
                         accessToken: accessToken
                     )
+                    post.threadsPostID = postID
+                    
+                } else if platform == .facebook {
+                    // Use helper extension to access pageIDs
+                    guard let pageID = post.helperGetPageID(platform: "facebook") else {
+                        os_log("No pageID found for Facebook", log: .default, type: .error)
+                        continue
+                    }
+                    
+                    let accountKey = "facebook_page_\(pageID)_access_token"
+                    let accessToken = try KeychainService.shared.getToken(forAccount: accountKey)
+                    
+                    postID = try await FacebookService.shared.publishPost(
+                        caption: post.caption,
+                        mediaURLs: post.mediaURLs.isEmpty ? nil : post.mediaURLs,
+                        pageID: pageID,
+                        accessToken: accessToken
+                    )
+                    post.facebookPostID = postID
+                    
                 } else {
-                    // For Facebook, we need page ID - this would come from the SwiftData store
-                    // For now, we'll just log an error
-                    Logger.publishing.error("Facebook publishing requires page ID")
+                    let platformName = await MainActor.run { platform.displayName }
+                    os_log("Unsupported platform: %{public}@", log: .default, type: .error, platformName)
                     continue
                 }
                 
-                Logger.publishing.info("Successfully published post \(scheduledPost.postID) as \(postID)")
+                publishedPlatforms.append(platform.rawValue)
+                let platformName = await MainActor.run { platform.displayName }
+                os_log("Successfully published to %{public}@", log: .default, type: .info, platformName)
                 
             } catch {
-                Logger.publishing.error("Failed to publish post \(scheduledPost.postID): \(error.localizedDescription)")
+                post.lastError = error.localizedDescription
+                let platformName = await MainActor.run { platform.displayName }
+                os_log("Failed to publish to %{public}@: %{public}@", log: .default, type: .error, platformName, error.localizedDescription)
             }
         }
+        
+        if !publishedPlatforms.isEmpty {
+            post.postStatus = .published
+            post.publishedDate = Date()
+        } else {
+            post.postStatus = .failed
+        }
+        
+        try? context.save()
     }
 }
+
 

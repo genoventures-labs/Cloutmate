@@ -35,6 +35,7 @@ struct TemplateManagementView: View {
                 .onDelete(perform: deleteTemplates)
             }
             .navigationTitle("Templates")
+            .frame(minWidth: 300, idealWidth: 350)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(action: {
@@ -85,7 +86,7 @@ struct CreateTemplateSheet: View {
                     TextField("Template Name", text: $name)
                 }
                 
-                Section("Caption") {
+                Section("Content") {
                     TextEditor(text: $caption)
                         .frame(minHeight: 100)
                 }
@@ -149,7 +150,7 @@ struct TemplateEditorView: View {
                 TextField("Name", text: $template.name)
             }
             
-            Section("Caption") {
+            Section("Content") {
                 TextEditor(text: $template.caption)
                     .frame(minHeight: 100)
             }

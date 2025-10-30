@@ -7,9 +7,10 @@
 
 import SwiftUI
 import Charts
+import CloutmateShared
 
 struct PlatformComparisonView: View {
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     
     var body: some View {
         HStack(spacing: 20) {
@@ -29,34 +30,26 @@ struct PlatformComparisonView: View {
         }
     }
     
-    private var threadPosts: [Post] {
+    private var threadPosts: [CloutmateShared.Post] {
         posts.filter { $0.postPlatforms.contains(.threads) }
     }
     
-    private var facebookPosts: [Post] {
+    private var facebookPosts: [CloutmateShared.Post] {
         posts.filter { $0.postPlatforms.contains(.facebook) }
     }
 }
 
 struct PlatformStatsCard: View {
     let platform: Platform
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let color: Color
-    
-    @State private var isHovered = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
                 HStack(spacing: 10) {
                     Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [color, color.opacity(0.7)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .fill(color.opacity(0.6))
                         .frame(width: 10, height: 10)
                     
                     Text(platform.displayName)
@@ -76,16 +69,7 @@ struct PlatformStatsCard: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .shadow(color: color.opacity(0.2), radius: isHovered ? 12 : 6, y: isHovered ? 6 : 3)
-        )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .glassPanel(tier: .contentCard, cornerRadius: 16, tintColor: color.opacity(0.1))
     }
     
     private var averageEngagement: Double {

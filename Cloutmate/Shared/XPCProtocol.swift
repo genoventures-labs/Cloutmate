@@ -8,7 +8,7 @@
 import Foundation
 
 @objc protocol CloutmateHelperProtocol {
-    func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String])
+    func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String], pageIDs: [String: String])
     func fetchInsights(postID: String)
     func checkScheduledPosts()
 }

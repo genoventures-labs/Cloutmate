@@ -9,10 +9,11 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 import Foundation
+import CloutmateShared
 
 struct PostDropDelegate: DropDelegate {
     let targetDate: Date
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let modelContext: ModelContext
     
     func performDrop(info: DropInfo) -> Bool {
@@ -21,16 +22,15 @@ struct PostDropDelegate: DropDelegate {
         }
         
         let targetDate = self.targetDate
-        let posts = self.posts
-        let modelContext = self.modelContext
         
         _ = itemProvider.loadTransferable(type: PostDragInfo.self) { result in
             guard case .success(let dragInfo) = result else {
                 return
             }
             
-            Task { @MainActor in
-                guard let post = posts.first(where: { $0.id == dragInfo.postID }) else {
+		_Concurrency.Task { @MainActor in
+                // Find the post by ID from the posts array
+                guard let post = self.posts.first(where: { $0.id == dragInfo.postID }) else {
                     return
                 }
                 
@@ -53,7 +53,7 @@ struct PostDragInfo: Codable, Transferable {
 }
 
 // Extension to make Post draggable
-extension Post {
+extension CloutmateShared.Post {
     var dragInfo: PostDragInfo {
         PostDragInfo(postID: self.id)
     }

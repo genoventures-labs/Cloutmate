@@ -14,13 +14,13 @@
 	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.kosmicapps.Cloutmate</string>
+		<string>group.kosmicapps.cloutmate</string>
 	</array>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
-	<true/>
-	<key>com.apple.security.automation.apple-events</key>
 	<true/>
 	<key>keychain-access-groups</key>
 	<array>

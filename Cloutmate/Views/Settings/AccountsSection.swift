@@ -15,81 +15,420 @@ struct AccountsSection: View {
     let accounts: [PlatformAccount]
     
     @State private var isAuthenticating = false
+    @State private var pendingFacebookPages: [FacebookPagesResponse.FacebookPage]? = nil
+    @State private var userAccessToken: String = ""
+    @State private var showingAllConnectedMessage = false
+    
+    // Token caching helper
+    private func cacheUserAccessToken(_ token: String) {
+        let cached = CachedToken(token: token, timestamp: Date())
+        if let data = try? JSONEncoder().encode(cached) {
+            try? KeychainService.shared.storeToken(String(data: data, encoding: .utf8) ?? "", forAccount: "facebook_user_token_data")
+        }
+    }
+    
+    private func getCachedUserAccessToken() -> String? {
+        guard let dataString = try? KeychainService.shared.getToken(forAccount: "facebook_user_token_data"),
+              let data = dataString.data(using: .utf8),
+              let cached = try? JSONDecoder().decode(CachedToken.self, from: data),
+              !cached.isExpired else {
+            return nil
+        }
+        return cached.token
+    }
+    
+    private func getConnectedFacebookPageIDs() -> Set<String> {
+        let descriptor = FetchDescriptor<PlatformAccount>(
+            predicate: #Predicate { $0.platform == "facebook" }
+        )
+        let accounts = (try? modelContext.fetch(descriptor)) ?? []
+        return Set(accounts.map { $0.accountID })
+    }
+    
+    private func hasValidToken(for platform: Platform) -> Bool {
+        let key = "\(platform.rawValue)_access_token"
+        if let _ = try? KeychainService.shared.getToken(forAccount: key) {
+            return true
+        }
+        return false
+    }
+    
+    private struct CachedToken: Codable {
+        let token: String
+        let timestamp: Date
+        
+        var isExpired: Bool {
+            Date().timeIntervalSince(timestamp) > (60 * 24 * 60 * 60)
+        }
+    }
     
     var body: some View {
         VStack(spacing: 12) {
+            // Connected Accounts Header
+            HStack {
+                Text("Connected Accounts")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Spacer()
+            }
+            
             // Existing accounts
             if accounts.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "person.crop.circle.badge.questionmark")
-                        .font(.largeTitle)
-                        .foregroundColor(.secondary)
+                // Empty state placeholder
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Image(systemName: "person.crop.circle.badge.questionmark")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        )
+                    
                     Text("No accounts connected")
-                        .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 20)
+                .padding()
+                .background(Color.secondary.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
+                )
+                .cornerRadius(8)
             } else {
-                ForEach(accounts) { account in
-                    HStack(spacing: 12) {
-                        if let platform = account.accountPlatform {
-                            Circle()
-                                .fill(platform == .threads ? Color.purple : Color.blue)
-                                .frame(width: 12, height: 12)
+                // Group accounts by platform
+                let facebookAccounts = accounts.filter { $0.platform == "facebook" }
+                let threadsAccounts = accounts.filter { $0.platform == "threads" }
+                
+                VStack(spacing: 16) {
+                    // Facebook accounts
+                    if !facebookAccounts.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "square.and.pencil")
+                                    .foregroundColor(.blue)
+                                Text("Facebook")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                            }
+                            
+                            ForEach(facebookAccounts) { account in
+                                facebookAccountCard(account)
+                            }
                         }
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(account.displayName ?? account.username)
-                                .font(.body)
-                            Text("@\(account.username)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Button(action: {
-                            removeAccount(account)
-                        }) {
-                            Image(systemName: "trash")
-                                .foregroundColor(.red)
-                        }
-                        .buttonStyle(.plain)
                     }
-                    .padding(.vertical, 4)
+                    
+                    // Threads accounts
+                    if !threadsAccounts.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "bubble.left.and.bubble.right")
+                                    .foregroundColor(.purple)
+                                Text("Threads")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                Spacer()
+                            }
+                            
+                            ForEach(threadsAccounts) { account in
+                                threadsAccountCard(account)
+                            }
+                        }
+                    }
                 }
             }
             
             Divider()
             
             // Add account buttons
-            VStack(spacing: 8) {
-                Button(action: {
-                    authenticatePlatform(.threads)
-                }) {
-                    Label("Connect Threads", systemImage: "plus.circle.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(isAuthenticating)
+            HStack(spacing: 12) {
+                PlatformConnectButton(
+                    platform: .threads,
+                    action: { 
+                        // Check if already has a valid token
+                        if let _ = try? KeychainService.shared.getToken(forAccount: "threads_access_token") {
+                            // Token exists, skip OAuth
+                            print("Threads token found, skipping OAuth")
+                            return
+                        }
+                        authenticatePlatform(.threads)
+                    },
+                    isDisabled: isAuthenticating || hasValidToken(for: .threads)
+                )
                 
-                Button(action: {
-                    authenticatePlatform(.facebook)
-                }) {
-                    Label("Connect Facebook Page", systemImage: "plus.circle.fill")
-                        .frame(maxWidth: .infinity)
+                PlatformConnectButton(
+                    platform: .facebook,
+                    action: { 
+                        // Check if already has a valid user token
+                        if let cachedToken = getCachedUserAccessToken() {
+                            // User token exists, show pages directly
+				_Concurrency.Task {
+                                do {
+                                    let pages = try await MetaAPIService.shared.getFacebookPages(accessToken: cachedToken)
+                                    let connectedPageIDs = getConnectedFacebookPageIDs()
+                                    let availablePages = pages.data.filter { !connectedPageIDs.contains($0.id) }
+                                    
+                                    await MainActor.run {
+                                        if availablePages.isEmpty {
+                                            print("All Facebook pages already connected")
+                                        } else {
+                                            pendingFacebookPages = availablePages
+                                        }
+                                    }
+                                } catch {
+                                    // Fall through to OAuth
+                                    authenticatePlatform(.facebook)
+                                }
+                            }
+                            return
+                        }
+                        authenticatePlatform(.facebook)
+                    },
+                    isDisabled: isAuthenticating
+                )
+            }
+            
+            // Inline page selection
+            if let pages = pendingFacebookPages {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Select a Facebook Page")
+                            .font(.headline)
+                        
+                        Spacer()
+                        
+                        Button("Cancel") {
+                            pendingFacebookPages = nil
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    
+                    if pages.isEmpty {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle")
+                                .foregroundColor(.secondary)
+                            Text("All pages already connected — nothing to add.")
+                                .foregroundColor(.secondary)
+                                .font(.body)
+                        }
+                        .padding()
+                        .transition(.opacity)
+                    }
+                    
+                    ForEach(pages, id: \.id) { page in
+                        Button(action: {
+				_Concurrency.Task {
+                                await connectSelectedPage(page)
+                            }
+                        }) {
+                            HStack(spacing: 12) {
+                                AsyncImage(url: URL(string: page.picture?.data.url ?? "")) { phase in
+                                    switch phase {
+                                    case .empty:
+                                        Circle()
+                                            .fill(Color.secondary.opacity(0.2))
+                                            .frame(width: 40, height: 40)
+                                            .overlay(
+                                                Image(systemName: "person.circle.fill")
+                                                    .foregroundColor(.secondary)
+                                            )
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fill)
+                                            .frame(width: 40, height: 40)
+                                            .clipShape(Circle())
+                                    case .failure:
+                                        Circle()
+                                            .fill(Color.secondary.opacity(0.2))
+                                            .frame(width: 40, height: 40)
+                                            .overlay(
+                                                Image(systemName: "person.circle.fill")
+                                                    .foregroundColor(.secondary)
+                                            )
+                                    @unknown default:
+                                        Circle()
+                                            .fill(Color.secondary.opacity(0.2))
+                                            .frame(width: 40, height: 40)
+                                    }
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(page.name)
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+                                    
+                                    if let category = page.category {
+                                        Text(category)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                            .padding()
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(12)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(isAuthenticating)
+                .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.35), value: pendingFacebookPages != nil)
+    }
+    
+    // MARK: - Account Card Views
+    
+    private func facebookAccountCard(_ account: PlatformAccount) -> some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: URL(string: account.profileImageURL ?? "")) { phase in
+                switch phase {
+                case .empty:
+                    Circle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Image(systemName: "person.circle.fill")
+                                .foregroundColor(.secondary)
+                        )
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 40, height: 40)
+                        .clipShape(Circle())
+                case .failure:
+                    Circle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                        .overlay(
+                            Image(systemName: "person.circle.fill")
+                                .foregroundColor(.secondary)
+                        )
+                @unknown default:
+                    Circle()
+                        .fill(Color.secondary.opacity(0.2))
+                        .frame(width: 40, height: 40)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text(account.displayName ?? account.username)
+                        .font(.body)
+                    Spacer()
+                    Text("Connected")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack(spacing: 8) {
+                    Button("Change") {
+                        // Use cached token if available
+                        if let cachedToken = getCachedUserAccessToken() {
+				_Concurrency.Task {
+                                do {
+                                    let pages = try await MetaAPIService.shared.getFacebookPages(accessToken: cachedToken)
+                                    let connectedIDs = getConnectedFacebookPageIDs()
+                                    let availablePages = pages.data.filter { !connectedIDs.contains($0.id) }
+                                    
+                                    await MainActor.run {
+                                        if availablePages.isEmpty && !pages.data.isEmpty {
+                                            showingAllConnectedMessage = true
+				_Concurrency.Task {
+                                                try? await _Concurrency.Task.sleep(for: .seconds(3))
+                                                showingAllConnectedMessage = false
+                                            }
+                                        } else {
+                                            pendingFacebookPages = availablePages
+                                        }
+                                    }
+                                } catch {
+                                    // Token expired, do OAuth
+                                    authenticatePlatform(.facebook)
+                                }
+                            }
+                        } else {
+                            // No cached token, do OAuth
+                            authenticatePlatform(.facebook)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundColor(Color.accentColor.opacity(0.8))
+                    
+                    Button("Disconnect") {
+                        removeAccount(account)
+                    }
+                    .font(.caption)
+                    .foregroundColor(.red.opacity(0.8))
+                }
+            }
+        }
+        .padding()
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.25), value: account.accountID)
+    }
+    
+    private func threadsAccountCard(_ account: PlatformAccount) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(Color.purple)
+                .frame(width: 40, height: 40)
+                .overlay(
+                    Image(systemName: "bubble.left.and.bubble.right.fill")
+                        .foregroundColor(.white)
+                        .font(.caption)
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text(account.displayName ?? account.username)
+                        .font(.body)
+                    Spacer()
+                    Text("Connected")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                Text("@\(account.username)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Button("Disconnect") {
+                    removeAccount(account)
+                }
+                .font(.caption)
+                .foregroundColor(.red.opacity(0.8))
+            }
+        }
+        .padding()
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.25), value: account.accountID)
     }
     
     private func authenticatePlatform(_ platform: Platform) {
         isAuthenticating = true
         
-        Task {
+				_Concurrency.Task {
             do {
                 // Get OAuth URL
                 guard let oauthURL = MetaAPIService.shared.getOAuthURL(platform: platform) else {
@@ -180,28 +519,43 @@ struct AccountsSection: View {
                 let tokenResponse = try await MetaAPIService.shared.exchangeCodeForToken(extractedCode, platform: platform)
                 
                 if platform == .facebook {
-                    // For Facebook, fetch pages and store the page token
+                    // For Facebook, fetch pages and show selection UI
                     let pagesResponse = try await MetaAPIService.shared.getFacebookPages(accessToken: tokenResponse.accessToken)
                     
-                    guard let firstPage = pagesResponse.data.first else {
+                    guard !pagesResponse.data.isEmpty else {
                         throw MetaAPIError.authenticationFailed
                     }
                     
-                    // Store the page access token (long-lived)
-                    try KeychainService.shared.storeToken(
-                        firstPage.accessToken,
-                        forAccount: "\(platform.rawValue)_access_token"
-                    )
+                    // Set pending pages for inline selection
+                    userAccessToken = tokenResponse.accessToken
                     
-                    // Save account to SwiftData with page info
-                    let account = PlatformAccount(
-                        platform: platform.rawValue,
-                        accountID: firstPage.id,
-                        username: firstPage.name,
-                        displayName: firstPage.name,
-                        profileImageURL: firstPage.picture?.data.url
-                    )
-                    modelContext.insert(account)
+                    // Cache the user access token
+                    cacheUserAccessToken(tokenResponse.accessToken)
+                    
+                    // Filter out already-connected pages
+                    let connectedPageIDs = getConnectedFacebookPageIDs()
+                    let availablePages = pagesResponse.data.filter { page in
+                        !connectedPageIDs.contains(page.id)
+                    }
+                    
+                    print("🔍 DEBUG: About to show page selection with \(availablePages.count) available pages (out of \(pagesResponse.data.count) total)")
+                    print("🔍 DEBUG: Connected page IDs: \(connectedPageIDs)")
+                    
+                    DispatchQueue.main.async {
+                        if availablePages.isEmpty && !pagesResponse.data.isEmpty {
+                            showingAllConnectedMessage = true
+                            // Hide message after 3 seconds
+				_Concurrency.Task {
+                                try? await _Concurrency.Task.sleep(for: .seconds(3))
+                                showingAllConnectedMessage = false
+                            }
+                        } else {
+                            pendingFacebookPages = availablePages
+                        }
+                    }
+                    
+                    isAuthenticating = false
+                    return
                 } else {
                     // For Threads, use regular account info
                     let accountInfo = try await MetaAPIService.shared.getAccountInfo(accessToken: tokenResponse.accessToken)
@@ -259,9 +613,56 @@ struct AccountsSection: View {
         }
     }
     
+    private func connectSelectedPage(_ page: FacebookPagesResponse.FacebookPage) async {
+        do {
+            // Check if already connected
+            let descriptor = FetchDescriptor<PlatformAccount>(
+                predicate: #Predicate { $0.platform == "facebook" && $0.accountID == page.id }
+            )
+            
+            if (try? modelContext.fetch(descriptor).first) != nil {
+                Logger.accounts.info("Page already connected: \(page.name)")
+                DispatchQueue.main.async {
+                    pendingFacebookPages = nil
+                }
+                return
+            }
+            
+            // Store the page access token (long-lived) with page-specific key
+            try KeychainService.shared.storeToken(
+                page.accessToken,
+                forAccount: "facebook_page_\(page.id)_access_token"
+            )
+            
+            // Save account to SwiftData with page info
+            let account = PlatformAccount(
+                platform: "facebook",
+                accountID: page.id,
+                username: page.name,
+                displayName: page.name,
+                profileImageURL: page.picture?.data.url
+            )
+            modelContext.insert(account)
+            
+            // Clear pending pages
+            DispatchQueue.main.async {
+                pendingFacebookPages = nil
+            }
+            
+            Logger.accounts.info("Successfully connected Facebook page: \(page.name)")
+        } catch {
+            Logger.accounts.error("Failed to connect selected page: \(error.localizedDescription)")
+        }
+    }
+    
     private func removeAccount(_ account: PlatformAccount) {
         // Remove token from Keychain
-        try? KeychainService.shared.deleteToken(forAccount: "\(account.platform)_access_token")
+        if account.platform == "facebook" {
+            // For Facebook, use page-specific key
+            try? KeychainService.shared.deleteToken(forAccount: "facebook_page_\(account.accountID)_access_token")
+        } else {
+            try? KeychainService.shared.deleteToken(forAccount: "\(account.platform)_access_token")
+        }
         
         // Remove account from SwiftData
         modelContext.delete(account)
@@ -276,7 +677,7 @@ func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws 
         }
         
         group.addTask {
-            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            try await _Concurrency.Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             throw NSError(domain: "TimeoutError", code: -1, userInfo: [NSLocalizedDescriptionKey: "OAuth authentication timed out after \(seconds) seconds"])
         }
         

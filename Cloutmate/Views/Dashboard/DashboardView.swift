@@ -8,20 +8,22 @@
 import SwiftUI
 import SwiftData
 import Charts
+import CloutmateShared
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Post.scheduledDate) private var allPosts: [Post]
+    @Query(sort: \CloutmateShared.Post.scheduledDate) private var allPosts: [CloutmateShared.Post]
     @State private var showComposer = false
+    @State private var refreshID = UUID()
     
-    private var todaysPosts: [Post] {
+    private var todaysPosts: [CloutmateShared.Post] {
         allPosts.filter { post in
             guard let scheduledDate = post.scheduledDate else { return false }
             return Calendar.current.isDateInToday(scheduledDate)
         }
     }
     
-    private var recentPosts: [Post] {
+    private var recentPosts: [CloutmateShared.Post] {
         let cutoffDate = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
         return allPosts.filter { post in
             post.status == PostStatus.published.rawValue &&
@@ -46,27 +48,33 @@ struct DashboardView: View {
                     .buttonStyle(.borderedProminent)
                 }
                 
-                // Today's Posts
+                // Today's Posts with Glass Panel
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Today's Posts")
                         .font(.title2)
                         .fontWeight(.semibold)
                     
-                    if todaysPosts.isEmpty {
-                        ContentUnavailableView(
-                            "No posts scheduled",
-                            systemImage: "calendar.badge.clock",
-                            description: Text("Schedule your first post to get started")
-                        )
-                        .frame(height: 200)
-                    } else {
-                        ForEach(todaysPosts) { post in
-                            PostSummaryCard(post: post)
+                    GlassPanel(tier: .contentCard) {
+                        if todaysPosts.isEmpty {
+                            ContentUnavailableView(
+                                "No posts scheduled",
+                                systemImage: "calendar.badge.clock",
+                                description: Text("Schedule your first post to get started")
+                            )
+                            .frame(height: 200)
+                            .padding()
+                        } else {
+                            VStack(spacing: 8) {
+                                ForEach(todaysPosts) { post in
+                                    PostSummaryCard(post: post)
+                                }
+                            }
+                            .padding()
                         }
                     }
                 }
                 
-                // Quick Stats - Expanded Grid
+                // Quick Stats - Expanded Grid with GlassMetricCard
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Last 7 Days Performance")
                         .font(.title2)
@@ -77,42 +85,42 @@ struct DashboardView: View {
                         GridItem(.adaptive(minimum: 160, maximum: 200)),
                         GridItem(.adaptive(minimum: 160, maximum: 200))
                     ], spacing: 16) {
-                        QuickStatsCard(
+                        GlassMetricCard(
                             title: "Posts Published",
                             value: "\(recentPosts.count)",
                             icon: "doc.text.fill",
                             color: .blue
                         )
                         
-                        QuickStatsCard(
+                        GlassMetricCard(
                             title: "Avg Engagement",
                             value: String(format: "%.1f%%", averageEngagement),
                             icon: "heart.fill",
                             color: .pink
                         )
                         
-                        QuickStatsCard(
+                        GlassMetricCard(
                             title: "Total Reach",
                             value: "\(totalReach)",
                             icon: "eye.fill",
                             color: .purple
                         )
                         
-                        QuickStatsCard(
+                        GlassMetricCard(
                             title: "Total Likes",
                             value: "\(totalLikes)",
                             icon: "hand.thumbsup.fill",
-                            color: .green
-                        )
-                        
-                        QuickStatsCard(
-                            title: "Total Comments",
-                            value: "\(totalComments)",
-                            icon: "bubble.left.fill",
                             color: .orange
                         )
                         
-                        QuickStatsCard(
+                        GlassMetricCard(
+                            title: "Total Comments",
+                            value: "\(totalComments)",
+                            icon: "bubble.left.fill",
+                            color: .green
+                        )
+                        
+                        GlassMetricCard(
                             title: "Total Impressions",
                             value: "\(totalImpressions)",
                             icon: "chart.bar.fill",
@@ -121,16 +129,21 @@ struct DashboardView: View {
                     }
                 }
                 
+                // Content Recycling Suggestions
+                ContentRecyclingCard()
+                    .frame(maxWidth: .infinity)
+                    .transition(.opacity)
+
                 // Upcoming & Activity
                 HStack(spacing: 16) {
-                    QuickStatsCard(
+                    GlassMetricCard(
                         title: "Upcoming Posts",
                         value: "\(upcomingPostsCount)",
                         icon: "calendar.badge.clock",
                         color: .cyan
                     )
                     
-                    QuickStatsCard(
+                    GlassMetricCard(
                         title: "Failed Posts",
                         value: "\(failedPostsCount)",
                         icon: "exclamationmark.triangle.fill",
@@ -143,9 +156,15 @@ struct DashboardView: View {
             }
             .padding()
         }
+        .background(Color(.windowBackgroundColor))
         .sheet(isPresented: $showComposer) {
             ComposerWindow()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshViewsFromMenuBar"))) { _ in
+            // Refresh view when notification received from menu bar
+            refreshID = UUID()
+        }
+        .id(refreshID)
     }
     
     private var averageEngagement: Double {

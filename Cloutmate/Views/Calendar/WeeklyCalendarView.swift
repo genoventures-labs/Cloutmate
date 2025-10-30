@@ -6,36 +6,51 @@
 //
 
 import SwiftUI
+import CloutmateShared
 
 struct WeeklyCalendarView: View {
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     @Binding var selectedDate: Date
+    @Binding var showingComposer: Bool
+    @Binding var prefilledDate: Date?
+    @Binding var showingPostPreview: Bool
+    @Binding var selectedPost: CloutmateShared.Post?
     
     @State private var displayedWeek = Date()
+    @State private var showPostListSheet = false
+    @State private var postsForSelectedDate: [CloutmateShared.Post] = []
+    @State private var selectedDateForList = Date()
     
     private let calendar = Calendar.current
     
     var body: some View {
         VStack(spacing: 0) {
-            // Week header
+            // Week header with Glass Buttons
             HStack {
-                Button(action: previousWeek) {
-                    Image(systemName: "chevron.left")
-                }
+                GlassButton(icon: "chevron.left", style: .iconOnly, tier: .overlay, tintColor: .blue, action: previousWeek)
+                    .frame(width: 32, height: 32)
                 
                 Spacer()
                 
                 Text(weekRangeText)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.bold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                 
                 Spacer()
                 
-                Button(action: nextWeek) {
-                    Image(systemName: "chevron.right")
-                }
+                GlassButton(icon: "chevron.right", style: .iconOnly, tier: .overlay, tintColor: .blue, action: nextWeek)
+                    .frame(width: 32, height: 32)
             }
-            .padding()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(.ultraThinMaterial)
             
             // Days with posts
             ScrollView {
@@ -44,15 +59,44 @@ struct WeeklyCalendarView: View {
                         DayColumn(
                             date: date,
                             posts: postsForDate(date),
-                            isSelected: calendar.isDate(date, inSameDayAs: selectedDate)
+                            isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
+                            onPostClick: { post in
+                                selectedPost = post
+                                showingPostPreview = true
+                            }
                         )
                         .onTapGesture {
                             selectedDate = date
+                            selectedDateForList = date
+                            postsForSelectedDate = postsForDate(date)
+                            showPostListSheet = true
+                        }
+                        .onTapGesture(count: 2) {
+                            // Double-click to schedule post on future date or today
+                            let calendar = Calendar.current
+                            let today = Date()
+                            if calendar.isDateInToday(date) || date > today {
+                                prefilledDate = date
+                                showingComposer = true
+                            }
                         }
                     }
                 }
                 .padding()
             }
+            .background(Color(.windowBackgroundColor))
+        }
+        .sheet(isPresented: $showPostListSheet) {
+            CalendarPostListSheet(
+                date: selectedDateForList,
+                posts: postsForSelectedDate,
+                selectedPost: $selectedPost,
+                isPresented: $showPostListSheet,
+                onPostTap: { post in
+                    showingPostPreview = true
+                    showPostListSheet = false
+                }
+            )
         }
     }
     
@@ -80,10 +124,16 @@ struct WeeklyCalendarView: View {
         return "\(start) - \(end)"
     }
     
-    private func postsForDate(_ date: Date) -> [Post] {
+    private func postsForDate(_ date: Date) -> [CloutmateShared.Post] {
         posts.filter { post in
-            guard let scheduledDate = post.scheduledDate else { return false }
-            return calendar.isDate(scheduledDate, inSameDayAs: date)
+            // Check both scheduledDate and publishedDate
+            if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
+                return true
+            }
+            if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
+                return true
+            }
+            return false
         }
     }
     
@@ -102,33 +152,52 @@ struct WeeklyCalendarView: View {
 
 struct DayColumn: View {
     let date: Date
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let isSelected: Bool
+    var onPostClick: ((CloutmateShared.Post) -> Void)?
+    
+    @State private var isHovered = false
     
     private let calendar = Calendar.current
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Day header
-            HStack {
-                Text(dayText)
-                    .font(.headline)
-                Text(dateText)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text("\(posts.count)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            // Day header with Glass Panel
+            GlassPanel(
+                tier: isSelected ? .overlay : .contentCard,
+                cornerRadius: 12,
+                tintColor: isSelected ? Color.blue.opacity(0.2) : nil
+            ) {
+                HStack {
+                    Text(dayText)
+                        .font(.system(.headline, design: .rounded))
+                    Text(dateText)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(posts.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
-            .cornerRadius(8)
+            .shadow(
+                color: isSelected ? .blue.opacity(0.3) : .black.opacity(0.05),
+                radius: isSelected ? 8 : 2,
+                y: isSelected ? 4 : 1
+            )
+            .scaleEffect(isHovered ? 1.02 : 1.0)
+            .animation(GlassMotion.Easing.spring, value: isHovered)
+            .onHover { hovering in
+                isHovered = hovering
+            }
             
             // Posts
             ForEach(posts) { post in
-                PostCard(post: post)
+                PostCard(post: post, onTap: {
+                    onPostClick?(post)
+                })
             }
         }
     }
@@ -147,15 +216,19 @@ struct DayColumn: View {
 }
 
 struct PostCard: View {
-    let post: Post
+    let post: CloutmateShared.Post
+    var onTap: (() -> Void)?
+    
+    @State private var isHovering = false
     
     var body: some View {
         HStack(spacing: 10) {
             // Platform badges
             ForEach(post.postPlatforms, id: \.self) { platform in
                 Image(systemName: platform == .threads ? "t.square.fill" : "f.square.fill")
-                    .font(.system(size: 14))
+                    .font(.system(size: 15))
                     .foregroundColor(platform == .threads ? .purple : .blue)
+                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
             }
             
             // Time
@@ -164,10 +237,16 @@ struct PostCard: View {
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.accentColor)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.accentColor.opacity(0.1))
-                    .cornerRadius(4)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.15), Color.accentColor.opacity(0.1)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(6)
             }
             
             // Caption preview
@@ -178,21 +257,63 @@ struct PostCard: View {
             
             Spacer()
         }
-        .padding(10)
+        .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.secondary.opacity(0.08))
+            Group {
+                if isHovering {
+                    LinearGradient(
+                        colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                } else {
+                    LinearGradient(
+                        colors: [Color.secondary.opacity(0.12), Color.secondary.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.accentColor.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    isHovering ? Color.accentColor.opacity(0.4) : Color.accentColor.opacity(0.2),
+                    lineWidth: isHovering ? 1.5 : 1
+                )
         )
-        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .cornerRadius(12)
+        .shadow(
+            color: isHovering ? Color.accentColor.opacity(0.3) : .black.opacity(0.05),
+            radius: isHovering ? 4 : 2,
+            x: 0,
+            y: isHovering ? 2 : 1
+        )
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isHovering = hovering
+            }
+        }
+        .onTapGesture {
+            onTap?()
+        }
         .draggable(post.dragInfo)
     }
 }
 
 #Preview {
-    WeeklyCalendarView(posts: [], selectedDate: .constant(Date()))
+    @Previewable @State var showingComposer = false
+    @Previewable @State var prefilledDate: Date? = nil
+    @Previewable @State var showingPostPreview = false
+    @Previewable @State var selectedPost: CloutmateShared.Post? = nil
+    
+    return WeeklyCalendarView(
+        posts: [],
+        selectedDate: .constant(Date()),
+        showingComposer: $showingComposer,
+        prefilledDate: $prefilledDate,
+        showingPostPreview: $showingPostPreview,
+        selectedPost: $selectedPost
+    )
 }
 

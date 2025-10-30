@@ -37,13 +37,19 @@ final class Post {
     var retryCount: Int = 0
     var lastError: String?
     
+    // PARA integration
+    var projectId: UUID?
+    var areaId: UUID?
+    
     init(
         caption: String,
         mediaURLs: [String] = [],
         scheduledDate: Date? = nil,
         platforms: [String] = [],
         status: String = PostStatus.draft.rawValue,
-        tags: [String] = []
+        tags: [String] = [],
+        projectId: UUID? = nil,
+        areaId: UUID? = nil
     ) {
         self.id = UUID()
         self.caption = caption
@@ -56,6 +62,8 @@ final class Post {
         self.createdAt = Date()
         self.updatedAt = Date()
         self.retryCount = 0
+        self.projectId = projectId
+        self.areaId = areaId
     }
     
     var postStatus: PostStatus {

@@ -14,7 +14,7 @@ final class CloutmateHelperApp: NSObject, NSApplicationDelegate {
     private var xpcDelegate: HelperXPCService?
     
     func applicationDidFinishLaunching(_ notification: Notification) {
-        Logger.xpc.info("CloutmateHelper launching...")
+        os_log("CloutmateHelper launching...", log: .default, type: .info)
         setupXPCListener()
         BackgroundScheduler.shared.start()
         InsightsPoller.shared.start()
@@ -29,11 +29,11 @@ final class CloutmateHelperApp: NSObject, NSApplicationDelegate {
         self.listener = listener
         self.xpcDelegate = delegate
         
-        Logger.xpc.info("XPC listener configured and resumed")
+        os_log("XPC listener configured and resumed", log: .default, type: .info)
     }
     
     func applicationWillTerminate(_ notification: Notification) {
-        Logger.xpc.info("CloutmateHelper terminating...")
+        os_log("CloutmateHelper terminating...", log: .default, type: .info)
     }
 }
 

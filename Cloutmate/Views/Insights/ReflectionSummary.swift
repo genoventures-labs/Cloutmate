@@ -6,9 +6,10 @@
 //
 
 import SwiftUI
+import CloutmateShared
 
 struct ReflectionSummary: View {
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -16,17 +17,11 @@ struct ReflectionSummary: View {
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "lightbulb.fill")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [.yellow, .orange],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundColor(Color.orange.opacity(0.7))
                         .frame(width: 32, height: 32)
                         .background(
                             Circle()
-                                .fill(Color.yellow.opacity(0.15))
+                                .fill(Color.orange.opacity(0.08))
                         )
                     
                     Text(summary)
@@ -48,11 +43,7 @@ struct ReflectionSummary: View {
         }
         .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
-        )
+        .glassPanel(tier: .contentCard, cornerRadius: 16)
     }
     
     private func generateSummary() -> String? {

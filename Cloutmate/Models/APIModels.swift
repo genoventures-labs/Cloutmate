@@ -91,3 +91,51 @@ struct FacebookPagesResponse: Codable {
     }
 }
 
+// MARK: - Page Insights Period
+enum PageInsightsPeriod: String, Codable {
+    case day
+    case week
+    case days28 = "days_28"
+    case month
+    case lifetime
+    
+    var secondsDuration: Int {
+        switch self {
+        case .day:
+            return 86400 // 1 day
+        case .week:
+            return 604800 // 7 days
+        case .days28:
+            return 2419200 // 28 days
+        case .month:
+            return 2592000 // ~30 days
+        case .lifetime:
+            return 0 // No duration for lifetime
+        }
+    }
+}
+
+// MARK: - Page Insights Response
+struct PageInsightsResponse: Codable {
+    let data: [PageInsightData]
+    
+    struct PageInsightData: Codable {
+        let name: String
+        let period: String
+        let values: [PageInsightValue]
+        let title: String?
+        let description: String?
+        let id: String?
+        
+        struct PageInsightValue: Codable {
+            let value: String
+            let endTime: String?
+            
+            enum CodingKeys: String, CodingKey {
+                case value
+                case endTime = "end_time"
+            }
+        }
+    }
+}
+

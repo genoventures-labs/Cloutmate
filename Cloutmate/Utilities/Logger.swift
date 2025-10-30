@@ -17,5 +17,6 @@ extension Logger {
     static let keychain = Logger(subsystem: subsystem, category: "Keychain")
     static let insights = Logger(subsystem: subsystem, category: "Insights")
     static let accounts = Logger(subsystem: subsystem, category: "Accounts")
+    static let notion = Logger(subsystem: subsystem, category: "Notion")
 }
 

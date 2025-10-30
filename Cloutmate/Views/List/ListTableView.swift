@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
+import CloutmateShared
 
 struct ListTableView: View {
     @Environment(\.modelContext) private var modelContext
@@ -19,6 +20,10 @@ struct ListTableView: View {
     @State private var selectedPlatform: Platform?
     @State private var selectedPosts = Set<UUID>()
     @State private var showComposer = false
+    @State private var showDeleteAllConfirmation = false
+    @State private var refreshID = UUID()
+    @State private var selectedViewType: ViewType = .table
+    @State private var showPropertyEditor = false
     
     var filteredPosts: [Post] {
         var filtered = posts
@@ -38,94 +43,145 @@ struct ListTableView: View {
         return filtered
     }
     
-    var body: some View {
-        VStack(spacing: 0) {
-            // Search and filters
-            VStack(spacing: 12) {
-                // Search bar
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                    TextField("Search posts...", text: $searchText)
-                }
-                .padding(8)
-                .background(Color.secondary.opacity(0.1))
-                .cornerRadius(8)
-                
-                // Filter chips
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        FilterChip(
-                            title: "All",
-                            isSelected: selectedStatus == nil && selectedPlatform == nil,
-                            action: { selectedStatus = nil; selectedPlatform = nil }
-                        )
-                        
-                        ForEach(PostStatus.allCases, id: \.self) { status in
-                            FilterChip(
-                                title: status.displayName,
-                                isSelected: selectedStatus == status,
-                                action: { selectedStatus = status }
-                            )
-                        }
-                        
-                        ForEach(Platform.allCases, id: \.self) { platform in
-                            FilterChip(
-                                title: platform.displayName,
-                                isSelected: selectedPlatform == platform,
-                                action: { selectedPlatform = platform }
-                            )
-                        }
-                    }
-                }
+    private var searchAndFiltersSection: some View {
+        VStack(spacing: 12) {
+            // Search bar
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.secondary)
+                TextField("Search posts...", text: $searchText)
             }
-            .padding()
+            .padding(8)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(8)
             
-            // Table
-            Table(filteredPosts, selection: $selectedPosts) {
-                TableColumn("Caption") { post in
-                    Text(post.caption)
-                        .lineLimit(2)
-                }
-                
-                TableColumn("Platform") { post in
-                    HStack(spacing: 4) {
-                        ForEach(post.postPlatforms, id: \.self) { platform in
-                            Text(platform.displayName)
-                                .font(.caption)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(platform == .threads ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
-                                .foregroundColor(platform == .threads ? .purple : .blue)
-                                .cornerRadius(4)
-                        }
+            // Filter chips
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    FilterChip(
+                        title: "All",
+                        isSelected: selectedStatus == nil && selectedPlatform == nil,
+                        action: { selectedStatus = nil; selectedPlatform = nil }
+                    )
+                    
+                    ForEach(PostStatus.allCases, id: \.self) { status in
+                        FilterChip(
+                            title: status.displayName,
+                            isSelected: selectedStatus == status,
+                            action: { selectedStatus = status }
+                        )
                     }
-                }
-                
-                TableColumn("Status") { post in
-                    StatusBadge(status: post.postStatus)
-                }
-                
-                TableColumn("Scheduled") { post in
-                    if let scheduledDate = post.scheduledDate {
-                        Text(scheduledDate, format: .dateTime.month().day().hour().minute())
-                    } else {
-                        Text("—")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                TableColumn("Engagement") { post in
-                    if let engagementRate = post.engagementRate {
-                        Text(String(format: "%.1f%%", engagementRate))
-                    } else {
-                        Text("—")
-                            .foregroundColor(.secondary)
+                    
+                    ForEach(Platform.allCases, id: \.self) { platform in
+                        FilterChip(
+                            title: platform.displayName,
+                            isSelected: selectedPlatform == platform,
+                            action: { selectedPlatform = platform }
+                        )
                     }
                 }
             }
         }
+        .padding()
+    }
+    
+    private var tableSection: some View {
+        Table(filteredPosts, selection: $selectedPosts) {
+            TableColumn("Caption") { post in
+                Text(post.caption)
+                    .lineLimit(2)
+                    .contextMenu {
+                        Button("Edit") {
+                            // TODO: Open editor
+                        }
+                        Button("Duplicate") {
+                            duplicatePost(post)
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            deleteSinglePost(post)
+                        }
+                    }
+            }
+            .width(min: 200, ideal: 300)
+            
+            TableColumn("Platform") { post in
+                HStack(spacing: 4) {
+                    ForEach(post.postPlatforms, id: \.self) { platform in
+                        Text(platform.displayName)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(platform == .threads ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
+                            .foregroundColor(platform == .threads ? .purple : .blue)
+                            .cornerRadius(4)
+                    }
+                }
+            }
+            .width(min: 120)
+            
+            TableColumn("Status") { post in
+                PostStatusBadge(status: CloutmateShared.PostStatus(rawValue: post.status) ?? .draft)
+            }
+            .width(min: 100)
+            
+            TableColumn("Scheduled") { post in
+                if let scheduledDate = post.scheduledDate {
+                    Text(scheduledDate, format: .dateTime.month().day().hour().minute())
+                } else {
+                    Text("—")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .width(min: 150)
+            
+            TableColumn("Engagement") { post in
+                if let engagementRate = post.engagementRate {
+                    Text(String(format: "%.1f%%", engagementRate))
+                } else {
+                    Text("—")
+                        .foregroundColor(.secondary)
+                }
+            }
+            .width(min: 100)
+        }
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            DatabaseViewPicker(
+                selectedView: $selectedViewType,
+                onManageProperties: { showPropertyEditor = true }
+            )
+            .padding(.top)
+            
+            searchAndFiltersSection
+            
+            Group {
+                switch selectedViewType {
+                case .table:
+            tableSection
+                case .kanban:
+                    KanbanBoardView(posts: filteredPosts)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .gallery:
+                    PostGalleryView(posts: filteredPosts)
+                case .timeline:
+                    PostTimelineView(posts: filteredPosts)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                @unknown default:
+                    EmptyView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .background(Color(.windowBackgroundColor))
         .navigationTitle("List")
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshViewsFromMenuBar"))) { _ in
+            // Refresh view when notification received from menu bar
+            refreshID = UUID()
+        }
+        .id(refreshID)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 if !selectedPosts.isEmpty {
@@ -134,7 +190,7 @@ struct ListTableView: View {
                             exportSelectedPosts()
                         }
                         
-                        Button("Delete", systemImage: "trash") {
+                        Button("Delete Selected", systemImage: "trash") {
                             deleteSelectedPosts()
                         }
                         
@@ -147,10 +203,28 @@ struct ListTableView: View {
                 Button("New Post") {
                     showComposer = true
                 }
+                
+                if !filteredPosts.isEmpty && selectedPosts.count == filteredPosts.count && filteredPosts.count > 1 {
+                    Button("Delete All", systemImage: "trash.fill") {
+                        showDeleteAllConfirmation = true
+                    }
+                    .foregroundColor(.red)
+                }
             }
+        }
+        .alert("Delete All Posts?", isPresented: $showDeleteAllConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete All", role: .destructive) {
+                deleteAllPosts()
+            }
+        } message: {
+            Text("This will permanently delete all \(filteredPosts.count) posts shown in the list. This action cannot be undone.")
         }
         .sheet(isPresented: $showComposer) {
             ComposerWindow()
+        }
+        .sheet(isPresented: $showPropertyEditor) {
+            CustomPropertyEditor()
         }
     }
     
@@ -197,6 +271,15 @@ struct ListTableView: View {
         }
     }
     
+    private func deleteAllPosts() {
+        withAnimation {
+            for post in filteredPosts {
+                modelContext.delete(post)
+            }
+            selectedPosts.removeAll()
+        }
+    }
+    
     private func archiveSelectedPosts() {
         let postsToArchive = posts.filter { selectedPosts.contains($0.id) }
         withAnimation {
@@ -209,6 +292,26 @@ struct ListTableView: View {
             }
             selectedPosts.removeAll()
         }
+    }
+    
+    private func deleteSinglePost(_ post: Post) {
+        withAnimation {
+            modelContext.delete(post)
+            if selectedPosts.contains(post.id) {
+                selectedPosts.remove(post.id)
+            }
+        }
+    }
+    
+    private func duplicatePost(_ post: Post) {
+        let duplicatedPost = Post(
+            caption: post.caption,
+            mediaURLs: post.mediaURLs,
+            scheduledDate: nil,
+            platforms: post.postPlatforms.map { $0.rawValue },
+            status: PostStatus.draft.rawValue
+        )
+        modelContext.insert(duplicatedPost)
     }
 }
 

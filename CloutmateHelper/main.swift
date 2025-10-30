@@ -8,11 +8,15 @@
 import Foundation
 import AppKit
 
-// Create and configure the helper app
-let app = NSApplication.shared
-let delegate = CloutmateHelperApp()
-app.delegate = delegate
+Task { @MainActor in
+    // Create and configure the helper app
+    let app = NSApplication.shared
+    let delegate = CloutmateHelperApp()
+    app.delegate = delegate
+    
+    // Run the application
+    app.run()
+}
 
-// Run the application
-app.run()
-
+// Keep the process alive
+RunLoop.main.run()

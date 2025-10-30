@@ -17,36 +17,67 @@ final class LoginItemService {
     private init() {}
     
     func enableLoginItem() -> Bool {
-        Logger.xpc.info("Enabling login item: \(self.helperID)")
+        Logger.xpc.debug("Enabling login item: \(self.helperID)")
         
         if #available(macOS 13.0, *) {
             do {
                 let service = SMAppService.loginItem(identifier: helperID)
+                
+                // Check if already registered
+                if service.status == .enabled {
+                    Logger.xpc.debug("Login item already enabled")
+                    return true
+                }
+                
                 try service.register()
+                Logger.xpc.info("Successfully registered login item")
                 return true
             } catch {
-                Logger.xpc.error("Failed to register login item: \(error.localizedDescription)")
+                // Note: Helper app may not be built yet in development
+                // This is expected and will work once the app is properly built
+                Logger.xpc.debug("Could not register login item (likely helper not built): \(error.localizedDescription)")
                 return false
             }
         } else {
-            return SMLoginItemSetEnabled(helperID as CFString, true)
+            let result = SMLoginItemSetEnabled(helperID as CFString, true)
+            if result {
+                Logger.xpc.info("Successfully enabled login item (legacy)")
+            } else {
+                Logger.xpc.debug("Could not enable login item (legacy)")
+            }
+            return result
         }
     }
     
     func disableLoginItem() -> Bool {
-        Logger.xpc.info("Disabling login item: \(self.helperID)")
+        Logger.xpc.debug("Disabling login item: \(self.helperID)")
         
         if #available(macOS 13.0, *) {
             do {
                 let service = SMAppService.loginItem(identifier: helperID)
+                
+                // Check if not registered
+                if service.status != .enabled {
+                    Logger.xpc.debug("Login item not registered")
+                    return true
+                }
+                
                 try service.unregister()
+                Logger.xpc.info("Successfully unregistered login item")
                 return true
             } catch {
-                Logger.xpc.error("Failed to unregister login item: \(error.localizedDescription)")
+                // This may fail if the helper was never registered
+                Logger.xpc.debug("Could not unregister login item: \(error.localizedDescription)")
                 return false
             }
         } else {
-            return SMLoginItemSetEnabled(helperID as CFString, false)
+            let result = SMLoginItemSetEnabled(helperID as CFString, false)
+            if result {
+                Logger.xpc.info("Successfully disabled login item (legacy)")
+            } else {
+                Logger.xpc.debug("Could not disable login item (legacy)")
+            }
+            return result
         }
     }
     
@@ -54,13 +85,10 @@ final class LoginItemService {
         if #available(macOS 13.0, *) {
             let service = SMAppService.loginItem(identifier: helperID)
             let status = service.status
-            // Error 22 means the service isn't registered yet, which means it's disabled
-            if status == .enabled {
-                return true
-            } else {
-                // Not enabled or not found
-                return false
-            }
+            
+            // Status can be: .notFound (when not registered), .enabled, or .notApproved
+            // Only return true if explicitly enabled
+            return status == .enabled
         } else {
             guard let loginItems = SMCopyAllJobDictionaries(kSMDomainUserLaunchd).takeRetainedValue() as? [[String: Any]] else {
                 return false

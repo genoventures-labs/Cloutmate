@@ -6,9 +6,12 @@
 //
 
 import SwiftUI
+import CloutmateShared
 
 struct PostSummaryCard: View {
-    let post: Post
+    let post: CloutmateShared.Post
+    
+    @State private var isHovered = false
     
     var body: some View {
         HStack(spacing: 12) {
@@ -37,16 +40,20 @@ struct PostSummaryCard: View {
             Spacer()
             
             // Status badge
-            StatusBadge(status: post.postStatus)
+            PostStatusBadge(status: post.postStatus)
         }
         .padding()
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(8)
+        .glassPanel(tier: .contentCard, cornerRadius: 10)
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .animation(GlassMotion.Easing.spring, value: isHovered)
+        .onHover { hovering in
+            isHovered = hovering
+        }
     }
 }
 
-struct StatusBadge: View {
-    let status: PostStatus
+struct PostStatusBadge: View {
+    let status: CloutmateShared.PostStatus
     
     var body: some View {
         Text(status.displayName)
@@ -60,7 +67,7 @@ struct StatusBadge: View {
     }
 }
 
-extension PostStatus {
+extension CloutmateShared.PostStatus {
     var color: Color {
         switch self {
         case .draft: return .gray
@@ -68,12 +75,13 @@ extension PostStatus {
         case .publishing: return .orange
         case .published: return .green
         case .failed: return .red
+        @unknown default: return .gray
         }
     }
 }
 
 #Preview {
-    PostSummaryCard(post: Post(caption: "Sample post caption", platforms: ["threads"]))
+    PostSummaryCard(post: CloutmateShared.Post(caption: "Sample post caption", platforms: ["threads"]))
         .padding()
 }
 

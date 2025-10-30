@@ -6,56 +6,78 @@
 //
 
 import Foundation
+import SwiftData
+import CloutmateShared
+import os.log
 
 final class BackgroundScheduler {
     static let shared = BackgroundScheduler()
     
     private var timer: Timer?
-    private var scheduledPosts: [String: ScheduledPost] = [:]
+    private let modelContainer: ModelContainer
     
-    private init() {}
-    
-    struct ScheduledPost {
-        let postID: String
-        let scheduledDate: Date
-        let caption: String
-        let mediaURLs: [String]
-        let platforms: [String]
+    private init() {
+        self.modelContainer = SharedDataManager.createSharedModelContainer()
     }
     
     func start() {
-        Logger.xpc.info("Starting background scheduler")
+        os_log("Starting background scheduler", log: .default, type: .info)
+        
+        // Check immediately on start
+        checkScheduledPosts()
+        
         timer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             self?.checkScheduledPosts()
         }
     }
     
-    func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String]) {
-        scheduledPosts[postID] = ScheduledPost(
-            postID: postID,
-            scheduledDate: scheduledDate,
-            caption: caption,
-            mediaURLs: mediaURLs,
-            platforms: platforms
-        )
-        Logger.xpc.info("Scheduled post \(postID) for \(scheduledDate)")
-    }
-    
     func checkScheduledPosts() {
-        let now = Date()
-        let postsToPublish = scheduledPosts.values.filter { $0.scheduledDate <= now }
+        let context = modelContainer.mainContext
         
-        for post in postsToPublish {
-            publishPost(post)
-            scheduledPosts.removeValue(forKey: post.postID)
+        // Check for scheduled posts ready to publish
+        let scheduledDescriptor = FetchDescriptor<Post>(
+            predicate: #Predicate { $0.status == "scheduled" }
+        )
+        
+        guard let scheduledPosts = try? context.fetch(scheduledDescriptor) else {
+            os_log("Failed to fetch scheduled posts from SwiftData", log: .default, type: .error)
+            return
+        }
+        
+        let now = Date()
+        
+        for post in scheduledPosts where post.scheduledDate ?? .distantFuture <= now {
+            os_log("Publishing scheduled post: %@", log: .default, type: .info, post.id.uuidString)
+            
+            post.postStatus = .publishing
+            try? context.save()
+            
+            Task {
+                await publishPost(post)
+            }
+        }
+        
+        // Also check for immediate posts (publishing status, no scheduled date)
+        let publishingDescriptor = FetchDescriptor<Post>(
+            predicate: #Predicate { $0.status == "publishing" && $0.scheduledDate == nil }
+        )
+        
+        guard let publishingPosts = try? context.fetch(publishingDescriptor) else {
+            return
+        }
+        
+        for post in publishingPosts {
+            os_log("Publishing immediate post: %@", log: .default, type: .info, post.id.uuidString)
+            
+        Task {
+                await publishPost(post)
+            }
         }
     }
     
-    private func publishPost(_ post: ScheduledPost) {
-        Logger.publishing.info("Publishing post: \(post.postID)")
-        Task {
-            await PostPublisher.shared.publish(post)
-        }
+    private func publishPost(_ post: Post) async {
+        let publisher = PostPublisher.shared
+        await publisher.publish(post, context: modelContainer.mainContext)
     }
 }
 

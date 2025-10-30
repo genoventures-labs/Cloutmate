@@ -8,6 +8,10 @@
 	<string>139e514b760dd135c65195793e62d091</string>
 	<key>MetaRedirectURI</key>
 	<string>https://oauth.kosmicapps.com/auth/callback</string>
+	<key>SMLoginItemIdentifiers</key>
+	<array>
+		<string>com.kosmicapps.Cloutmate.Helper</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

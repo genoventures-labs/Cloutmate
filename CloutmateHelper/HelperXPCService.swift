@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os.log
 
 class HelperXPCService: NSObject, NSXPCListenerDelegate, CloutmateHelperProtocol {
     func listener(_ listener: NSXPCListener, shouldAcceptNewConnection newConnection: NSXPCConnection) -> Bool {
@@ -15,24 +16,20 @@ class HelperXPCService: NSObject, NSXPCListenerDelegate, CloutmateHelperProtocol
         return true
     }
     
-    func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String]) {
-        Logger.xpc.info("Received schedule request for post: \(postID)")
-        BackgroundScheduler.shared.schedulePost(
-            postID: postID,
-            scheduledDate: scheduledDate,
-            caption: caption,
-            mediaURLs: mediaURLs,
-            platforms: platforms
-        )
+    // schedulePost is deprecated - scheduler now reads from SwiftData directly
+    @objc func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String], pageIDs: [String: String]) {
+        os_log("schedulePost called but no longer needed - scheduler reads from SwiftData", log: .default, type: .default)
+        // Just trigger a check - the post should already be in SwiftData
+        checkScheduledPosts()
     }
     
     func fetchInsights(postID: String) {
-        Logger.xpc.info("Received insights fetch request for post: \(postID)")
+        os_log("Received insights fetch request for post: %{public}@", log: .default, type: .info, postID)
         InsightsPoller.shared.fetchInsights(for: postID)
     }
     
     func checkScheduledPosts() {
-        Logger.xpc.info("Received check scheduled posts request")
+        os_log("Received check scheduled posts request", log: .default, type: .info)
         BackgroundScheduler.shared.checkScheduledPosts()
     }
 }

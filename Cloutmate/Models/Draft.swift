@@ -18,6 +18,12 @@ final class Draft {
     var updatedAt: Date = Date()
     var notes: String?
     
+    // Draft lifecycle tracking
+    var associatedPostID: UUID?
+    var convertedAt: Date?
+    var scheduledOrPublishedDate: Date?
+    var isArchived: Bool = false
+    
     init(
         caption: String = "",
         mediaURLs: [String] = [],
@@ -31,6 +37,7 @@ final class Draft {
         self.createdAt = Date()
         self.updatedAt = Date()
         self.notes = notes
+        self.isArchived = false
     }
     
     func toPost(platforms: [Platform], scheduledDate: Date?) -> Post {

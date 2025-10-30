@@ -8,71 +8,102 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import CloutmateShared
 
 struct MonthlyCalendarView: View {
     @Environment(\.modelContext) private var modelContext
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     @Binding var selectedDate: Date
+    @Binding var showingComposer: Bool
+    @Binding var prefilledDate: Date?
+    @Binding var showingPostPreview: Bool
+    @Binding var selectedPost: CloutmateShared.Post?
     
     @State private var displayedMonth = Date()
+    @State private var showPostListSheet = false
+    @State private var postsForSelectedDate: [CloutmateShared.Post] = []
+    @State private var selectedDateForList = Date()
     
     private let calendar = Calendar.current
     private let daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     
     var body: some View {
         VStack(spacing: 0) {
-            // Month header
+            // Month header with Glass Buttons
             HStack {
-                Button(action: previousMonth) {
-                    Image(systemName: "chevron.left")
-                        .font(.title3)
-                        .foregroundColor(.accentColor)
-                }
-                .buttonStyle(.plain)
+                GlassButton(icon: "chevron.left", style: .iconOnly, tier: .overlay, tintColor: .blue, action: previousMonth)
+                    .frame(width: 32, height: 32)
                 
                 Spacer()
                 
                 Text(displayedMonth, format: .dateTime.month(.wide).year())
-                    .font(.title)
+                    .font(.system(.title, design: .rounded))
                     .fontWeight(.bold)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
                 
                 Spacer()
                 
-                Button(action: nextMonth) {
-                    Image(systemName: "chevron.right")
-                        .font(.title3)
-                        .foregroundColor(.accentColor)
-                }
-                .buttonStyle(.plain)
+                GlassButton(icon: "chevron.right", style: .iconOnly, tier: .overlay, tintColor: .blue, action: nextMonth)
+                    .frame(width: 32, height: 32)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(.ultraThinMaterial)
             
             // Days of week
             HStack {
                 ForEach(daysOfWeek, id: \.self) { day in
                     Text(day)
-                        .font(.caption)
+                        .font(.system(.caption, design: .rounded))
                         .fontWeight(.semibold)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal)
+            .padding(.horizontal, 20)
+            .background(
+                LinearGradient(
+                    colors: [Color.secondary.opacity(0.06), Color.secondary.opacity(0.02)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             
-            // Calendar grid
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+            // Calendar grid with Floating Glass Capsules
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
                 ForEach(calendarDays, id: \.self) { date in
-                    CalendarDayCell(
+                    GlassCalendarDayCell(
                         date: date,
                         posts: postsForDate(date),
                         isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
-                        isCurrentMonth: calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month)
+                        isToday: calendar.isDateInToday(date),
+                        isCurrentMonth: calendar.isDate(date, equalTo: displayedMonth, toGranularity: .month),
+                        onPostClick: { post in
+                            selectedPost = post
+                            showingPostPreview = true
+                        },
+                        onSelect: {
+                            selectedDate = date
+                            selectedDateForList = date
+                            postsForSelectedDate = postsForDate(date)
+                            showPostListSheet = true
+                        },
+                        onDoubleClick: {
+                            // Double-click to schedule post on future date or today
+                            let today = Date()
+                            if calendar.isDateInToday(date) || date > today {
+                                prefilledDate = date
+                                showingComposer = true
+                            }
+                        }
                     )
-                    .onTapGesture {
-                        selectedDate = date
-                    }
                     .onDrop(of: [.text], delegate: PostDropDelegate(
                         targetDate: date,
                         posts: posts,
@@ -80,7 +111,21 @@ struct MonthlyCalendarView: View {
                     ))
                 }
             }
-            .padding()
+            .padding(20)
+            .background(.ultraThinMaterial.opacity(0.3))
+        }
+        .background(Color(.windowBackgroundColor))
+        .sheet(isPresented: $showPostListSheet) {
+            CalendarPostListSheet(
+                date: selectedDateForList,
+                posts: postsForSelectedDate,
+                selectedPost: $selectedPost,
+                isPresented: $showPostListSheet,
+                onPostTap: { post in
+                    showingPostPreview = true
+                    showPostListSheet = false
+                }
+            )
         }
     }
     
@@ -95,10 +140,16 @@ struct MonthlyCalendarView: View {
         }
     }
     
-    private func postsForDate(_ date: Date) -> [Post] {
+    private func postsForDate(_ date: Date) -> [CloutmateShared.Post] {
         posts.filter { post in
-            guard let scheduledDate = post.scheduledDate else { return false }
-            return calendar.isDate(scheduledDate, inSameDayAs: date)
+            // Check both scheduledDate and publishedDate
+            if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
+                return true
+            }
+            if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
+                return true
+            }
+            return false
         }
     }
     
@@ -117,9 +168,10 @@ struct MonthlyCalendarView: View {
 
 struct CalendarDayCell: View {
     let date: Date
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     let isSelected: Bool
     let isCurrentMonth: Bool
+    var onPostClick: ((CloutmateShared.Post) -> Void)?
     
     private let calendar = Calendar.current
     private var isToday: Bool {
@@ -140,8 +192,12 @@ struct CalendarDayCell: View {
                 HStack(spacing: 3) {
                     ForEach(posts.prefix(2), id: \.id) { post in
                         Image(systemName: post.postPlatforms.contains(.threads) ? "t.square.fill" : "f.square.fill")
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundColor(post.postPlatforms.contains(.threads) ? .purple : .blue)
+                            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+                            .onTapGesture {
+                                onPostClick?(post)
+                            }
                     }
                     if posts.count > 2 {
                         Text("+\(posts.count - 2)")
@@ -149,30 +205,42 @@ struct CalendarDayCell: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                .padding(.top, 2)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 80)
         .background(
             Group {
                 if isToday {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.accentColor)
+                    LinearGradient(
+                        colors: [Color.accentColor, Color.accentColor.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 } else if isSelected {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.accentColor.opacity(0.2))
+                    LinearGradient(
+                        colors: [Color.accentColor.opacity(0.15), Color.accentColor.opacity(0.1)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 } else if isWeekend {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.secondary.opacity(0.05))
+                    LinearGradient(
+                        colors: [Color.secondary.opacity(0.08), Color.secondary.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
                 } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.clear)
+                    Color.clear
                 }
             }
         )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(isSelected && !isToday ? Color.accentColor : Color.clear, lineWidth: 2)
         )
+        .shadow(color: posts.isEmpty ? .clear : (isSelected ? Color.accentColor.opacity(0.3) : .black.opacity(0.05)), radius: isSelected ? 4 : 2, x: 0, y: isSelected ? 2 : 1)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
     
     private var dayNumber: String {
@@ -181,7 +249,7 @@ struct CalendarDayCell: View {
         return formatter.string(from: date)
     }
     
-    private func colorForPost(_ post: Post) -> Color {
+    private func colorForPost(_ post: CloutmateShared.Post) -> Color {
         if post.postPlatforms.contains(.threads) {
             return .purple
         } else if post.postPlatforms.contains(.facebook) {
@@ -192,6 +260,18 @@ struct CalendarDayCell: View {
 }
 
 #Preview {
-    MonthlyCalendarView(posts: [], selectedDate: .constant(Date()))
+    @Previewable @State var showingComposer = false
+    @Previewable @State var prefilledDate: Date? = nil
+    @Previewable @State var showingPostPreview = false
+    @Previewable @State var selectedPost: CloutmateShared.Post? = nil
+    
+    MonthlyCalendarView(
+        posts: [],
+        selectedDate: .constant(Date()),
+        showingComposer: $showingComposer,
+        prefilledDate: $prefilledDate,
+        showingPostPreview: $showingPostPreview,
+        selectedPost: $selectedPost
+    )
 }
 

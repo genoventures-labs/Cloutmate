@@ -32,7 +32,10 @@ final class OAuthCallbackServer {
                 self.listener = listener
                 
                 listener.newConnectionHandler = { [weak self] connection in
-                    self?.handleConnection(connection)
+                    guard let self = self else { return }
+                    _Concurrency.Task {
+                        await self.handleConnection(connection)
+                    }
                 }
                 
                 listener.stateUpdateHandler = { state in
@@ -58,7 +61,7 @@ final class OAuthCallbackServer {
         }
     }
     
-    private func handleConnection(_ connection: NWConnection) {
+    private func handleConnection(_ connection: NWConnection) async {
         connection.start(queue: .global())
         
         connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, isComplete, error in

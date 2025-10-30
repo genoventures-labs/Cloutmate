@@ -33,19 +33,10 @@ final class XPCService {
         return connection.remoteObjectProxy as? CloutmateHelperProtocol
     }
     
-    func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String]) {
-        guard let remoteObject = getRemoteObject() else {
-            Logger.xpc.error("Failed to get remote object for scheduling post")
-            return
-        }
-        
-        remoteObject.schedulePost(
-            postID: postID,
-            scheduledDate: scheduledDate,
-            caption: caption,
-            mediaURLs: mediaURLs,
-            platforms: platforms
-        )
+    // Deprecated: schedulePost no longer needed - helper reads from SwiftData directly
+    func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String], pageIDs: [String: String]) {
+        Logger.xpc.info("schedulePost called - triggering immediate check (post should be in SwiftData)")
+        checkScheduledPosts()
     }
     
     func fetchInsights(postID: String) {

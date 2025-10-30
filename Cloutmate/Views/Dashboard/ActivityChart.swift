@@ -7,9 +7,10 @@
 
 import SwiftUI
 import Charts
+import CloutmateShared
 
 struct ActivityChart: View {
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
     
     private var activityData: [ActivityDataPoint] {
         let last14Days = Array(0..<14).map { dayOffset in

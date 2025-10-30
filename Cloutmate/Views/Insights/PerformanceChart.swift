@@ -7,11 +7,13 @@
 
 import SwiftUI
 import Charts
+import CloutmateShared
 
 struct PerformanceChart: View {
-    let posts: [Post]
+    let posts: [CloutmateShared.Post]
+    @State private var isVisible = false
     
-    private var sortedPosts: [Post] {
+    private var sortedPosts: [CloutmateShared.Post] {
         posts.compactMap { post in
             guard post.publishedDate != nil, post.engagementRate != nil else { return nil }
             return post
@@ -27,7 +29,7 @@ struct PerformanceChart: View {
                 )
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color.blue.opacity(0.6), Color.blue.opacity(0.05)],
+                        colors: [Color.gray.opacity(0.3), Color.gray.opacity(0.05)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -38,22 +40,16 @@ struct PerformanceChart: View {
                     x: .value("Date", publishedDate),
                     y: .value("Engagement", engagementRate)
                 )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color.blue, Color.blue.opacity(0.8)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .lineStyle(StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                .foregroundStyle(Color.gray.opacity(0.7))
+                .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                 .interpolationMethod(.catmullRom)
                 
                 PointMark(
                     x: .value("Date", publishedDate),
                     y: .value("Engagement", engagementRate)
                 )
-                .foregroundStyle(Color.blue)
-                .symbolSize(60)
+                .foregroundStyle(Color.gray)
+                .symbolSize(40)
             }
         }
         .chartXAxis {
@@ -76,6 +72,13 @@ struct PerformanceChart: View {
             Rectangle()
                 .fill(Color.clear)
         }
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                isVisible = true
+            }
+        }
+        .opacity(isVisible ? 1 : 0)
+        .scaleEffect(isVisible ? 1 : 0.95)
     }
 }
 

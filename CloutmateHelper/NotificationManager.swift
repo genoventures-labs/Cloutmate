@@ -7,6 +7,7 @@
 
 import Foundation
 import UserNotifications
+import os.log
 
 final class NotificationManager {
     static let shared = NotificationManager()
@@ -16,7 +17,7 @@ final class NotificationManager {
     func requestAuthorization() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             if let error = error {
-                Logger.publishing.error("Notification authorization error: \(error.localizedDescription)")
+                os_log("Notification authorization error: %{public}@", log: .default, type: .error, error.localizedDescription)
             }
         }
     }
