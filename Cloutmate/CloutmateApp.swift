@@ -24,6 +24,9 @@ struct CloutmateApp: App {
     @StateObject private var accessibilityGlassManager = AccessibilityGlassManager()
     @StateObject private var distributedNotificationManager: DistributedNotificationManager
     @StateObject private var themeManager = ReactiveThemeManager.shared
+    @StateObject private var focusRitualManager = FocusRitualManager.shared
+    @StateObject private var smartNudgeService = SmartNudgeService.shared
+    @State private var ritualsStarted = false
     
     static let sharedModelContainer: ModelContainer = CloutmateApp.createAppModelContainer()
 
@@ -44,6 +47,7 @@ struct CloutmateApp: App {
                         checkAndRunMigration()
                         registerGlobalHotkey()
                         startARTE()
+                        startRitualSystemsIfNeeded()
                     }
             }
             .modelContainer(CloutmateApp.sharedModelContainer)
@@ -101,6 +105,14 @@ struct CloutmateApp: App {
         publishingTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { _ in
             checkAndPublishScheduledPosts()
         }
+    }
+
+    private func startRitualSystemsIfNeeded() {
+        guard !ritualsStarted else { return }
+        ritualsStarted = true
+        let context = CloutmateApp.sharedModelContainer.mainContext
+        focusRitualManager.start(modelContext: context)
+        smartNudgeService.start(modelContext: context)
     }
     
     private func checkAndPublishScheduledPosts() {
@@ -274,7 +286,12 @@ extension CloutmateApp {
             WorkflowTemplate.self,
             // AI & Phase 7 models (ARTE)
             ARTEConfiguration.self,
-            StateTransitionHistory.self
+            StateTransitionHistory.self,
+            // Phase 8 models (Rituals)
+            FocusRitual.self,
+            RitualCompletion.self,
+            WeeklyReview.self,
+            SmartNudge.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"

@@ -52,6 +52,13 @@ struct AnalyticsSnapshot: Identifiable, Sendable {
     let memoryNodes: Int
     let conceptCount: Int
     let graphDensity: Double
+
+    // Ritual metrics (Phase 8)
+    let ritualCompletionRate: Double
+    let morningRitualStreak: Int
+    let eveningRitualStreak: Int
+    let lastWeeklyReview: Date?
+    let nudgeResponseRate: Double
 }
 
 /// Emotional trend over time
@@ -143,6 +150,11 @@ final class AnalyticsEngine {
         let contentMetrics = gatherContentMetrics(start: startDate, end: endDate, modelContext: modelContext)
         let learningMetrics = gatherLearningMetrics(start: startDate, end: endDate, modelContext: modelContext)
         let graphMetrics = gatherGraphMetrics(modelContext: modelContext)
+        let ritualSummary = RitualAnalytics.shared.generateSummary(
+            for: timeRange,
+            customRange: customRange,
+            modelContext: modelContext
+        )
         
         return AnalyticsSnapshot(
             startDate: startDate,
@@ -170,7 +182,12 @@ final class AnalyticsEngine {
             activeThemes: graphMetrics.activeThemes,
             memoryNodes: graphMetrics.nodes,
             conceptCount: graphMetrics.concepts,
-            graphDensity: graphMetrics.density
+            graphDensity: graphMetrics.density,
+            ritualCompletionRate: ritualSummary.completionRate,
+            morningRitualStreak: ritualSummary.morningStreak,
+            eveningRitualStreak: ritualSummary.eveningStreak,
+            lastWeeklyReview: ritualSummary.lastWeeklyReview,
+            nudgeResponseRate: ritualSummary.nudgeResponseRate
         )
     }
     
@@ -440,6 +457,14 @@ final class AnalyticsEngine {
         }
         
         return trends.reversed()
+    }
+
+    /// Get ritual completion trend over time
+    func getRitualCompletionTrend(
+        days: Int,
+        modelContext: ModelContext
+    ) -> [(date: Date, completionRate: Double)] {
+        RitualAnalytics.shared.completionTrend(days: days, modelContext: modelContext)
     }
 }
 

@@ -47,6 +47,74 @@ struct SettingsView: View {
                     AIAssistantSection()
                 }
                 
+                // Rituals & Nudges
+                GlassCard(showHeader: true, headerContent: {
+                    AnyView(
+                        HStack {
+                            Image(systemName: "target")
+                                .foregroundColor(.kosmicBlue)
+                            Text("Rituals & Nudges")
+                                .font(.headline)
+                        }
+                    )
+                }) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        let settings = RitualSettings.shared
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Morning Ritual")
+                                .font(.subheadline.weight(.semibold))
+                            Text(formatTime(settings.morningTime))
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Evening Reflection")
+                                .font(.subheadline.weight(.semibold))
+                            Text(formatTime(settings.eveningTime))
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Weekly Review")
+                                .font(.subheadline.weight(.semibold))
+                            Text("\(weekdayName(settings.weeklyReviewDay)) \(formatTime(settings.weeklyReviewTime))")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Divider()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Smart Nudges")
+                                .font(.subheadline.weight(.semibold))
+                            Text(settings.nudgesEnabled ? "Enabled" : "Disabled")
+                                .font(.footnote)
+                                .foregroundColor(settings.nudgesEnabled ? .kosmicGreen : .secondary)
+                        }
+
+                        NavigationLink {
+                            RitualSettingsView()
+                                .navigationTitle("Rituals & Nudges")
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text("Open Ritual Controls")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                            .padding(.vertical, 8)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
                 // Accounts section
                 GlassCard(showHeader: true, headerContent: {
                     AnyView(
@@ -177,6 +245,22 @@ struct SettingsView: View {
         }
         .background(Color(.windowBackgroundColor))
         .navigationTitle("Settings")
+    }
+}
+
+private extension SettingsView {
+    func formatTime(_ components: DateComponents) -> String {
+        var dateComponents = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        dateComponents.hour = components.hour
+        dateComponents.minute = components.minute
+        let date = Calendar.current.date(from: dateComponents) ?? Date()
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    func weekdayName(_ weekday: Int) -> String {
+        let symbols = Calendar.current.weekdaySymbols
+        let index = max(0, min(symbols.count - 1, weekday - 1))
+        return symbols[index]
     }
 }
 

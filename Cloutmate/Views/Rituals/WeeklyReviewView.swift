@@ -2,434 +2,467 @@
 //  WeeklyReviewView.swift
 //  Cloutmate
 //
-//  Weekly review ritual workflow
+//  Phase 8: Cognitive Loop Completion
+//  Guided five-step weekly review ritual
 //
 
 import SwiftUI
 import SwiftData
+import Charts
 import CloutmateShared
 
 struct WeeklyReviewView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var inboxItems: [CloutmateShared.InboxItem]
-    @Query private var tasks: [CloutmateShared.Task]
-    @Query private var projects: [CloutmateShared.Project]
-    @Query private var posts: [CloutmateShared.Post]
-    
-    @State private var currentStep = ReviewStep.clearInbox
-    @State private var completedSteps: Set<ReviewStep> = []
-    @State private var weekLearnings = ""
-    @State private var nextWeekPriorities = ""
-    
-    enum ReviewStep: String, CaseIterable {
-        case clearInbox = "Clear Inbox"
-        case reviewProjects = "Review Projects"
-        case checkTasks = "Check Tasks"
-        case schedulePosts = "Schedule Posts"
-        case captureLearnings = "Capture Learnings"
-        
-        var icon: String {
-            switch self {
-            case .clearInbox: return "tray.fill"
-            case .reviewProjects: return "folder.fill"
-            case .checkTasks: return "checkmark.circle"
-            case .schedulePosts: return "calendar"
-            case .captureLearnings: return "brain.head.profile"
-            }
-        }
-        
-        var description: String {
-            switch self {
-            case .clearInbox: return "Process all items in your inbox"
-            case .reviewProjects: return "Update project status and plan ahead"
-            case .checkTasks: return "Review and organize upcoming tasks"
-            case .schedulePosts: return "Schedule content for the next week"
-            case .captureLearnings: return "Capture insights and plan next week"
-            }
-        }
-    }
-    
-    var unconvertedInbox: [InboxItem] {
-        inboxItems.filter { $0.convertedAt == nil }
-    }
-    
-    var upcomingTasks: [Task] {
-        let today = Date()
-        let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: today) ?? Date()
-        return tasks.filter { task in
-            guard let due = task.dueDate else { return false }
-            return due <= nextWeek && task.status != .done
-        }
-    }
-    
-    var activeProjects: [Project] {
-        projects.filter { $0.status == .active }
-    }
-    
-    var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "calendar.badge.clock")
-                            .foregroundStyle(Color.kosmicBlue)
-                            .font(.largeTitle)
-                        Text("Weekly Review")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                    }
-                    
-                    Text("Let's get your week organized")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    
-                    // Progress indicator
-                    HStack(spacing: 8) {
-                        ForEach(ReviewStep.allCases, id: \.self) { step in
-                            Circle()
-                                .fill(completedSteps.contains(step) ? Color.kosmicGreen : Color.gray.opacity(0.3))
-                                .frame(width: 12, height: 12)
-                        }
-                    }
-                }
-                .glassPanel(tier: .overlay, cornerRadius: 12)
-                .padding()
-                
-                // Current step content
-                switch currentStep {
-                case .clearInbox:
-                    ClearInboxStep(items: unconvertedInbox, onComplete: { markComplete(.clearInbox) })
-                case .reviewProjects:
-                    ReviewProjectsStep(projects: activeProjects, onComplete: { markComplete(.reviewProjects) })
-                case .checkTasks:
-                    CheckTasksStep(tasks: upcomingTasks, onComplete: { markComplete(.checkTasks) })
-                case .schedulePosts:
-                    SchedulePostsStep(posts: posts, onComplete: { markComplete(.schedulePosts) })
-                case .captureLearnings:
-                    CaptureLearningsStep(
-                        learnings: $weekLearnings,
-                        priorities: $nextWeekPriorities,
-                        onComplete: { saveReview() }
-                    )
-                }
-                
-                // Navigation
-                HStack {
-                    if currentStep != ReviewStep.allCases.first {
-                        Button("Previous") {
-                            previousStep()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    
-                    Spacer()
-                    
-                    if currentStep != ReviewStep.allCases.last {
-                        Button("Next") {
-                            nextStep()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    } else {
-                        Button("Complete Review") {
-                            saveReview()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(weekLearnings.isEmpty && nextWeekPriorities.isEmpty)
-                    }
-                }
-                .padding()
-            }
-        }
-        .background(Color.clear)
-        .navigationTitle("Weekly Review")
-    }
-    
-    private func nextStep() {
-        markComplete(currentStep)
-        if let currentIndex = ReviewStep.allCases.firstIndex(of: currentStep),
-           currentIndex < ReviewStep.allCases.count - 1 {
-            currentStep = ReviewStep.allCases[currentIndex + 1]
-        }
-    }
-    
-    private func previousStep() {
-        if let currentIndex = ReviewStep.allCases.firstIndex(of: currentStep),
-           currentIndex > 0 {
-            currentStep = ReviewStep.allCases[currentIndex - 1]
-        }
-    }
-    
-    private func markComplete(_ step: ReviewStep) {
-        completedSteps.insert(step)
-    }
-    
-    private func saveReview() {
-        // Create summary note
-        let noteTitle = "Weekly Review - \(Date().formatted(date: .complete, time: .omitted))"
-        let noteContent = """
-        # Weekly Review
-        
-        ## Key Learnings
-        \(weekLearnings)
-        
-        ## Next Week Priorities
-        \(nextWeekPriorities)
-        
-        ## Completed Steps
-        \(completedSteps.map { "- \($0.rawValue)" }.joined(separator: "\n"))
-        """
-        
-        let reviewNote = Note(title: noteTitle, markdown: noteContent, tags: ["review", "weekly"])
-        modelContext.insert(reviewNote)
-        
-        try? modelContext.save()
-    }
-}
+    @Bindable var review: WeeklyReview
 
-struct ClearInboxStep: View {
-    let items: [InboxItem]
-    let onComplete: () -> Void
-    
-    @Environment(\.modelContext) private var modelContext
-    
+    @State private var step: ReviewStep = .clearInbox
+    @State private var inboxItems: [InboxItem] = []
+    @State private var topCPSItems: [PriorityItem] = []
+    @State private var insightsDraft: String = ""
+    @State private var recommendationsDraft: String = ""
+    @State private var nextFocusInputs: [String] = ["", "", ""]
+    @State private var isGeneratingInsights = false
+    @State private var completionState: CompletionState = .idle
+    @State private var focusGravityTrend: [(Date, Double)] = []
+
+    private enum CompletionState: Equatable {
+        case idle
+        case saving
+        case success
+        case failure(String)
+    }
+
+    enum ReviewStep: Int, CaseIterable, Identifiable {
+        case clearInbox
+        case reviewCPS
+        case distillInsights
+        case recommendations
+        case nextFocus
+
+        var id: Int { rawValue }
+
+        var title: String {
+            switch self {
+            case .clearInbox: return "1. Clear Inbox"
+            case .reviewCPS: return "2. CPS Shifts"
+            case .distillInsights: return "3. Distill Insights"
+            case .recommendations: return "4. Recommendations"
+            case .nextFocus: return "5. Next Week"
+            }
+        }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Step 1: Clear Your Inbox")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            if items.isEmpty {
-                VStack(spacing: 12) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(Color.kosmicGreen)
-                    
-                    Text("Inbox is empty!")
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                    
-                    Text("Great work keeping your inbox clean.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 24) {
+            header
+            stepSelector
+            stepContent
+            metricsPanel
+            finalizeSection
+        }
+        .padding(24)
+        .background(Color(.windowBackgroundColor))
+        .task {
+            await loadData()
+        }
+        .animation(.easeInOut(duration: 0.2), value: step)
+        .animation(.easeInOut(duration: 0.2), value: completionState)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Weekly Review")
+                .font(.system(size: 32, weight: .bold))
+            Text("Reveal your patterns and set the next focus orbit")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var stepSelector: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(ReviewStep.allCases) { current in
+                    Button {
+                        step = current
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(current.title)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(step == current ? .white : .primary)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(step == current ? KosmicPalette.violet : Color.secondary.opacity(0.1))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var stepContent: some View {
+        switch step {
+        case .clearInbox:
+            inboxStep
+        case .reviewCPS:
+            cpsStep
+        case .distillInsights:
+            insightsStep
+        case .recommendations:
+            recommendationsStep
+        case .nextFocus:
+            nextFocusStep
+        }
+    }
+
+    private var inboxStep: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Clear Inbox of Stale Items", systemImage: "tray.fill")
+                    .font(.system(size: 18, weight: .semibold))
+
+                if inboxItems.isEmpty {
+                    Text("Your inbox is clear. Capture velocity is healthy.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Review these inbox items and mark the ones you resolved or archived.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+
+                    ForEach(inboxItems, id: \.id) { item in
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "square.and.pencil")
+                                .foregroundColor(KosmicPalette.cyan)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.content)
+                                    .font(.system(size: 14, weight: .semibold))
+                                Text("Captured \(item.createdAt.formatted(.dateTime.month().day()))")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(12)
+                        .background(Color.secondary.opacity(0.05))
+                        .cornerRadius(12)
+                    }
+
+                    Button("Mark Inbox Cleared") {
+                        review.inboxItemsCleared = inboxItems.count
+                        inboxItems.removeAll()
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(22)
+        }
+    }
+
+    private var cpsStep: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Review Top CPS Shifts", systemImage: "chart.bar.doc.horizontal")
+                    .font(.system(size: 18, weight: .semibold))
+
+                if topCPSItems.isEmpty {
+                    Text("Aurora is still calibrating your CPS scores. Keep capturing and completing work.")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(topCPSItems.prefix(5), id: \.objectId) { item in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(item.title)
+                                .font(.system(size: 15, weight: .semibold))
+                            Text(item.detail)
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                            Text(String(format: "Score: %.2f", item.score))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(KosmicPalette.violet)
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.secondary.opacity(0.05))
+                        .cornerRadius(12)
+                    }
+                }
+            }
+            .padding(22)
+        }
+    }
+
+    private var insightsStep: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Label("Distill Insights", systemImage: "brain.head.profile")
+                        .font(.system(size: 18, weight: .semibold))
+                    Spacer()
+                    if isGeneratingInsights {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    } else {
+                        Button("AI Summary") {
+                            _Concurrency.Task {
+                                await generateInsightsSummary()
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                }
+
+                TextEditor(text: $insightsDraft)
+                    .frame(minHeight: 180)
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.secondary.opacity(0.1))
+                    )
+
+                Text("Capture the patterns Aurora surfaced this week: what pulled focus, what accelerated momentum, and what you learned.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .padding(22)
+        }
+    }
+
+    private var recommendationsStep: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Recommendations", systemImage: "paperplane")
+                    .font(.system(size: 18, weight: .semibold))
+
+                TextEditor(text: $recommendationsDraft)
+                    .frame(minHeight: 140)
+                    .padding(12)
+                    .background(Color.secondary.opacity(0.05))
+                    .cornerRadius(12)
+
+                Text("Consider who should know about these insights. Would you share them with your team, community, or future self?")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .padding(22)
+        }
+    }
+
+    private var nextFocusStep: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                Label("Next Week’s Focuses", systemImage: "target")
+                    .font(.system(size: 18, weight: .semibold))
+
+                ForEach(0..<nextFocusInputs.count, id: \.self) { index in
+                    TextField("Focus #\(index + 1)", text: $nextFocusInputs[index])
+                        .textFieldStyle(.roundedBorder)
+                }
+
+                Text("Aurora will surface these during morning rituals to keep your orbit aligned.")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+            .padding(22)
+        }
+    }
+
+    private var metricsPanel: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Weekly Metrics")
+                    .font(.system(size: 18, weight: .semibold))
+
+                HStack(spacing: 18) {
+                    metricTile(title: "Focus Gravity", value: review.focusGravityScore, format: "%.2f", icon: "globe")
+                    metricTile(title: "Capture Velocity", value: review.captureVelocity, format: "%.1f", icon: "tray.and.arrow.down")
+                    metricTile(title: "Output Velocity", value: review.outputVelocity, format: "%.1f", icon: "bolt.fill")
+                    metricTile(title: "Clarity Index", value: review.clarityIndex, format: "%.0f%%", icon: "sparkles")
+                }
+
+                if !focusGravityTrend.isEmpty {
+                    Chart {
+                        ForEach(focusGravityTrend, id: \.0) { point in
+                            LineMark(
+                                x: .value("Date", point.0, unit: .day),
+                                y: .value("Gravity", point.1)
+                            )
+                            .foregroundStyle(KosmicPalette.violet)
+                        }
+                    }
+                    .frame(height: 150)
+                }
+            }
+            .padding(22)
+        }
+    }
+
+    private func metricTile(title: String, value: Double, format: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(KosmicPalette.violet)
+                .font(.system(size: 20))
+            Text(String(format: format, value))
+                .font(.system(size: 20, weight: .bold))
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color.secondary.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    private var finalizeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                finalizeReview()
+            } label: {
+                HStack {
+                    if case .saving = completionState {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    Text("Complete Weekly Review")
+                        .font(.system(size: 16, weight: .bold))
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
-                .glassPanel(tier: .contentCard, cornerRadius: 12)
-                .padding(.horizontal)
-                
-                Button("Mark Complete") {
-                    onComplete()
-                }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal)
-            } else {
-                Text("You have \(items.count) unconverted items in your inbox")
-                    .font(.body)
-                    .padding(.horizontal)
-                
-                ForEach(items.prefix(5)) { item in
-                    HStack {
-                        Text(item.content)
-                            .lineLimit(2)
-                            .font(.body)
-                        Spacer()
-                        Button("Convert") {
-                            // Quick convert to note
-                            let note = Note(title: item.content.prefix(50).description, markdown: item.content)
-                            modelContext.insert(note)
-                            item.convertedAt = Date()
-                            item.convertedToType = "note"
-                            try? modelContext.save()
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    .padding()
-                    .glassPanel(tier: .contentCard, cornerRadius: 8)
-                    .padding(.horizontal)
-                }
-                
-                if items.count > 5 {
-                    Text("+ \(items.count - 5) more items")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                }
+                .padding(.vertical, 14)
             }
-        }
-    }
-}
+            .buttonStyle(.borderedProminent)
+            .disabled(isSaving)
 
-struct ReviewProjectsStep: View {
-    let projects: [Project]
-    let onComplete: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Step 2: Review Projects")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            if projects.isEmpty {
-                Text("No active projects to review")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .padding()
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
-                
-                Button("Mark Complete") {
-                    onComplete()
+            switch completionState {
+            case .success:
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Weekly review saved. Aurora updated your Clarity Index.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal)
-            } else {
-                ForEach(projects.prefix(5)) { project in
-                    HStack {
-                        Image(systemName: "folder.fill")
-                            .foregroundStyle(Color.kosmicBlue)
-                        Text(project.title)
-                            .font(.body)
-                        Spacer()
-                        ProjectStatusBadge(status: project.status)
-                    }
-                    .padding()
-                    .glassPanel(tier: .contentCard, cornerRadius: 8)
-                    .padding(.horizontal)
+            case let .failure(message):
+                HStack {
+                    Image(systemName: "exclamationmark.octagon.fill")
+                        .foregroundColor(.orange)
+                    Text(message)
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
                 }
+            default:
+                EmptyView()
             }
         }
     }
-}
 
-struct CheckTasksStep: View {
-    let tasks: [Task]
-    let onComplete: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Step 3: Check Tasks")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            if tasks.isEmpty {
-                Text("No tasks due this week")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .padding()
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
-                
-                Button("Mark Complete") {
-                    onComplete()
-                }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal)
-            } else {
-                ForEach(tasks.prefix(5)) { task in
-                    TaskRow(task: task)
-                        .padding(.horizontal)
-                }
-            }
-        }
+    private var isSaving: Bool {
+        if case .saving = completionState { return true }
+        return false
     }
-}
 
-struct SchedulePostsStep: View {
-    let posts: [CloutmateShared.Post]
-    let onComplete: () -> Void
-    
-    var upcomingPosts: [CloutmateShared.Post] {
-        let nextWeek = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
-        return posts.filter { post in
-            guard let scheduled = post.scheduledDate else { return false }
-            return scheduled <= nextWeek && post.postStatus != .published
-        }
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Step 4: Schedule Posts")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            if upcomingPosts.isEmpty {
-                Text("No posts to schedule this week")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .padding()
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
-                
-                Button("Mark Complete") {
-                    onComplete()
-                }
-                .buttonStyle(.borderedProminent)
-                .padding(.horizontal)
-            } else {
-                ForEach(upcomingPosts.prefix(5)) { post in
-                    PostPreviewRow(post: post)
-                        .padding(.horizontal)
-                }
-            }
-        }
-    }
-}
+    // MARK: - Data Loading
 
-struct CaptureLearningsStep: View {
-    @Binding var learnings: String
-    @Binding var priorities: String
-    let onComplete: () -> Void
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Step 5: Capture Learnings")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("What went well this week?")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                TextEditor(text: $learnings)
-                    .frame(height: 100)
-                    .padding(8)
-                    .glassPanel(tier: .contentCard, cornerRadius: 8)
-            }
-            .padding(.horizontal)
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Top 3 priorities for next week:")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                TextEditor(text: $priorities)
-                    .frame(height: 100)
-                    .padding(8)
-                    .glassPanel(tier: .contentCard, cornerRadius: 8)
-            }
-            .padding(.horizontal)
+    private func loadData() async {
+        await loadInbox()
+        await loadCPS()
+        await loadMetrics()
+    }
+
+    private func loadInbox() async {
+        let descriptor = FetchDescriptor<InboxItem>(
+            predicate: #Predicate { $0.convertedAt == nil },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        let items = (try? modelContext.fetch(descriptor)) ?? []
+        await MainActor.run {
+            inboxItems = items
         }
     }
-}
 
-// MARK: - Supporting Views
-private struct ProjectStatusBadge: View {
-    let status: ProjectStatus
-    
-    var body: some View {
-        Text(status.displayName)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(status.color.opacity(0.2))
-            .foregroundColor(status.color)
-            .cornerRadius(6)
+    private func loadCPS() async {
+        let items = PriorityEngine.shared.getTopObjects(limit: 5, modelContext: modelContext)
+        await MainActor.run {
+            topCPSItems = items
+        }
+    }
+
+    private func loadMetrics() async {
+        let snapshot = AnalyticsEngine.shared.generateSnapshot(for: .thisWeek, modelContext: modelContext)
+        await MainActor.run {
+            review.focusGravityScore = snapshot.avgPriorityScore
+            review.captureVelocity = Double(snapshot.tasksCreated)
+            review.outputVelocity = Double(snapshot.tasksCompleted)
+            review.clarityIndex = snapshot.learningScore * 100
+            focusGravityTrend = RitualAnalytics.shared.completionTrend(days: 14, modelContext: modelContext)
+        }
+    }
+
+    // MARK: - Actions
+
+    private func generateInsightsSummary() async {
+        isGeneratingInsights = true
+        let cpsSummary = topCPSItems.map { "- \($0.title) (score \(String(format: "%.2f", $0.score)))" }.joined(separator: "\n")
+        let prompt = "Summarize weekly focus shifts based on these priority items:\n\(cpsSummary). Provide 2-3 concise insights."
+        do {
+            let response = try await GeminiService.shared.generateResponse(for: prompt)
+            await MainActor.run {
+                insightsDraft = response
+                isGeneratingInsights = false
+            }
+        } catch {
+            await MainActor.run {
+                insightsDraft = "Aurora couldn't generate insights right now. Capture your own takeaways."
+                isGeneratingInsights = false
+            }
+        }
+    }
+
+    private func finalizeReview() {
+        guard !isSaving else { return }
+        completionState = .saving
+
+        _Concurrency.Task { @MainActor in
+            review.summary = buildSummary()
+            review.insights = insightsDraft
+            review.recommendations = recommendationsDraft
+            review.nextFocuses = nextFocusInputs.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            review.markStarted()
+            review.markCompleted()
+            review.metadata["completedAt"] = Date().description
+
+            RitualAnalytics.shared.recordWeeklyReview(review, modelContext: modelContext)
+            completionState = .success
+        }
+    }
+
+    private func buildSummary() -> String {
+        let focuses = review.nextFocuses.joined(separator: ", ")
+        return "Inbox cleared: \(review.inboxItemsCleared). Focus gravity: \(String(format: "%.2f", review.focusGravityScore)). Next focuses: \(focuses)."
     }
 }
 
 #Preview {
-    WeeklyReviewView()
-        .modelContainer(for: [CloutmateShared.InboxItem.self, CloutmateShared.Task.self, CloutmateShared.Project.self, CloutmateShared.Post.self, CloutmateShared.Note.self])
+    do {
+        let container = try ModelContainer(
+            for: WeeklyReview.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let review = WeeklyReview(scheduledFor: Date())
+        container.mainContext.insert(review)
+        return WeeklyReviewView(review: review)
+            .modelContainer(container)
+            .frame(width: 880, height: 760)
+    } catch {
+        return Text("Preview unavailable")
+    }
 }
-

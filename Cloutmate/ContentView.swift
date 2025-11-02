@@ -39,6 +39,10 @@ struct ContentView: View {
             // Main window content
             MainWindowView()
         }
+        .overlay(alignment: .top) {
+            NudgeOverlayView()
+                .padding(.top, 12)
+        }
         .onAppear {
             updateColorScheme()
         }

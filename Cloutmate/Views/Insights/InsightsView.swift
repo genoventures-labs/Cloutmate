@@ -21,6 +21,7 @@ struct InsightsView: View {
     @State private var isLoading = false
     @State private var selectedTab: InsightTab = .overview
     @State private var autoRefreshTimer: Timer?
+    @State private var ritualTrend: [(Date, Double)] = []
     
     var body: some View {
         VStack(spacing: 0) {
@@ -224,6 +225,11 @@ struct InsightsView: View {
             
             // ARTE Status Indicator (Phase 7)
             EmotionalStateIndicator()
+            
+            // Focus Ritual Metrics
+            if currentSnapshot != nil {
+                focusRitualsCard
+            }
             
             // Aurora's Current Experiment
             if let snapshot = currentSnapshot, snapshot.feedbackEventsCount > 0 {
@@ -492,6 +498,7 @@ struct InsightsView: View {
         )
         await MainActor.run {
             currentSnapshot = snapshot
+            ritualTrend = AnalyticsEngine.shared.getRitualCompletionTrend(days: 14, modelContext: modelContext)
             isLoading = false
         }
     }
@@ -629,6 +636,86 @@ struct InsightsView: View {
     private func stopAutoRefresh() {
         autoRefreshTimer?.invalidate()
         autoRefreshTimer = nil
+    }
+}
+
+// MARK: - Focus Ritual Metrics Card
+
+extension InsightsView {
+    private var focusRitualsCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 16) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "target")
+                        .foregroundColor(KosmicPalette.violet)
+                    Text("Focus Rituals")
+                        .font(.system(size: 18, weight: .bold))
+                    Spacer()
+                    if let snapshot = currentSnapshot {
+                        Text(String(format: "%.0f%%", snapshot.ritualCompletionRate * 100))
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(KosmicPalette.violet)
+                    }
+                }
+
+                if let snapshot = currentSnapshot {
+                    HStack(spacing: 16) {
+                        ritualMetric(title: "Morning Streak", value: "\(snapshot.morningRitualStreak) days")
+                        ritualMetric(title: "Evening Streak", value: "\(snapshot.eveningRitualStreak) days")
+                        ritualMetric(
+                            title: "Nudge Response",
+                            value: String(format: "%.0f%%", snapshot.nudgeResponseRate * 100)
+                        )
+                        if let lastReview = snapshot.lastWeeklyReview {
+                            ritualMetric(title: "Last Review", value: lastReview.formatted(date: .abbreviated, time: .omitted))
+                        } else {
+                            ritualMetric(title: "Last Review", value: "Pending")
+                        }
+                    }
+                }
+
+                if !ritualTrend.isEmpty {
+                    Chart {
+                        ForEach(ritualTrend, id: \.0) { point in
+                            LineMark(
+                                x: .value("Date", point.0, unit: .day),
+                                y: .value("Completion", point.1)
+                            )
+                            .interpolationMethod(.catmullRom)
+                            .foregroundStyle(KosmicPalette.violet)
+                            AreaMark(
+                                x: .value("Date", point.0, unit: .day),
+                                y: .value("Completion", point.1)
+                            )
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [KosmicPalette.violet.opacity(0.35), .clear],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        }
+                    }
+                    .frame(height: 120)
+                } else {
+                    Text("Complete a few rituals to unlock consistency insights.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(18)
+        }
+    }
+
+    private func ritualMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(value)
+                .font(.system(size: 16, weight: .bold))
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

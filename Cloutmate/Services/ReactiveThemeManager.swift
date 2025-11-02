@@ -48,6 +48,18 @@ final class ReactiveThemeManager: ObservableObject {
         logger.info("ARTE: ReactiveThemeManager initialized")
     }
     
+    var emotionalStatePublisher: AnyPublisher<EmotionalState, Never> {
+        $currentState.eraseToAnyPublisher()
+    }
+
+    var emotionalConfidencePublisher: AnyPublisher<Double, Never> {
+        $confidence.eraseToAnyPublisher()
+    }
+
+    func currentEmotion() -> EmotionalState {
+        currentState
+    }
+    
     // MARK: - Lifecycle
     
     /// Start ARTE with model context
