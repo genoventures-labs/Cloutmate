@@ -105,7 +105,7 @@ struct CalendarPostListSheet: View {
                     .font(.headline)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .purple],
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -170,7 +170,7 @@ struct PostRow: View {
                         Text(String(format: "%.1f%%", engagementRate))
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundColor(.green)
+                            .foregroundColor(.kosmicGreen)
                         Text("Engagement")
                             .font(.caption2)
                             .foregroundColor(.secondary)
@@ -182,7 +182,7 @@ struct PostRow: View {
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isHovered ? Color.blue.opacity(0.5) : Color.clear, lineWidth: 1)
+                    .stroke(isHovered ? Color.kosmicBlue.opacity(0.5) : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

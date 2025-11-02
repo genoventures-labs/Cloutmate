@@ -18,14 +18,14 @@ struct PlatformComparisonView: View {
             PlatformStatsCard(
                 platform: .threads,
                 posts: threadPosts,
-                color: .purple
+                color: .kosmicPurple
             )
             
             // Facebook stats
             PlatformStatsCard(
                 platform: .facebook,
                 posts: facebookPosts,
-                color: .blue
+                color: .kosmicBlue
             )
         }
     }

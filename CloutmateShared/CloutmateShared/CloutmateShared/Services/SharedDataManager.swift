@@ -13,7 +13,6 @@ public final class SharedDataManager {
         let schema = Schema([
             // Shared models
             Post.self,
-            Draft.self,
             Template.self,
             PlatformAccount.self,
             PerformancePrediction.self,

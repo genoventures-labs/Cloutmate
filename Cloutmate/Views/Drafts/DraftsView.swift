@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import CloutmateShared
 
 struct DraftsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -113,7 +114,7 @@ struct DraftsView: View {
                 if draft.scheduledOrPublishedDate != nil {
                     let isScheduled = draft.associatedPostID != nil
                     let statusText = isScheduled ? "Scheduled" : "Published"
-                    let statusColor = isScheduled ? Color.blue : Color.green
+                    let statusColor = isScheduled ? Color.kosmicBlue : Color.kosmicGreen
                     
                     HStack(spacing: 6) {
                         Circle()
@@ -130,7 +131,7 @@ struct DraftsView: View {
                 } else {
                     Text("Ready")
                         .font(.caption)
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                 }
             }
             .width(min: 100)
@@ -144,8 +145,8 @@ struct DraftsView: View {
                                     .font(.caption2)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.1))
-                                    .foregroundColor(.blue)
+                                    .background(Color.kosmicBlue.opacity(0.1))
+                                    .foregroundColor(.kosmicBlue)
                                     .cornerRadius(4)
                             }
                             if draft.tags.count > 3 {
@@ -310,8 +311,10 @@ struct DraftsView: View {
         draftToConvert = draft
     }
     
-    private func applyTemplate(_ template: Template, to draft: Draft) {
-        template.apply(toDraft: draft)
+    private func applyTemplate(_ template: CloutmateShared.Template, to draft: Draft) {
+        draft.caption = template.caption
+        draft.tags = template.tags
+        draft.updatedAt = Date()
     }
     
     private func handleDraftKept(draft: Draft, result: DraftConversionResult) {
@@ -382,7 +385,7 @@ struct DraftRow: View {
                     // Draft has been converted
                     let isScheduled = draft.associatedPostID != nil
                     let statusText = isScheduled ? "Scheduled" : "Published"
-                    let statusColor = isScheduled ? Color.blue : Color.green
+                    let statusColor = isScheduled ? Color.kosmicBlue : Color.kosmicGreen
                     
                     Text("\(statusText) \(date, format: .dateTime.month().day().hour().minute())")
                         .font(.caption)
@@ -402,10 +405,10 @@ struct DraftRow: View {
                 } else {
                     Text("Ready")
                         .font(.caption)
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.green.opacity(0.1))
+                        .background(Color.kosmicGreen.opacity(0.1))
                         .cornerRadius(4)
                 }
             }
@@ -528,10 +531,10 @@ struct DraftListItem: View {
             .glassPanel(
                 tier: isSelected ? .overlay : .contentCard,
                 cornerRadius: 12,
-                tintColor: isSelected ? Color.blue.opacity(0.15) : nil
+                tintColor: isSelected ? Color.kosmicBlue.opacity(0.15) : nil
             )
             .shadow(
-                color: isSelected ? .blue.opacity(0.2) : .black.opacity(0.05),
+                color: isSelected ? Color.kosmicBlue.opacity(0.2) : .black.opacity(0.05),
                 radius: isSelected ? 8 : 2,
                 y: isSelected ? 4 : 1
             )

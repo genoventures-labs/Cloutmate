@@ -11,9 +11,9 @@ import CloutmateShared
 
 struct WeeklyReviewView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var inboxItems: [InboxItem]
-    @Query private var tasks: [Task]
-    @Query private var projects: [Project]
+    @Query private var inboxItems: [CloutmateShared.InboxItem]
+    @Query private var tasks: [CloutmateShared.Task]
+    @Query private var projects: [CloutmateShared.Project]
     @Query private var posts: [CloutmateShared.Post]
     
     @State private var currentStep = ReviewStep.clearInbox
@@ -73,7 +73,7 @@ struct WeeklyReviewView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "calendar.badge.clock")
-                            .foregroundStyle(.blue.gradient)
+                            .foregroundStyle(Color.kosmicBlue)
                             .font(.largeTitle)
                         Text("Weekly Review")
                             .font(.largeTitle)
@@ -88,7 +88,7 @@ struct WeeklyReviewView: View {
                     HStack(spacing: 8) {
                         ForEach(ReviewStep.allCases, id: \.self) { step in
                             Circle()
-                                .fill(completedSteps.contains(step) ? Color.green : Color.gray.opacity(0.3))
+                                .fill(completedSteps.contains(step) ? Color.kosmicGreen : Color.gray.opacity(0.3))
                                 .frame(width: 12, height: 12)
                         }
                     }
@@ -203,7 +203,7 @@ struct ClearInboxStep: View {
                 VStack(spacing: 12) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 60))
-                        .foregroundStyle(.green.gradient)
+                        .foregroundStyle(Color.kosmicGreen)
                     
                     Text("Inbox is empty!")
                         .font(.title3)
@@ -287,11 +287,11 @@ struct ReviewProjectsStep: View {
                 ForEach(projects.prefix(5)) { project in
                     HStack {
                         Image(systemName: "folder.fill")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Color.kosmicBlue)
                         Text(project.title)
                             .font(.body)
                         Spacer()
-                        StatusBadge(status: project.status)
+                        ProjectStatusBadge(status: project.status)
                     }
                     .padding()
                     .glassPanel(tier: .contentCard, cornerRadius: 8)
@@ -412,8 +412,24 @@ struct CaptureLearningsStep: View {
     }
 }
 
+// MARK: - Supporting Views
+private struct ProjectStatusBadge: View {
+    let status: ProjectStatus
+    
+    var body: some View {
+        Text(status.displayName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(status.color.opacity(0.2))
+            .foregroundColor(status.color)
+            .cornerRadius(6)
+    }
+}
+
 #Preview {
     WeeklyReviewView()
-        .modelContainer(for: [InboxItem.self, Task.self, Project.self, Post.self, Note.self])
+        .modelContainer(for: [CloutmateShared.InboxItem.self, CloutmateShared.Task.self, CloutmateShared.Project.self, CloutmateShared.Post.self, CloutmateShared.Note.self])
 }
 

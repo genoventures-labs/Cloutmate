@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CloutmateShared
 
 enum AITool: String, CaseIterable {
     case brainstorm = "Brainstorm Ideas"
@@ -70,6 +71,8 @@ actor AICreativeService {
             return 5000
         case .threads:
             return 500
+        @unknown default:
+            return 500
         }
     }
     
@@ -79,6 +82,8 @@ actor AICreativeService {
             return "Facebook posts perform well with storytelling, asking questions, and sharing personal experiences. Keep it conversational and authentic."
         case .threads:
             return "Threads favors concise, engaging content with emojis. Make it punchy and conversation-starting."
+        @unknown default:
+            return "Focus on clear, engaging copy tailored to the platform's audience."
         }
     }
 }

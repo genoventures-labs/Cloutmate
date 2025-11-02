@@ -50,7 +50,7 @@ struct ContentPerformanceChart: View {
             .cornerRadius(8)
         }
         .chartForegroundStyleScale([
-            "With Media": Color.green.opacity(0.7),
+            "With Media": Color.kosmicGreen.opacity(0.7),
             "Text Only": Color.gray.opacity(0.7)
         ])
         .chartYAxis {

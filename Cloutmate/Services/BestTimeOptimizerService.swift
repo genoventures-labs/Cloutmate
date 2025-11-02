@@ -10,8 +10,8 @@ import SwiftData
 import CloutmateShared
 import os.log
 
-
-actor BestTimeOptimizerService {
+@MainActor
+final class BestTimeOptimizerService {
     static let shared = BestTimeOptimizerService()
     
     private init() {}

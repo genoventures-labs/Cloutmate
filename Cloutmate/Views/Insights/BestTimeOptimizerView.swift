@@ -87,9 +87,9 @@ struct BestTimeOptimizerView: View {
                             if index == 0 {
                                 Text("Best")
                                     .font(.caption)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.kosmicGreen)
                                     .padding(6)
-                                    .background(Color.green.opacity(0.1))
+                                    .background(Color.kosmicGreen.opacity(0.1))
                                     .cornerRadius(6)
                             }
                         }
@@ -114,7 +114,7 @@ struct BestTimeOptimizerView: View {
                                     Spacer()
                                     Text(test.status == .active ? "Active" : "Completed")
                                         .font(.caption)
-                                        .foregroundColor(test.status == .active ? .blue : .secondary)
+                                        .foregroundColor(test.status == .active ? .kosmicBlue : .secondary)
                                 }
                                 
                                 HStack(spacing: 12) {
@@ -125,7 +125,7 @@ struct BestTimeOptimizerView: View {
                                             "Winner: \(winning.formatted(date: .omitted, time: .shortened))",
                                             systemImage: "checkmark.circle"
                                         )
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.kosmicGreen)
                                         .font(.caption)
                                     }
                                 }

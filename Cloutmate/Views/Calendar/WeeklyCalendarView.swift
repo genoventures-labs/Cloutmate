@@ -27,7 +27,7 @@ struct WeeklyCalendarView: View {
         VStack(spacing: 0) {
             // Week header with Glass Buttons
             HStack {
-                GlassButton(icon: "chevron.left", style: .iconOnly, tier: .overlay, tintColor: .blue, action: previousWeek)
+                GlassButton(icon: "chevron.left", style: .iconOnly, tintColor: .kosmicBlue, action: previousWeek)
                     .frame(width: 32, height: 32)
                 
                 Spacer()
@@ -37,7 +37,7 @@ struct WeeklyCalendarView: View {
                     .fontWeight(.bold)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .purple],
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -45,7 +45,7 @@ struct WeeklyCalendarView: View {
                 
                 Spacer()
                 
-                GlassButton(icon: "chevron.right", style: .iconOnly, tier: .overlay, tintColor: .blue, action: nextWeek)
+                GlassButton(icon: "chevron.right", style: .iconOnly, tintColor: .kosmicBlue, action: nextWeek)
                     .frame(width: 32, height: 32)
             }
             .padding(.horizontal, 20)
@@ -166,7 +166,7 @@ struct DayColumn: View {
             GlassPanel(
                 tier: isSelected ? .overlay : .contentCard,
                 cornerRadius: 12,
-                tintColor: isSelected ? Color.blue.opacity(0.2) : nil
+                tintColor: isSelected ? Color.kosmicBlue.opacity(0.2) : nil
             ) {
                 HStack {
                     Text(dayText)
@@ -183,7 +183,7 @@ struct DayColumn: View {
                 .padding(.vertical, 12)
             }
             .shadow(
-                color: isSelected ? .blue.opacity(0.3) : .black.opacity(0.05),
+                color: isSelected ? Color.kosmicBlue.opacity(0.3) : .black.opacity(0.05),
                 radius: isSelected ? 8 : 2,
                 y: isSelected ? 4 : 1
             )
@@ -227,7 +227,7 @@ struct PostCard: View {
             ForEach(post.postPlatforms, id: \.self) { platform in
                 Image(systemName: platform == .threads ? "t.square.fill" : "f.square.fill")
                     .font(.system(size: 15))
-                    .foregroundColor(platform == .threads ? .purple : .blue)
+                    .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
                     .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
             }
             
@@ -316,4 +316,3 @@ struct PostCard: View {
         selectedPost: $selectedPost
     )
 }
-

@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import CloutmateShared
+import CloutmateShared
 
 final class FacebookService {
     static let shared = FacebookService()
@@ -30,4 +32,3 @@ final class FacebookService {
         return response.id
     }
 }
-

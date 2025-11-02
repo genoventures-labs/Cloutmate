@@ -8,8 +8,10 @@
 import Foundation
 import SwiftData
 import os.log
+import CloutmateShared
 
-actor AIExecutionService {
+@MainActor
+final class AIExecutionService {
     static let shared = AIExecutionService()
     
     private init() {}
@@ -390,6 +392,7 @@ actor AIExecutionService {
 enum ExecutionError: LocalizedError {
     case invalidParameter(String)
     case executionFailed(String)
+    case notFound(String)
     
     var errorDescription: String? {
         switch self {
@@ -397,6 +400,8 @@ enum ExecutionError: LocalizedError {
             return "Invalid parameter: \(message)"
         case .executionFailed(let message):
             return "Execution failed: \(message)"
+        case .notFound(let message):
+            return "Not found: \(message)"
         }
     }
 }

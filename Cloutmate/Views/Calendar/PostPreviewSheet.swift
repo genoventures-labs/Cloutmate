@@ -89,7 +89,7 @@ struct PostPreviewSheet: View {
                 HStack {
                     Image(systemName: platform == .threads ? "t.square.fill" : "f.square.fill")
                         .font(.title3)
-                        .foregroundColor(platform == .threads ? .purple : .blue)
+                        .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
                     
                     Text(platform.displayName)
                         .font(.body)
@@ -237,11 +237,11 @@ struct PostStatusRow: View {
         case .draft:
             return .gray
         case .scheduled:
-            return .blue
+            return .kosmicBlue
         case .publishing:
             return .orange
         case .published:
-            return .green
+            return .kosmicGreen
         case .failed:
             return .red
         @unknown default:

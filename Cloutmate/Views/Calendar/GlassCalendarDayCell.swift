@@ -93,7 +93,7 @@ struct GlassCalendarDayCell: View {
                     .padding(.vertical, 1)
                     .background(
                         Capsule()
-                            .fill(Color.blue.opacity(0.8))
+                            .fill(Color.kosmicBlue.opacity(0.8))
                             .blur(radius: 2)
                     )
             }
@@ -113,7 +113,7 @@ struct GlassCalendarDayCell: View {
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(Color.blue.opacity(0.9))
+                                    .fill(Color.kosmicBlue.opacity(0.9))
                                     .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
                             )
                             .offset(x: -4, y: 4)
@@ -149,7 +149,7 @@ struct GlassCalendarDayCell: View {
         Group {
             if showMorph {
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.blue.opacity(0.3))
+                    .fill(Color.kosmicBlue.opacity(0.3))
                     .blur(radius: 20)
             }
         }
@@ -165,7 +165,7 @@ struct GlassCalendarDayCell: View {
         if !isCurrentMonth {
             return .secondary.opacity(0.5)
         } else if isToday {
-            return .blue
+            return .kosmicBlue
         } else if isSelected {
             return .primary
         } else {
@@ -175,9 +175,9 @@ struct GlassCalendarDayCell: View {
     
     private var tintColor: Color? {
         if isToday {
-            return .blue.opacity(0.15)
+            return .kosmicBlue.opacity(0.15)
         } else if isSelected {
-            return .blue.opacity(0.1)
+            return .kosmicBlue.opacity(0.1)
         } else {
             return nil
         }
@@ -185,9 +185,9 @@ struct GlassCalendarDayCell: View {
     
     private var shadowColor: Color {
         if isToday {
-            return .blue.opacity(0.3)
+            return .kosmicBlue.opacity(0.3)
         } else if isSelected {
-            return .blue.opacity(0.2)
+            return .kosmicBlue.opacity(0.2)
         } else {
             return .black.opacity(0.05)
         }
@@ -211,8 +211,8 @@ struct GlassCalendarDayCell: View {
     
     private func indicatorColor(for post: CloutmateShared.Post) -> Color {
         switch post.postStatus {
-        case .scheduled: return .blue
-        case .published: return .green
+        case .scheduled: return .kosmicBlue
+        case .published: return .kosmicGreen
         case .failed: return .red
         case .publishing: return .orange
         case .draft: return .gray

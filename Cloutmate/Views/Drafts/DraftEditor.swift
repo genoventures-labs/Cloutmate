@@ -52,6 +52,9 @@ struct DraftEditor: View {
                         
                         Spacer()
                         
+                        // Voice Input Button
+                        VoiceInputButton(text: $draft.caption)
+                        
                         // AI Assistant Button (only show if AI is enabled)
                         if AISettings.shared.isAIEnabled {
                             Button(action: {
@@ -65,7 +68,7 @@ struct DraftEditor: View {
                                             .scaleEffect(0.6)
                                     }
                                     Image(systemName: "sparkles")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.kosmicBlue)
                                         .font(.headline)
                                         .symbolEffect(.pulse.byLayer, options: .repeating, isActive: isAIGenerating)
                                 }
@@ -97,7 +100,7 @@ struct DraftEditor: View {
                         GlassPanel(
                             tier: .contentCard,
                             cornerRadius: 14,
-                            tintColor: isContentFocused ? Color.blue.opacity(0.1) : nil
+                            tintColor: isContentFocused ? Color.kosmicBlue.opacity(0.1) : nil
                         ) {
                             ZStack(alignment: .topLeading) {
                                 if draft.caption.isEmpty {
@@ -120,7 +123,7 @@ struct DraftEditor: View {
                                         RoundedRectangle(cornerRadius: 14)
                                             .stroke(
                                                 LinearGradient(
-                                                    colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)],
+                                                    colors: [Color.kosmicBlue.opacity(0.3), Color.kosmicPurple.opacity(0.3)],
                                                     startPoint: .topLeading,
                                                     endPoint: .bottomTrailing
                                                 ),
@@ -161,10 +164,10 @@ struct DraftEditor: View {
                     if showSaveConfirmation {
                         HStack(spacing: 6) {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
+                                .foregroundColor(.kosmicGreen)
                             Text("Saved")
                                 .font(.caption)
-                                .foregroundColor(.green)
+                                .foregroundColor(.kosmicGreen)
                         }
                         .transition(.opacity.combined(with: .scale))
                     }

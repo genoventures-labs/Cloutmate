@@ -7,9 +7,13 @@
 
 import Foundation
 import SwiftData
+import CloutmateShared
+
+fileprivate typealias PARANote = CloutmateShared.Note
+fileprivate typealias PARATask = CloutmateShared.Task
 
 enum TaskExtractionService {
-    static func extractTasksFromNote(_ note: Note, context: ModelContext) throws {
+    fileprivate static func extractTasksFromNote(_ note: PARANote, context: ModelContext) throws {
         let markdown = note.markdown
         
         // Parse markdown checkboxes: - [ ] task text
@@ -72,7 +76,7 @@ enum TaskExtractionService {
         try? context.save()
     }
     
-    static func extractTasksFromHighlights(note: Note, context: ModelContext) throws {
+    fileprivate static func extractTasksFromHighlights(note: PARANote, context: ModelContext) throws {
         for highlight in note.highlights {
             // Try to detect if highlight looks like a task
             if highlight.contains("TODO") || highlight.contains("FIXME") || highlight.contains("REMINDER") {
@@ -105,7 +109,7 @@ enum TaskExtractionService {
 // MARK: - AI-Assisted Task Extraction
 
 extension TaskExtractionService {
-    static func extractTasksWithAI(_ note: Note, context: ModelContext) async throws {
+    fileprivate static func extractTasksWithAI(_ note: PARANote, context: ModelContext) async throws {
         guard AISettings.shared.isAIEnabled else { return }
         
         let markdown = note.markdown

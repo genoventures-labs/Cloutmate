@@ -2,40 +2,38 @@
 //  GlassDivider.swift
 //  Cloutmate
 //
-//  Glassmorphic Harmony UI - Glass Divider Component
+//  Minimal Divider Component
 //
 
 import SwiftUI
 
 struct GlassDivider: View {
-    var thickness: CGFloat = 0.5
-    var opacity: Double = 0.2
+    var thickness: CGFloat = 1
+    var opacity: Double = 1.0 // Legacy parameter, no longer used
+    
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
         Rectangle()
-            .fill(Color.white.opacity(opacity))
-            .frame(height: thickness)
-            .blur(radius: 0.5)
+            .fill(glassColorSystem.dividerColor())
+        .frame(height: thickness)
     }
 }
 
 extension Divider {
-    static func glass(opacity: Double = 0.2) -> some View {
-        GlassDivider(opacity: opacity)
+    static func glass(opacity: Double = 1.0) -> some View {
+        GlassDivider()
     }
 }
 
 #Preview {
     VStack(spacing: 20) {
         Text("Above")
-        
         GlassDivider()
-        
         Text("Below")
-        
-        GlassDivider(thickness: 1, opacity: 0.3)
-        
+        GlassDivider(thickness: 1)
         Text("Thicker")
     }
     .padding()
+    .environmentObject(GlassColorSystem())
 }

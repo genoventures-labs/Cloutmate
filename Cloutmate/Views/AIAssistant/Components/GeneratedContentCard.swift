@@ -18,7 +18,7 @@ struct GeneratedContentCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "sparkles")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                     
                     Text("Generated Content")
                         .font(.headline)
@@ -33,7 +33,7 @@ struct GeneratedContentCard: View {
                         }
                     }) {
                         Image(systemName: copied ? "checkmark.circle.fill" : "doc.on.doc")
-                            .foregroundColor(copied ? .green : .blue)
+                            .foregroundColor(copied ? .kosmicGreen : .kosmicBlue)
                     }
                     .buttonStyle(.plain)
                 }

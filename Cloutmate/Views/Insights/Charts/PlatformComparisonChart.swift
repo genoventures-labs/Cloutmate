@@ -54,8 +54,8 @@ struct PlatformComparisonChart: View {
             .cornerRadius(8)
         }
         .chartForegroundStyleScale([
-            "Threads": Color.purple.opacity(0.7),
-            "Facebook": Color.blue.opacity(0.7)
+            "Threads": Color.kosmicPurple.opacity(0.7),
+            "Facebook": Color.kosmicBlue.opacity(0.7)
         ])
         .chartYAxis {
             AxisMarks(position: .leading) { value in

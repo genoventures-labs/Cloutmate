@@ -12,17 +12,16 @@ import CloutmateShared
 struct ProjectsView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Project.updatedAt, order: .reverse) private var allProjects: [Project]
-    @Query private var allTasks: [Task]
+    @Query(sort: \CloutmateShared.Project.updatedAt, order: .reverse) private var allProjects: [CloutmateShared.Project]
+    @Query private var allTasks: [CloutmateShared.Task]
     @Query private var allAreas: [Area]
     
     @State private var searchText = ""
-    @State private var selectedStatus: ProjectStatus?
+    @State private var selectedStatus: CloutmateShared.ProjectStatus?
     @State private var selectedArea: Area?
     @State private var selectedTags: Set<String> = []
     @State private var selectedProjects = Set<UUID>()
     @State private var showCreateSheet = false
-    @State private var showProjectSheet = false
     @State private var projectToShow: Project?
     @State private var showBulkStatusSheet = false
     @State private var showArchiveConfirmation = false
@@ -134,7 +133,6 @@ struct ProjectsView: View {
                 .contextMenu {
                     Button("Edit") {
                         projectToShow = project
-                        showProjectSheet = true
                     }
                     Button("Duplicate") {
                         duplicateProject(project)
@@ -151,7 +149,7 @@ struct ProjectsView: View {
             .width(min: 200, ideal: 300)
             
             TableColumn("Status") { project in
-                StatusBadge(status: project.status)
+                ProjectStatusBadge(status: project.status)
             }
             .width(min: 100)
             
@@ -181,7 +179,7 @@ struct ProjectsView: View {
                 let taskCount = allTasks.filter { $0.projectId == project.id && $0.status != .done }.count
                 Text("\(taskCount)")
                     .font(.caption)
-                    .foregroundColor(taskCount > 0 ? .blue : .secondary)
+                    .foregroundColor(taskCount > 0 ? .kosmicBlue : .secondary)
             }
             .width(min: 80)
             
@@ -226,10 +224,8 @@ struct ProjectsView: View {
         .sheet(isPresented: $showCreateSheet) {
             CreateProjectSheet()
         }
-        .sheet(isPresented: $showProjectSheet) {
-            if let project = projectToShow {
-                ProjectHubSheet(project: project)
-            }
+        .sheet(item: $projectToShow) { project in
+            ProjectHubSheet(project: project)
         }
         .sheet(isPresented: $showBulkStatusSheet) {
             BulkStatusSheet(projects: filteredProjects.filter { selectedProjects.contains($0.id) }) { newStatus in
@@ -306,7 +302,7 @@ struct ProjectCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.title2)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -323,7 +319,7 @@ struct ProjectCard: View {
                 
                 Spacer()
                 
-                StatusBadge(status: project.status)
+                ProjectStatusBadge(status: project.status)
             }
         }
         .padding()
@@ -520,9 +516,9 @@ struct BulkStatusSheet: View {
 extension ProjectStatus {
     var color: Color {
         switch self {
-        case .active: return .green
+        case .active: return .kosmicGreen
         case .paused: return .orange
-        case .completed: return .blue
+        case .completed: return .kosmicBlue
         }
     }
 }
@@ -573,12 +569,12 @@ struct ProjectHeaderSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text(project.title)
                     .font(.title2)
                     .fontWeight(.semibold)
                 Spacer()
-                StatusBadge(status: project.status)
+                ProjectStatusBadge(status: project.status)
             }
             
             if let goal = project.goal {
@@ -598,7 +594,7 @@ struct ProjectHeaderSection: View {
     }
 }
 
-struct StatusBadge: View {
+private struct ProjectStatusBadge: View {
     let status: ProjectStatus
     
     var body: some View {
@@ -620,7 +616,7 @@ struct ProjectTasksSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "checkmark.circle")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text("Tasks")
                     .font(.headline)
                 Text("(\(tasks.count))")
@@ -651,7 +647,7 @@ struct ProjectNotesSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "doc.text")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.kosmicPurple)
                 Text("Notes")
                     .font(.headline)
                 Text("(\(notes.count))")
@@ -681,7 +677,7 @@ struct ProjectNoteRow: View {
     var body: some View {
         HStack {
             Image(systemName: "doc.text")
-                .foregroundColor(.purple)
+                .foregroundColor(.kosmicPurple)
             
             Text(note.title)
                 .font(.body)
@@ -704,7 +700,7 @@ struct ProjectPostsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "square.and.pencil")
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.kosmicGreen)
                 Text("Posts")
                     .font(.headline)
                 Text("(\(posts.count))")
@@ -730,6 +726,6 @@ struct ProjectPostsSection: View {
 
 #Preview {
     ProjectsView()
-        .modelContainer(for: [Project.self, Task.self, Note.self, Post.self])
+        .modelContainer(for: [CloutmateShared.Project.self, CloutmateShared.Task.self, CloutmateShared.Note.self, CloutmateShared.Post.self])
 }
 

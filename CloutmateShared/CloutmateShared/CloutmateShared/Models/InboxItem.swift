@@ -9,17 +9,17 @@ import Foundation
 import SwiftData
 
 @Model
-final class InboxItem {
-    var id: UUID = UUID()
-    var content: String = ""
-    var itemType: String = "text" // text, image, file, url
-    var fileURL: String?
-    var createdAt: Date = Date()
-    var convertedToType: String? // task, note, post, project
-    var convertedToId: UUID?
-    var convertedAt: Date?
+public final class InboxItem {
+    public var id: UUID = UUID()
+    public var content: String = ""
+    public var itemType: String = "text" // text, image, file, url
+    public var fileURL: String?
+    public var createdAt: Date = Date()
+    public var convertedToType: String? // task, note, post, project
+    public var convertedToId: UUID?
+    public var convertedAt: Date?
     
-    init(
+    public init(
         content: String,
         itemType: String = "text",
         fileURL: String? = nil

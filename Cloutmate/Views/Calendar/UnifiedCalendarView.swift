@@ -12,15 +12,13 @@ import CloutmateShared
 struct UnifiedCalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CloutmateShared.Post.scheduledDate) private var posts: [CloutmateShared.Post]
-    @Query(sort: \Task.dueDate) private var tasks: [Task]
+    @Query(sort: \CloutmateShared.Task.dueDate) private var tasks: [CloutmateShared.Task]
     
     @State private var selectedDate = Date()
     @State private var isWeeklyView = false
     @State private var showingComposer = false
     @State private var prefilledDate: Date?
-    @State private var showingPostPreview = false
     @State private var selectedPost: CloutmateShared.Post?
-    @State private var showingTaskDetail = false
     @State private var selectedTask: Task?
     @State private var draggedItem: Any?
     @State private var showConflictWarning = false
@@ -37,16 +35,16 @@ struct UnifiedCalendarView: View {
                     GlassButton(
                         "Monthly",
                         style: .pill,
-                        tier: !isWeeklyView ? .overlay : .contentCard,
-                        tintColor: .blue,
+                        role: !isWeeklyView ? .primary : .surface,
+                        tintColor: !isWeeklyView ? Color(red: 0.36, green: 0.66, blue: 1.0) : Color.white.opacity(0.35),
                         action: { isWeeklyView = false }
                     )
                     
                     GlassButton(
                         "Weekly",
                         style: .pill,
-                        tier: isWeeklyView ? .overlay : .contentCard,
-                        tintColor: .blue,
+                        role: isWeeklyView ? .primary : .surface,
+                        tintColor: isWeeklyView ? Color(red: 0.36, green: 0.66, blue: 1.0) : Color.white.opacity(0.35),
                         action: { isWeeklyView = true }
                     )
                     
@@ -61,9 +59,7 @@ struct UnifiedCalendarView: View {
                         selectedDate: $selectedDate,
                         showingComposer: $showingComposer,
                         prefilledDate: $prefilledDate,
-                        showingPostPreview: $showingPostPreview,
                         selectedPost: $selectedPost,
-                        showingTaskDetail: $showingTaskDetail,
                         selectedTask: $selectedTask
                     )
                     .background(Color.clear)
@@ -74,9 +70,7 @@ struct UnifiedCalendarView: View {
                         selectedDate: $selectedDate,
                         showingComposer: $showingComposer,
                         prefilledDate: $prefilledDate,
-                        showingPostPreview: $showingPostPreview,
                         selectedPost: $selectedPost,
-                        showingTaskDetail: $showingTaskDetail,
                         selectedTask: $selectedTask
                     )
                     .background(Color.clear)
@@ -87,15 +81,11 @@ struct UnifiedCalendarView: View {
         .sheet(isPresented: $showingComposer) {
             ComposerWindow(prefilledDate: prefilledDate)
         }
-        .sheet(isPresented: $showingPostPreview) {
-            if let post = selectedPost {
-                PostPreviewSheet(post: Binding.constant(post))
-            }
+        .sheet(item: $selectedPost) { post in
+            PostPreviewSheet(post: Binding.constant(post))
         }
-        .sheet(isPresented: $showingTaskDetail) {
-            if let task = selectedTask {
-                TaskDetailSheet(task: task, isPresented: $showingTaskDetail)
-            }
+        .sheet(item: $selectedTask) { task in
+            TaskDetailSheet(task: task)
         }
     }
 }
@@ -106,9 +96,7 @@ struct UnifiedWeeklyCalendarView: View {
     @Binding var selectedDate: Date
     @Binding var showingComposer: Bool
     @Binding var prefilledDate: Date?
-    @Binding var showingPostPreview: Bool
     @Binding var selectedPost: CloutmateShared.Post?
-    @Binding var showingTaskDetail: Bool
     @Binding var selectedTask: Task?
     
     @State private var displayedWeek = Date()
@@ -122,7 +110,7 @@ struct UnifiedWeeklyCalendarView: View {
         VStack(spacing: 0) {
             // Week header
             HStack {
-                GlassButton(icon: "chevron.left", style: .iconOnly, tier: .overlay, tintColor: .blue, action: previousWeek)
+                GlassButton(icon: "chevron.left", style: .iconOnly, tintColor: .kosmicBlue, action: previousWeek)
                     .frame(width: 32, height: 32)
                 
                 Spacer()
@@ -132,7 +120,7 @@ struct UnifiedWeeklyCalendarView: View {
                     .fontWeight(.bold)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .purple],
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -140,7 +128,7 @@ struct UnifiedWeeklyCalendarView: View {
                 
                 Spacer()
                 
-                GlassButton(icon: "chevron.right", style: .iconOnly, tier: .overlay, tintColor: .blue, action: nextWeek)
+                GlassButton(icon: "chevron.right", style: .iconOnly, tintColor: .kosmicBlue, action: nextWeek)
                     .frame(width: 32, height: 32)
             }
             .padding(.horizontal, 20)
@@ -158,11 +146,9 @@ struct UnifiedWeeklyCalendarView: View {
                             isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                             onPostClick: { post in
                                 selectedPost = post
-                                showingPostPreview = true
                             },
                             onTaskClick: { task in
                                 selectedTask = task
-                                showingTaskDetail = true
                             }
                         )
                         .onTapGesture {
@@ -268,9 +254,7 @@ struct UnifiedMonthlyCalendarView: View {
     @Binding var selectedDate: Date
     @Binding var showingComposer: Bool
     @Binding var prefilledDate: Date?
-    @Binding var showingPostPreview: Bool
     @Binding var selectedPost: CloutmateShared.Post?
-    @Binding var showingTaskDetail: Bool
     @Binding var selectedTask: Task?
     
     @State private var currentMonth = Date()
@@ -284,7 +268,7 @@ struct UnifiedMonthlyCalendarView: View {
         VStack(spacing: 0) {
             // Month header
             HStack {
-                GlassButton(icon: "chevron.left", style: .iconOnly, tier: .overlay, tintColor: .blue, action: previousMonth)
+                GlassButton(icon: "chevron.left", style: .iconOnly, tintColor: .kosmicBlue, action: previousMonth)
                     .frame(width: 32, height: 32)
                 
                 Spacer()
@@ -294,7 +278,7 @@ struct UnifiedMonthlyCalendarView: View {
                     .fontWeight(.bold)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .purple],
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -302,7 +286,7 @@ struct UnifiedMonthlyCalendarView: View {
                 
                 Spacer()
                 
-                GlassButton(icon: "chevron.right", style: .iconOnly, tier: .overlay, tintColor: .blue, action: nextMonth)
+                GlassButton(icon: "chevron.right", style: .iconOnly, tintColor: .kosmicBlue, action: nextMonth)
                     .frame(width: 32, height: 32)
             }
             .padding(.horizontal, 20)
@@ -478,7 +462,7 @@ struct UnifiedDayColumn: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.blue)
+                            .background(Color.kosmicBlue)
                             .cornerRadius(8)
                     }
                     
@@ -489,16 +473,16 @@ struct UnifiedDayColumn: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.green)
+                            .background(Color.kosmicGreen)
                             .cornerRadius(8)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .glassPanel(tier: isSelected ? .overlay : .contentCard, cornerRadius: 12, tintColor: isSelected ? Color.blue.opacity(0.2) : nil)
+            .glassPanel(tier: isSelected ? .overlay : .contentCard, cornerRadius: 12, tintColor: isSelected ? Color.kosmicBlue.opacity(0.2) : nil)
             .shadow(
-                color: isSelected ? .blue.opacity(0.3) : .black.opacity(0.05),
+                color: isSelected ? Color.kosmicBlue.opacity(0.3) : .black.opacity(0.05),
                 radius: isSelected ? 8 : 2,
                 y: isSelected ? 4 : 1
             )
@@ -546,7 +530,7 @@ struct TaskCard: View {
         HStack(spacing: 10) {
             // Task icon
             Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(task.status == .done ? .green : .orange)
+                .foregroundColor(task.status == .done ? .kosmicGreen : .orange)
                 .font(.title3)
             
             // Task title
@@ -562,7 +546,7 @@ struct TaskCard: View {
             Group {
                 if isHovering {
                     LinearGradient(
-                        colors: [Color.green.opacity(0.12), Color.green.opacity(0.08)],
+                        colors: [Color.kosmicGreen.opacity(0.12), Color.kosmicGreen.opacity(0.08)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -578,13 +562,13 @@ struct TaskCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
-                    isHovering ? Color.green.opacity(0.4) : Color.green.opacity(0.2),
+                    isHovering ? Color.kosmicGreen.opacity(0.4) : Color.kosmicGreen.opacity(0.2),
                     lineWidth: isHovering ? 1.5 : 1
                 )
         )
         .cornerRadius(12)
         .shadow(
-            color: isHovering ? Color.green.opacity(0.3) : .black.opacity(0.05),
+            color: isHovering ? Color.kosmicGreen.opacity(0.3) : .black.opacity(0.05),
             radius: isHovering ? 4 : 2,
             x: 0,
             y: isHovering ? 2 : 1
@@ -679,8 +663,8 @@ struct UnifiedCalendarListSheet: View {
 }
 
 struct TaskDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
     let task: Task
-    @Binding var isPresented: Bool
     
     var body: some View {
         NavigationStack {
@@ -688,7 +672,7 @@ struct TaskDetailSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack {
                         Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(task.status == .done ? .green : .orange)
+                            .foregroundColor(task.status == .done ? .kosmicGreen : .orange)
                             .font(.title)
                         Text(task.title)
                             .font(.title2)
@@ -712,7 +696,7 @@ struct TaskDetailSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        isPresented = false
+                        dismiss()
                     }
                 }
             }
@@ -751,18 +735,18 @@ struct UnifiedCalendarDayCell: View {
                 Text("\(dayNumber)")
                     .font(.system(.body, design: .rounded))
                     .fontWeight(isToday ? .bold : .regular)
-                    .foregroundColor(isToday ? .blue : (isCurrentMonth ? .primary : .secondary))
+                    .foregroundColor(isToday ? .kosmicBlue : (isCurrentMonth ? .primary : .secondary))
                 
                 // Item count badges
                 HStack(spacing: 2) {
                     if postCount > 0 {
                         Circle()
-                            .fill(Color.blue)
+                            .fill(Color.kosmicBlue)
                             .frame(width: 4, height: 4)
                     }
                     if taskCount > 0 {
                         Circle()
-                            .fill(Color.green)
+                            .fill(Color.kosmicGreen)
                             .frame(width: 4, height: 4)
                     }
                 }
@@ -770,11 +754,11 @@ struct UnifiedCalendarDayCell: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.blue.opacity(0.2) : Color.clear)
+                    .fill(isSelected ? Color.kosmicBlue.opacity(0.2) : Color.clear)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(isToday ? Color.blue : Color.clear, lineWidth: 2)
+                    .stroke(isToday ? Color.kosmicBlue : Color.clear, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
@@ -783,6 +767,5 @@ struct UnifiedCalendarDayCell: View {
 
 #Preview {
     UnifiedCalendarView()
-        .modelContainer(for: [Post.self, Task.self])
+        .modelContainer(for: [CloutmateShared.Post.self, CloutmateShared.Task.self])
 }
-

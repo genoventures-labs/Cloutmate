@@ -144,7 +144,8 @@ struct VoiceRecordModal: View {
                 isPaused = false
                 startDate = Date()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = "⚠️ \(error.localizedDescription)\n\nTip: Check System Settings → Privacy & Security → Microphone and Speech Recognition"
+                isRecording = false
             }
         }
     }

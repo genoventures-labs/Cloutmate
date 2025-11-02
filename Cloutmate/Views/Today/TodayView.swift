@@ -12,10 +12,10 @@ import CloutmateShared
 struct TodayView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @EnvironmentObject private var accessibilityManager: AccessibilityGlassManager
-    @Query private var tasks: [Task]
+    @Query private var tasks: [CloutmateShared.Task]
     @Query private var posts: [CloutmateShared.Post]
-    @Query private var inboxItems: [InboxItem]
-    @Query private var projects: [Project]
+    @Query private var inboxItems: [CloutmateShared.InboxItem]
+    @Query private var projects: [CloutmateShared.Project]
     
     var unconvertedInbox: Int {
         inboxItems.filter { $0.convertedAt == nil }.count
@@ -124,7 +124,7 @@ struct TodayTasksSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "checkmark.circle")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text("Tasks Due Today")
                     .font(.headline)
             }
@@ -149,7 +149,7 @@ struct TaskRow: View {
                 try? modelContext.save()
             }) {
                 Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(task.status == .done ? .green : .blue)
+                    .foregroundColor(task.status == .done ? .kosmicGreen : .kosmicBlue)
             }
             .buttonStyle(.plain)
             
@@ -177,7 +177,7 @@ struct TodayPostsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "square.and.pencil")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.kosmicPurple)
                 Text("Posts Scheduled Today")
                     .font(.headline)
             }
@@ -233,9 +233,9 @@ struct TodayPostStatusBadge: View {
     private var statusColor: Color {
         switch status {
         case .draft: return .gray
-        case .scheduled: return .blue
+        case .scheduled: return .kosmicBlue
         case .publishing: return .orange
-        case .published: return .green
+        case .published: return .kosmicGreen
         case .failed: return .red
         @unknown default: return .gray
         }
@@ -249,7 +249,7 @@ struct ActiveProjectsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text("Active Projects")
                     .font(.headline)
             }
@@ -268,7 +268,7 @@ struct ProjectPreviewRow: View {
     var body: some View {
         HStack {
             Circle()
-                .fill(.blue.opacity(0.2))
+                .fill(Color.kosmicBlue.opacity(0.2))
                 .frame(width: 8, height: 8)
             
             Text(project.title)
@@ -322,6 +322,6 @@ struct EmptyTodayView: View {
 
 #Preview {
     TodayView()
-        .modelContainer(for: [Task.self, Post.self, InboxItem.self, Project.self])
+        .modelContainer(for: [CloutmateShared.Task.self, CloutmateShared.Post.self, CloutmateShared.InboxItem.self, CloutmateShared.Project.self])
 }
 

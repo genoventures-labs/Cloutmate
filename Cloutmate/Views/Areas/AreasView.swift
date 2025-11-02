@@ -7,19 +7,19 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct AreasView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Area.updatedAt, order: .reverse) private var allAreas: [Area]
-    @Query private var allProjects: [Project]
+    @Query private var allProjects: [CloutmateShared.Project]
     
     @State private var searchText = ""
     @State private var selectedTags: Set<String> = []
     @State private var hasCadenceFilter: Bool?
     @State private var selectedAreas = Set<UUID>()
     @State private var showCreateSheet = false
-    @State private var showAreaDetail = false
     @State private var selectedArea: Area?
     @State private var showArchiveConfirmation = false
     
@@ -112,11 +112,9 @@ struct AreasView: View {
                 .contextMenu {
                     Button("Edit") {
                         selectedArea = area
-                        showAreaDetail = true
                     }
                     Button("Manage Cadence") {
                         selectedArea = area
-                        showAreaDetail = true
                     }
                     Button("Archive") {
                         // Archive functionality
@@ -133,7 +131,7 @@ struct AreasView: View {
                 let projectCount = allProjects.filter { $0.areaId == area.id }.count
                 Text("\(projectCount)")
                     .font(.caption)
-                    .foregroundColor(projectCount > 0 ? .blue : .secondary)
+                    .foregroundColor(projectCount > 0 ? .kosmicBlue : .secondary)
             }
             .width(min: 100)
             
@@ -143,7 +141,7 @@ struct AreasView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "clock.fill")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                         Text("Scheduled")
                             .font(.caption)
                     }
@@ -163,8 +161,8 @@ struct AreasView: View {
                                     .font(.caption2)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color.blue.opacity(0.1))
-                                    .foregroundColor(.blue)
+                                    .background(Color.kosmicBlue.opacity(0.1))
+                                    .foregroundColor(.kosmicBlue)
                                     .cornerRadius(4)
                             }
                             if area.tags.count > 3 {
@@ -224,10 +222,8 @@ struct AreasView: View {
         .sheet(isPresented: $showCreateSheet) {
             CreateAreaSheet()
         }
-        .sheet(isPresented: $showAreaDetail) {
-            if let area = selectedArea {
-                AreaDetailSheet(area: area)
-            }
+        .sheet(item: $selectedArea) { area in
+            AreaDetailSheet(area: area)
         }
     }
     
@@ -313,14 +309,14 @@ struct CreateAreaSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "info.circle")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.kosmicBlue)
                             Text("Note: Cadence settings can be configured after creating the area.")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                     }
                     .padding()
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color.kosmicBlue.opacity(0.1))
                     .cornerRadius(8)
                 }
                 .padding()
@@ -365,7 +361,7 @@ struct AreaCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "rectangle.stack.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text(area.title)
                     .font(.headline)
                 Spacer()

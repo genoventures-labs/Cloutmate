@@ -10,6 +10,9 @@ import SwiftData
 import CloutmateShared
 import os.log
 
+typealias Platform = CloutmateShared.Platform
+typealias PostStatus = CloutmateShared.PostStatus
+
 // Extension to access pageIDs property that may not be visible due to SwiftData module issues
 extension Post {
     func helperGetPageID(platform: String) -> String? {
@@ -96,5 +99,4 @@ final class PostPublisher {
         try? context.save()
     }
 }
-
 

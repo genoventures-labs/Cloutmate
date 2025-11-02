@@ -210,7 +210,6 @@
 		342C0BF52EAB20B10033973B /* Exceptions for "Cloutmate" folder in "CloudmateHelper" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Models/Platform.swift,
 				Models/Post.swift,
 				Services/KeychainService.swift,
 				Shared/XPCProtocol.swift,
@@ -228,14 +227,8 @@
 		34F546232EAE80EA00111A1A /* Exceptions for "CloutmateShared" folder in "CloutmateWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				CloutmateShared/CloutmateShared/Models/AIMessage.swift,
-				CloutmateShared/CloutmateShared/Models/AISettings.swift,
-				CloutmateShared/CloutmateShared/Models/Draft.swift,
-				CloutmateShared/CloutmateShared/Models/InsightSnapshot.swift,
 				CloutmateShared/CloutmateShared/Models/Platform.swift,
-				"CloutmateShared/CloutmateShared/Models/Platform+UI.swift",
 				CloutmateShared/CloutmateShared/Models/PlatformAccount.swift,
-				CloutmateShared/CloutmateShared/Models/PlatformAIConfiguration.swift,
 				CloutmateShared/CloutmateShared/Models/Post.swift,
 				CloutmateShared/CloutmateShared/Models/Template.swift,
 			);
@@ -244,14 +237,8 @@
 		34F546312EAE844600111A1A /* Exceptions for "CloutmateShared" folder in "CloutmateMenuBar" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				CloutmateShared/CloutmateShared/Models/AIMessage.swift,
-				CloutmateShared/CloutmateShared/Models/AISettings.swift,
-				CloutmateShared/CloutmateShared/Models/Draft.swift,
-				CloutmateShared/CloutmateShared/Models/InsightSnapshot.swift,
 				CloutmateShared/CloutmateShared/Models/Platform.swift,
-				"CloutmateShared/CloutmateShared/Models/Platform+UI.swift",
 				CloutmateShared/CloutmateShared/Models/PlatformAccount.swift,
-				CloutmateShared/CloutmateShared/Models/PlatformAIConfiguration.swift,
 				CloutmateShared/CloutmateShared/Models/Post.swift,
 				CloutmateShared/CloutmateShared/Models/Template.swift,
 			);

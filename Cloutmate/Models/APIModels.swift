@@ -41,15 +41,33 @@ struct PublishPostResponse: Codable {
 }
 
 // MARK: - Post Insights Response
-struct PostInsightsResponse: Codable {
+struct PostInsightsResponse: Decodable {
     let data: [InsightData]
     
-    struct InsightData: Codable {
+    struct InsightData: Decodable {
         let name: String
         let values: [InsightValue]
         
-        struct InsightValue: Codable {
-            let value: String
+        struct InsightValue: Decodable {
+            let numericValue: Double?
+            let breakdown: [String: Double]?
+            
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let doubleValue = try? container.decode(Double.self) {
+                    numericValue = doubleValue
+                    breakdown = nil
+                } else if let stringValue = try? container.decode(String.self), let doubleValue = Double(stringValue) {
+                    numericValue = doubleValue
+                    breakdown = nil
+                } else if let dictValue = try? container.decode([String: Double].self) {
+                    numericValue = nil
+                    breakdown = dictValue
+                } else {
+                    numericValue = nil
+                    breakdown = nil
+                }
+            }
         }
     }
 }
@@ -116,10 +134,10 @@ enum PageInsightsPeriod: String, Codable {
 }
 
 // MARK: - Page Insights Response
-struct PageInsightsResponse: Codable {
+struct PageInsightsResponse: Decodable {
     let data: [PageInsightData]
     
-    struct PageInsightData: Codable {
+    struct PageInsightData: Decodable {
         let name: String
         let period: String
         let values: [PageInsightValue]
@@ -127,13 +145,32 @@ struct PageInsightsResponse: Codable {
         let description: String?
         let id: String?
         
-        struct PageInsightValue: Codable {
-            let value: String
+        struct PageInsightValue: Decodable {
+            let numericValue: Double?
+            let breakdown: [String: Double]?
             let endTime: String?
             
             enum CodingKeys: String, CodingKey {
                 case value
                 case endTime = "end_time"
+            }
+            
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                endTime = try container.decodeIfPresent(String.self, forKey: .endTime)
+                if let doubleValue = try? container.decode(Double.self, forKey: .value) {
+                    numericValue = doubleValue
+                    breakdown = nil
+                } else if let stringValue = try? container.decode(String.self, forKey: .value), let doubleValue = Double(stringValue) {
+                    numericValue = doubleValue
+                    breakdown = nil
+                } else if let dictValue = try? container.decode([String: Double].self, forKey: .value) {
+                    numericValue = nil
+                    breakdown = dictValue
+                } else {
+                    numericValue = nil
+                    breakdown = nil
+                }
             }
         }
     }

@@ -1,36 +1,49 @@
 //
 //  GlassColorSystem.swift
-//  Cloutmate
+//  CloutmateShared
 //
-//  Glassmorphic Harmony UI - Glass Color System
+//  Minimal Apple Music-inspired color system with theme support
 //
 
 import SwiftUI
 import Combine
 import AppKit
 
-class GlassColorSystem: ObservableObject {
-    @Published var isTimeBasedShiftingEnabled: Bool = true
-    @Published var currentColorScheme: ColorScheme = .light
+public final class GlassColorSystem: ObservableObject {
+    @Published public var isTimeBasedShiftingEnabled: Bool = true
+    @Published public var currentColorScheme: ColorScheme = .dark
     
     private var cancellables = Set<AnyCancellable>()
     
-    // MARK: - Time of Day Detection
-    private var timeOfDay: TimeOfDay {
-        guard isTimeBasedShiftingEnabled else { return .afternoon }
-        
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<12: return .morning
-        case 12..<17: return .afternoon
-        case 17..<21: return .evening
-        default: return .night
+    // MARK: - Palette
+    private enum Palette {
+        // Dark Mode Colors (Apple Music inspired)
+        enum Dark {
+            static let background = Color(hex: "1A1A1A")
+            static let backgroundElevated = Color(hex: "2C2C2E")
+            static let backgroundSecondary = Color(hex: "3A3A3C")
+            static let card = Color(hex: "2C2C2E")
+            static let cardElevated = Color(hex: "3A3A3C")
         }
+        
+        // Light Mode Colors
+        enum Light {
+            static let background = Color(hex: "F5F5F7")
+            static let backgroundElevated = Color.white
+            static let backgroundSecondary = Color(hex: "EBEBF0")
+            static let card = Color.white
+            static let cardElevated = Color.white
+        }
+        
+        // Kosmic Brand Accents (theme-independent)
+        static let accentPrimary = Color(red: 72/255, green: 131/255, blue: 255/255)
+        static let accentSecondary = Color(red: 124/255, green: 77/255, blue: 255/255)
+        static let success = Color(red: 67/255, green: 160/255, blue: 71/255)
+        static let danger = Color(red: 229/255, green: 57/255, blue: 53/255)
     }
     
-    // MARK: - Glass Tint Colors (Light Mode)
-    
-    enum GlassRole {
+    // MARK: - Roles
+    public enum GlassRole {
         case primary
         case accent
         case success
@@ -38,167 +51,220 @@ class GlassColorSystem: ObservableObject {
         case surface
     }
     
-    // Base colors with opacity
-    func glassTint(for role: GlassRole) -> Color {
-        let baseColor: Color
-        
+    // MARK: - Theme-Aware Colors
+    
+    /// Main background color
+    public func backgroundColor() -> Color {
+        currentColorScheme == .dark ? Palette.Dark.background : Palette.Light.background
+    }
+    
+    /// Elevated background (sidebar)
+    public func backgroundElevated() -> Color {
+        currentColorScheme == .dark ? Palette.Dark.backgroundElevated : Palette.Light.backgroundElevated
+    }
+    
+    /// Secondary background
+    public func backgroundSecondary() -> Color {
+        currentColorScheme == .dark ? Palette.Dark.backgroundSecondary : Palette.Light.backgroundSecondary
+    }
+    
+    /// Card background
+    public func cardColor() -> Color {
+        currentColorScheme == .dark ? Palette.Dark.card : Palette.Light.card
+    }
+    
+    /// Elevated card background
+    public func cardElevated() -> Color {
+        currentColorScheme == .dark ? Palette.Dark.cardElevated : Palette.Light.cardElevated
+    }
+    
+    /// Border color (subtle)
+    public func borderColor() -> Color {
+        currentColorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+    }
+    
+    /// Divider color
+    public func dividerColor() -> Color {
+        currentColorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.06)
+    }
+    
+    /// Primary text color
+    public func textPrimary() -> Color {
+        currentColorScheme == .dark ? Color.white : Color.black
+    }
+    
+    /// Secondary text color
+    public func textSecondary() -> Color {
+        currentColorScheme == .dark ? Color.white.opacity(0.7) : Color.black.opacity(0.6)
+    }
+    
+    /// Tertiary text color
+    public func textTertiary() -> Color {
+        currentColorScheme == .dark ? Color.white.opacity(0.5) : Color.black.opacity(0.4)
+    }
+    
+    /// Accent tint for roles
+    public func glassTint(for role: GlassRole) -> Color {
         switch role {
         case .primary:
-            baseColor = currentColorScheme == .dark ? 
-                Color(red: 144/255, green: 202/255, blue: 249/255) :
-                Color(red: 30/255, green: 136/255, blue: 229/255)
-                
+            return Palette.accentPrimary
         case .accent:
-            baseColor = currentColorScheme == .dark ?
-                Color(red: 179/255, green: 157/255, blue: 219/255) :
-                Color(red: 124/255, green: 77/255, blue: 255/255)
-                
+            return Palette.accentSecondary
         case .success:
-            baseColor = currentColorScheme == .dark ?
-                Color(red: 129/255, green: 199/255, blue: 132/255) :
-                Color(red: 67/255, green: 160/255, blue: 71/255)
-                
+            return Palette.success
         case .danger:
-            baseColor = currentColorScheme == .dark ?
-                Color(red: 239/255, green: 154/255, blue: 154/255) :
-                Color(red: 229/255, green: 57/255, blue: 53/255)
-                
+            return Palette.danger
         case .surface:
-            baseColor = currentColorScheme == .dark ?
-                Color(white: 0, opacity: 0.25) :
-                Color(white: 1, opacity: 0.3)
+            return currentColorScheme == .dark ? Palette.Dark.backgroundSecondary : Palette.Light.backgroundSecondary
         }
-        
-        // Apply time-of-day ambient shift
-        return applyAmbientShift(to: baseColor)
     }
     
-    // MARK: - Border Glow
-    func borderGlow(for role: GlassRole) -> Color {
+    /// Solid button color (replaces gradient)
+    public func buttonColor(for role: GlassRole) -> Color {
         switch role {
         case .primary:
-            return Color(red: 30/255, green: 136/255, blue: 229/255, opacity: 0.3)
+            return Palette.accentPrimary
         case .accent:
-            return Color(red: 124/255, green: 77/255, blue: 255/255, opacity: 0.35)
+            return Palette.accentSecondary
         case .success:
-            return Color(red: 67/255, green: 160/255, blue: 71/255, opacity: 0.3)
+            return Palette.success
         case .danger:
-            return Color(red: 229/255, green: 57/255, blue: 53/255, opacity: 0.3)
+            return Palette.danger
         case .surface:
-            return Color(white: 1, opacity: 0.2)
+            return currentColorScheme == .dark ? Palette.Dark.cardElevated : Palette.Light.cardElevated
         }
     }
     
-    // MARK: - Ambient Color Shifting
-    private enum TimeOfDay {
-        case morning
-        case afternoon
-        case evening
-        case night
+    /// Legacy: Returns solid color as gradient for backward compatibility
+    public func buttonGradient(for role: GlassRole) -> LinearGradient {
+        let color = buttonColor(for: role)
+        return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
     
-    private func applyAmbientShift(to color: Color) -> Color {
-        guard isTimeBasedShiftingEnabled else { return color }
-        
-        // Convert to HSB for ambient adjustment
-        let shiftFactor: CGFloat
-        
-        switch timeOfDay {
-        case .morning:
-            // Warm, golden shift
-            shiftFactor = 0.02 // Slight yellow shift
-        case .afternoon:
-            // Neutral
-            shiftFactor = 0.0
-        case .evening:
-            // Cool, violet shift (Kosmic tone)
-            shiftFactor = -0.03 // Blue-violet shift
-        case .night:
-            // Deep blue shift
-            shiftFactor = -0.05
+    /// Simplified border (returns solid color as gradient for compatibility)
+    public func borderGradient(for role: GlassRole) -> LinearGradient {
+        let color: Color
+        switch role {
+        case .primary, .accent, .success, .danger:
+            color = glassTint(for: role).opacity(0.3)
+        case .surface:
+            color = borderColor()
         }
-        
-        // Apply subtle hue shift
-        return color.adjustHue(shiftFactor)
+        return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
     
-    // MARK: - Auroral Gradient (for tab headers)
-    func auroralGradient() -> LinearGradient {
-        let colors: [Color]
-        
-        if isTimeBasedShiftingEnabled {
-            switch timeOfDay {
-            case .morning:
-                colors = [
-                    Color(red: 255/255, green: 235/255, blue: 200/255, opacity: 0.6),
-                    Color(red: 255/255, green: 200/255, blue: 150/255, opacity: 0.4)
-                ]
-            case .afternoon:
-                colors = [
-                    Color(red: 200/255, green: 220/255, blue: 255/255, opacity: 0.6),
-                    Color(red: 150/255, green: 180/255, blue: 255/255, opacity: 0.4)
-                ]
-            case .evening:
-                colors = [
-                    Color(red: 220/255, green: 200/255, blue: 255/255, opacity: 0.6),
-                    Color(red: 180/255, green: 150/255, blue: 255/255, opacity: 0.4)
-                ]
-            case .night:
-                colors = [
-                    Color(red: 100/255, green: 120/255, blue: 200/255, opacity: 0.6),
-                    Color(red: 50/255, green: 70/255, blue: 150/255, opacity: 0.4)
-                ]
-            }
-        } else {
-            colors = [
-                Color(red: 200/255, green: 220/255, blue: 255/255, opacity: 0.6),
-                Color(red: 150/255, green: 180/255, blue: 255/255, opacity: 0.4)
-            ]
+    /// Removed glow effect - returns transparent
+    public func borderGlow(for role: GlassRole) -> Color {
+        return .clear
+    }
+    
+    // MARK: - Panels (Simplified for minimal design)
+    
+    /// Sidebar color (flat)
+    public func sidebarGradient() -> LinearGradient {
+        let color = backgroundElevated()
+        return LinearGradient(colors: [color], startPoint: .top, endPoint: .bottom)
+    }
+    
+    /// Panel color based on tier (flat)
+    public func panelGradient(for tier: GlassTier) -> LinearGradient {
+        let color: Color
+        switch tier {
+        case .background:
+            color = backgroundColor()
+        case .sidebar:
+            color = backgroundElevated()
+        case .contentCard:
+            color = cardColor()
+        case .overlay:
+            color = cardElevated()
+        case .floatingAction:
+            color = cardElevated()
         }
+        return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    /// No specular highlight in minimal design
+    public func panelSpecularHighlight(for tier: GlassTier) -> LinearGradient {
+        return LinearGradient(colors: [Color.clear], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    /// Subtle border rim
+    public func panelRim(for tier: GlassTier) -> LinearGradient {
+        let color = borderColor()
+        return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    // MARK: - Legacy support (removed effects)
+    
+    /// Removed auroral gradient
+    public func auroralGradient() -> LinearGradient {
+        let color = Palette.accentPrimary.opacity(0.6)
+        return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    /// Flat background (no gradient)
+    public func backgroundGradient() -> LinearGradient {
+        let color = backgroundColor()
+        return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    // MARK: - Lifecycle
+    public init() {
+        // Initialize with system appearance
+        updateColorScheme()
         
-        return LinearGradient(
-            colors: colors,
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    // MARK: - Background Gradient
-    func backgroundGradient() -> LinearGradient {
-        return LinearGradient(
-            colors: [
-                Color(red: 249/255, green: 250/255, blue: 251/255),
-                Color(red: 237/255, green: 239/255, blue: 242/255)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-    
-    init() {
-        // Update color scheme based on system appearance
+        // Listen for system appearance changes
         NotificationCenter.default.publisher(for: NSNotification.Name("NSInterfaceThemeChangedNotification"))
             .sink { [weak self] _ in
-                guard let self = self else { return }
                 _Concurrency.Task { @MainActor in
-                    self.updateColorScheme()
+                    // Only update if using system theme
+                    let appearanceMode = UserDefaults.standard.string(forKey: "appearanceMode") ?? "system"
+                    if appearanceMode == "system" {
+                        self?.updateColorScheme()
+                    }
                 }
             }
             .store(in: &cancellables)
-        
-        updateColorScheme()
     }
     
     private func updateColorScheme() {
-        currentColorScheme = NSApp.effectiveAppearance.name == .darkAqua ? .dark : .light
+        // Respect user's appearance preference
+        let appearanceMode = UserDefaults.standard.string(forKey: "appearanceMode") ?? "system"
+        switch appearanceMode {
+        case "light":
+            currentColorScheme = .light
+        case "dark":
+            currentColorScheme = .dark
+        default: // system
+            currentColorScheme = NSApp.effectiveAppearance.name == .darkAqua ? .dark : .light
+        }
     }
 }
 
-// MARK: - Color Extension
+// MARK: - Color Extension for Hex Support
 extension Color {
-    func adjustHue(_ shift: CGFloat) -> Color {
-        // SwiftUI doesn't have native HSB manipulation, so we return original
-        // In a production app, you'd convert to HSB, adjust, and convert back
-        return self
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (255, 0, 0, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }

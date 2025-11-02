@@ -9,16 +9,16 @@ import SwiftUI
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
+import CloutmateShared
 
 struct NotesView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \Note.updatedAt, order: .reverse) private var allNotes: [Note]
+    @Query(sort: \CloutmateShared.Note.updatedAt, order: .reverse) private var allNotes: [CloutmateShared.Note]
     
     @State private var searchText = ""
     @State private var selectedTags: Set<String> = []
     @State private var selectedNotes = Set<UUID>()
     @State private var showCreateSheet = false
-    @State private var showNoteSheet = false
     @State private var selectedNote: Note?
     
     var filteredNotes: [Note] {
@@ -105,7 +105,6 @@ struct NotesView: View {
                 .contextMenu {
                     Button("Edit") {
                         selectedNote = note
-                        showNoteSheet = true
                     }
                     Button("Duplicate") {
                         duplicateNote(note)
@@ -130,8 +129,8 @@ struct NotesView: View {
                                     .font(.caption2)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color.purple.opacity(0.1))
-                                    .foregroundColor(.purple)
+                                    .background(Color.kosmicPurple.opacity(0.1))
+                                    .foregroundColor(.kosmicPurple)
                                     .cornerRadius(4)
                             }
                             if note.tags.count > 3 {
@@ -205,10 +204,8 @@ struct NotesView: View {
         .sheet(isPresented: $showCreateSheet) {
             CreateNoteSheet()
         }
-        .sheet(isPresented: $showNoteSheet) {
-            if let note = selectedNote {
-                NoteDetailSheet(note: note)
-            }
+        .sheet(item: $selectedNote) { note in
+            NoteDetailSheet(note: note)
         }
     }
     
@@ -356,9 +353,13 @@ struct CreateNoteSheet: View {
                 }
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Content")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Text("Content")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        VoiceInputButton(text: $content)
+                    }
                     TextEditor(text: $content)
                         .font(.body)
                         .frame(minHeight: 300)

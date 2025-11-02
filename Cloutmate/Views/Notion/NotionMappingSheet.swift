@@ -47,7 +47,7 @@ struct NotionMappingSheet: View {
                     HStack {
                         Image(systemName: "arrow.left.arrow.right")
                             .font(.title2)
-                            .foregroundStyle(.blue.gradient)
+                            .foregroundStyle(Color.kosmicBlue)
                         Text("Map Properties")
                             .font(.title2)
                             .fontWeight(.bold)

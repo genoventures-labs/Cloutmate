@@ -11,6 +11,7 @@ struct DashboardSectionPanel<Content: View>: View {
     let title: String
     let icon: String
     let accent: Color
+    let minHeight: CGFloat?
     @Binding var isCollapsed: Bool
     private let content: () -> Content
 
@@ -19,11 +20,13 @@ struct DashboardSectionPanel<Content: View>: View {
         icon: String,
         accent: Color,
         isCollapsed: Binding<Bool>,
+        minHeight: CGFloat? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.title = title
         self.icon = icon
         self.accent = accent
+        self.minHeight = minHeight
         self._isCollapsed = isCollapsed
         self.content = content
     }
@@ -40,6 +43,8 @@ struct DashboardSectionPanel<Content: View>: View {
                     VStack(alignment: .leading, spacing: 16) {
                         content()
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(minHeight: minHeight, alignment: .topLeading)
                     .padding(20)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -66,7 +71,7 @@ struct DashboardSectionPanel<Content: View>: View {
                 if isCollapsed {
                     Text("Section collapsed")
                         .metricLabelStyle()
-                        .foregroundStyle(.secondary)
+                        .dashboardSecondaryText()
                 }
             }
 
@@ -101,7 +106,7 @@ struct DashboardSectionPanel<Content: View>: View {
                         .foregroundColor(accent)
                     Text("Tap the chevron to reopen this section.")
                         .metricLabelStyle()
-                        .foregroundStyle(.secondary)
+                        .dashboardSecondaryText()
                     Spacer()
                 }
                 .padding(.horizontal, 16)

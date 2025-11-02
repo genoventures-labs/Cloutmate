@@ -14,6 +14,7 @@ struct PerformancePredictorPanel: View {
     @Query(sort: \Post.publishedDate, order: .reverse) private var allPosts: [Post]
     
     let post: Post
+    let refreshID: UUID
     @State private var prediction: PerformancePrediction?
     @State private var isAnalyzing = false
     
@@ -21,7 +22,7 @@ struct PerformancePredictorPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "chart.line.uptrend.xyaxis")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                     .font(.title3)
                 
                 Text("Performance Prediction")
@@ -86,21 +87,21 @@ struct PerformancePredictorPanel: View {
                         icon: "text.alignleft",
                         name: "Caption Length",
                         score: prediction.captionLengthScore,
-                        color: .blue
+                        color: .kosmicBlue
                     )
                     
                     FactorRow(
                         icon: "face.smiling",
                         name: "Tone",
                         score: prediction.toneScore,
-                        color: .green
+                        color: .kosmicGreen
                     )
                     
                     FactorRow(
                         icon: "number",
                         name: "Hashtags",
                         score: prediction.hashtagScore,
-                        color: .purple
+                        color: .kosmicPurple
                     )
                     
                     FactorRow(
@@ -131,7 +132,7 @@ struct PerformancePredictorPanel: View {
                     
                     HStack {
                         Image(systemName: "clock.badge.checkmark")
-                            .foregroundColor(.green)
+                            .foregroundColor(.kosmicGreen)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Optimal Posting Time")
@@ -168,6 +169,11 @@ struct PerformancePredictorPanel: View {
                 await analyzePost()
             }
         }
+        .onChange(of: refreshID) { _, _ in
+            _Concurrency.Task {
+                await analyzePost()
+            }
+        }
     }
     
     private func analyzePost() async {
@@ -187,7 +193,7 @@ struct PerformancePredictorPanel: View {
     
     private func scoreColor(_ score: Double) -> Color {
         if score >= 70 {
-            return .green
+            return .kosmicGreen
         } else if score >= 50 {
             return .orange
         } else {
@@ -225,4 +231,3 @@ private struct FactorRow: View {
         }
     }
 }
-

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct AreaCadenceSettingsView: View {
     @Bindable var area: Area
@@ -23,7 +24,7 @@ struct AreaCadenceSettingsView: View {
                 // Header
                 HStack {
                     Image(systemName: "rectangle.stack.fill")
-                        .foregroundStyle(.blue.gradient)
+                        .foregroundStyle(Color.kosmicBlue)
                         .font(.largeTitle)
                     Text("Cadence Settings")
                         .font(.title2)

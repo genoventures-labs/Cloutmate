@@ -36,14 +36,14 @@ struct ActivityChart: View {
                     x: .value("Date", dataPoint.date, unit: .day),
                     y: .value("Posts", dataPoint.count)
                 )
-                .foregroundStyle(.blue)
+                .foregroundStyle(Color.kosmicBlue)
                 .interpolationMethod(.catmullRom)
                 
                 AreaMark(
                     x: .value("Date", dataPoint.date, unit: .day),
                     y: .value("Posts", dataPoint.count)
                 )
-                .foregroundStyle(.blue.opacity(0.2))
+                .foregroundStyle(Color.kosmicBlue.opacity(0.2))
                 .interpolationMethod(.catmullRom)
             }
             .frame(height: 100)

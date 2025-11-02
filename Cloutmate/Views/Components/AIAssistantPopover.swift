@@ -35,7 +35,7 @@ struct AIAssistantPopover: View {
             // Header
             HStack {
                 Image(systemName: "sparkles")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                 Text("AI Assistant")
                     .font(.headline)
                 Spacer()
@@ -53,7 +53,7 @@ struct AIAssistantPopover: View {
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: tool.icon)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.kosmicBlue)
                                 .frame(width: 24)
                             
                             Text(tool.rawValue)

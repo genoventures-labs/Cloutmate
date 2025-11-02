@@ -7,8 +7,10 @@
 
 import Foundation
 import SwiftData
+import CloutmateShared
 
-actor CalendarAvailabilityService {
+@MainActor
+final class CalendarAvailabilityService {
     static let shared = CalendarAvailabilityService()
     
     func availableTimeSlots(

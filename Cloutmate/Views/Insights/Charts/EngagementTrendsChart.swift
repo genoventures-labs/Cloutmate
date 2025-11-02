@@ -48,7 +48,7 @@ struct EngagementTrendsChart: View {
                 )
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [Color.blue.opacity(0.3), Color.blue.opacity(0.05)],
+                        colors: [Color.kosmicBlue.opacity(0.3), Color.kosmicBlue.opacity(0.05)],
                         startPoint: .top,
                         endPoint: .bottom
                     )
@@ -59,7 +59,7 @@ struct EngagementTrendsChart: View {
                     x: .value("Date", publishedDate),
                     y: .value("Engagement", engagementRate)
                 )
-                .foregroundStyle(Color.blue.opacity(0.8))
+                .foregroundStyle(Color.kosmicBlue.opacity(0.8))
                 .lineStyle(StrokeStyle(lineWidth: 2))
                 .interpolationMethod(.catmullRom)
                 
@@ -67,7 +67,7 @@ struct EngagementTrendsChart: View {
                     x: .value("Date", publishedDate),
                     y: .value("Engagement", engagementRate)
                 )
-                .foregroundStyle(Color.blue)
+                .foregroundStyle(Color.kosmicBlue)
                 .symbolSize(60)
                 .opacity(0.7)
             }

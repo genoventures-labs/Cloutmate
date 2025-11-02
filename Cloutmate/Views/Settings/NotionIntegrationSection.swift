@@ -32,7 +32,7 @@ struct NotionIntegrationSection: View {
                 Button(action: connectToNotion) {
                     HStack {
                         Image(systemName: "link.badge.plus")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                         Text(isConnecting ? "Connecting..." : "Connect Notion")
                         Spacer()
                         if isConnecting {
@@ -40,7 +40,7 @@ struct NotionIntegrationSection: View {
                                 .scaleEffect(0.8)
                         } else {
                             Image(systemName: "arrow.right.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.kosmicBlue)
                         }
                     }
                 }
@@ -57,7 +57,7 @@ struct NotionIntegrationSection: View {
                     HStack {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
+                                .foregroundColor(.kosmicGreen)
                             Text("Connected to Notion")
                                 .font(.subheadline)
                         }
@@ -74,11 +74,11 @@ struct NotionIntegrationSection: View {
                     }) {
                         HStack {
                             Image(systemName: "plus.circle")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.kosmicBlue)
                             Text("Import Database")
                             Spacer()
                             Image(systemName: "arrow.right.circle.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.kosmicBlue)
                         }
                     }
                     .buttonStyle(.plain)
@@ -237,7 +237,7 @@ struct DatabaseSyncStatusRow: View {
     var body: some View {
         HStack {
             Image(systemName: "externaldrive")
-                .foregroundColor(.blue)
+                .foregroundColor(.kosmicBlue)
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(config.databaseTitle ?? "Database")
@@ -264,7 +264,7 @@ struct DatabaseSyncStatusRow: View {
                 config.isActive = isActive
             }) {
                 Image(systemName: isActive ? "pause.circle" : "play.circle")
-                    .foregroundColor(isActive ? .orange : .green)
+                    .foregroundColor(isActive ? .orange : .kosmicGreen)
             }
             .buttonStyle(.plain)
             

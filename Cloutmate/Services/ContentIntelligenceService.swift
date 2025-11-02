@@ -10,7 +10,8 @@ import SwiftData
 import CloutmateShared
 import os.log
 
-actor ContentIntelligenceService {
+@MainActor
+final class ContentIntelligenceService {
     static let shared = ContentIntelligenceService()
     
     private init() {}

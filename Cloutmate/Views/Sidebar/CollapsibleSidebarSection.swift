@@ -13,6 +13,7 @@ struct CollapsibleSidebarSection: View {
     let tabs: [TabIdentifier]
     @Binding var selectedTab: TabIdentifier
     @State private var isExpanded: Bool
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     init(title: String, icon: String, tabs: [TabIdentifier], selectedTab: Binding<TabIdentifier>, isExpanded: Bool = true) {
         self.title = title
@@ -37,14 +38,14 @@ struct CollapsibleSidebarSection: View {
             }) {
                 HStack {
                     Image(systemName: icon)
-                        .foregroundStyle(.blue.gradient)
+                        .foregroundStyle(Color(red: 72/255, green: 131/255, blue: 255/255)) // Kosmic blue
                         .font(.system(size: 16))
                         .frame(width: 20)
                     
                     Text(title)
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Color.kosmicBlue)
                     
                     Spacer()
                     
@@ -53,17 +54,18 @@ struct CollapsibleSidebarSection: View {
                             .font(.caption2)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.2))
-                            .foregroundColor(.blue)
+                            .background(Color(red: 72/255, green: 131/255, blue: 255/255).opacity(0.2))
+                            .foregroundStyle(Color(red: 72/255, green: 131/255, blue: 255/255))
                             .cornerRadius(10)
                     }
                     
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(glassColorSystem.textTertiary())
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -82,6 +84,7 @@ struct CollapsibleSidebarSection: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -94,5 +97,6 @@ struct CollapsibleSidebarSection: View {
         isExpanded: true
     )
     .padding()
+    .environmentObject(GlassColorSystem())
 }
 

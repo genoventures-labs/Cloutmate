@@ -8,19 +8,29 @@
 import Foundation
 import SwiftData
 import os.log
+import CloutmateShared
 
-
-actor MigrationService {
+@MainActor
+final class MigrationService {
     static let shared = MigrationService()
     
     private init() {}
     
     func migrateExistingData(context: ModelContext) async throws {
+        // Check if migration already ran
+        if UserDefaults.standard.object(forKey: "phase3_migrated_date") != nil {
+            os_log("Phase 3 migration already completed, skipping", log: .default, type: .info)
+            return
+        }
+        
         // Log counts BEFORE migration
         let draftsCountBefore = try context.fetch(FetchDescriptor<Draft>()).count
         let postsCountBefore = try context.fetch(FetchDescriptor<Post>()).count
         
         os_log("Starting Phase 3 migration: %d drafts, %d posts", log: .default, type: .info, draftsCountBefore, postsCountBefore)
+        
+        // Capture timestamp BEFORE migration starts - any drafts created after this are new
+        let migrationStartTime = Date()
         
         // Transaction wrapper
         try context.transaction {
@@ -32,8 +42,14 @@ actor MigrationService {
         )
             context.insert(defaultArea)
             
-            // 2. Migrate Drafts → Inbox Items (keep originals for fallback)
-            let drafts = try context.fetch(FetchDescriptor<Draft>())
+            // 2. Migrate ONLY pre-existing Drafts → Inbox Items
+            // Only archive drafts created BEFORE migration starts
+            let descriptor = FetchDescriptor<Draft>(
+                predicate: #Predicate { $0.createdAt < migrationStartTime }
+            )
+            let drafts = try context.fetch(descriptor)
+            os_log("Found %d pre-existing drafts to migrate", log: .default, type: .info, drafts.count)
+            
             for draft in drafts {
                 let inboxItem = InboxItem(
                     content: draft.caption,
@@ -43,8 +59,9 @@ actor MigrationService {
                 inboxItem.createdAt = draft.createdAt
                 context.insert(inboxItem)
                 
-                // Mark draft as migrated (archived)
+                // Mark draft as migrated (archived) - only old drafts
                 draft.isArchived = true
+                draft.notes = (draft.notes ?? "") + "\n[Migrated to Inbox on \(migrationStartTime.formatted())]"
             }
             
             // 3. Link all existing Posts to default Area
@@ -60,10 +77,13 @@ actor MigrationService {
         let inboxCountAfter = try context.fetch(FetchDescriptor<InboxItem>()).count
         os_log("Migration complete: %d inbox items created", log: .default, type: .info, inboxCountAfter)
         
-        // Store migration metadata
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "phase3_migrated_date")
+        // Store migration metadata - THIS PREVENTS RE-RUNNING
+        UserDefaults.standard.set(migrationStartTime.timeIntervalSince1970, forKey: "phase3_migrated_date")
         UserDefaults.standard.set(draftsCountBefore, forKey: "phase3_drafts_count")
         UserDefaults.standard.set(inboxCountAfter, forKey: "phase3_inbox_count")
+        UserDefaults.standard.synchronize()
+        
+        os_log("Migration timestamp stored: %f", log: .default, type: .info, migrationStartTime.timeIntervalSince1970)
     }
     
     // Rollback helper (for Settings → Advanced)

@@ -34,7 +34,7 @@ struct DashboardSettingsView: View {
                         Toggle(isOn: bindingFor(cardType)) {
                             HStack {
                                 Image(systemName: cardType.icon)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                     .frame(width: 20)
                                 Text(cardType.rawValue)
                             }
@@ -49,7 +49,7 @@ struct DashboardSettingsView: View {
                         Toggle(isOn: bindingFor(cardType)) {
                             HStack {
                                 Image(systemName: cardType.icon)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                     .frame(width: 20)
                                 Text(cardType.rawValue)
                             }
@@ -64,7 +64,7 @@ struct DashboardSettingsView: View {
                         Toggle(isOn: bindingFor(cardType)) {
                             HStack {
                                 Image(systemName: cardType.icon)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                     .frame(width: 20)
                                 Text(cardType.rawValue)
                             }
@@ -78,7 +78,7 @@ struct DashboardSettingsView: View {
                         if cardType == .socialOverview {
                             HStack {
                                 Image(systemName: cardType.icon)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                     .frame(width: 20)
                                 Text("Social Overview (Always On)")
                                 Spacer()
@@ -88,7 +88,7 @@ struct DashboardSettingsView: View {
                             Toggle(isOn: bindingFor(cardType)) {
                                 HStack {
                                     Image(systemName: cardType.icon)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.kosmicBlue)
                                         .frame(width: 20)
                                     Text(cardType.rawValue)
                                 }
@@ -103,7 +103,7 @@ struct DashboardSettingsView: View {
                         Toggle(isOn: bindingFor(cardType)) {
                             HStack {
                                 Image(systemName: cardType.icon)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                     .frame(width: 20)
                                 Text(cardType.rawValue)
                             }
@@ -120,7 +120,7 @@ struct DashboardSettingsView: View {
                         ForEach(visibleCards, id: \.id) { card in
                             HStack {
                                 Image(systemName: card.type.icon)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                     .frame(width: 20)
                                 Text(card.type.rawValue)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -169,7 +169,7 @@ struct DashboardSettingsView: View {
 
     private var categorizedCards: (workflow: [DashboardCardType], projects: [DashboardCardType], resources: [DashboardCardType], social: [DashboardCardType], facebook: [DashboardCardType]) {
         let workflow: [DashboardCardType] = [.todayOverview, .inboxCount, .upcomingTasks, .upcomingDeadlines]
-        let projects: [DashboardCardType] = [.activeProjects, .projectsOverview, .tasksOverview, .completionRate]
+        let projects: [DashboardCardType] = [.projectsOverview]
         let resources: [DashboardCardType] = [.areasHealth, .notesActivity, .recentNotes]
         let social: [DashboardCardType] = [.scheduledPosts, .draftCount, .recentInsights, .postingStreak, .topPerformingPost, .socialOverview, .contentPerformance, .platformComparison]
         let facebook: [DashboardCardType] = [.facebookPageInsightsOverview, .facebookPageViews, .facebookPageFans, .facebookPageReach, .facebookPageImpressions, .facebookEngagedUsers, .facebookPostEngagements]
@@ -220,14 +220,14 @@ struct CardToggleRow: View {
         Button(action: action) {
             HStack {
                 Image(systemName: cardType.icon)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                     .frame(width: 20)
                 Text(cardType.rawValue)
                     .foregroundColor(.primary)
                 Spacer()
                 if isVisible {
                     Image(systemName: "checkmark")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                         .font(.caption)
                 }
             }

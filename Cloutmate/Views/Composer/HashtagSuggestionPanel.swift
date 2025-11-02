@@ -25,7 +25,7 @@ struct HashtagSuggestionPanel: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "number")
-                    .foregroundColor(.purple)
+                    .foregroundColor(.kosmicPurple)
                 
                 Text("Hashtag Suggestions")
                     .font(.headline)
@@ -58,12 +58,12 @@ struct HashtagSuggestionPanel: View {
                                         if set.averagePerformance > 0 {
                                             Label("\(Int(set.averagePerformance * 100))%", systemImage: "chart.line.uptrend.xyaxis")
                                                 .font(.caption2)
-                                                .foregroundColor(.green)
+                                                .foregroundColor(.kosmicGreen)
                                         }
                                     }
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(Color.blue.opacity(0.2))
+                                    .background(Color.kosmicBlue.opacity(0.2))
                                     .cornerRadius(6)
                                 }
                                 .buttonStyle(.plain)
@@ -241,16 +241,16 @@ struct HashtagChip: View {
                 if performance > 0 {
                     Image(systemName: performance > 5 ? "arrow.up.circle.fill" : "circle.fill")
                         .font(.caption2)
-                        .foregroundColor(performance > 5 ? .green : .gray)
+                        .foregroundColor(performance > 5 ? .kosmicGreen : .gray)
                 }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(isSelected ? Color.blue.opacity(0.3) : Color.secondary.opacity(0.1))
+            .background(isSelected ? Color.kosmicBlue.opacity(0.3) : Color.secondary.opacity(0.1))
             .cornerRadius(6)
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 1)
+                    .stroke(isSelected ? Color.kosmicBlue : Color.clear, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

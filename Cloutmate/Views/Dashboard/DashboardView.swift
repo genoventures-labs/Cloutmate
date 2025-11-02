@@ -14,6 +14,8 @@ struct DashboardView: View {
     @State private var showSettings = false
     @State private var refreshID = UUID()
     @Query private var dashboardCards: [DashboardCard]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+
     @AppStorage("dashboard.section.workflow.collapsed") private var workflowCollapsed = false
     @AppStorage("dashboard.section.projects.collapsed") private var projectsCollapsed = false
     @AppStorage("dashboard.section.areas.collapsed") private var areasCollapsed = false
@@ -51,29 +53,16 @@ struct DashboardView: View {
                     DashboardSectionPanel(
                         title: "Workflow Focus",
                         icon: "bolt.fill",
-                        accent: KosmicPalette.cyan,
+                        accent: glassAccent(for: .primary),
                         isCollapsed: $workflowCollapsed
                     ) {
-                        if anyVisible([.todayOverview, .inboxCount, .upcomingTasks, .upcomingDeadlines]) {
-                            VStack(spacing: 12) {
-                                if isVisible(.todayOverview) {
-                                    TodayOverviewCard(size: size(for: .todayOverview, fallback: .medium))
-                                }
-                                if isVisible(.inboxCount) {
-                                    InboxCountCard(size: size(for: .inboxCount, fallback: .small))
-                                }
-                                if isVisible(.upcomingTasks) {
-                                    UpcomingTasksCard(size: size(for: .upcomingTasks, fallback: .medium))
-                                }
-                                if isVisible(.upcomingDeadlines) {
-                                    UpcomingDeadlinesCard(size: size(for: .upcomingDeadlines, fallback: .medium))
-                                }
-                            }
+                        if isVisible(.todayOverview) {
+                            TodayOverviewCard(size: size(for: .todayOverview, fallback: .medium))
                         } else {
                             sectionEmptyBanner(
                                 primary: "No workflow cards enabled",
                                 secondary: "Toggle on PARA essentials in Dashboard Settings.",
-                                accent: KosmicPalette.cyan
+                                accent: glassAccent(for: .primary)
                             )
                         }
                     }
@@ -81,29 +70,16 @@ struct DashboardView: View {
                     DashboardSectionPanel(
                         title: "Projects",
                         icon: "folder.fill",
-                        accent: KosmicPalette.violet,
+                        accent: glassAccent(for: .accent),
                         isCollapsed: $projectsCollapsed
                     ) {
-                        if anyVisible([.projectsOverview, .activeProjects, .tasksOverview, .completionRate]) {
-                            VStack(spacing: 12) {
-                                if isVisible(.projectsOverview) {
-                                    ProjectsOverviewCard(size: size(for: .projectsOverview, fallback: .medium))
-                                }
-                                if isVisible(.activeProjects) {
-                                    ActiveProjectsCard(size: size(for: .activeProjects, fallback: .small))
-                                }
-                                if isVisible(.tasksOverview) {
-                                    TasksOverviewCard(size: size(for: .tasksOverview, fallback: .medium))
-                                }
-                                if isVisible(.completionRate) {
-                                    CompletionRateCard(size: size(for: .completionRate, fallback: .small))
-                                }
-                            }
+                        if isVisible(.projectsOverview) {
+                            ProjectsOverviewCard(size: size(for: .projectsOverview, fallback: .medium))
                         } else {
                             sectionEmptyBanner(
                                 primary: "No project cards enabled",
                                 secondary: "Surface your active initiatives from Settings.",
-                                accent: KosmicPalette.violet
+                                accent: glassAccent(for: .accent)
                             )
                         }
                     }
@@ -111,8 +87,9 @@ struct DashboardView: View {
                     DashboardSectionPanel(
                         title: "Areas",
                         icon: "square.grid.2x2.fill",
-                        accent: KosmicPalette.cyan,
-                        isCollapsed: $areasCollapsed
+                        accent: glassAccent(for: .primary),
+                        isCollapsed: $areasCollapsed,
+                        minHeight: 280
                     ) {
                         if anyVisible([.areasHealth]) {
                             if isVisible(.areasHealth) {
@@ -122,7 +99,7 @@ struct DashboardView: View {
                             sectionEmptyBanner(
                                 primary: "No area cards enabled",
                                 secondary: "Keep track of your pillars by enabling area insights.",
-                                accent: KosmicPalette.cyan
+                                accent: glassAccent(for: .primary)
                             )
                         }
                     }
@@ -130,7 +107,7 @@ struct DashboardView: View {
                     DashboardSectionPanel(
                         title: "Resources",
                         icon: "book.closed.fill",
-                        accent: KosmicPalette.violet,
+                        accent: glassAccent(for: .accent),
                         isCollapsed: $resourcesCollapsed
                     ) {
                         if anyVisible([.notesActivity, .recentNotes]) {
@@ -146,7 +123,7 @@ struct DashboardView: View {
                             sectionEmptyBanner(
                                 primary: "No resource cards enabled",
                                 secondary: "Enable note activity to illuminate your knowledge base.",
-                                accent: KosmicPalette.violet
+                                accent: glassAccent(for: .accent)
                             )
                         }
                     }
@@ -154,7 +131,7 @@ struct DashboardView: View {
                     DashboardSectionPanel(
                         title: "Social",
                         icon: "chart.bar.fill",
-                        accent: KosmicPalette.cyan,
+                        accent: glassAccent(for: .primary),
                         isCollapsed: $socialCollapsed
                     ) {
                         if anyVisible([.contentPerformance, .platformComparison]) {
@@ -170,7 +147,7 @@ struct DashboardView: View {
                             sectionEmptyBanner(
                                 primary: "No social cards enabled",
                                 secondary: "Add publishing insights from Dashboard Settings when needed.",
-                                accent: KosmicPalette.cyan
+                                accent: glassAccent(for: .primary)
                             )
                         }
                     }
@@ -193,6 +170,10 @@ struct DashboardView: View {
             refreshID = UUID()
         }
         .id(refreshID)
+    }
+    
+    private func glassAccent(for role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
     
     // MARK: - Helpers
@@ -240,9 +221,6 @@ struct DashboardView: View {
             (.upcomingTasks, .medium),
             (.upcomingDeadlines, .medium),
             (.projectsOverview, .medium),
-            (.activeProjects, .small),
-            (.tasksOverview, .medium),
-            (.completionRate, .small),
             (.areasHealth, .medium),
             (.notesActivity, .medium),
             (.recentNotes, .medium)

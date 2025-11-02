@@ -36,8 +36,8 @@ struct PostDetailPopup: View {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                             PostDetailMetricRow(label: "Engagement Rate", value: String(format: "%.1f%%", post.engagementRate ?? 0), icon: "heart.fill", color: .pink)
                             PostDetailMetricRow(label: "Likes", value: "\(post.likes ?? 0)", icon: "hand.thumbsup.fill", color: .orange)
-                            PostDetailMetricRow(label: "Comments", value: "\(post.comments ?? 0)", icon: "bubble.left.fill", color: .blue)
-                            PostDetailMetricRow(label: "Reach", value: "\(post.reach ?? 0)", icon: "eye.fill", color: .purple)
+                            PostDetailMetricRow(label: "Comments", value: "\(post.comments ?? 0)", icon: "bubble.left.fill", color: .kosmicBlue)
+                            PostDetailMetricRow(label: "Reach", value: "\(post.reach ?? 0)", icon: "eye.fill", color: .kosmicPurple)
                         }
                     }
                     .glassPanel(tier: .contentCard, cornerRadius: 12)
@@ -69,8 +69,8 @@ struct PostDetailPopup: View {
                                         .font(.caption)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
-                                        .background(platform == .threads ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
-                                        .foregroundColor(platform == .threads ? .purple : .blue)
+                                        .background(platform == .threads ? Color.kosmicPurple.opacity(0.2) : Color.kosmicBlue.opacity(0.2))
+                                        .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
                                         .cornerRadius(6)
                                 }
                             }

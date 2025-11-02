@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct TemplateManagementView: View {
     @Environment(\.modelContext) private var modelContext
@@ -162,8 +163,8 @@ struct TemplateEditorView: View {
                             .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(platform == .threads ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
-                            .foregroundColor(platform == .threads ? .purple : .blue)
+                            .background(platform == .threads ? Color.kosmicPurple.opacity(0.2) : Color.kosmicBlue.opacity(0.2))
+                            .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
                             .cornerRadius(8)
                     }
                 }

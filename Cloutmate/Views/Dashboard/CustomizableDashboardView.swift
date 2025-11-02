@@ -7,9 +7,11 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct CustomizableDashboardView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query private var userCards: [DashboardCard]
     @Query private var dashboardCards: [DashboardCard]
     
@@ -51,29 +53,16 @@ struct CustomizableDashboardView: View {
                     DashboardSectionPanel(
                         title: "Workflow Focus",
                         icon: "bolt.fill",
-                        accent: KosmicPalette.cyan,
+                        accent: glassTint(.primary),
                         isCollapsed: $workflowCollapsed
                     ) {
-                        if anyVisible([.todayOverview, .inboxCount, .upcomingTasks, .upcomingDeadlines]) {
-                            VStack(spacing: 12) {
-                                if isVisible(.todayOverview) {
-                                    TodayOverviewCard(size: size(for: .todayOverview, fallback: .medium))
-                                }
-                                if isVisible(.inboxCount) {
-                                    InboxCountCard(size: size(for: .inboxCount, fallback: .small))
-                                }
-                                if isVisible(.upcomingTasks) {
-                                    UpcomingTasksCard(size: size(for: .upcomingTasks, fallback: .medium))
-                                }
-                                if isVisible(.upcomingDeadlines) {
-                                    UpcomingDeadlinesCard(size: size(for: .upcomingDeadlines, fallback: .medium))
-                                }
-                            }
+                        if isVisible(.todayOverview) {
+                            TodayOverviewCard(size: size(for: .todayOverview, fallback: .medium))
                         } else {
                             sectionEmptyBanner(
                                 primary: "No workflow cards enabled",
                                 secondary: "Toggle on PARA essentials in Dashboard Settings.",
-                                accent: KosmicPalette.cyan
+                                accent: glassTint(.primary)
                             )
                         }
                     }
@@ -81,29 +70,16 @@ struct CustomizableDashboardView: View {
                     DashboardSectionPanel(
                         title: "Projects",
                         icon: "folder.fill",
-                        accent: KosmicPalette.violet,
+                        accent: glassTint(.accent),
                         isCollapsed: $projectsCollapsed
                     ) {
-                        if anyVisible([.projectsOverview, .activeProjects, .tasksOverview, .completionRate]) {
-                            VStack(spacing: 12) {
-                                if isVisible(.projectsOverview) {
-                                    ProjectsOverviewCard(size: size(for: .projectsOverview, fallback: .medium))
-                                }
-                                if isVisible(.activeProjects) {
-                                    ActiveProjectsCard(size: size(for: .activeProjects, fallback: .small))
-                                }
-                                if isVisible(.tasksOverview) {
-                                    TasksOverviewCard(size: size(for: .tasksOverview, fallback: .medium))
-                                }
-                                if isVisible(.completionRate) {
-                                    CompletionRateCard(size: size(for: .completionRate, fallback: .small))
-                                }
-                            }
+                        if isVisible(.projectsOverview) {
+                            ProjectsOverviewCard(size: size(for: .projectsOverview, fallback: .medium))
                         } else {
                             sectionEmptyBanner(
                                 primary: "No project cards enabled",
                                 secondary: "Surface your active initiatives from Settings.",
-                                accent: KosmicPalette.violet
+                                accent: glassTint(.accent)
                             )
                         }
                     }
@@ -111,7 +87,7 @@ struct CustomizableDashboardView: View {
                     DashboardSectionPanel(
                         title: "Areas",
                         icon: "square.grid.2x2.fill",
-                        accent: KosmicPalette.cyan,
+                        accent: glassTint(.primary),
                         isCollapsed: $areasCollapsed
                     ) {
                         if anyVisible([.areasHealth]) {
@@ -122,7 +98,7 @@ struct CustomizableDashboardView: View {
                             sectionEmptyBanner(
                                 primary: "No area cards enabled",
                                 secondary: "Keep track of your pillars by enabling area insights.",
-                                accent: KosmicPalette.cyan
+                                accent: glassTint(.primary)
                             )
                         }
                     }
@@ -130,7 +106,7 @@ struct CustomizableDashboardView: View {
                     DashboardSectionPanel(
                         title: "Resources",
                         icon: "book.closed.fill",
-                        accent: KosmicPalette.violet,
+                        accent: glassTint(.accent),
                         isCollapsed: $resourcesCollapsed
                     ) {
                         if anyVisible([.notesActivity, .recentNotes]) {
@@ -146,7 +122,7 @@ struct CustomizableDashboardView: View {
                             sectionEmptyBanner(
                                 primary: "No resource cards enabled",
                                 secondary: "Enable note activity to illuminate your knowledge base.",
-                                accent: KosmicPalette.violet
+                                accent: glassTint(.accent)
                             )
                         }
                     }
@@ -154,7 +130,7 @@ struct CustomizableDashboardView: View {
                     DashboardSectionPanel(
                         title: "Social",
                         icon: "chart.bar.fill",
-                        accent: KosmicPalette.cyan,
+                        accent: glassTint(.primary),
                         isCollapsed: $socialCollapsed
                     ) {
                         if anyVisible([.contentPerformance, .platformComparison]) {
@@ -170,7 +146,7 @@ struct CustomizableDashboardView: View {
                             sectionEmptyBanner(
                                 primary: "No social cards enabled",
                                 secondary: "Add publishing insights from Dashboard Settings when needed.",
-                                accent: KosmicPalette.cyan
+                                accent: glassTint(.primary)
                             )
                         }
                     }
@@ -198,9 +174,6 @@ struct CustomizableDashboardView: View {
                 (.upcomingTasks, .medium),
                 (.upcomingDeadlines, .medium),
                 (.projectsOverview, .medium),
-                (.activeProjects, .small),
-                (.tasksOverview, .medium),
-                (.completionRate, .small),
                 (.areasHealth, .medium),
                 (.notesActivity, .medium),
                 (.recentNotes, .medium)
@@ -256,17 +229,24 @@ struct CustomizableDashboardView: View {
     }
 }
 
+extension CustomizableDashboardView {
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
+    }
+}
+
 struct DashboardCardView: View {
     let card: DashboardCard
     let cardSize: DashboardCardSize
     @State private var isHovered = false
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Card Header
             HStack {
                 Image(systemName: card.type.icon)
-                    .foregroundColor(KosmicPalette.violet)
+                    .foregroundColor(glassTint(.accent))
                 
                 Text(card.type.rawValue)
                     .font(.system(size: 20, weight: .semibold))
@@ -275,7 +255,7 @@ struct DashboardCardView: View {
                 
                 if card.isPinned {
                     Image(systemName: "pin.fill")
-                        .foregroundColor(KosmicPalette.neutral600)
+                        .foregroundColor(glassTint(.surface))
                         .font(.caption)
                 }
             }
@@ -363,8 +343,13 @@ struct DashboardCardView: View {
         .glassPanel(tier: .contentCard, cornerRadius: 12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isHovered ? KosmicPalette.violet.opacity(0.4) : Color.clear, lineWidth: 2)
+                .stroke(glassTint(.accent), lineWidth: 2)
+                .opacity(isHovered ? 0.4 : 0)
         )
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
@@ -373,129 +358,424 @@ struct TodayOverviewCard: View {
     let size: DashboardCardSize
     @Query private var tasks: [Task]
     @Query private var inbox: [InboxItem]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        if size == .large {
+        switch size {
+        case .small:
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(inbox.filter { $0.convertedAt == nil }.count) inbox items")
-                    .font(.body)
-                Divider()
-                Text("\(tasks.filter { $0.status != .done }.count) active tasks")
-                    .font(.body)
-            }
-        } else {
-            VStack {
-                Text("\(inbox.filter { $0.convertedAt == nil }.count)")
-                    .font(.system(size: 36, weight: .bold))
-                Text("inbox items")
+                Text("\(inboxCount)")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(glassTint(.primary))
+                Text("Inbox items awaiting triage")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .dashboardSecondaryText()
+            }
+        default:
+            VStack(alignment: .leading, spacing: 24) {
+                HStack(spacing: 24) {
+                    DashboardMetricTile(
+                        label: "Inbox",
+                        value: "\(inboxCount)",
+                        accent: glassTint(.primary),
+                        caption: inboxCount == 0 ? "All clear" : "Tap Inbox to convert"
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    DashboardMetricTile(
+                        label: "Active tasks",
+                        value: "\(activeTasksCount)",
+                        accent: glassTint(.accent),
+                        caption: overdueCount > 0 ? "\(overdueCount) overdue" : "On schedule"
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    DashboardMetricTile(
+                        label: "Completed today",
+                        value: "\(completedToday)",
+                        accent: glassTint(.success)
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                
+                Divider()
+                    .overlay(.white.opacity(0.08))
+                
+                VStack(alignment: .leading, spacing: 18) {
+                    focusSection
+                    inboxSection
+                    
+                    Text(nextActionCopy)
+                        .font(.footnote)
+                        .dashboardSecondaryText()
+                }
             }
         }
+    }
+    
+    private var inboxCount: Int {
+        inbox.filter { $0.convertedAt == nil }.count
+    }
+    
+    private var activeTasksCount: Int {
+        tasks.filter { $0.status != .done }.count
+    }
+    
+    private var overdueCount: Int {
+        let now = Date()
+        return tasks.filter { task in
+            guard let due = task.dueDate else { return false }
+            return task.status != .done && due < now
+        }.count
+    }
+    
+    private var upcomingTasks: [Task] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: 2, to: Date()) ?? Date()
+        return tasks.filter { task in
+            guard let due = task.dueDate else { return false }
+            return task.status != .done && due >= Date() && due <= cutoff
+        }
+        .sorted { ($0.dueDate ?? Date()) < ($1.dueDate ?? Date()) }
+    }
+    
+    private var inboxToConvert: [InboxItem] {
+        inbox.filter { $0.convertedAt == nil }
+            .sorted { $0.createdAt < $1.createdAt }
+    }
+    
+    @ViewBuilder
+    private var focusSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Today's Focus")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .dashboardSecondaryText()
+            
+            if upcomingTasks.isEmpty {
+                Text("No tasks due soon. Review projects or capture the next step.")
+                    .font(.footnote)
+                    .dashboardSecondaryText()
+            } else {
+                ForEach(upcomingTasks.prefix(3)) { task in
+                    focusTaskRow(task)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var inboxSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Inbox To Convert")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .dashboardSecondaryText()
+            
+            if inboxToConvert.isEmpty {
+                Text("Inbox is clear. Capture anything on your mind.")
+                    .font(.footnote)
+                    .dashboardSecondaryText()
+            } else {
+                ForEach(inboxToConvert.prefix(3)) { item in
+                    inboxRow(item)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func focusTaskRow(_ task: Task) -> some View {
+        HStack(spacing: 12) {
+            DashboardTag(text: "Due", color: glassTint(.accent))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(task.title.isEmpty ? "Untitled task" : task.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                if let due = task.dueDate {
+                    Text(due.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .dashboardSecondaryText()
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.primary.opacity(0.03))
+        )
+    }
+    
+    @ViewBuilder
+    private func inboxRow(_ item: InboxItem) -> some View {
+        HStack(spacing: 12) {
+            DashboardTag(text: "Capture", color: glassTint(.primary))
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.content.isEmpty ? "Untitled item" : item.content)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Text(item.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption2)
+                    .dashboardSecondaryText()
+            }
+            
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.primary.opacity(0.03))
+        )
+    }
+    
+    private var completedToday: Int {
+        tasks.filter { task in
+            guard let completedAt = task.completedAt else { return false }
+            return Calendar.current.isDateInToday(completedAt)
+        }.count
+    }
+    
+    private var nextActionCopy: String {
+        if !inboxToConvert.isEmpty { return "You have inbox items waiting. Convert a few now to keep flow moving." }
+        if overdueCount > 0 { return "Tackle overdue tasks first to reset momentum." }
+        if activeTasksCount == 0 { return "No active tasks. Capture what’s next to stay in motion." }
+        return "Great pace today! Wrap with a quick review or reflection."
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
 struct InboxCountCard: View {
     let size: DashboardCardSize
     @Query private var inboxItems: [InboxItem]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var unconvertedCount: Int {
         inboxItems.filter { $0.convertedAt == nil }.count
     }
     
     var body: some View {
-        VStack {
-            Text("\(unconvertedCount)")
-                .font(.system(size: 48, weight: .bold))
-                .foregroundColor(.orange)
-            Text(unconvertedCount == 1 ? "item waiting" : "items waiting")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            DashboardMetricTile(
+                label: unconvertedCount == 1 ? "Item waiting" : "Items waiting",
+                value: "\(unconvertedCount)",
+                accent: glassTint(.primary)
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            Text(unconvertedCount == 0 ? "Inbox is clear."
+                 : "Convert a handful now so planning stays effortless.")
+                .font(.footnote)
+                .dashboardSecondaryText()
         }
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
 struct ActiveProjectsCard: View {
     let size: DashboardCardSize
     @Query(filter: #Predicate<Project> { $0.statusRaw == "active" }) private var projects: [Project]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        if size == .large {
+        switch size {
+        case .small:
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(projects.prefix(5)) { project in
-                    HStack {
-                        Circle()
-                            .fill(.blue)
-                            .frame(width: 8, height: 8)
-                        Text(project.title)
-                            .font(.body)
-                        Spacer()
+                Text("\(projects.count)")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(glassTint(.accent))
+                Text(projects.count == 1 ? "Active project" : "Active projects")
+                    .font(.caption)
+                    .dashboardSecondaryText()
+            }
+        default:
+            VStack(alignment: .leading, spacing: 24) {
+                DashboardMetricTile(
+                    label: "Active projects",
+                    value: "\(projects.count)",
+                    accent: glassTint(.accent),
+                    caption: focusSummary
+                )
+                
+                Divider()
+                    .overlay(.white.opacity(0.08))
+                
+                if projects.isEmpty {
+                    Text("No active projects right now. Choose one area to advance next.")
+                        .font(.footnote)
+                        .dashboardSecondaryText()
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(projects.prefix(4)) { project in
+                            projectRow(project)
+                        }
                     }
                 }
-                if projects.isEmpty {
-                    Text("No active projects")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        } else {
-            VStack {
-                Text("\(projects.count)")
-                    .font(.system(size: 36, weight: .bold))
-                Text(projects.count == 1 ? "project" : "projects")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
         }
     }
-}
+    
+    private var focusSummary: String {
+        if projects.isEmpty { return "Spin up your next initiative." }
+        let names = projects.prefix(3).map { $0.title }
+        return "Focused on " + names.joined(separator: ", ")
+    }
+    
+    @ViewBuilder
+    private func projectRow(_ project: Project) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(glassTint(.accent))
+                .frame(width: 24, height: 24)
+                .opacity(0.2)
+                .overlay(
+                    Image(systemName: "folder.fill")
+                        .foregroundColor(glassTint(.accent))
+                        .font(.system(size: 12, weight: .semibold))
+                )
+            Text(project.title)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .lineLimit(1)
+            Spacer()
+            Text(project.statusRaw.capitalized)
+                .font(.caption2)
+                .dashboardSecondaryText()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.primary.opacity(0.03))
+        )
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
+    }
+} 
 
 struct UpcomingTasksCard: View {
     let size: DashboardCardSize
     @Query private var tasks: [Task]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var upcoming: [Task] {
-        let tomorrow = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        let deadline = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
         return tasks.filter { task in
             guard let due = task.dueDate else { return false }
-            return due <= tomorrow && task.status != .done
+            return due <= deadline && task.status != .done
         }
+        .sorted { ($0.dueDate ?? Date()) < ($1.dueDate ?? Date()) }
     }
     
     var body: some View {
-        if size == .large {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(upcoming.prefix(8)) { task in
-                    HStack {
-                        Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                            .foregroundColor(task.status == .done ? .green : .secondary)
-                        Text(task.title)
-                            .font(.caption)
-                            .lineLimit(1)
-                        Spacer()
+        switch size {
+        case .small:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(upcoming.count)")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(upcoming.isEmpty ? .secondary : glassTint(.primary))
+                Text(upcoming.count == 1 ? "Task due soon" : "Tasks due soon")
+                    .font(.caption)
+                    .dashboardSecondaryText()
+            }
+        default:
+            VStack(alignment: .leading, spacing: 24) {
+                DashboardMetricTile(
+                    label: "Due this week",
+                    value: "\(upcoming.count)",
+                    accent: upcoming.isEmpty ? .secondary : glassTint(.primary),
+                    caption: upcoming.first?.dueDate.map { "Next due \($0.formatted(date: .abbreviated, time: .omitted))" }
+                )
+                
+                Divider()
+                    .overlay(.white.opacity(0.08))
+                
+                if upcoming.isEmpty {
+                    Text("You’re ahead of schedule. Check back for upcoming commitments.")
+                        .font(.footnote)
+                        .dashboardSecondaryText()
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(upcoming.prefix(5)) { task in
+                            taskRow(task)
+                        }
                     }
                 }
-                if upcoming.isEmpty {
-                    Text("No tasks due")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        } else {
-            VStack {
-                Text("\(upcoming.count)")
-                    .font(.system(size: 36, weight: .bold))
-                Text(upcoming.count == 1 ? "task due" : "tasks due")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
         }
+    }
+    
+    @ViewBuilder
+    private func taskRow(_ task: Task) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(glassTint(.accent))
+                .frame(width: 24, height: 24)
+                .opacity(0.18)
+                .overlay(
+                    Image(systemName: "checkmark.circle")
+                        .foregroundColor(glassTint(.accent))
+                        .font(.system(size: 12, weight: .semibold))
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                if let due = task.dueDate {
+                    Text(due.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .dashboardSecondaryText()
+                }
+            }
+            Spacer()
+            if let priority = TaskPriority(rawValue: task.priorityRaw) {
+                DashboardTag(text: priority.displayName, color: color(for: priority))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.primary.opacity(0.03))
+        )
+    }
+    
+    private func color(for priority: TaskPriority) -> Color {
+        switch priority {
+        case .high: return glassTint(.danger)
+        case .medium: return glassTint(.primary)
+        case .low: return glassTint(.surface)
+        }
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
 struct ScheduledPostsCard: View {
     let size: DashboardCardSize
     @Query private var posts: [Post]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var scheduledToday: Int {
         posts.filter { post in
@@ -504,73 +784,194 @@ struct ScheduledPostsCard: View {
         }.count
     }
     
+    var scheduledThisWeek: Int {
+        let end = Calendar.current.date(byAdding: .day, value: 7, to: Date()) ?? Date()
+        return posts.filter { post in
+            guard let scheduled = post.scheduledDate else { return false }
+            return scheduled >= Date() && scheduled <= end
+        }.count
+    }
+    
     var body: some View {
-        VStack {
-            Text("\(scheduledToday)")
-                .font(.system(size: 36, weight: .bold))
-            Text(scheduledToday == 1 ? "post today" : "posts today")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        switch size {
+        case .small:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(scheduledToday)")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(glassTint(.accent))
+                Text(scheduledToday == 1 ? "Post scheduled today" : "Posts scheduled today")
+                    .font(.caption)
+                    .dashboardSecondaryText()
+            }
+        default:
+            VStack(alignment: .leading, spacing: 24) {
+                HStack(spacing: 24) {
+                    DashboardMetricTile(
+                        label: "Today",
+                        value: "\(scheduledToday)",
+                        accent: glassTint(.accent)
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    DashboardMetricTile(
+                        label: "Next 7 days",
+                        value: "\(scheduledThisWeek)",
+                        accent: glassTint(.primary)
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                
+                Divider()
+                    .overlay(.white.opacity(0.08))
+                
+                Text(scheduledToday == 0 ? "No posts scheduled today. Queue something to keep feeds active." : "Content is lined up—review captions or creative if you need refinements.")
+                    .font(.footnote)
+                    .dashboardSecondaryText()
+            }
         }
+    }
+    
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
 struct DraftCountCard: View {
     let size: DashboardCardSize
     @Query private var drafts: [Draft]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var activeCount: Int {
         drafts.filter { !$0.isArchived }.count
     }
     
     var body: some View {
-        VStack {
-            Text("\(activeCount)")
-                .font(.system(size: 36, weight: .bold))
-            Text(activeCount == 1 ? "draft" : "drafts")
-                .font(.caption)
-                .foregroundColor(.secondary)
+        switch size {
+        case .small:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(activeCount)")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(glassTint(.primary))
+                Text(activeCount == 1 ? "Active draft" : "Active drafts")
+                    .font(.caption)
+                    .dashboardSecondaryText()
+            }
+        default:
+            VStack(alignment: .leading, spacing: 18) {
+                DashboardMetricTile(
+                    label: activeCount == 1 ? "Active draft" : "Active drafts",
+                    value: "\(activeCount)",
+                    accent: glassTint(.primary),
+                    caption: drafts.isEmpty ? "Spin up a new idea." : "Newest edited \(latestEdit)"
+                )
+                
+                Divider()
+                    .overlay(.white.opacity(0.08))
+                
+                Text(activeCount == 0 ? "Repurpose a top post or outline a fresh concept." : "Review your top draft and move it into scheduling when ready.")
+                    .font(.footnote)
+                    .dashboardSecondaryText()
+            }
         }
+    }
+    
+    private var latestEdit: String {
+        guard let last = drafts.sorted(by: { $0.updatedAt > $1.updatedAt }).first else { return "—" }
+        return last.updatedAt.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
 struct RecentNotesCard: View {
     let size: DashboardCardSize
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        if size == .large {
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(notes.prefix(8)) { note in
-                    HStack {
-                        Image(systemName: "doc.text")
-                            .foregroundColor(.secondary)
-                            .font(.caption)
-                        Text(note.title)
-                            .font(.caption)
-                            .lineLimit(1)
-                        Spacer()
+        switch size {
+        case .small:
+            VStack(alignment: .leading, spacing: 8) {
+                Text("\(notes.count)")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundColor(glassTint(.accent))
+                Text(notes.count == 1 ? "Note on file" : "Notes on file")
+                    .font(.caption)
+                    .dashboardSecondaryText()
+            }
+        default:
+            VStack(alignment: .leading, spacing: 24) {
+                DashboardMetricTile(
+                    label: notes.count == 1 ? "Note archived" : "Notes archived",
+                    value: "\(notes.count)",
+                    accent: glassTint(.accent),
+                    caption: latestNoteCopy
+                )
+                
+                Divider()
+                    .overlay(.white.opacity(0.08))
+                
+                if notes.isEmpty {
+                    Text("You haven’t captured anything yet. Start a note to collect ideas and references.")
+                        .font(.footnote)
+                        .dashboardSecondaryText()
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        ForEach(notes.prefix(5)) { note in
+                            noteRow(note)
+                        }
                     }
                 }
-                if notes.isEmpty {
-                    Text("No notes yet")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-        } else {
-            VStack {
-                Text("\(notes.count)")
-                    .font(.system(size: 36, weight: .bold))
-                Text(notes.count == 1 ? "note" : "notes")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
         }
+    }
+    
+    private var latestNoteCopy: String {
+        guard let latest = notes.first else { return "No notes yet" }
+        return "Last updated " + latest.updatedAt.formatted(date: .abbreviated, time: .shortened)
+    }
+    
+    @ViewBuilder
+    private func noteRow(_ note: Note) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(glassTint(.primary))
+                .frame(width: 24, height: 24)
+                .opacity(0.18)
+                .overlay(
+                    Image(systemName: "doc.text")
+                        .foregroundColor(glassTint(.primary))
+                        .font(.system(size: 12, weight: .semibold))
+                )
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(note.title.isEmpty ? "Untitled note" : note.title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                
+                Text(note.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption2)
+                    .dashboardSecondaryText()
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.primary.opacity(0.03))
+        )
+    }
+
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
     }
 }
 
 #Preview {
     CustomizableDashboardView()
-        .modelContainer(for: [DashboardCard.self, Task.self, InboxItem.self])
+        .modelContainer(for: [DashboardCard.self, CloutmateShared.Task.self, CloutmateShared.InboxItem.self])
 }

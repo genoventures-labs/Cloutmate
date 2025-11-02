@@ -24,6 +24,7 @@ struct ListTableView: View {
     @State private var refreshID = UUID()
     @State private var selectedViewType: ViewType = .table
     @State private var showPropertyEditor = false
+    @State private var postToEdit: Post?
     
     var filteredPosts: [Post] {
         var filtered = posts
@@ -92,7 +93,7 @@ struct ListTableView: View {
                     .lineLimit(2)
                     .contextMenu {
                         Button("Edit") {
-                            // TODO: Open editor
+                            postToEdit = post
                         }
                         Button("Duplicate") {
                             duplicatePost(post)
@@ -112,8 +113,8 @@ struct ListTableView: View {
                             .font(.caption)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(platform == .threads ? Color.purple.opacity(0.2) : Color.blue.opacity(0.2))
-                            .foregroundColor(platform == .threads ? .purple : .blue)
+                            .background(platform == .threads ? Color.kosmicPurple.opacity(0.2) : Color.kosmicBlue.opacity(0.2))
+                            .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
                             .cornerRadius(4)
                     }
                 }
@@ -222,6 +223,9 @@ struct ListTableView: View {
         }
         .sheet(isPresented: $showComposer) {
             ComposerWindow()
+        }
+        .sheet(item: $postToEdit) { post in
+            ComposerWindow(existingPost: post)
         }
         .sheet(isPresented: $showPropertyEditor) {
             CustomPropertyEditor()

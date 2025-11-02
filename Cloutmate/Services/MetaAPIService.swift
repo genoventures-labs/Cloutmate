@@ -8,16 +8,35 @@
 import Foundation
 import AuthenticationServices
 import os.log
+import CloutmateShared
 
 enum MetaAPIError: Error {
     case authenticationFailed
     case invalidResponse
     case networkError(Error)
     case apiError(MetaAPIError.ErrorDetail)
+    case metricsUnavailable(String)
     
     struct ErrorDetail {
         let message: String
         let code: Int
+    }
+}
+
+extension MetaAPIError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .authenticationFailed:
+            return "Authentication with Meta failed. Please reconnect your account."
+        case .invalidResponse:
+            return "Meta returned an unexpected response."
+        case .networkError(let error):
+            return error.localizedDescription
+        case .apiError(let detail):
+            return detail.message
+        case .metricsUnavailable(let message):
+            return message
+        }
     }
 }
 
@@ -371,40 +390,62 @@ final class MetaAPIService {
         since: Int? = nil,
         until: Int? = nil
     ) async throws -> PageInsightsResponse {
-        // Build metrics list: overview and engagement metrics
-        let metrics = [
-            "page_views_total",
-            "page_fans",
-            "page_reach",
-            "page_impressions",
-            "page_engaged_users",
-            "page_post_engagements",
-            "page_consumptions"
-        ].joined(separator: ",")
-        
-        // Build endpoint with period parameter
-        var endpoint = "\(pageID)/insights?metric=\(metrics)"
-        
-        // For period-based metrics, add since/until dates
-        if period != .lifetime {
-            let untilDate = until ?? Int(Date().timeIntervalSince1970)
-            let sinceDate: Int
-            
-            if let customSince = since {
-                sinceDate = customSince
-                // Use day period for custom date ranges
-                endpoint += "&period=day"
-            } else {
-                sinceDate = untilDate - period.secondsDuration
-                endpoint += "&period=\(period.rawValue)"
-            }
-            
-            endpoint += "&since=\(sinceDate)&until=\(untilDate)"
+        // Build metrics list with currently supported Facebook Page Insights metrics (Graph API v19+)
+        // Note: Only request metrics that are universally available.
+        // Many pages (especially creator/digital creator pages) don't have access to engagement metrics.
+        // Different metrics support different periods:
+        // - page_fans: lifetime only
+        // - page_impressions: day/week/days_28 (universally available)
+        var metrics: [String]
+        if period == .lifetime {
+            metrics = ["page_fans"]
         } else {
-            endpoint += "&period=\(period.rawValue)"
+            // Only request page_impressions - it's the most reliable metric
+            // page_engaged_users requires pages_read_engagement permission and is often unavailable
+            metrics = ["page_impressions"]
         }
         
-        return try await request(endpoint: endpoint, accessToken: accessToken)
+        guard !metrics.isEmpty else {
+            Logger.metaAPI.error("No valid metrics available for period \(period.rawValue)")
+            return PageInsightsResponse(data: [])
+        }
+        
+        func buildEndpoint(for metrics: [String]) -> String {
+            var endpoint = "\(pageID)/insights?metric=\(metrics.joined(separator: ","))"
+            endpoint += "&period=\(period.rawValue)"
+            if period != .lifetime {
+                let untilDate = until ?? Int(Date().timeIntervalSince1970)
+                let sinceDate: Int
+                if let customSince = since {
+                    sinceDate = customSince
+                } else {
+                    sinceDate = untilDate - period.secondsDuration
+                }
+                endpoint += "&since=\(sinceDate)&until=\(untilDate)"
+            }
+            return endpoint
+        }
+        
+        do {
+            let endpoint = buildEndpoint(for: metrics)
+            return try await request(endpoint: endpoint, accessToken: accessToken)
+        } catch MetaAPIError.apiError(let detail) where detail.code == 100 && detail.message.contains("valid insights metric") {
+            Logger.metaAPI.error("Meta API rejected metrics \(metrics.joined(separator: ",")) for page \(pageID). Falling back to single-metric requests.")
+            var aggregatedData: [PageInsightsResponse.PageInsightData] = []
+            for metric in metrics {
+                do {
+                    let endpoint = buildEndpoint(for: [metric])
+                    let response: PageInsightsResponse = try await request(endpoint: endpoint, accessToken: accessToken)
+                    aggregatedData.append(contentsOf: response.data)
+                } catch {
+                    Logger.metaAPI.error("Failed to fetch metric \(metric) for page \(pageID): \(error.localizedDescription)")
+                }
+            }
+            if !aggregatedData.isEmpty {
+                return PageInsightsResponse(data: aggregatedData)
+            }
+            throw MetaAPIError.metricsUnavailable("Meta returned (#100) for every metric. This usually means the page does not have access to Insights data for these metrics or the required permissions are missing.")
+        }
     }
 }
 

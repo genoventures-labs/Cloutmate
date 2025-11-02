@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import SwiftData
 import GoogleGenerativeAI
+import CloutmateShared
 
 enum DateFilter: String, CaseIterable {
     case all = "All"
@@ -24,6 +25,8 @@ final class AIAssistantViewModel {
     private let aiService = AICreativeService.shared
     private let geminiService = GeminiService.shared
     private let aiSettings = AISettings.shared
+    private let actionRouter = AIActionRouter.shared
+    private let feedbackLogger = AIFeedbackLogger.shared
     
     var messages: [AIMessage] = []
     var currentConversation: AIConversation?
@@ -62,6 +65,13 @@ final class AIAssistantViewModel {
             currentConversation = conversation
             selectedConversation = conversation
             
+            // Save the conversation immediately so it appears in the list
+            do {
+                try modelContext.save()
+            } catch {
+                print("Failed to save conversation: \(error)")
+            }
+            
             // Load messages for this conversation
             if let messages = conversation.messages {
                 self.messages = messages
@@ -89,10 +99,20 @@ final class AIAssistantViewModel {
             modelContext.insert(errorMessage)
             messages.append(errorMessage)
             currentConversation?.messages?.append(errorMessage)
+            try? modelContext.save()
             return
         }
         
-        let userMessage = AIMessage(role: "user", content: text)
+        // Analyze emotional tone of user message
+        let emotionalSnapshot = EmotionAnalyzer.analyzeTone(text: text)
+        
+        let userMessage = AIMessage(
+            role: "user",
+            content: text,
+            emotion: emotionalSnapshot.primaryEmotion.rawValue,
+            emotionScore: emotionalSnapshot.valence,
+            emotionIntensity: emotionalSnapshot.intensity
+        )
         modelContext.insert(userMessage)
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
@@ -146,7 +166,13 @@ final class AIAssistantViewModel {
             // Build app context for AI
             let appContext = try await AppContextService.shared.buildContextForAI(modelContext: modelContext)
             
-            // Check for execution intent first
+            // Check for REFLECTION intent first (introspective queries about patterns/state)
+            if let reflectionIntent = try? await geminiService.detectReflectionIntent(input: text) {
+                await processReflection(reflectionIntent, originalQuery: text, modelContext: modelContext, isFirstMessage: isFirstMessage)
+                return
+            }
+            
+            // Then check for execution intent (action-oriented commands)
             if let executionIntent = try? await geminiService.detectExecutionIntent(input: text) {
                 await executeIntent(executionIntent, modelContext: modelContext, isFirstMessage: isFirstMessage)
                 return
@@ -155,10 +181,95 @@ final class AIAssistantViewModel {
             // Convert conversation messages to ModelContent for context
             let conversationModelContent: [ModelContent]? = await geminiService.convertMessagesToModelContent(messages)
             
+            // Build adaptive payload context (recall + feedback loop)
+            let recallSnippets = AIRecallService.shared.fetchRelevantSnippets(
+                for: text,
+                modelContext: modelContext
+            )
+            var feedbackSummaries = feedbackLogger.recentSummaries(
+                limit: 3,
+                modelContext: modelContext
+            )
+            if let weeklySummary = feedbackLogger.weeklyActivitySummary(modelContext: modelContext),
+               !feedbackSummaries.contains(where: { $0.title == weeklySummary.title }) {
+                feedbackSummaries.insert(weeklySummary, at: 0)
+            }
+            
+            // Build emotional narrative from recent conversation messages
+            let narrativeSummary = buildEmotionalNarrative(from: messages)
+            
+            // Fetch top priority items from CPS
+            let priorityItems = PriorityEngine.shared.getTopObjects(limit: 10, modelContext: modelContext)
+            
+            // Build focus session context if enabled
+            var focusContext: FocusSessionContext? = nil
+            if AIConfigService.shared.config.featureFlags.focusModeEnabled {
+                let activeSession = FocusSessionService.shared.getActiveSession(modelContext: modelContext)
+                let now = Date()
+                let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+                let stats = FocusSessionService.shared.getSessionStats(
+                    for: DateInterval(start: weekAgo, end: now),
+                    modelContext: modelContext
+                )
+                
+                focusContext = FocusSessionContext(
+                    isActive: activeSession != nil,
+                    objective: activeSession?.objective,
+                    elapsedMinutes: activeSession != nil ? Int(activeSession!.elapsedTime / 60) : nil,
+                    remainingMinutes: activeSession != nil ? Int(max(0, activeSession!.remainingTime) / 60) : nil,
+                    recentSessionCount: stats.totalSessions,
+                    completionRate: stats.completionRate,
+                    totalFocusHoursThisWeek: Int(stats.totalFocusTime / 3600)
+                )
+            }
+            
+            // Build live themes context if enabled
+            var liveThemes: [ConceptSummary]? = nil
+            if AIConfigService.shared.config.featureFlags.narrativeEnabled {
+                liveThemes = ConceptTracker.shared.getConceptSummaries(limit: 5, modelContext: modelContext)
+            }
+            
+            // Fetch past conversation summaries (excluding current)
+            let pastConversationSummaries = ConversationArchive.shared.getConversationSummariesForContext(
+                excludingId: currentConversation?.id,
+                limit: 3,
+                modelContext: modelContext
+            )
+            
+            // Fetch memory graph themes if enabled
+            var memoryThemes: [ThemeSummary]? = nil
+            if AIConfigService.shared.config.featureFlags.memoryGraphEnabled {
+                let themes = MemoryGraphService.shared.getActiveThemes(modelContext: modelContext)
+                memoryThemes = themes.prefix(5).map { theme in
+                    ThemeSummary(
+                        id: theme.id,
+                        label: theme.label,
+                        description: theme.themeDescription,
+                        salience: theme.salience,
+                        memberCount: theme.memberNodeIds.count,
+                        keywords: theme.keywords,
+                        isActive: theme.isActive
+                    )
+                }
+            }
+            
+            let payloadContext = AIPayloadContext(
+                recall: recallSnippets,
+                priorities: priorityItems,
+                feedback: feedbackSummaries,
+                focusSession: focusContext,
+                liveThemes: liveThemes,
+                pastConversations: pastConversationSummaries.isEmpty ? nil : pastConversationSummaries,
+                memoryThemes: memoryThemes,
+                narrativeSummary: narrativeSummary,
+                metadata: ["phase": "6", "emotionalContinuity": "enabled", "cpsEnabled": "true", "focusModeEnabled": String(AIConfigService.shared.config.featureFlags.focusModeEnabled), "narrativeEnabled": String(AIConfigService.shared.config.featureFlags.narrativeEnabled), "crossConversationEnabled": "true", "memoryGraphEnabled": String(AIConfigService.shared.config.featureFlags.memoryGraphEnabled)]
+            )
+            
             // Use Gemini with app context for app-smart responses
             let response = try await geminiService.generateResponseWithAppContext(
                 for: text,
                 appContext: appContext,
+                payloadContext: payloadContext,
                 conversationMessages: conversationModelContent
             )
             
@@ -172,6 +283,9 @@ final class AIAssistantViewModel {
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
                 isLoading = false
+                
+                // Save after adding messages
+                try? modelContext.save()
             }
             
             // Generate title if this is the first message
@@ -191,66 +305,83 @@ final class AIAssistantViewModel {
                 currentConversation?.messages?.append(errorMessage)
                 self.errorMessage = error.localizedDescription
                 isLoading = false
+                
+                // Save after adding error message
+                try? modelContext.save()
             }
         }
     }
     
     private func executeIntent(_ intent: GeminiService.ExecutionIntent, modelContext: ModelContext, isFirstMessage: Bool) async {
-        let executionService = AIExecutionService.shared
-        
         do {
-            var result: AIExecutionService.ExecutionResult
-            
-            switch intent.operation {
-            case .archiveTasks:
-                let criteria = AIExecutionService.ArchiveCriteria(rawValue: intent.criteria ?? "completed") ?? .completed
-                result = try await executionService.archiveTasks(
-                    criteria: criteria,
-                    daysAgo: intent.daysAgo,
-                    projectId: nil,
-                    context: modelContext
-                )
+            if let action = AIIntentAction(from: intent) {
+                let actionResult = try await actionRouter.route(action, modelContext: modelContext)
                 
-            case .summarizePosts:
-                let filter = AIExecutionService.PostFilter(rawValue: intent.postFilter ?? "all") ?? .all
-                result = try await executionService.summarizePosts(
-                    filter: filter,
-                    filterValue: intent.filterValue,
-                    context: modelContext
-                )
+                let attributedResult = convertMarkdownToAttributedString(actionResult.markdown)
+                let assistantMessage = AIMessage(role: "assistant", content: attributedResult)
                 
-            case .generateReport:
-                let reportType = AIExecutionService.ReportType(rawValue: intent.reportType ?? "weekly") ?? .weekly
-                result = try await executionService.generateProgressReport(
-                    type: reportType,
-                    context: modelContext
-                )
+                await MainActor.run {
+                    modelContext.insert(assistantMessage)
+                    messages.append(assistantMessage)
+                    currentConversation?.messages?.append(assistantMessage)
+                    isLoading = false
+                    try? modelContext.save()
+                }
                 
-            case .predictScheduling:
-                result = try await executionService.predictSchedulingNeeds(
-                    daysAhead: intent.daysAhead ?? 7,
-                    context: modelContext
-                )
+                feedbackLogger.record(action: action, result: actionResult, modelContext: modelContext)
+                
+                if isFirstMessage, let conversation = currentConversation {
+                    await generateAndSetTitle(from: action.displayName, conversation: conversation, modelContext: modelContext)
+                }
+            } else {
+                // Fallback to legacy execution for unknown intents (should rarely trigger).
+                let executionService = AIExecutionService.shared
+                let legacyResult: AIExecutionService.ExecutionResult
+                
+                switch intent.operation {
+                case .archiveTasks:
+                    let criteria = AIExecutionService.ArchiveCriteria(rawValue: intent.criteria ?? "completed") ?? .completed
+                    legacyResult = try await executionService.archiveTasks(
+                        criteria: criteria,
+                        daysAgo: intent.daysAgo,
+                        projectId: nil,
+                        context: modelContext
+                    )
+                case .summarizePosts:
+                    let filter = AIExecutionService.PostFilter(rawValue: intent.postFilter ?? "all") ?? .all
+                    legacyResult = try await executionService.summarizePosts(
+                        filter: filter,
+                        filterValue: intent.filterValue,
+                        context: modelContext
+                    )
+                case .generateReport:
+                    let type = AIExecutionService.ReportType(rawValue: intent.reportType ?? "weekly") ?? .weekly
+                    legacyResult = try await executionService.generateProgressReport(
+                        type: type,
+                        context: modelContext
+                    )
+                case .predictScheduling:
+                    legacyResult = try await executionService.predictSchedulingNeeds(
+                        daysAhead: intent.daysAhead ?? 7,
+                        context: modelContext
+                    )
+                default:
+                    // All other operations (createPost, publishPost, tasks, notes, inbox, projects) 
+                    // are handled by AIActionRouter above and should never reach this fallback
+                    throw ExecutionError.executionFailed("Operation \(intent.operation.rawValue) not supported in legacy execution path")
+                }
+                
+                let attributed = convertMarkdownToAttributedString(legacyResult.asMarkdown())
+                let assistantMessage = AIMessage(role: "assistant", content: attributed)
+                
+                await MainActor.run {
+                    modelContext.insert(assistantMessage)
+                    messages.append(assistantMessage)
+                    currentConversation?.messages?.append(assistantMessage)
+                    isLoading = false
+                    try? modelContext.save()
+                }
             }
-            
-            // Display execution result
-            let resultMessage = result.asMarkdown()
-            let attributedResult = convertMarkdownToAttributedString(resultMessage)
-            
-            let assistantMessage = AIMessage(role: "assistant", content: attributedResult)
-            
-            await MainActor.run {
-                modelContext.insert(assistantMessage)
-                messages.append(assistantMessage)
-                currentConversation?.messages?.append(assistantMessage)
-                isLoading = false
-            }
-            
-            // Generate title if this is the first message
-            if isFirstMessage, let conversation = currentConversation {
-                await generateAndSetTitle(from: "Execute \(intent.operation.rawValue)", conversation: conversation, modelContext: modelContext)
-            }
-            
         } catch {
             let errorMessage = AIMessage(
                 role: "assistant",
@@ -263,7 +394,86 @@ final class AIAssistantViewModel {
                 currentConversation?.messages?.append(errorMessage)
                 self.errorMessage = error.localizedDescription
                 isLoading = false
+                
+                // Save after adding error message
+                try? modelContext.save()
             }
+        }
+    }
+    
+    private func processReflection(_ intent: GeminiService.ReflectionIntent, originalQuery: String, modelContext: ModelContext, isFirstMessage: Bool) async {
+        // Map the user's query to the appropriate time range for analytics
+        // For now, default to "thisWeek" unless the query explicitly mentions other timeframes
+        let timeRange: AnalyticsTimeRange = .thisWeek
+        
+        // Use AIReflectionService to analyze Intelligence Dashboard data
+        let reflectionService = AIReflectionService.shared
+        let reflectiveInsight = await reflectionService.reflect(
+            on: intent,
+            timeRange: timeRange,
+            modelContext: modelContext
+        )
+        
+        // Generate chart data if this is a visualization-oriented query
+        var chartData: ChartData? = nil
+        let queryLower = originalQuery.lowercased()
+        let hasVisualizationRequest = queryLower.contains("visualiz") || queryLower.contains("render") ||
+                                       queryLower.contains("display") || queryLower.contains("curve") ||
+                                       queryLower.contains("graph") || queryLower.contains("chart") ||
+                                       queryLower.contains("projection")
+        
+        if hasVisualizationRequest {
+            // Generate appropriate chart based on intent
+            switch intent {
+            case .productivityPatterns:
+                chartData = await ChartGenerator.generateProductivityChart(timeRange: timeRange, modelContext: modelContext)
+            case .focusEffectiveness:
+                chartData = await ChartGenerator.generateFocusChart(timeRange: timeRange, modelContext: modelContext)
+            case .emotionalTrends:
+                chartData = await ChartGenerator.generateEmotionalChart(timeRange: timeRange, modelContext: modelContext)
+            case .weekOverview, .monthOverview:
+                // For projection-specific queries, use projection chart
+                if queryLower.contains("projection") || queryLower.contains("predict") {
+                    chartData = await ChartGenerator.generateProjectionChart(timeRange: timeRange, modelContext: modelContext)
+                }
+            default:
+                break
+            }
+        }
+        
+        // Format as Aurora's thoughtful response
+        let fullResponse = """
+        💭 **Reflection on your patterns and progress**
+        
+        \(reflectiveInsight)
+        
+        ---
+        
+        _This analysis is based on data from your Intelligence Dashboard. Visit **Insights** to explore these patterns visually._
+        """
+        
+        let attributedResponse = convertMarkdownToAttributedString(fullResponse)
+        let assistantMessage = AIMessage(role: "assistant", content: attributedResponse, chartData: chartData)
+        
+        await MainActor.run {
+            modelContext.insert(assistantMessage)
+            messages.append(assistantMessage)
+            currentConversation?.messages?.append(assistantMessage)
+            isLoading = false
+            try? modelContext.save()
+        }
+        
+        // Log this as a feedback event for learning
+        let feedbackEvent = AIFeedbackEvent(
+            actionName: "reflection_query",
+            resultMessage: "Provided reflective insights for \(intent.rawValue)",
+            itemsAffected: 1
+        )
+        modelContext.insert(feedbackEvent)
+        try? modelContext.save()
+        
+        if isFirstMessage, let conversation = currentConversation {
+            await generateAndSetTitle(from: "Reflection: \(intent.rawValue)", conversation: conversation, modelContext: modelContext)
         }
     }
     
@@ -282,6 +492,7 @@ final class AIAssistantViewModel {
             modelContext.insert(errorMessage)
             messages.append(errorMessage)
             currentConversation?.messages?.append(errorMessage)
+            try? modelContext.save()
             return
         }
         
@@ -308,6 +519,9 @@ final class AIAssistantViewModel {
             messages.append(assistantMessage)
             currentConversation?.messages?.append(assistantMessage)
             isLoading = false
+            
+            // Save after adding quick tool message
+            try? modelContext.save()
         }
     }
     
@@ -315,6 +529,49 @@ final class AIAssistantViewModel {
         messages.removeAll()
         currentConversation = nil
         selectedConversation = nil
+    }
+    
+    // MARK: - Message Editing
+    
+    func editAndRegenerateMessage(_ messageToEdit: AIMessage, newContent: String, modelContext: ModelContext) {
+        guard let messageIndex = messages.firstIndex(where: { $0.id == messageToEdit.id }) else {
+            return
+        }
+        
+        // Update the message content
+        messageToEdit.content = newContent
+        messageToEdit.timestamp = Date()
+        
+        // Remove all messages after the edited one (to regenerate from this point)
+        let messagesToRemove = messages.suffix(from: messageIndex + 1)
+        
+        // Remove from conversation
+        if let conversation = currentConversation {
+            for message in messagesToRemove {
+                if let conversationMessages = conversation.messages,
+                   let idx = conversationMessages.firstIndex(where: { $0.id == message.id }) {
+                    conversation.messages?.remove(at: idx)
+                }
+                modelContext.delete(message)
+            }
+        }
+        
+        // Remove from local messages array
+        messages.removeSubrange((messageIndex + 1)..<messages.count)
+        
+        // Save changes
+        try? modelContext.save()
+        
+        // Track if this is the first message in the conversation
+        let isFirstMessage = messageIndex == 0
+        
+        // Regenerate AI response
+        isLoading = true
+        errorMessage = nil
+        
+        _Concurrency.Task {
+            await processMessage(newContent, modelContext: modelContext, isFirstMessage: isFirstMessage)
+        }
     }
     
     // MARK: - Conversation Management
@@ -593,70 +850,96 @@ final class AIAssistantViewModel {
     
     // MARK: - Helper Methods
     
+    private func buildEmotionalNarrative(from messages: [AIMessage]) -> String? {
+        // Analyze recent messages (last 5-10) for emotional flow
+        let recentMessages = Array(messages.suffix(min(10, messages.count)))
+        
+        guard !recentMessages.isEmpty else { return nil }
+        
+        // Filter messages with emotional data
+        let emotionalMessages = recentMessages.filter { message in
+            guard let emotion = message.emotion, !emotion.isEmpty else { return false }
+            return message.emotionIntensity > 0.1
+        }
+        
+        guard emotionalMessages.count >= 2 else { return nil }
+        
+        // Detect emotional trajectory
+        let emotionScores = emotionalMessages.map { $0.emotionScore }
+        let avgScore = emotionScores.reduce(0.0, +) / Double(emotionScores.count)
+        
+        // Get dominant emotions
+        var emotionCounts: [String: Int] = [:]
+        for message in emotionalMessages {
+            if let emotion = message.emotion {
+                emotionCounts[emotion, default: 0] += 1
+            }
+        }
+        
+        let dominantEmotions = emotionCounts.sorted { $0.value > $1.value }.prefix(2).map { $0.key }
+        
+        // Build narrative
+        var narrative = "Conversation Emotional Context: "
+        
+        if avgScore > 0.3 {
+            narrative += "The discussion has been flowing with positive energy"
+        } else if avgScore < -0.3 {
+            narrative += "The conversation has touched on challenging topics"
+        } else {
+            narrative += "The exchange has maintained a balanced, thoughtful tone"
+        }
+        
+        if !dominantEmotions.isEmpty {
+            narrative += ", with recurring \(dominantEmotions.joined(separator: " and ")) themes"
+        }
+        
+        // Detect emotional shift
+        if emotionalMessages.count >= 3 {
+            let recentThree = Array(emotionalMessages.suffix(3))
+            let firstScore = recentThree.first?.emotionScore ?? 0
+            let lastScore = recentThree.last?.emotionScore ?? 0
+            let shift = lastScore - firstScore
+            
+            if abs(shift) > 0.5 {
+                if shift > 0 {
+                    narrative += ". Recent messages show a shift toward more positive energy"
+                } else {
+                    narrative += ". The tone has become more serious or concerned recently"
+                }
+            }
+        }
+        
+        narrative += "."
+        return narrative
+    }
+    
     private func convertMarkdownToAttributedString(_ markdown: String) -> String {
-        // Basic markdown to rich text conversion
-        var result = markdown
+        let normalizedNewlines = markdown.replacingOccurrences(of: "\r\n", with: "\n")
+        let lines = normalizedNewlines.components(separatedBy: .newlines)
+        var output: [String] = []
+        var previousBlank = false
         
-        // Bold **text**
-        result = result.replacingOccurrences(
-            of: #"\*\*([^*]+)\*\*"#,
-            with: "$1",
-            options: .regularExpression
-        )
-        
-        // Italic *text*
-        result = result.replacingOccurrences(
-            of: #"(?<!\*)\*([^*]+)\*(?!\*)"#,
-            with: "$1",
-            options: .regularExpression
-        )
-        
-        // Code `text`
-        result = result.replacingOccurrences(
-            of: #"`([^`]+)`"#,
-            with: "$1",
-            options: .regularExpression
-        )
-        
-        // Headers # Text (process line by line)
-        let lines = result.components(separatedBy: .newlines)
-        result = lines.map { line in
-            var processed = line
-            // H3
-            processed = processed.replacingOccurrences(
-                of: #"^#{3}\s+(.+)$"#,
-                with: "$1",
-                options: .regularExpression
-            )
-            // H2
-            processed = processed.replacingOccurrences(
-                of: #"^#{2}\s+(.+)$"#,
-                with: "$1",
-                options: .regularExpression
-            )
-            // H1
-            processed = processed.replacingOccurrences(
-                of: #"^#\s+(.+)$"#,
-                with: "$1",
-                options: .regularExpression
-            )
-            // Lists
-            processed = processed.replacingOccurrences(
-                of: #"^[-*+]\s+(.+)$"#,
-                with: "• $1",
-                options: .regularExpression
-            )
-            return processed
-        }.joined(separator: "\n")
-        
-        // Remove markdown links but keep text
-        result = result.replacingOccurrences(
-            of: #"\[([^\]]+)\]\([^\)]+\)"#,
-            with: "$1",
-            options: .regularExpression
-        )
-        
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty {
+                if !previousBlank && !output.isEmpty {
+                    output.append("")
+                }
+                previousBlank = true
+                continue
+            }
+            previousBlank = false
+            if trimmed.hasPrefix("•") {
+                let content = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                output.append("- " + content)
+            } else if trimmed.hasPrefix("▪") || trimmed.hasPrefix("◦") {
+                let content = trimmed.dropFirst().trimmingCharacters(in: .whitespaces)
+                output.append("- " + content)
+            } else {
+                output.append(line)
+            }
+        }
+        return output.joined(separator: "\n")
     }
     
     private func extractCleanContent(from text: String, tool: AITool) -> String {

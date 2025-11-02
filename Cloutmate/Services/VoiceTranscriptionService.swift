@@ -16,6 +16,7 @@ final class VoiceTranscriptionService: NSObject {
     private let speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private var accumulatedText: String = ""
     #if os(iOS)
     private let audioSession = AVAudioSession.sharedInstance()
     #endif
@@ -66,6 +67,9 @@ final class VoiceTranscriptionService: NSObject {
             throw NSError(domain: "VoiceTranscription", code: 11, userInfo: [NSLocalizedDescriptionKey: "Speech recognizer not available"])
         }
 
+        // Reset accumulated text for new session
+        accumulatedText = ""
+
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let recognitionRequest else {
             throw NSError(domain: "VoiceTranscription", code: 12, userInfo: [NSLocalizedDescriptionKey: "Failed to create recognition request"])
@@ -74,10 +78,16 @@ final class VoiceTranscriptionService: NSObject {
         recognitionRequest.requiresOnDeviceRecognition = true
 
         let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        
+        // Validate the format
+        guard inputFormat.sampleRate > 0 && inputFormat.channelCount > 0 else {
+            throw NSError(domain: "VoiceTranscription", code: 13, userInfo: [NSLocalizedDescriptionKey: "Invalid audio format from input node"])
+        }
 
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+        // Use the input node's native format
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
             guard let self else { return }
             self.recognitionRequest?.append(buffer)
             self.updateLevel(from: buffer)
@@ -91,9 +101,16 @@ final class VoiceTranscriptionService: NSObject {
             if let result {
                 let text = result.bestTranscription.formattedString
                 if result.isFinal {
-                    self.onFinal?(text)
+                    // Append to accumulated text with proper spacing
+                    if !self.accumulatedText.isEmpty {
+                        self.accumulatedText += " "
+                    }
+                    self.accumulatedText += text
+                    self.onFinal?(self.accumulatedText)
                 } else {
-                    self.onPartial?(text)
+                    // Show accumulated text + current partial
+                    let combined = self.accumulatedText.isEmpty ? text : "\(self.accumulatedText) \(text)"
+                    self.onPartial?(combined)
                 }
             }
             if let error {

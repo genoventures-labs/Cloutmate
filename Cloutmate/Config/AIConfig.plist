@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>RecallWeights</key>
+	<dict>
+		<key>recencyWeight</key>
+		<real>0.5</real>
+		<key>frequencyWeight</key>
+		<real>0.3</real>
+		<key>importanceWeight</key>
+		<real>0.2</real>
+		<key>recencyHalfLifeHours</key>
+		<real>36</real>
+		<key>frequencyNormalizationFactor</key>
+		<real>8</real>
+	</dict>
+	<key>CPSWeights</key>
+	<dict>
+		<key>recency</key>
+		<real>0.3</real>
+		<key>frequency</key>
+		<real>0.25</real>
+		<key>connections</key>
+		<real>0.25</real>
+		<key>aiMentions</key>
+		<real>0.15</real>
+		<key>manualBoost</key>
+		<real>0.05</real>
+	</dict>
+	<key>FeatureFlags</key>
+	<dict>
+		<key>AIRecallEnabled</key>
+		<true/>
+		<key>AIActionRouterEnabled</key>
+		<true/>
+		<key>AICPSEnabled</key>
+		<true/>
+	<key>AIFocusModeEnabled</key>
+	<true/>
+	<key>AINarrativeEnabled</key>
+	<true/>
+		<key>AIMemoryGraphEnabled</key>
+		<true/>
+		<key>AIFeedbackLoggingEnabled</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

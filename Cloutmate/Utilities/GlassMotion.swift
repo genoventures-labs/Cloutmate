@@ -10,6 +10,10 @@ import SwiftUI
 // MARK: - Animation Timing Constants
 enum GlassMotion {
     
+    // MARK: - ARTE Integration (Phase 7)
+    /// Global emotional animation speed multiplier (set by ReactiveThemeManager)
+    static var emotionalSpeedMultiplier: Double = 1.0
+    
     // MARK: - Durations
     enum Duration {
         static let tabSwitch: Double = 0.25
@@ -19,15 +23,31 @@ enum GlassMotion {
         static let ripple: Double = 0.3
         static let auroraPulse: Double = 3.0
         static let shimmer: Double = 1.5
+        
+        /// Apply emotional modulation to duration
+        static func modulated(_ baseDuration: Double) -> Double {
+            return baseDuration / emotionalSpeedMultiplier
+        }
     }
     
     // MARK: - Easing Curves
     enum Easing {
-        static let tabSwitch = SwiftUI.Animation.cubicBezier(0.4, 0, 0.2, 1, duration: Duration.tabSwitch)
-        static let modalOpen = SwiftUI.Animation.easeOut(duration: Duration.modalOpen)
-        static let buttonPress = SwiftUI.Animation.linear(duration: Duration.buttonPress)
-        static let refreshLoad = SwiftUI.Animation.easeInOut(duration: Duration.refreshLoad)
-        static let spring = SwiftUI.Animation.spring(response: 0.3, dampingFraction: 0.7)
+        static var tabSwitch: SwiftUI.Animation {
+            SwiftUI.Animation.cubicBezier(0.4, 0, 0.2, 1, duration: Duration.modulated(Duration.tabSwitch))
+        }
+        static var modalOpen: SwiftUI.Animation {
+            SwiftUI.Animation.easeOut(duration: Duration.modulated(Duration.modalOpen))
+        }
+        static var buttonPress: SwiftUI.Animation {
+            SwiftUI.Animation.linear(duration: Duration.modulated(Duration.buttonPress))
+        }
+        static var refreshLoad: SwiftUI.Animation {
+            SwiftUI.Animation.easeInOut(duration: Duration.modulated(Duration.refreshLoad))
+        }
+        static var spring: SwiftUI.Animation {
+            let response = 0.3 / emotionalSpeedMultiplier
+            return SwiftUI.Animation.spring(response: response, dampingFraction: 0.7)
+        }
     }
     
     // MARK: - Transform Values

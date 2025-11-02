@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CloutmateShared
 
 struct PlatformConnectButton: View {
     let platform: Platform

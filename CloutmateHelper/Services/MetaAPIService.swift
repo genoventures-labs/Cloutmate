@@ -7,9 +7,7 @@
 
 import Foundation
 import os.log
-
-// Import Platform from CloutmateShared
-// Note: Platform should be accessible via import CloutmateShared
+import CloutmateShared
 
 enum MetaAPIError: Error {
     case authenticationFailed
@@ -203,4 +201,3 @@ final class MetaAPIService {
         return try await request(endpoint: endpoint, accessToken: accessToken)
     }
 }
-

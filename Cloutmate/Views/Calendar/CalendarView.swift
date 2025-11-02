@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct CalendarView: View {
     var body: some View {
@@ -16,6 +17,6 @@ struct CalendarView: View {
 
 #Preview {
     CalendarView()
-        .modelContainer(for: [Post.self, Task.self])
+        .modelContainer(for: [CloutmateShared.Post.self, CloutmateShared.Task.self])
 }
 

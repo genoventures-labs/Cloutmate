@@ -17,15 +17,33 @@ struct PublishPostResponse: Codable {
 }
 
 // MARK: - Post Insights Response
-struct PostInsightsResponse: Codable {
+struct PostInsightsResponse: Decodable {
     let data: [InsightData]
     
-    struct InsightData: Codable {
+    struct InsightData: Decodable {
         let name: String
         let values: [InsightValue]
         
-        struct InsightValue: Codable {
-            let value: String
+        struct InsightValue: Decodable {
+            let numericValue: Double?
+            let breakdown: [String: Double]?
+            
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let doubleValue = try? container.decode(Double.self) {
+                    numericValue = doubleValue
+                    breakdown = nil
+                } else if let stringValue = try? container.decode(String.self), let doubleValue = Double(stringValue) {
+                    numericValue = doubleValue
+                    breakdown = nil
+                } else if let dictValue = try? container.decode([String: Double].self) {
+                    numericValue = nil
+                    breakdown = dictValue
+                } else {
+                    numericValue = nil
+                    breakdown = nil
+                }
+            }
         }
     }
 }

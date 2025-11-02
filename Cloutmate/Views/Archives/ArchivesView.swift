@@ -8,12 +8,13 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import CloutmateShared
 
 struct ArchivesView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var projects: [Project]
+    @Query private var projects: [CloutmateShared.Project]
     @Query private var areas: [Area]
-    @Query private var resources: [Note]
+    @Query private var resources: [CloutmateShared.Note]
     
     @State private var selectedCategory: ArchiveCategory = .all
     @State private var searchText = ""
@@ -196,9 +197,9 @@ struct ArchivesView: View {
     
     private func colorForItem(_ item: ArchiveItem) -> Color {
         switch item {
-        case .project: return .blue
+        case .project: return .kosmicBlue
         case .area: return .gray
-        case .resource: return .purple
+        case .resource: return .kosmicPurple
         }
     }
     
@@ -290,6 +291,6 @@ enum ArchiveCategory: String, CaseIterable {
 
 #Preview {
     ArchivesView()
-        .modelContainer(for: [Project.self, Area.self, Note.self])
+        .modelContainer(for: [CloutmateShared.Project.self, Area.self, CloutmateShared.Note.self])
 }
 

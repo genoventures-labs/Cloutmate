@@ -9,10 +9,10 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-enum TaskStatus: String, Codable, CaseIterable {
+public enum TaskStatus: String, Codable, CaseIterable {
     case todo, inProgress, done, cancelled
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .todo: return "To Do"
         case .inProgress: return "In Progress"
@@ -22,10 +22,10 @@ enum TaskStatus: String, Codable, CaseIterable {
     }
 }
 
-enum TaskPriority: String, Codable, CaseIterable {
+public enum TaskPriority: String, Codable, CaseIterable {
     case low, medium, high
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .low: return "Low"
         case .medium: return "Medium"
@@ -33,32 +33,32 @@ enum TaskPriority: String, Codable, CaseIterable {
         }
     }
     
-    var color: Color {
+    public var color: Color {
         switch self {
-        case .low: return .gray
-        case .medium: return .blue
-        case .high: return .red
+        case .low: return Color(white: 0.5) // Gray
+        case .medium: return Color(red: 72/255, green: 131/255, blue: 255/255) // Kosmic blue
+        case .high: return Color(red: 229/255, green: 57/255, blue: 53/255) // Red
         }
     }
 }
 
 @Model
-final class Task {
-    var id: UUID = UUID()
-    var title: String = ""
-    var notes: String?
-    var statusRaw: String = TaskStatus.todo.rawValue
-    var priorityRaw: String = TaskPriority.medium.rawValue
-    var dueDate: Date?
-    var projectId: UUID?
-    var areaId: UUID?
-    var dependsOnIds: [UUID] = []
-    var effort: String? // small, medium, large
-    var createdAt: Date = Date()
-    var updatedAt: Date = Date()
-    var completedAt: Date?
+public final class Task {
+    public var id: UUID = UUID()
+    public var title: String = ""
+    public var notes: String?
+    public var statusRaw: String = TaskStatus.todo.rawValue
+    public var priorityRaw: String = TaskPriority.medium.rawValue
+    public var dueDate: Date?
+    public var projectId: UUID?
+    public var areaId: UUID?
+    public var dependsOnIds: [UUID] = []
+    public var effort: String? // small, medium, large
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var completedAt: Date?
     
-    init(
+    public init(
         title: String,
         notes: String? = nil,
         status: TaskStatus = .todo,
@@ -82,7 +82,7 @@ final class Task {
         self.dependsOnIds = []
     }
     
-    var status: TaskStatus {
+    public var status: TaskStatus {
         get { TaskStatus(rawValue: statusRaw) ?? .todo }
         set { 
             statusRaw = newValue.rawValue
@@ -93,7 +93,7 @@ final class Task {
         }
     }
     
-    var priority: TaskPriority {
+    public var priority: TaskPriority {
         get { TaskPriority(rawValue: priorityRaw) ?? .medium }
         set { 
             priorityRaw = newValue.rawValue

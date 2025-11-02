@@ -2,7 +2,7 @@
 //  GlassFloatingButton.swift
 //  Cloutmate
 //
-//  Glassmorphic Harmony UI - Glass Floating Action Button
+//  Minimal Floating Action Button
 //
 
 import SwiftUI
@@ -11,47 +11,41 @@ struct GlassFloatingButton: View {
     let icon: String
     let action: () -> Void
     
-    var tintColor: Color = .blue
+    var tintColor: Color = Color(red: 0.36, green: 0.66, blue: 1.0)
     var size: CGFloat = 56
     
     @State private var isPressed = false
     @State private var isHovered = false
     
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
     var body: some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundColor(tintColor)
-                .frame(width: size, height: size)
-                .glassPanel(
-                    tier: .floatingAction,
-                    cornerRadius: size / 2,
-                    tintColor: tintColor.opacity(0.15)
-                )
-                .overlay(
-                    // Light trail effect
-                    Group {
-                        if isHovered || isPressed {
-                            Circle()
-                                .stroke(
-                                    tintColor.opacity(0.4),
-                                    lineWidth: 2
-                                )
-                                .frame(width: size + 4, height: size + 4)
-                                .blur(radius: 2)
-                        }
-                    }
-                )
-                .shadow(
-                    color: (isHovered || isPressed) ? tintColor.opacity(0.3) : .black.opacity(0.2),
-                    radius: isHovered ? 16 : 8,
-                    y: isHovered ? 8 : 4
-                )
-                .scaleEffect(isPressed ? 0.95 : (isHovered ? 1.05 : 1.0))
+            ZStack {
+                Circle()
+                    .fill(tintColor)
+                    .overlay(
+                        Circle()
+                            .strokeBorder(tintColor.opacity(0.3), lineWidth: 1)
+                    )
+                    .shadow(
+                        color: Color.black.opacity(shadowOpacity),
+                        radius: shadowRadius,
+                        x: 0,
+                        y: shadowY
+                    )
+                    .scaleEffect(isPressed ? 0.95 : (isHovered ? 1.02 : 1.0))
+                    .opacity(isPressed ? 0.9 : 1.0)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(.white)
+            }
+            .frame(width: size, height: size)
         }
         .buttonStyle(.plain)
-        .animation(GlassMotion.Easing.spring, value: isHovered)
-        .animation(GlassMotion.Easing.spring, value: isPressed)
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.1), value: isPressed)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -59,19 +53,28 @@ struct GlassFloatingButton: View {
             isPressed = pressing
         }, perform: {})
     }
+    
+    private var shadowOpacity: Double {
+        isHovered ? 0.25 : 0.18
+    }
+    
+    private var shadowRadius: CGFloat {
+        isHovered ? 12 : 10
+    }
+    
+    private var shadowY: CGFloat {
+        isHovered ? 6 : 4
+    }
 }
 
 #Preview {
     ZStack(alignment: .bottomTrailing) {
-        Color.gray.opacity(0.1)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        
         VStack(spacing: 20) {
-            GlassFloatingButton(icon: "plus", action: {}, tintColor: .blue)
+            GlassFloatingButton(icon: "plus", action: {}, tintColor: .kosmicBlue)
             GlassFloatingButton(icon: "heart.fill", action: {}, tintColor: .pink)
-            GlassFloatingButton(icon: "bolt.fill", action: {}, tintColor: .yellow)
         }
         .padding()
     }
     .frame(width: 300, height: 300)
+    .environmentObject(GlassColorSystem())
 }

@@ -2,7 +2,7 @@
 //  GlassMetricCard.swift
 //  Cloutmate
 //
-//  Glassmorphic Harmony UI - Glass Metric Card Component
+//  Minimal Metric Card Component
 //
 
 import SwiftUI
@@ -12,17 +12,17 @@ struct GlassMetricCard: View {
     let value: String
     let icon: String
     let color: Color
-    let gradientColor: Color
+    let gradientColor: Color // Legacy parameter
     
     @State private var isHovered = false
-    @Environment(\.accessibilityGlassManager) private var accessibilityManager
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     init(
         title: String,
         value: String,
         icon: String,
         color: Color,
-        gradientColor: Color? = nil
+        gradientColor: Color? = nil // Kept for compatibility
     ) {
         self.title = title
         self.value = value
@@ -32,21 +32,18 @@ struct GlassMetricCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Icon with circular glass background
+        VStack(alignment: .leading, spacing: 12) {
+            // Icon
             HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(color.opacity(0.9))
-                    .frame(width: 32, height: 32)
-                    .background(
-                        Circle()
-                            .fill(color.opacity(0.1))
-                            .background(
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                            )
-                    )
+                ZStack {
+                    Circle()
+                        .fill(color.opacity(0.15))
+                        .frame(width: 32, height: 32)
+                    
+                    Image(systemName: icon)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(color)
+                }
                 
                 Spacer()
             }
@@ -56,51 +53,32 @@ struct GlassMetricCard: View {
             // Value and title
             VStack(alignment: .leading, spacing: 4) {
                 Text(value)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.primary)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(glassColorSystem.textPrimary())
                 
                 Text(title)
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .tracking(0.2)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(glassColorSystem.textSecondary())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .glassPanel(
-            tier: .contentCard,
-            cornerRadius: 16,
-            tintColor: gradientColor.opacity(0.05)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(glassColorSystem.cardColor())
         )
         .overlay(
-            // Shimmer pass on hover
-            Group {
-                if isHovered && accessibilityManager.shouldApplyEffects() {
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.white.opacity(0),
-                            Color.white.opacity(0.3),
-                            Color.white.opacity(0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .blendMode(.overlay)
-                    .animation(
-                        Animation.linear(duration: 1.5)
-                            .repeatForever(autoreverses: false),
-                        value: isHovered
-                    )
-                }
-            }
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(glassColorSystem.borderColor(), lineWidth: 1)
         )
         .shadow(
-            color: isHovered ? .black.opacity(0.15) : .black.opacity(0.05),
-            radius: isHovered ? 12 : 4,
-            y: isHovered ? 6 : 2
+            color: Color.black.opacity(isHovered ? 0.12 : 0.08),
+            radius: isHovered ? 8 : 6,
+            x: 0,
+            y: isHovered ? 3 : 2
         )
-        .scaleEffect(isHovered ? GlassMotion.Transform.hoverScale : 1.0)
-        .animation(GlassMotion.Easing.spring, value: isHovered)
+        .scaleEffect(isHovered ? 1.002 : 1.0)
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -108,12 +86,12 @@ struct GlassMetricCard: View {
 }
 
 #Preview {
-    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 20) {
+    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
         GlassMetricCard(
             title: "Total Posts",
             value: "42",
             icon: "doc.text.fill",
-            color: .blue
+            color: .kosmicBlue
         )
         
         GlassMetricCard(
@@ -127,7 +105,7 @@ struct GlassMetricCard: View {
             title: "Reach",
             value: "1.2K",
             icon: "eye.fill",
-            color: .purple
+            color: .kosmicPurple
         )
         
         GlassMetricCard(
@@ -138,4 +116,5 @@ struct GlassMetricCard: View {
         )
     }
     .padding()
+    .environmentObject(GlassColorSystem())
 }

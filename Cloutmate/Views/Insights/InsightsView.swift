@@ -2,7 +2,8 @@
 //  InsightsView.swift
 //  Cloutmate
 //
-//  Created by Mike Letts on 10/23/25.
+//  Personal Intelligence Dashboard
+//  Your mirror - unified intelligence showing how you think, work, and evolve
 //
 
 import SwiftUI
@@ -10,526 +11,618 @@ import SwiftData
 import Charts
 import os.log
 import CloutmateShared
+import UniformTypeIdentifiers
 
 struct InsightsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \CloutmateShared.Post.publishedDate, order: .reverse) private var allPosts: [CloutmateShared.Post]
-    @Query(filter: #Predicate<PlatformAccount> { $0.platform == "facebook" }) private var facebookPages: [PlatformAccount]
     
-    @State private var selectedTimeRange: TimeRange = .week
-    @State private var isRefreshing = false
+    @State private var selectedTimeRange: AnalyticsTimeRange = .thisWeek
+    @State private var currentSnapshot: AnalyticsSnapshot?
+    @State private var isLoading = false
+    @State private var selectedTab: InsightTab = .overview
     @State private var autoRefreshTimer: Timer?
-    @State private var refreshID = UUID()
-    
-    // Facebook Page Insights state
-    @State private var selectedPageID: String? = nil
-    @State private var pageInsightsPeriod: PageInsightsData? = nil
-    @State private var pageInsightsLifetime: PageInsightsData? = nil
-    @State private var isLoadingPageInsights = false
-    @State private var pageInsightsError: String? = nil
-    
-    private var publishedPosts: [CloutmateShared.Post] {
-        allPosts.filter { $0.status == PostStatus.published.rawValue }
-    }
-    
-    var filteredPosts: [CloutmateShared.Post] {
-        let cutoffDate = Calendar.current.date(byAdding: selectedTimeRange.dateComponent, value: -selectedTimeRange.rawValue, to: Date()) ?? Date()
-        return publishedPosts.filter { ($0.publishedDate ?? Date()) >= cutoffDate }
-    }
-    
-    // Check if banner should be shown - only for published posts without engagement data
-    private var shouldShowDataBanner: Bool {
-        // Only show banner if there are no posts at all
-        guard !filteredPosts.isEmpty else { return true }
-        
-        // Filter to only published posts
-        let publishedPosts = filteredPosts.filter { $0.postStatus == .published }
-        
-        // If there are no published posts, don't show the banner
-        guard !publishedPosts.isEmpty else { return false }
-        
-        // Check if more than 50% of published posts lack engagement data
-        let publishedWithoutData = publishedPosts.filter { $0.engagementRate == nil }.count
-        return Double(publishedWithoutData) / Double(publishedPosts.count) > 0.5
-    }
     
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 32) {
-                if shouldShowDataBanner {
-                    dataBanner
-                }
-                
-                if !facebookPages.isEmpty {
-                    facebookPageInsightsSection
-                }
-                
-                headerView
-                
-                // Key Metrics Grid - 8 cards in 4 columns
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Key Metrics")
-                        .sectionTitleStyle()
+        VStack(spacing: 0) {
+            // Header with time range selector
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Intelligence Dashboard")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.primary)
                     
-                    LazyVGrid(columns: [
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible()),
-                        GridItem(.flexible())
-                    ], spacing: 20) {
-                        // Existing metrics
-                        GlassMetricCard(
-                            title: "Total Posts",
-                            value: "\(filteredPosts.count)",
-                            icon: "doc.text.fill",
-                            color: KosmicPalette.cyan
-                        )
-                        .id("total_posts_\(selectedTimeRange.rawValue)_\(filteredPosts.count)")
-                        .transition(.opacity)
-                        
-                        GlassMetricCard(
-                            title: "Avg Engagement",
-                            value: String(format: "%.1f%%", averageEngagement),
-                            icon: "heart.fill",
-                            color: KosmicPalette.violet
-                        )
-                        .id("avg_engagement_\(selectedTimeRange.rawValue)_\(averageEngagement)")
-                        .transition(.opacity)
-                        
-                        GlassMetricCard(
-                            title: "Total Reach",
-                            value: "\(totalReach)",
-                            icon: "eye.fill",
-                            color: KosmicPalette.cyan
-                        )
-                        .id("total_reach_\(selectedTimeRange.rawValue)_\(totalReach)")
-                        .transition(.opacity)
-                        
-                        GlassMetricCard(
-                            title: "Total Likes",
-                            value: "\(totalLikes)",
-                            icon: "hand.thumbsup.fill",
-                            color: KosmicPalette.violet
-                        )
-                        .id("total_likes_\(selectedTimeRange.rawValue)_\(totalLikes)")
-                        .transition(.opacity)
-                        
-                        // New metrics
-                        GlassMetricCard(
-                            title: "Best Posting Time",
-                            value: String(format: "%d:00", bestPostingHour),
-                            icon: "clock.fill",
-                            color: KosmicPalette.violet
-                        )
-                        .id("best_posting_time_\(selectedTimeRange.rawValue)_\(bestPostingHour)")
-                        .transition(.opacity)
-                        
-                        GlassMetricCard(
-                            title: "Top Content Type",
-                            value: topContentType,
-                            icon: "star.fill",
-                            color: KosmicPalette.cyan
-                        )
-                        .id("top_content_\(selectedTimeRange.rawValue)")
-                        .transition(.opacity)
-                        
-                        GlassMetricCard(
-                            title: "Growth Rate",
-                            value: String(format: "%.1f%%", growthRate),
-                            icon: "chart.line.uptrend.xyaxis",
-                            color: KosmicPalette.violet
-                        )
-                        .id("growth_rate_\(selectedTimeRange.rawValue)_\(growthRate)")
-                        .transition(.opacity)
-                        
-                        GlassMetricCard(
-                            title: "Platform Leader",
-                            value: leadingPlatform.rawValue.capitalized,
-                            icon: "trophy.fill",
-                            color: KosmicPalette.cyan
-                        )
-                        .id("platform_leader_\(selectedTimeRange.rawValue)")
-                        .transition(.opacity)
-                    }
+                    Text("Your cognitive patterns and personal growth")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
                 }
                 
-                // Interactive Charts Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Performance Analytics")
-                        .sectionTitleStyle()
-                    
-                    InteractiveChartsView(posts: filteredPosts)
-                        .id("charts_\(selectedTimeRange.rawValue)_\(filteredPosts.count)")
-                        .transition(.opacity)
-                }
+                Spacer()
                 
-                GlassPanel(tier: .contentCard, cornerRadius: 16) {
-                    BestTimeOptimizerView()
-                }
-
-                GlassPanel(tier: .contentCard, cornerRadius: 16) {
-                    ContentGapAnalyzerView()
-                }
-
-                GlassPanel(tier: .contentCard, cornerRadius: 16) {
-                    HashtagPerformanceView()
-                }
-
-                // Detailed Analytics Section
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Detailed Analytics")
-                        .sectionTitleStyle()
-                    
-                    GlassPanel(tier: .contentCard, cornerRadius: 16) {
-                        VStack(spacing: 20) {
-                            // Platform Performance
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "square.stack.3d.up.fill")
-                                        .foregroundColor(KosmicPalette.cyan)
-                                    Text("Platform Performance")
-                                        .sectionTitleStyle()
-                                    Spacer()
-                                }
-                                PlatformComparisonView(posts: filteredPosts)
-                            }
-                            
-                            Divider()
-                            
-                            // Reflection Summary
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(KosmicPalette.violet)
-                                    Text("Insights Summary")
-                                        .sectionTitleStyle()
-                                    Spacer()
-                                }
-                                ReflectionSummary(posts: filteredPosts)
-                            }
-                        }
-                        .padding(20)
-                    }
-                    .id("analytics_\(selectedTimeRange.rawValue)_\(filteredPosts.count)")
-                    .transition(.opacity)
-                }
+                timeRangePicker
             }
-            .padding(28)
-            .animation(.easeInOut(duration: 0.25), value: selectedTimeRange)
-        }
-        .background(Color(.windowBackgroundColor))
-        .navigationTitle("Insights")
-        .onAppear {
-            startAutoRefresh()
-            // Select first page if available and none selected
-            if selectedPageID == nil, let firstPage = facebookPages.first {
-                selectedPageID = firstPage.accountID
-                _Concurrency.Task {
-                    await fetchPageInsights(for: firstPage.accountID)
+            .padding(.horizontal, 28)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+            
+            // Tab view
+            TabView(selection: $selectedTab) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        cognitiveOverviewSection
+                    }
+                    .padding(28)
                 }
+                .background(Color(.windowBackgroundColor))
+                .tabItem {
+                    Label("Overview", systemImage: "brain.head.profile")
+                }
+                .tag(InsightTab.overview)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        memoryGraphSection
+                    }
+                    .padding(28)
+                }
+                .background(Color(.windowBackgroundColor))
+                .tabItem {
+                    Label("Memory Graph", systemImage: "network")
+                }
+                .tag(InsightTab.memoryGraph)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        focusAnalyticsSection
+                    }
+                    .padding(28)
+                }
+                .background(Color(.windowBackgroundColor))
+                .tabItem {
+                    Label("Focus", systemImage: "chart.bar.fill")
+                }
+                .tag(InsightTab.focus)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        emotionalHeatmapSection
+                    }
+                    .padding(28)
+                }
+                .background(Color(.windowBackgroundColor))
+                .tabItem {
+                    Label("Emotional", systemImage: "heart.circle.fill")
+                }
+                .tag(InsightTab.emotional)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        learningLoopSection
+                    }
+                    .padding(28)
+                }
+                .background(Color(.windowBackgroundColor))
+                .tabItem {
+                    Label("Learning", systemImage: "sparkles")
+                }
+                .tag(InsightTab.learning)
+                
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 32) {
+                        connectionsSection
+                    }
+                    .padding(28)
+                }
+                .background(Color(.windowBackgroundColor))
+                .tabItem {
+                    Label("Connections", systemImage: "link.circle.fill")
+                }
+                .tag(InsightTab.connections)
             }
         }
-        .onChange(of: selectedTimeRange) { _, _ in
-            // Refresh page insights when time range changes
-            if let pageID = selectedPageID {
-                _Concurrency.Task {
-                    await fetchPageInsights(for: pageID)
-                }
+        .task {
+            await loadAnalytics()
+            await MainActor.run {
+                startAutoRefresh()
             }
         }
         .onDisappear {
             stopAutoRefresh()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshViewsFromMenuBar"))) { _ in
-            // Refresh view when notification received from menu bar
-            refreshID = UUID()
-        }
-        .id(refreshID)
-    }
-    
-    private var averageEngagement: Double {
-        let postsWithMetrics = filteredPosts.filter { $0.engagementRate != nil }
-        guard !postsWithMetrics.isEmpty else { return 0 }
-        return postsWithMetrics.reduce(0) { $0 + ($1.engagementRate ?? 0) } / Double(postsWithMetrics.count)
-    }
-    
-    private var totalReach: Int {
-        filteredPosts.reduce(0) { $0 + ($1.reach ?? 0) }
-    }
-    
-    private var totalLikes: Int {
-        filteredPosts.reduce(0) { $0 + ($1.likes ?? 0) }
-    }
-    
-    // Best posting time - hour with highest avg engagement
-    private var bestPostingHour: Int {
-        let hourEngagement = Dictionary(grouping: filteredPosts) { post in
-            Calendar.current.component(.hour, from: post.publishedDate ?? Date())
-        }
-        .mapValues { posts in
-            let rates = posts.compactMap { $0.engagementRate }
-            return rates.isEmpty ? 0 : rates.reduce(0, +) / Double(rates.count)
-        }
-        return hourEngagement.max(by: { $0.value < $1.value })?.key ?? 12
-    }
-    
-    // Top content type - with or without media
-    private var topContentType: String {
-        let withMedia = filteredPosts.filter { !$0.mediaURLs.isEmpty }
-        let textOnly = filteredPosts.filter { $0.mediaURLs.isEmpty }
-        
-        let withMediaAvg = averageEngagement(for: withMedia)
-        let textOnlyAvg = averageEngagement(for: textOnly)
-        
-        return withMediaAvg > textOnlyAvg ? "Media" : "Text"
-    }
-    
-    // Growth rate - week over week engagement change
-    private var growthRate: Double {
-        // Compare current week avg to previous week avg
-        let currentWeek = averageEngagement
-        
-        let previousWeekStart = Calendar.current.date(byAdding: .weekOfYear, value: -2, to: Date()) ?? Date()
-        let previousWeekEnd = Calendar.current.date(byAdding: .weekOfYear, value: -1, to: Date()) ?? Date()
-        
-        let previousWeekPosts = publishedPosts.filter { post in
-            guard let publishedDate = post.publishedDate else { return false }
-            return publishedDate >= previousWeekStart && publishedDate < previousWeekEnd
-        }
-        
-        let previousWeekAvg = averageEngagement(for: previousWeekPosts)
-        
-        guard previousWeekAvg > 0 else { return 0 }
-        
-        let change = ((currentWeek - previousWeekAvg) / previousWeekAvg) * 100
-        return change
-    }
-    
-    // Leading platform - platform with best avg engagement
-    private var leadingPlatform: Platform {
-        let threadsPosts = filteredPosts.filter { $0.postPlatforms.contains(.threads) }
-        let facebookPosts = filteredPosts.filter { $0.postPlatforms.contains(.facebook) }
-        
-        let threadsAvg = averageEngagement(for: threadsPosts)
-        let facebookAvg = averageEngagement(for: facebookPosts)
-        
-        return threadsAvg >= facebookAvg ? .threads : .facebook
-    }
-    
-    // Helper for calculating average engagement for specific posts
-    private func averageEngagement(for posts: [CloutmateShared.Post]) -> Double {
-        let postsWithMetrics = posts.filter { $0.engagementRate != nil }
-        guard !postsWithMetrics.isEmpty else { return 0 }
-        return postsWithMetrics.reduce(0) { $0 + ($1.engagementRate ?? 0) } / Double(postsWithMetrics.count)
-    }
-    
-    private var headerView: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Insights")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.primary)
-                
-                Text("Track your content performance")
-                    .metricLabelStyle()
+        .onChange(of: selectedTimeRange) { _, _ in
+            _Concurrency.Task {
+                await loadAnalytics()
             }
-            
-            Spacer()
-            
-            timeRangePicker
         }
-        .padding(.bottom, 8)
     }
+    
+    // MARK: - Time Range Picker
     
     private var timeRangePicker: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 8) {
-                GlassButton(
-                    "Week",
-                    style: .pill,
-                    tier: selectedTimeRange == .week ? .overlay : .contentCard,
-                    tintColor: KosmicPalette.violet,
-                    action: { selectedTimeRange = .week }
-                )
-                GlassButton(
-                    "Month",
-                    style: .pill,
-                    tier: selectedTimeRange == .month ? .overlay : .contentCard,
-                    tintColor: KosmicPalette.violet,
-                    action: { selectedTimeRange = .month }
-                )
-                GlassButton(
-                    "Year",
-                    style: .pill,
-                    tier: selectedTimeRange == .year ? .overlay : .contentCard,
-                    tintColor: KosmicPalette.violet,
-                    action: { selectedTimeRange = .year }
-                )
-            }
-            
-            GlassButton(
-                "Refresh",
-                icon: "arrow.clockwise",
-                style: .standard,
-                tier: .contentCard,
-                tintColor: KosmicPalette.cyan,
-                action: refreshInsights
-            )
-            .disabled(isRefreshing)
-            .animation(.easeInOut(duration: 0.2), value: isRefreshing)
-        }
-    }
-    
-    private var dataBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "info.circle.fill")
-                .foregroundColor(KosmicPalette.violet)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Limited data available")
-                    .sectionTitleStyle()
-                Text("Connect platforms to see full insights and engagement metrics.")
-                    .metricLabelStyle()
-            }
-            Spacer()
-        }
-        .padding(16)
-        .background(KosmicPalette.violet.opacity(0.08))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(KosmicPalette.violet.opacity(0.2), lineWidth: 1)
-        )
-    }
-    
-    private var facebookPageInsightsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Facebook Page Insights")
-                .sectionTitleStyle()
-            
-            FacebookPageSelector(
-                pages: facebookPages,
-                selectedPageID: $selectedPageID
-            )
-            .onChange(of: selectedPageID) { _, newValue in
-                if let pageID = newValue {
-                    _Concurrency.Task {
-                        await fetchPageInsights(for: pageID)
-                    }
-                } else {
-                    pageInsightsPeriod = nil
-                    pageInsightsLifetime = nil
+        HStack(spacing: 8) {
+            ForEach([AnalyticsTimeRange.today, .thisWeek, .thisMonth], id: \.self) { range in
+                Button {
+                    selectedTimeRange = range
+                } label: {
+                    Text(range.displayName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(selectedTimeRange == range ? .white : .primary)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(selectedTimeRange == range ? KosmicPalette.violet : Color.clear)
+                        )
                 }
-            }
-            
-            if let pageID = selectedPageID {
-                FacebookPageInsightsSection(
-                    periodInsights: pageInsightsPeriod,
-                    lifetimeInsights: pageInsightsLifetime,
-                    isLoading: isLoadingPageInsights,
-                    error: pageInsightsError
-                )
+                .buttonStyle(.plain)
             }
         }
     }
     
-    private func refreshInsights() {
-        isRefreshing = true
-		_Concurrency.Task {
-            // Fetch insights from Meta API
-            await fetchLatestInsights()
-            
-            // Also refresh Facebook page insights if a page is selected
-            if let pageID = selectedPageID {
-                await fetchPageInsights(for: pageID)
-            }
-            
-            isRefreshing = false
-        }
-    }
+    // MARK: - 🧠 Cognitive Overview
     
-    private func fetchLatestInsights() async {
-        for post in publishedPosts {
-            for platform in post.postPlatforms {
-            do {
-                    // Get appropriate access token
-                    let accessToken: String
-                    if platform == .threads {
-                        accessToken = try KeychainService.shared.getToken(forAccount: "threads_access_token")
-                    } else if platform == .facebook {
-                        // Get page-specific token from pageIDs
-                        guard let pageID = post.getPageID(for: .facebook) else { continue }
-                        accessToken = try KeychainService.shared.getToken(forAccount: "facebook_page_\(pageID)_access_token")
-                    } else {
-                        continue
+    private var cognitiveOverviewSection: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Current Mode Card
+            GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 24))
+                            .foregroundColor(KosmicPalette.cyan)
+                        Text("Current Mode")
+                            .font(.system(size: 20, weight: .bold))
+                        Spacer()
                     }
                     
-                    // Get platform-specific post ID
-                    let postID: String?
-                    if platform == .threads {
-                        postID = post.threadsPostID
-                    } else {
-                        postID = post.facebookPostID
-                    }
-                    
-                    guard let postID = postID else { continue }
-                
-                // Fetch insights - convert CloutmateShared.Platform to Cloutmate.Platform
-                    let nativePlatform: Cloutmate.Platform
-                    switch platform {
-                    case .threads:
-                        nativePlatform = .threads
-                    case .facebook:
-                        nativePlatform = .facebook
-                    }
-                    let insights = try await MetaAPIService.shared.getPostInsights(
-                        postID: postID,
-                        accessToken: accessToken,
-                        platform: nativePlatform
-                    )
-                    
-                    // Apply mutations on main thread
-                    await MainActor.run {
-                    // Update post with insights (accumulate across platforms)
-                    for data in insights.data {
-                        guard let value = data.values.first?.value,
-                              let doubleValue = Double(value) else { continue }
-                        switch data.name {
-                        case "likes", "reactions", "post_reactions_by_type_total":
-                            post.likes = (post.likes ?? 0) + Int(doubleValue)
-                        case "comments":
-                            post.comments = (post.comments ?? 0) + Int(doubleValue)
-                        case "impressions", "post_impressions":
-                            post.impressions = (post.impressions ?? 0) + Int(doubleValue)
-                        case "reach", "post_engaged_users":
-                            post.reach = (post.reach ?? 0) + Int(doubleValue)
-                        default:
-                            break
+                    if let snapshot = currentSnapshot {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(getCurrentMode(from: snapshot))
+                                .font(.system(size: 32, weight: .bold))
+                                .foregroundColor(KosmicPalette.violet)
+                            
+                            Text(getModeDescription(from: snapshot))
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
+                                .lineLimit(3)
                         }
+                    } else {
+                        ProgressView()
                     }
-                    // Calculate engagement rate
-                    if let impressions = post.impressions, impressions > 0 {
-                        let likes = post.likes ?? 0
-                        let comments = post.comments ?? 0
-                        post.engagementRate = Double(likes + comments) / Double(impressions) * 100
-                    }
-                    try? modelContext.save()
-                    }
-                    // Skip ContentIntelligenceService call since it expects Cloutmate.Post
-                    
-            } catch {
-                    Logger.insights.error("Failed to fetch insights for \(platform.displayName) post \(post.id): \(error.localizedDescription)")
                 }
+                .padding(20)
+            }
+            
+            // Stats Grid
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                // Emotional Pulse
+                IntelligenceStatCard(
+                    title: "Emotional Pulse",
+                    value: formatEmotionalPulse(),
+                    subtitle: "7-day average",
+                    icon: "heart.circle.fill",
+                    color: getEmotionalColor()
+                )
+                
+                // Learning Loop
+                IntelligenceStatCard(
+                    title: "Learning Score",
+                    value: String(format: "%.0f%%", currentSnapshot?.learningScore ?? 0.0),
+                    subtitle: "Aurora's growth",
+                    icon: "chart.line.uptrend.xyaxis.circle.fill",
+                    color: KosmicPalette.cyan
+                )
+                
+                // Active Themes
+                IntelligenceStatCard(
+                    title: "Active Themes",
+                    value: "\(currentSnapshot?.activeThemes ?? 0)",
+                    subtitle: "in memory graph",
+                    icon: "network",
+                    color: KosmicPalette.violet
+                )
+            }
+            
+            // ARTE Status Indicator (Phase 7)
+            EmotionalStateIndicator()
+            
+            // Aurora's Current Experiment
+            if let snapshot = currentSnapshot, snapshot.feedbackEventsCount > 0 {
+                GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(KosmicPalette.violet)
+                            Text("Aurora's Current Experiment")
+                                .font(.system(size: 16, weight: .semibold))
+                        }
+                        
+                        Text(getAuroraExperiment(from: snapshot))
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(16)
+                }
+            }
+        }
+    }
+    
+    // MARK: - 🔍 Memory Graph
+    
+    private var memoryGraphSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Memory Graph")
+                        .font(.system(size: 24, weight: .bold))
+                    Text("Your concepts and how they connect")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            
+            ConceptGraphView()
+                .frame(height: 600)
+        }
+    }
+    
+    // MARK: - 📈 Focus Analytics
+    
+    private var focusAnalyticsSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Focus Analytics")
+                        .font(.system(size: 24, weight: .bold))
+                    Text("Your focus patterns and productivity rhythm")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            
+            ProductivityMetricsView(
+                snapshot: currentSnapshot,
+                timeRange: selectedTimeRange
+            )
+        }
+    }
+    
+    // MARK: - ❤️ Emotional Heatmap
+    
+    private var emotionalHeatmapSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Emotional Heatmap")
+                        .font(.system(size: 24, weight: .bold))
+                    Text("Your emotional landscape over time")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            
+            EmotionalHeatmapView(
+                snapshot: currentSnapshot,
+                timeRange: selectedTimeRange
+            )
+        }
+    }
+    
+    // MARK: - 🌀 Learning Loop
+    
+    private var learningLoopSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Learning Loop")
+                        .font(.system(size: 24, weight: .bold))
+                    Text("What Aurora learns from you")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            
+            LearningLoopView(
+                snapshot: currentSnapshot,
+                timeRange: selectedTimeRange
+            )
+        }
+    }
+    
+    // MARK: - 🔗 Connections
+    
+    private var connectionsSection: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Connections")
+                        .font(.system(size: 24, weight: .bold))
+                    Text("Recurring themes and concept evolution")
+                        .font(.system(size: 14))
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            
+            // Top Recurring Motifs
+            GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(KosmicPalette.violet)
+                        Text("Recurring Motifs")
+                            .font(.system(size: 18, weight: .bold))
+                        Spacer()
+                    }
+                    
+                    if let concepts = getTopConcepts() {
+                        VStack(spacing: 12) {
+                            ForEach(concepts, id: \.name) { concept in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(concept.name)
+                                            .font(.system(size: 16, weight: .semibold))
+                                        Text("Mentioned \(concept.count) times")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(String(format: "%.1f", concept.salience))
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(KosmicPalette.cyan)
+                                }
+                                .padding(12)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.secondary.opacity(0.05))
+                                )
+                            }
+                        }
+                    } else {
+                        Text("No themes detected yet. Continue working and reflecting.")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                            .padding(.vertical, 8)
+                    }
+                }
+                .padding(20)
+            }
+            
+            // Theme Evolution Graph
+            GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "arrow.triangle.branch")
+                            .foregroundColor(KosmicPalette.cyan)
+                        Text("Theme Evolution")
+                            .font(.system(size: 18, weight: .bold))
+                        Spacer()
+                    }
+                    
+                    if let snapshot = currentSnapshot {
+                        Text("In the last \(selectedTimeRange.displayName.lowercased()), \(snapshot.activeThemes) themes emerged from \(snapshot.memoryNodes) memory nodes")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    // Placeholder for future evolution visualization
+                    Text("Theme evolution visualization coming soon")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.7))
+                        .italic()
+                        .padding(.vertical, 8)
+                }
+                .padding(20)
+            }
+            
+            // Long-term Memory Summary
+            GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .foregroundColor(KosmicPalette.violet)
+                        Text("Long-term Memory")
+                            .font(.system(size: 18, weight: .bold))
+                        Spacer()
+                    }
+                    
+                    if let snapshot = currentSnapshot {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Memory Graph Density: \(String(format: "%.1f%%", snapshot.graphDensity * 100))")
+                                .font(.system(size: 14))
+                            Text("Total Concepts: \(snapshot.conceptCount)")
+                                .font(.system(size: 14))
+                            Text("Memory Nodes: \(snapshot.memoryNodes)")
+                                .font(.system(size: 14))
+                        }
+                        .foregroundColor(.secondary)
+                    }
+                }
+                .padding(20)
+            }
+            
+            // Export Options
+            HStack(spacing: 12) {
+                Button {
+                    exportWeeklyReflection()
+                } label: {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("Export Weekly Reflection")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(KosmicPalette.violet)
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                
+                Button {
+                    // Future: Compare weeks feature
+                } label: {
+                    HStack {
+                        Image(systemName: "chart.bar.xaxis")
+                        Text("Compare Weeks")
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
+                }
+                .buttonStyle(.plain)
+                .disabled(true)
+            }
+        }
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func loadAnalytics() async {
+        isLoading = true
+        let snapshot = await AnalyticsEngine.shared.generateSnapshot(
+            for: selectedTimeRange,
+            modelContext: modelContext
+        )
+        await MainActor.run {
+            currentSnapshot = snapshot
+            isLoading = false
+        }
+    }
+    
+    private func getCurrentMode(from snapshot: AnalyticsSnapshot) -> String {
+        // Determine mode based on recent activity
+        let focusScore = snapshot.focusSessionsCount > 0 ? Double(snapshot.focusSessionsCount) : 0
+        let taskScore = snapshot.completionRate
+        let emotionalScore = abs(snapshot.emotionalSnapshot.valence)
+        
+        if focusScore > 3 && taskScore > 0.7 {
+            return "Deep Work"
+        } else if taskScore > 0.5 {
+            return "Productive Flow"
+        } else if emotionalScore > 0.6 {
+            return "High Energy"
+        } else if snapshot.feedbackEventsCount > 10 {
+            return "Learning Mode"
+        } else {
+            return "Exploring"
+        }
+    }
+    
+    private func getModeDescription(from snapshot: AnalyticsSnapshot) -> String {
+        let mode = getCurrentMode(from: snapshot)
+        switch mode {
+        case "Deep Work":
+            return "You're in a highly focused state with multiple deep work sessions. Keep this momentum going."
+        case "Productive Flow":
+            return "You're completing tasks at a strong pace. Your productivity rhythm is healthy."
+        case "High Energy":
+            return "Your emotional state is vibrant. Channel this energy into creative work."
+        case "Learning Mode":
+            return "Aurora is learning rapidly from your patterns. Your feedback loop is strong."
+        default:
+            return "You're exploring and building habits. Your intelligence system is warming up."
+        }
+    }
+    
+    private func formatEmotionalPulse() -> String {
+        guard let snapshot = currentSnapshot else { return "--" }
+        let valence = snapshot.emotionalSnapshot.valence
+        
+        if valence > 0.5 {
+            return "Positive"
+        } else if valence > 0 {
+            return "Stable"
+        } else if valence > -0.5 {
+            return "Reflective"
+        } else {
+            return "Challenging"
+        }
+    }
+    
+    private func getEmotionalColor() -> Color {
+        guard let snapshot = currentSnapshot else { return .gray }
+        let valence = snapshot.emotionalSnapshot.valence
+        
+        if valence > 0.5 {
+            return .kosmicGreen
+        } else if valence > 0 {
+            return KosmicPalette.cyan
+        } else if valence > -0.5 {
+            return .orange
+        } else {
+            return .red
+        }
+    }
+    
+    private func getAuroraExperiment(from snapshot: AnalyticsSnapshot) -> String {
+        // Generate dynamic experiment message based on current data
+        if snapshot.focusSessionsCount > 5 {
+            return "Testing response tone adaptation based on your weekly focus ratio. Aurora is learning to match your energy levels."
+        } else if snapshot.completionRate > 0.7 {
+            return "Analyzing task completion patterns to predict optimal work times. You've been finishing tasks faster when you tag them by mood."
+        } else if snapshot.emotionalTrend == .improving {
+            return "Observing emotional continuity patterns. Your positive trend is being factored into recommendation algorithms."
+        } else {
+            return "Building your baseline cognitive profile. Aurora adapts more intelligently the more you interact."
+        }
+    }
+    
+    private func getTopConcepts() -> [(name: String, salience: Double, count: Int)]? {
+        guard let snapshot = currentSnapshot else { return nil }
+        
+        // Fetch actual concepts from ConceptNode
+        let conceptDescriptor = FetchDescriptor<ConceptNode>(
+            sortBy: [SortDescriptor(\ConceptNode.relevanceWeight, order: .reverse)]
+        )
+        
+        guard let concepts = try? modelContext.fetch(conceptDescriptor) else {
+            return nil
+        }
+        
+        let topConcepts = concepts.prefix(5).map { concept -> (name: String, salience: Double, count: Int) in
+            (
+                name: concept.concept,
+                salience: concept.relevanceWeight,
+                count: concept.mentionCount
+            )
+        }
+        
+        return topConcepts.isEmpty ? nil : Array(topConcepts)
+    }
+    
+    private func exportWeeklyReflection() {
+        // Future: Generate PDF report
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.pdf]
+        panel.nameFieldStringValue = "Weekly_Reflection_\(Date().ISO8601Format()).pdf"
+        panel.message = "Export your weekly reflection"
+        
+        panel.begin { response in
+            if response == .OK, let url = panel.url {
+                // TODO: Generate PDF with:
+                // - Cognitive overview
+                // - Focus session summary
+                // - Emotional heatmap
+                // - Top themes and concepts
+                // - Aurora's insights
+                Logger.insights.info("Exporting weekly reflection to \(url.path)")
             }
         }
     }
     
     private func startAutoRefresh() {
-        // Refresh immediately on appear
-        refreshInsights()
-        
-        // Then refresh every 5 minutes
+        // Refresh every 5 minutes
         autoRefreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
-            refreshInsights()
+            _Concurrency.Task {
+                await loadAnalytics()
+            }
         }
     }
     
@@ -537,56 +630,112 @@ struct InsightsView: View {
         autoRefreshTimer?.invalidate()
         autoRefreshTimer = nil
     }
+}
+
+// MARK: - Insight Tabs
+
+enum InsightTab: String, CaseIterable {
+    case overview = "Overview"
+    case memoryGraph = "Memory Graph"
+    case focus = "Focus Analytics"
+    case emotional = "Emotional Heatmap"
+    case learning = "Learning Loop"
+    case connections = "Connections"
     
-    // MARK: - Facebook Page Insights
+    var title: String { rawValue }
     
-    private func fetchPageInsights(for pageID: String) async {
-        isLoadingPageInsights = true
-        pageInsightsError = nil
-        
-        do {
-            // Get page access token
-            let accessToken = try KeychainService.shared.getToken(forAccount: "facebook_page_\(pageID)_access_token")
-            
-            // Calculate date range based on selectedTimeRange
-            let until = Int(Date().timeIntervalSince1970)
-            let daysAgo = selectedTimeRange.rawValue
-            let since = until - (daysAgo * 86400) // Convert days to seconds
-            
-            // Fetch both period and lifetime insights
-            // Use day period with custom date range for accurate time range matching
-            async let periodResponse = MetaAPIService.shared.getPageInsights(
-                pageID: pageID,
-                accessToken: accessToken,
-                period: .day,
-                since: since,
-                until: until
-            )
-            
-            async let lifetimeResponse = MetaAPIService.shared.getPageInsights(
-                pageID: pageID,
-                accessToken: accessToken,
-                period: .lifetime
-            )
-            
-            let (periodData, lifetimeData) = try await (periodResponse, lifetimeResponse)
-            
-            await MainActor.run {
-                pageInsightsPeriod = PageInsightsData(from: periodData)
-                pageInsightsLifetime = PageInsightsData(from: lifetimeData)
-                isLoadingPageInsights = false
-            }
-        } catch {
-            Logger.insights.error("Failed to fetch page insights for page \(pageID): \(error.localizedDescription)")
-            await MainActor.run {
-                pageInsightsError = error.localizedDescription
-                isLoadingPageInsights = false
-            }
+    var subtitle: String {
+        switch self {
+        case .overview:
+            return "Your cognitive state at a glance"
+        case .memoryGraph:
+            return "Concepts and their relationships"
+        case .focus:
+            return "Productivity patterns and streaks"
+        case .emotional:
+            return "Your emotional journey"
+        case .learning:
+            return "What Aurora learns from you"
+        case .connections:
+            return "Recurring themes and evolution"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .overview:
+            return "brain.head.profile"
+        case .memoryGraph:
+            return "network"
+        case .focus:
+            return "chart.bar.fill"
+        case .emotional:
+            return "heart.circle.fill"
+        case .learning:
+            return "sparkles"
+        case .connections:
+            return "link.circle.fill"
         }
     }
 }
 
-// MARK: - Helper Structures
+// MARK: - Intelligence Stat Card
+
+struct IntelligenceStatCard: View {
+    let title: String
+    let value: String
+    let subtitle: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: icon)
+                        .font(.system(size: 20))
+                        .foregroundColor(color)
+                    Spacer()
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(value)
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.primary)
+                    
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    
+                    Text(subtitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary.opacity(0.7))
+                }
+            }
+            .padding(16)
+            .frame(height: 140)
+        }
+    }
+}
+
+// MARK: - AnalyticsTimeRange Extension
+
+extension AnalyticsTimeRange {
+    var displayName: String {
+        switch self {
+        case .today: return "Today"
+        case .thisWeek: return "Week"
+        case .thisMonth: return "Month"
+        case .thisQuarter: return "Quarter"
+        case .thisYear: return "Year"
+        case .custom: return "Custom"
+        }
+    }
+}
+
+// MARK: - Helper Structures (for backwards compatibility)
 
 struct PageInsightsData {
     let pageViewsTotal: Int
@@ -603,24 +752,30 @@ struct PageInsightsData {
         var engagedUsers = 0, postEngagements = 0, consumptions = 0
         
         for insight in response.data {
-            guard let valueString = insight.values.last?.value,
-                  let value = Double(valueString) else { continue }
+            var totalValue: Double = 0
+            for rawValue in insight.values {
+                if let numeric = rawValue.numericValue {
+                    totalValue += numeric
+                } else if let breakdown = rawValue.breakdown {
+                    totalValue += breakdown.values.reduce(0, +)
+                }
+            }
             
             switch insight.name {
             case "page_views_total":
-                views = Int(value)
+                views = Int(totalValue)
             case "page_fans":
-                fans = Int(value)
+                fans = Int(totalValue)
             case "page_reach":
-                reach = Int(value)
+                reach = Int(totalValue)
             case "page_impressions":
-                impressions = Int(value)
+                impressions = Int(totalValue)
             case "page_engaged_users":
-                engagedUsers = Int(value)
+                engagedUsers = Int(totalValue)
             case "page_post_engagements":
-                postEngagements = Int(value)
+                postEngagements = Int(totalValue)
             case "page_consumptions":
-                consumptions = Int(value)
+                consumptions = Int(totalValue)
             default:
                 break
             }
@@ -636,347 +791,13 @@ struct PageInsightsData {
     }
 }
 
-enum TimeRange: Int, CaseIterable {
-    case week = 7
-    case month = 30
-    case year = 365
-    
-    var dateComponent: Calendar.Component {
-        .day
-    }
-}
-
-struct TimeRangeButton: View {
-    let title: String
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(isSelected ? .white : .primary)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(isSelected ? Color.accentColor : Color.clear)
-                )
-                .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct MetricCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    var gradientColor: Color? = nil
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(color.opacity(0.8))
-                    .frame(width: 40, height: 40)
-                    .background(
-                        Circle()
-                            .fill(color.opacity(0.08))
-                    )
-                
-                Spacer()
-            }
-            
-            Spacer()
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(value)
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.primary)
-                
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .tracking(0.2)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(20)
-        .background(
-            ZStack {
-                if let gradientColor = gradientColor {
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    gradientColor.opacity(0.05),
-                                    gradientColor.opacity(0.02)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-                
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.05), radius: 6, y: 3)
-            }
-        )
-    }
-}
-
-// MARK: - Facebook Page Selector
-
-struct FacebookPageSelector: View {
-    let pages: [PlatformAccount]
-    @Binding var selectedPageID: String?
-    
-    var body: some View {
-        Menu {
-            ForEach(pages, id: \.id) { page in
-                Button {
-                    selectedPageID = page.accountID
-                } label: {
-                    HStack {
-                        Text(page.displayName ?? page.username)
-                        if selectedPageID == page.accountID {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "square.stack.3d.up.fill")
-                    .foregroundColor(KosmicPalette.cyan)
-                Text(selectedPageName)
-                    .sectionTitleStyle()
-                Spacer()
-                Image(systemName: "chevron.down")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(12)
-            .glassPanel(tier: .contentCard, cornerRadius: 12, tintColor: KosmicPalette.cyan.opacity(0.1))
-        }
-        .buttonStyle(.plain)
-    }
-    
-    private var selectedPageName: String {
-        guard let pageID = selectedPageID,
-              let page = pages.first(where: { $0.accountID == pageID }) else {
-            return pages.first?.displayName ?? pages.first?.username ?? "Select Page"
-        }
-        return page.displayName ?? page.username
-    }
-}
-
-// MARK: - Facebook Page Insights Section
-
-struct FacebookPageInsightsSection: View {
-    let periodInsights: PageInsightsData?
-    let lifetimeInsights: PageInsightsData?
-    let isLoading: Bool
-    let error: String?
-    
-    var body: some View {
-        if isLoading {
-            HStack {
-                Spacer()
-                ProgressView()
-                    .padding(40)
-                Spacer()
-            }
-            .glassPanel(tier: .contentCard, cornerRadius: 16)
-        } else if let error = error {
-            HStack(spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundColor(KosmicPalette.violet)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Failed to load insights")
-                        .sectionTitleStyle()
-                    Text(error)
-                        .metricLabelStyle()
-                }
-                Spacer()
-            }
-            .padding(16)
-            .glassPanel(tier: .contentCard, cornerRadius: 16)
-        } else if periodInsights == nil && lifetimeInsights == nil {
-            HStack {
-                Spacer()
-                VStack(spacing: 6) {
-                    Text("Awaiting insights")
-                        .sectionTitleStyle()
-                    Text("Post or connect a page to see metrics here.")
-                        .metricLabelStyle()
-                }
-                    .padding(40)
-                Spacer()
-            }
-            .glassPanel(tier: .contentCard, cornerRadius: 16)
-        } else {
-            VStack(spacing: 24) {
-                // Current Period Section
-                if let period = periodInsights {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "clock.fill")
-                                .foregroundColor(KosmicPalette.cyan)
-                            Text("Current Period")
-                                .sectionTitleStyle()
-                            Spacer()
-                        }
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            GlassMetricCard(
-                                title: "Page Views",
-                                value: formatNumber(period.pageViewsTotal),
-                                icon: "eye.fill",
-                                color: KosmicPalette.cyan
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Page Fans",
-                                value: formatNumber(period.pageFans),
-                                icon: "person.3.fill",
-                                color: KosmicPalette.violet
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Page Reach",
-                                value: formatNumber(period.pageReach),
-                                icon: "arrow.up.right.circle.fill",
-                                color: KosmicPalette.violet
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Impressions",
-                                value: formatNumber(period.pageImpressions),
-                                icon: "chart.bar.fill",
-                                color: KosmicPalette.cyan
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Engaged Users",
-                                value: formatNumber(period.pageEngagedUsers),
-                                icon: "heart.fill",
-                                color: KosmicPalette.violet
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Post Engagements",
-                                value: formatNumber(period.pagePostEngagements),
-                                icon: "hand.thumbsup.fill",
-                                color: KosmicPalette.cyan
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Consumptions",
-                                value: formatNumber(period.pageConsumptions),
-                                icon: "play.circle.fill",
-                                color: KosmicPalette.cyan
-                            )
-                        }
-                    }
-                }
-                
-                // Lifetime Section
-                if let lifetime = lifetimeInsights {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "infinity.circle.fill")
-                                .foregroundColor(KosmicPalette.violet)
-                            Text("Lifetime")
-                                .sectionTitleStyle()
-                            Spacer()
-                        }
-                        
-                        LazyVGrid(columns: [
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible()),
-                            GridItem(.flexible())
-                        ], spacing: 16) {
-                            GlassMetricCard(
-                                title: "Total Page Views",
-                                value: formatNumber(lifetime.pageViewsTotal),
-                                icon: "eye.fill",
-                                color: KosmicPalette.cyan
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Total Fans",
-                                value: formatNumber(lifetime.pageFans),
-                                icon: "person.3.fill",
-                                color: KosmicPalette.violet
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Total Reach",
-                                value: formatNumber(lifetime.pageReach),
-                                icon: "arrow.up.right.circle.fill",
-                                color: KosmicPalette.violet
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Total Impressions",
-                                value: formatNumber(lifetime.pageImpressions),
-                                icon: "chart.bar.fill",
-                                color: KosmicPalette.cyan
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Total Engaged Users",
-                                value: formatNumber(lifetime.pageEngagedUsers),
-                                icon: "heart.fill",
-                                color: KosmicPalette.violet
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Total Post Engagements",
-                                value: formatNumber(lifetime.pagePostEngagements),
-                                icon: "hand.thumbsup.fill",
-                                color: KosmicPalette.cyan
-                            )
-                            
-                            GlassMetricCard(
-                                title: "Total Consumptions",
-                                value: formatNumber(lifetime.pageConsumptions),
-                                icon: "play.circle.fill",
-                                color: KosmicPalette.cyan
-                            )
-                        }
-                    }
-                }
-            }
-            .padding(20)
-            .glassPanel(tier: .contentCard, cornerRadius: 16)
-        }
-    }
-    
-    private func formatNumber(_ value: Int) -> String {
-        if value >= 1_000_000 {
-            return String(format: "%.1fM", Double(value) / 1_000_000)
-        } else if value >= 1_000 {
-            return String(format: "%.1fK", Double(value) / 1_000)
-        } else {
-            return "\(value)"
-        }
-    }
-}
-
 #Preview {
     InsightsView()
-        .modelContainer(for: [Post.self])
+        .modelContainer(for: [
+            AIConversation.self,
+            CloutmateShared.Task.self,
+            FocusSession.self,
+            ConceptNode.self,
+            StoryToken.self
+        ])
 }
-

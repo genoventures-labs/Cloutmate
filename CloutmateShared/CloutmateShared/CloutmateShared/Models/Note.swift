@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum ResourceType: String, Codable, CaseIterable {
+public enum ResourceType: String, Codable, CaseIterable {
     case note = "Note"
     case article = "Article"
     case video = "Video"
@@ -20,22 +20,22 @@ enum ResourceType: String, Codable, CaseIterable {
 }
 
 @Model
-final class Note {
-    var id: UUID = UUID()
-    var title: String = ""
-    var markdown: String = ""
-    var tags: [String] = []
-    var projectId: UUID?
-    var areaId: UUID?
-    var backlinks: [UUID] = [] // IDs of other notes/projects
-    var highlights: [String] = [] // Array of highlighted text snippets (3.0b feature)
-    var source: String? // URL or reference
-    var type: ResourceType = ResourceType.note
-    var createdAt: Date = Date()
-    var updatedAt: Date = Date()
-    var isArchived: Bool = false
+public final class Note {
+    public var id: UUID = UUID()
+    public var title: String = ""
+    public var markdown: String = ""
+    public var tags: [String] = []
+    public var projectId: UUID?
+    public var areaId: UUID?
+    public var backlinks: [UUID] = [] // IDs of other notes/projects
+    public var highlights: [String] = [] // Array of highlighted text snippets (3.0b feature)
+    public var source: String? // URL or reference
+    public var type: ResourceType = ResourceType.note
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var isArchived: Bool = false
     
-    init(
+    public init(
         title: String,
         markdown: String = "",
         tags: [String] = [],

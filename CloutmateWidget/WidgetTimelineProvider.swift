@@ -34,7 +34,7 @@ struct CloutmateTimelineProvider: TimelineProvider {
         let calendar = Calendar.current
         
         // Access shared SwiftData container via app group
-        Task { @MainActor in
+        _Concurrency.Task { @MainActor in
             var scheduledCount = 0
             var nextPostDate: Date? = nil
             var nextPostCaption: String? = nil

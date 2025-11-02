@@ -34,14 +34,14 @@ final class InsightsPoller {
     
     func fetchInsights(for postID: String) {
         os_log("Fetching insights for post: %{public}@", log: .default, type: .info, postID)
-        Task {
+        _Concurrency.Task {
             await fetchInsightsForPost(postID)
         }
     }
     
     private func pollAllPosts() {
         os_log("Polling insights for all published posts", log: .default, type: .info)
-        Task {
+        _Concurrency.Task {
             await fetchInsightsForAllPosts()
         }
     }
@@ -98,8 +98,15 @@ final class InsightsPoller {
                 
                 // Update post
                 for data in insights.data {
-                    guard let value = data.values.first?.value,
-                          let doubleValue = Double(value) else { continue }
+                    guard let rawValue = data.values.first else { continue }
+                    let doubleValue: Double
+                    if let numeric = rawValue.numericValue {
+                        doubleValue = numeric
+                    } else if let breakdown = rawValue.breakdown {
+                        doubleValue = breakdown.values.reduce(0, +)
+                    } else {
+                        continue
+                    }
                     
                     switch data.name {
                     case "likes", "reactions", "post_reactions_by_type_total":

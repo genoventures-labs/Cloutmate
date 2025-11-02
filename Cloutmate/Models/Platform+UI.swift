@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CloutmateShared
 
 extension Platform {
     var iconName: String {
@@ -14,6 +15,8 @@ extension Platform {
             return "bubble.left.and.bubble.right.fill"
         case .facebook:
             return "f.circle.fill"
+        @unknown default:
+            return "globe"
         }
     }
     
@@ -23,6 +26,8 @@ extension Platform {
             return Color(red: 0.6, green: 0.4, blue: 1.0) // Purple
         case .facebook:
             return Color(red: 0.23, green: 0.35, blue: 0.84) // Facebook Blue
+        @unknown default:
+            return Color.accentColor
         }
     }
     
@@ -32,6 +37,8 @@ extension Platform {
             return Color(red: 0.6, green: 0.4, blue: 1.0).opacity(0.1)
         case .facebook:
             return Color(red: 0.23, green: 0.35, blue: 0.84).opacity(0.1)
+        @unknown default:
+            return Color.accentColor.opacity(0.1)
         }
     }
     
@@ -41,7 +48,8 @@ extension Platform {
             return "Connect Threads"
         case .facebook:
             return "Connect Facebook"
+        @unknown default:
+            return "Connect Account"
         }
     }
 }
-

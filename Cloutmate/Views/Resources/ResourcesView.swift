@@ -9,21 +9,21 @@ import SwiftUI
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
+import CloutmateShared
 
 struct ResourcesView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query(filter: #Predicate<Note> { $0.isArchived == false && $0.projectId == nil }, sort: \Note.updatedAt, order: .reverse) private var resourceNotes: [Note]
-    @Query private var allProjects: [Project]
+    @Query(filter: #Predicate<CloutmateShared.Note> { $0.isArchived == false && $0.projectId == nil }, sort: \CloutmateShared.Note.updatedAt, order: .reverse) private var resourceNotes: [CloutmateShared.Note]
+    @Query private var allProjects: [CloutmateShared.Project]
     @Query private var allAreas: [Area]
     
     @State private var searchText = ""
-    @State private var selectedProject: Project?
+    @State private var selectedProject: CloutmateShared.Project?
     @State private var selectedArea: Area?
     @State private var selectedTags: Set<String> = []
     @State private var hasHighlightsFilter: Bool?
-    @State private var selectedType: ResourceType?
+    @State private var selectedType: CloutmateShared.ResourceType?
     @State private var selectedNotes = Set<UUID>()
-    @State private var showNoteSheet = false
     @State private var selectedNote: Note?
     @State private var showCreateSheet = false
     
@@ -148,11 +148,9 @@ struct ResourcesView: View {
                 .contextMenu {
                     Button("Edit") {
                         selectedNote = note
-                        showNoteSheet = true
                     }
                     Button("Highlight") {
                         selectedNote = note
-                        showNoteSheet = true
                     }
                     Button("Archive") {
                         archiveNote(note)
@@ -169,7 +167,7 @@ struct ResourcesView: View {
                 HStack(spacing: 4) {
                     Image(systemName: iconForType(note.type))
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                     Text(note.type.rawValue)
                         .font(.caption)
                 }
@@ -193,7 +191,7 @@ struct ResourcesView: View {
                    let project = allProjects.first(where: { $0.id == projectId }) {
                     Text(project.title)
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                 } else if let areaId = note.areaId,
                           let area = allAreas.first(where: { $0.id == areaId }) {
                     Text(area.title)
@@ -215,8 +213,8 @@ struct ResourcesView: View {
                                     .font(.caption2)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Color.purple.opacity(0.1))
-                                    .foregroundColor(.purple)
+                                    .background(Color.kosmicPurple.opacity(0.1))
+                                    .foregroundColor(.kosmicPurple)
                                     .cornerRadius(4)
                             }
                             if note.tags.count > 3 {
@@ -278,10 +276,8 @@ struct ResourcesView: View {
                 }
             }
         }
-        .sheet(isPresented: $showNoteSheet) {
-            if let note = selectedNote {
-                NoteEditorSheet(note: note)
-            }
+        .sheet(item: $selectedNote) { note in
+            NoteEditorSheet(note: note)
         }
         .sheet(isPresented: $showCreateSheet) {
             CreateResourceSheet()
@@ -399,7 +395,7 @@ struct NoteCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "doc.text")
-                    .foregroundStyle(.purple.gradient)
+                    .foregroundStyle(Color.kosmicPurple)
                     .font(.title3)
                 
                 VStack(alignment: .leading, spacing: 4) {

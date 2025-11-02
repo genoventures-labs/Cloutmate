@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 enum CaptureType {
     case inbox, task, note, post
@@ -198,7 +199,7 @@ struct TemplatePickerSheet: View {
                     }) {
                         HStack {
                             Image(systemName: template.type.icon)
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.kosmicBlue)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(template.title)
                                     .font(.headline)
@@ -211,7 +212,7 @@ struct TemplatePickerSheet: View {
                             if template.isBuiltIn {
                                 Label("Built-in", systemImage: "checkmark.seal")
                                     .font(.caption2)
-                                    .foregroundStyle(.blue)
+                                    .foregroundStyle(Color.kosmicBlue)
                             }
                         }
                     }
@@ -233,6 +234,6 @@ struct TemplatePickerSheet: View {
 
 #Preview {
     QuickCaptureView()
-        .modelContainer(for: [InboxItem.self, Task.self, Note.self, Post.self, PARATemplate.self])
+        .modelContainer(for: [CloutmateShared.InboxItem.self, CloutmateShared.Task.self, CloutmateShared.Note.self, CloutmateShared.Post.self, PARATemplate.self])
 }
 

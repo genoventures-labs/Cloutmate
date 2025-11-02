@@ -22,7 +22,7 @@ struct ContentRecyclingCard: View {
             AnyView(
                 HStack {
                     Image(systemName: "arrow.clockwise.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                     Text("Content Recycling")
                         .font(.headline)
                 }
@@ -121,7 +121,7 @@ private struct RecyclingPostRow: View {
                             if recyclable.recycleCount > 0 {
                                 Label("\(recyclable.recycleCount)x", systemImage: "arrow.clockwise")
                                     .font(.caption2)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                             }
                         }
                     }
@@ -134,7 +134,7 @@ private struct RecyclingPostRow: View {
                         }
                     }) {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                     }
                     .buttonStyle(.plain)
                     .disabled(isGeneratingVariations)

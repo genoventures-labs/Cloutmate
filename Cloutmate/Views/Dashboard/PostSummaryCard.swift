@@ -19,7 +19,7 @@ struct PostSummaryCard: View {
             VStack(spacing: 4) {
                 ForEach(post.postPlatforms, id: \.self) { platform in
                     Circle()
-                        .fill(platform == .threads ? Color.purple : Color.blue)
+                        .fill(platform == .threads ? Color.kosmicPurple : Color.kosmicBlue)
                         .frame(width: 8, height: 8)
                 }
             }
@@ -71,9 +71,9 @@ extension CloutmateShared.PostStatus {
     var color: Color {
         switch self {
         case .draft: return .gray
-        case .scheduled: return .blue
+        case .scheduled: return .kosmicBlue
         case .publishing: return .orange
-        case .published: return .green
+        case .published: return .kosmicGreen
         case .failed: return .red
         @unknown default: return .gray
         }

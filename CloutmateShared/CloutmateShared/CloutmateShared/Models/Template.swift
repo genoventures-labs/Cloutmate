@@ -37,11 +37,5 @@ public final class Template {
         get { platforms.compactMap { Platform(rawValue: $0) } }
         set { platforms = newValue.map { $0.rawValue } }
     }
-    
-    public func apply(toDraft draft: Draft) {
-        draft.caption = caption
-        draft.tags = tags
-        draft.updatedAt = Date()
-    }
 }
 

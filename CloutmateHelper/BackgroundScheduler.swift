@@ -52,7 +52,7 @@ final class BackgroundScheduler {
             post.postStatus = .publishing
             try? context.save()
             
-            Task {
+            _Concurrency.Task {
                 await publishPost(post)
             }
         }
@@ -69,7 +69,7 @@ final class BackgroundScheduler {
         for post in publishingPosts {
             os_log("Publishing immediate post: %@", log: .default, type: .info, post.id.uuidString)
             
-        Task {
+            _Concurrency.Task {
                 await publishPost(post)
             }
         }

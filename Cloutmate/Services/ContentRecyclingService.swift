@@ -10,7 +10,8 @@ import SwiftData
 import CloutmateShared
 import os.log
 
-actor ContentRecyclingService {
+@MainActor
+final class ContentRecyclingService {
     static let shared = ContentRecyclingService()
     
     private init() {}

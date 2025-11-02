@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct InboxView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -18,7 +19,6 @@ struct InboxView: View {
     @State private var selectedType: String?
     @State private var selectedDateRange: DateRange?
     @State private var selectedItems = Set<UUID>()
-    @State private var showConvertSheet = false
     @State private var selectedItem: InboxItem?
     
     var unconvertedItems: [InboxItem] {
@@ -136,7 +136,6 @@ struct InboxView: View {
                         Divider()
                         Button("View Details") {
                             selectedItem = item
-                            showConvertSheet = true
                         }
                         Divider()
                         Button("Delete", role: .destructive) {
@@ -165,16 +164,16 @@ struct InboxView: View {
             
             TableColumn("Quick Actions") { item in
                 HStack(spacing: 8) {
-                    QuickConvertButton(icon: "checkmark.circle", color: .blue) {
+                    QuickConvertButton(icon: "checkmark.circle", color: .kosmicBlue) {
                         convertItemToTask(item)
                     }
-                    QuickConvertButton(icon: "doc.text", color: .purple) {
+                    QuickConvertButton(icon: "doc.text", color: .kosmicPurple) {
                         convertItemToNote(item)
                     }
                     QuickConvertButton(icon: "square.and.pencil", color: .orange) {
                         convertItemToPost(item)
                     }
-                    QuickConvertButton(icon: "folder.fill", color: .green) {
+                    QuickConvertButton(icon: "folder.fill", color: .kosmicGreen) {
                         convertItemToProject(item)
                     }
                 }
@@ -215,10 +214,8 @@ struct InboxView: View {
                 }
             }
         }
-        .sheet(isPresented: $showConvertSheet) {
-            if let item = selectedItem {
-                InboxDetailSheet(item: item)
-            }
+        .sheet(item: $selectedItem) { item in
+            InboxDetailSheet(item: item)
         }
     }
     
@@ -233,9 +230,9 @@ struct InboxView: View {
     
     private func itemTypeColor(_ type: String) -> Color {
         switch type {
-        case "text": return .blue
-        case "file": return .purple
-        case "url": return .green
+        case "text": return .kosmicBlue
+        case "file": return .kosmicPurple
+        case "url": return .kosmicGreen
         default: return .gray
         }
     }
@@ -407,16 +404,16 @@ struct InboxDetailSheet: View {
                             .font(.system(size: 20, weight: .semibold))
                         
                         HStack(spacing: 16) {
-                            ConvertButton(icon: "checkmark.circle", title: "Task", color: .blue) {
+                            ConvertButton(icon: "checkmark.circle", title: "Task", color: .kosmicBlue) {
                                 convertToTask()
                             }
-                            ConvertButton(icon: "doc.text", title: "Note", color: .purple) {
+                            ConvertButton(icon: "doc.text", title: "Note", color: .kosmicPurple) {
                                 convertToNote()
                             }
                             ConvertButton(icon: "square.and.pencil", title: "Post", color: .orange) {
                                 convertToPost()
                             }
-                            ConvertButton(icon: "folder.fill", title: "Project", color: .green) {
+                            ConvertButton(icon: "folder.fill", title: "Project", color: .kosmicGreen) {
                                 convertToProject()
                             }
                         }

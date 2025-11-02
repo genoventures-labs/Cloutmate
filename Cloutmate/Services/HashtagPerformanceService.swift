@@ -10,7 +10,8 @@ import SwiftData
 import CloutmateShared
 import os.log
 
-actor HashtagPerformanceService {
+@MainActor
+final class HashtagPerformanceService {
     static let shared = HashtagPerformanceService()
     
     private init() {}

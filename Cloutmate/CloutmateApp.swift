@@ -13,6 +13,9 @@ import CloutmateShared
 import os.log
 import Carbon
 
+typealias Platform = CloutmateShared.Platform
+typealias PostStatus = CloutmateShared.PostStatus
+
 @main
 struct CloutmateApp: App {
     @State private var selectedTab: TabIdentifier = .home
@@ -20,6 +23,7 @@ struct CloutmateApp: App {
     @StateObject private var glassColorSystem = GlassColorSystem()
     @StateObject private var accessibilityGlassManager = AccessibilityGlassManager()
     @StateObject private var distributedNotificationManager: DistributedNotificationManager
+    @StateObject private var themeManager = ReactiveThemeManager.shared
     
     static let sharedModelContainer: ModelContainer = CloutmateApp.createAppModelContainer()
 
@@ -39,6 +43,7 @@ struct CloutmateApp: App {
                         startPublishingTimer()
                         checkAndRunMigration()
                         registerGlobalHotkey()
+                        startARTE()
                     }
             }
             .modelContainer(CloutmateApp.sharedModelContainer)
@@ -180,6 +185,40 @@ struct CloutmateApp: App {
             print("Global hotkey ⌥Space registered successfully")
         }
     }
+    
+    // MARK: - ARTE Integration (Phase 7)
+    
+    private func startARTE() {
+        _Concurrency.Task { @MainActor in
+            // Start ReactiveThemeManager
+            let context = CloutmateApp.sharedModelContainer.mainContext
+            themeManager.start(modelContext: context)
+            
+            // Subscribe to theme changes to update GlassColorSystem
+            themeManager.$currentState
+                .sink { [weak glassColorSystem] state in
+                    glassColorSystem?.updateEmotionalState(state, intensity: themeManager.intensity)
+                }
+                .store(in: &themeManager.cancellables)
+            
+            // Subscribe to intensity changes
+            themeManager.$intensity
+                .sink { [weak glassColorSystem] intensity in
+                    glassColorSystem?.emotionalIntensity = intensity
+                }
+                .store(in: &themeManager.cancellables)
+            
+            // Update GlassMotion animation speed
+            themeManager.$currentState
+                .sink { state in
+                    let palette = EmotionalPalette.palette(for: state)
+                    GlassMotion.emotionalSpeedMultiplier = palette.animationSpeed
+                }
+                .store(in: &themeManager.cancellables)
+            
+            os_log("ARTE: Integration complete - reactive theme system active", log: .default, type: .info)
+        }
+    }
 }
 
 extension CloutmateApp {
@@ -187,7 +226,7 @@ extension CloutmateApp {
         let schema = Schema([
             // Shared models used in the app (publicly accessible)
             CloutmateShared.Post.self,
-            CloutmateShared.Draft.self,
+            Draft.self,  // Draft is app-local, not in CloutmateShared
             CloutmateShared.Template.self,
             CloutmateShared.PlatformAccount.self,
             CloutmateShared.PerformancePrediction.self,
@@ -200,13 +239,42 @@ extension CloutmateApp {
             CloutmateShared.PostView.self,
             CloutmateShared.HashtagPerformance.self,
             CloutmateShared.HashtagSet.self,
-            // App-local PARA models for dashboard cards
-            Note.self,
-            Task.self,
-            Project.self,
-            InboxItem.self,
+            // Shared PARA models (used by dashboard cards and other features)
+            CloutmateShared.Note.self,
+            CloutmateShared.Task.self,
+            CloutmateShared.Project.self,
+            CloutmateShared.InboxItem.self,
+            // App-local PARA models
+            Area.self,
             // App-specific models
-            DashboardCard.self
+            DashboardCard.self,
+            AIMessage.self,
+            AIConversation.self,
+            ConversationDigest.self,
+            UserPreferences.self,
+            InsightSnapshot.self,
+            Journal.self,
+            Campaign.self,
+            NotionSyncConfig.self,
+            PARATemplate.self,
+            // AI & Phase 3-5 models
+            RecallIndexEntry.self,
+            AIFeedbackEvent.self,
+            PriorityScore.self,
+            FocusSession.self,
+            ConceptNode.self,
+            StoryToken.self,
+            // AI & Phase 6 models
+            MemoryNode.self,
+            MemoryEdge.self,
+            ThemeNode.self,
+            // AI & Phase 6.1 models
+            WorkflowPattern.self,
+            AutomationRule.self,
+            WorkflowTemplate.self,
+            // AI & Phase 7 models (ARTE)
+            ARTEConfiguration.self,
+            StateTransitionHistory.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"
@@ -214,7 +282,7 @@ extension CloutmateApp {
             fatalError("Unable to access app group container")
         }
         // Bump the store filename to force schema recreation after adding new models
-        let storeURL = appGroupURL.appendingPathComponent("Cloutmate_v2.sqlite")
+        let storeURL = appGroupURL.appendingPathComponent("Cloutmate_v3.sqlite")
         
         let config = ModelConfiguration(
             schema: schema,

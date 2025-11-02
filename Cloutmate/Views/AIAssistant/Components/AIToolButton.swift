@@ -16,7 +16,7 @@ struct AIToolButton: View {
             VStack(spacing: 8) {
                 Image(systemName: tool.icon)
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                     .frame(width: 44, height: 44)
                     .background(.ultraThinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))

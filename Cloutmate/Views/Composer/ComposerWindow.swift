@@ -38,6 +38,7 @@ struct ComposerWindow: View {
     @State private var showAIPromptDialog = false
     @State private var userPromptText = ""
     @State private var isAIGenerating = false
+    @State private var analyticsRefreshID = UUID()
     
     init(draft: Draft? = nil, existingPost: CloutmateShared.Post? = nil, prefilledDate: Date? = nil, onSave: ((DraftConversionResult) -> Void)? = nil) {
         self.draft = draft
@@ -78,7 +79,7 @@ struct ComposerWindow: View {
                         .scaleEffect(0.5)
                 }
                 Image(systemName: "sparkles")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                     .font(.caption)
                     .symbolEffect(.pulse.byLayer, options: .repeating, isActive: isAIGenerating)
             }
@@ -194,7 +195,7 @@ struct ComposerWindow: View {
     private var aiSuggestionsSection: some View {
         if !caption.isEmpty && !selectedPlatforms.isEmpty {
             Section {
-                PerformancePredictorPanel(post: createPreviewPost())
+                PerformancePredictorPanel(post: createPreviewPost(), refreshID: analyticsRefreshID)
             }
         }
         
@@ -291,7 +292,7 @@ struct ComposerWindow: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(
                     LinearGradient(
-                        colors: [.blue.opacity(0.2), .purple.opacity(0.2)],
+                        colors: [.kosmicBlue.opacity(0.2), .kosmicPurple.opacity(0.2)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -331,6 +332,25 @@ struct ComposerWindow: View {
                 scheduledDate = date
             }
         }
+        .onChange(of: caption) { _, _ in
+            triggerAnalyticsRefresh()
+        }
+        .onChange(of: selectedPlatforms) { _, _ in
+            triggerAnalyticsRefresh()
+        }
+        .onChange(of: tags) { _, _ in
+            triggerAnalyticsRefresh()
+        }
+        .onChange(of: isScheduled) { _, _ in
+            triggerAnalyticsRefresh()
+        }
+        .onChange(of: scheduledDate) { _, _ in
+            triggerAnalyticsRefresh()
+        }
+    }
+    
+    private func triggerAnalyticsRefresh() {
+        analyticsRefreshID = UUID()
     }
     
     private func validateInput() -> Bool {
@@ -722,4 +742,3 @@ struct MediaPreviewView: View {
     ComposerWindow()
         .modelContainer(for: [Post.self, Draft.self])
 }
-

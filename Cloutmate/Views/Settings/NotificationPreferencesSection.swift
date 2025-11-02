@@ -25,7 +25,7 @@ struct NotificationPreferencesSection: View {
     @State private var showPlatformSettings = false
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(alignment: .leading, spacing: 16) {
             // General Notifications
             VStack(alignment: .leading, spacing: 12) {
                 Text("General Notifications")
@@ -36,7 +36,7 @@ struct NotificationPreferencesSection: View {
                 Toggle(isOn: $notifyPostPublished) {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                            .foregroundColor(.kosmicGreen)
                             .frame(width: 20)
                         Text("Post published")
                     }
@@ -54,7 +54,7 @@ struct NotificationPreferencesSection: View {
                 Toggle(isOn: $notifyInsightsUpdated) {
                     HStack(spacing: 8) {
                         Image(systemName: "chart.line.uptrend.xyaxis")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                             .frame(width: 20)
                         Text("Insights updated")
                     }
@@ -73,7 +73,7 @@ struct NotificationPreferencesSection: View {
                 HStack {
                     HStack(spacing: 8) {
                         Image(systemName: "speaker.wave.2.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                             .frame(width: 20)
                         Text("Sound")
                     }
@@ -93,7 +93,7 @@ struct NotificationPreferencesSection: View {
                 HStack {
                     HStack(spacing: 8) {
                         Image(systemName: "bell.badge.fill")
-                            .foregroundColor(.purple)
+                            .foregroundColor(.kosmicPurple)
                             .frame(width: 20)
                         Text("Banner Style")
                     }

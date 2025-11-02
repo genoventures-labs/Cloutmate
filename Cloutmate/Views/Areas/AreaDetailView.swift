@@ -7,22 +7,23 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct AreaDetailView: View {
     let area: Area
-    @Query private var allTasks: [Task]
-    @Query private var allNotes: [Note]
-    @Query private var allProjects: [Project]
+    @Query private var allTasks: [CloutmateShared.Task]
+    @Query private var allNotes: [CloutmateShared.Note]
+    @Query private var allProjects: [CloutmateShared.Project]
     
-    var areaTasks: [Task] {
+    var areaTasks: [CloutmateShared.Task] {
         allTasks.filter { $0.areaId == area.id }
     }
     
-    var areaNotes: [Note] {
+    var areaNotes: [CloutmateShared.Note] {
         allNotes.filter { $0.areaId == area.id }
     }
     
-    var areaProjects: [Project] {
+    var areaProjects: [CloutmateShared.Project] {
         allProjects.filter { $0.areaId == area.id }
     }
     
@@ -55,7 +56,7 @@ struct AreaHeaderSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "rectangle.stack.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.largeTitle)
                 Text(area.title)
                     .font(.title)
@@ -81,7 +82,7 @@ struct AreaProjectsSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text("Projects")
                     .font(.headline)
                 Text("(\(projects.count))")
@@ -111,11 +112,11 @@ struct ProjectRow: View {
     var body: some View {
         HStack {
             Image(systemName: "folder")
-                .foregroundColor(.blue)
+                .foregroundColor(.kosmicBlue)
             Text(project.title)
                 .font(.body)
             Spacer()
-            StatusBadge(status: project.status)
+            ProjectStatusBadge(status: project.status)
         }
         .padding()
         .glassPanel(tier: .contentCard, cornerRadius: 8)
@@ -129,7 +130,7 @@ struct AreaTasksSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "checkmark.circle")
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
                 Text("Tasks")
                     .font(.headline)
                 Text("(\(tasks.count))")
@@ -160,7 +161,7 @@ struct AreaNotesSection: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "doc.text")
-                    .foregroundStyle(.purple)
+                    .foregroundStyle(Color.kosmicPurple)
                 Text("Notes")
                     .font(.headline)
                 Text("(\(notes.count))")
@@ -190,7 +191,7 @@ struct AreaNoteRow: View {
     var body: some View {
         HStack {
             Image(systemName: "doc.text")
-                .foregroundColor(.purple)
+                .foregroundColor(.kosmicPurple)
             Text(note.title)
                 .font(.body)
             Spacer()
@@ -209,7 +210,7 @@ struct AreaTaskRow: View {
     var body: some View {
         HStack {
             Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(task.status == .done ? .green : .blue)
+                .foregroundColor(task.status == .done ? .kosmicGreen : .kosmicBlue)
             Text(task.title)
                 .font(.body)
                 .strikethrough(task.status == .done)
@@ -220,8 +221,24 @@ struct AreaTaskRow: View {
     }
 }
 
+// MARK: - Supporting Views
+private struct ProjectStatusBadge: View {
+    let status: ProjectStatus
+    
+    var body: some View {
+        Text(status.displayName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(status.color.opacity(0.2))
+            .foregroundColor(status.color)
+            .cornerRadius(6)
+    }
+}
+
 #Preview {
     AreaDetailView(area: Area(title: "Example Area", notes: "This is a sample area"))
-        .modelContainer(for: [Area.self, Project.self, Task.self, Note.self])
+        .modelContainer(for: [Area.self, CloutmateShared.Project.self, CloutmateShared.Task.self, CloutmateShared.Note.self])
 }
 

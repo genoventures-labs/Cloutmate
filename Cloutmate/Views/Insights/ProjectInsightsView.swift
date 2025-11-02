@@ -12,13 +12,12 @@ import CloutmateShared
 
 struct ProjectInsightsView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var projects: [Project]
+    @Query private var projects: [CloutmateShared.Project]
     @Query private var posts: [CloutmateShared.Post]
-    @Query private var tasks: [Task]
+    @Query private var tasks: [CloutmateShared.Task]
     @Query private var insights: [InsightSnapshot]
     
-    @State private var selectedProject: Project?
-    @State private var showProjectDetail = false
+    @State private var selectedProject: CloutmateShared.Project?
     
     var body: some View {
         ScrollView {
@@ -44,7 +43,6 @@ struct ProjectInsightsView: View {
                         tasks: tasks.filter { $0.projectId == project.id },
                         onTap: {
                             selectedProject = project
-                            showProjectDetail = true
                         }
                     )
                     .padding(.horizontal)
@@ -55,7 +53,7 @@ struct ProjectInsightsView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "checkmark.seal.fill")
-                                .foregroundStyle(.green)
+                                .foregroundStyle(Color.kosmicGreen)
                             Text("Completed Projects")
                                 .font(.headline)
                         }
@@ -71,10 +69,8 @@ struct ProjectInsightsView: View {
         }
         .background(Color.clear)
         .navigationTitle("Project Insights")
-        .sheet(isPresented: $showProjectDetail) {
-            if let project = selectedProject {
-                ProjectDetailInsightsSheet(project: project, posts: posts, tasks: tasks, insights: insights)
-            }
+        .sheet(item: $selectedProject) { project in
+            ProjectDetailInsightsSheet(project: project, posts: posts, tasks: tasks, insights: insights)
         }
     }
     
@@ -116,21 +112,21 @@ struct ActiveProjectsSummary: View {
                 icon: "folder.fill",
                 title: "Active Projects",
                 value: "\(projects.count)",
-                color: .blue
+                color: .kosmicBlue
             )
             
             SummaryCard(
                 icon: "square.and.pencil",
                 title: "Total Posts",
                 value: "\(totalPostsCount)",
-                color: .purple
+                color: .kosmicPurple
             )
             
             SummaryCard(
                 icon: "checkmark.circle",
                 title: "Completion",
                 value: "\(Int(completionRate * 100))%",
-                color: .green
+                color: .kosmicGreen
             )
         }
         .padding(.horizontal)
@@ -182,7 +178,7 @@ struct ProjectPerformanceCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "folder.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.title3)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -217,7 +213,7 @@ struct ProjectPerformanceCard: View {
                     Text("\(Int(completionRate * 100))%")
                         .font(.title3)
                         .fontWeight(.semibold)
-                        .foregroundStyle(completionRate > 0.7 ? .green : .orange)
+                        .foregroundStyle(completionRate > 0.7 ? .kosmicGreen : .orange)
                     Text("Complete")
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -234,7 +230,7 @@ struct ProjectPerformanceCard: View {
                         .frame(height: 8)
                     
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(LinearGradient(colors: [.blue, .purple], startPoint: .leading, endPoint: .trailing))
+                        .fill(LinearGradient(colors: [.kosmicBlue, .kosmicPurple], startPoint: .leading, endPoint: .trailing))
                         .frame(width: geometry.size.width * completionRate, height: 8)
                 }
             }
@@ -251,7 +247,7 @@ struct CompletedProjectCard: View {
     var body: some View {
         HStack {
             Image(systemName: "checkmark.seal.fill")
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.kosmicGreen)
             Text(project.title)
                 .font(.body)
             Spacer()
@@ -321,6 +317,6 @@ struct ProjectDetailInsightsSheet: View {
 
 #Preview {
     ProjectInsightsView()
-        .modelContainer(for: [Project.self, Post.self, Task.self, InsightSnapshot.self])
+        .modelContainer(for: [CloutmateShared.Project.self, CloutmateShared.Post.self, CloutmateShared.Task.self, InsightSnapshot.self])
 }
 

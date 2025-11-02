@@ -42,7 +42,7 @@ struct QuickStatsCard: View {
             title: "Posts Published",
             value: "12",
             icon: "doc.text.fill",
-            color: .blue
+            color: .kosmicBlue
         )
         QuickStatsCard(
             title: "Avg Engagement",

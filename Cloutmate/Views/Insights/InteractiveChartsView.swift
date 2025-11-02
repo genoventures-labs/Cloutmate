@@ -28,8 +28,8 @@ struct InteractiveChartsView: View {
                     GlassButton(
                         type.rawValue,
                         style: .pill,
-                        tier: selectedChartType == type ? .overlay : .contentCard,
-                        tintColor: .blue,
+                        role: selectedChartType == type ? .primary : .surface,
+                        tintColor: selectedChartType == type ? Color(red: 0.36, green: 0.66, blue: 1.0) : Color.white.opacity(0.35),
                         action: {
                             withAnimation(GlassMotion.Easing.spring) {
                                 selectedChartType = type

@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import AuthenticationServices
 import os.log
+import CloutmateShared
 
 struct AccountsSection: View {
     @Environment(\.modelContext) private var modelContext
@@ -63,15 +64,7 @@ struct AccountsSection: View {
     }
     
     var body: some View {
-        VStack(spacing: 12) {
-            // Connected Accounts Header
-            HStack {
-                Text("Connected Accounts")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                Spacer()
-            }
-            
+        VStack(alignment: .leading, spacing: 12) {
             // Existing accounts
             if accounts.isEmpty {
                 // Empty state placeholder
@@ -106,7 +99,7 @@ struct AccountsSection: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "square.and.pencil")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.kosmicBlue)
                                 Text("Facebook")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
@@ -124,7 +117,7 @@ struct AccountsSection: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "bubble.left.and.bubble.right")
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(.kosmicPurple)
                                 Text("Threads")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
@@ -324,7 +317,7 @@ struct AccountsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                         .font(.caption)
                     Text(account.displayName ?? account.username)
                         .font(.body)
@@ -386,7 +379,7 @@ struct AccountsSection: View {
     private func threadsAccountCard(_ account: PlatformAccount) -> some View {
         HStack(spacing: 12) {
             Circle()
-                .fill(Color.purple)
+                .fill(Color.kosmicPurple)
                 .frame(width: 40, height: 40)
                 .overlay(
                     Image(systemName: "bubble.left.and.bubble.right.fill")
@@ -397,7 +390,7 @@ struct AccountsSection: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                         .font(.caption)
                     Text(account.displayName ?? account.username)
                         .font(.body)
@@ -604,6 +597,8 @@ struct AccountsSection: View {
                             print("Network error: \(underlyingError)")
                         case .apiError(let detail):
                             print("Meta API error: \(detail.message) (code: \(detail.code))")
+                        case .metricsUnavailable(let message):
+                            print("Meta metrics unavailable: \(message)")
                         }
                     }
                 }

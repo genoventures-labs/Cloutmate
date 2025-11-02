@@ -175,7 +175,7 @@ struct ItemRow: View {
         HStack(alignment: .top, spacing: 12) {
             Button(action: onToggle) {
                 Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .foregroundColor(isSelected ? .blue : .secondary)
+                    .foregroundColor(isSelected ? .kosmicBlue : .secondary)
                     .font(.title3)
             }
             .buttonStyle(.plain)
@@ -190,11 +190,11 @@ struct ItemRow: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(isSelected ? Color.blue.opacity(0.1) : Color.secondary.opacity(0.05))
+                .fill(isSelected ? Color.kosmicBlue.opacity(0.1) : Color.secondary.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.blue.opacity(0.3) : Color.clear, lineWidth: 2)
+                .stroke(isSelected ? Color.kosmicBlue.opacity(0.3) : Color.clear, lineWidth: 2)
         )
         .contentShape(Rectangle())
         .onTapGesture {

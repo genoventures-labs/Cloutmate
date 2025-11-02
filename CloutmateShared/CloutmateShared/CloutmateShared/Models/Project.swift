@@ -9,10 +9,10 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-enum ProjectStatus: String, Codable, CaseIterable {
+public enum ProjectStatus: String, Codable, CaseIterable {
     case active, paused, completed
     
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .active: return "Active"
         case .paused: return "Paused"
@@ -22,23 +22,23 @@ enum ProjectStatus: String, Codable, CaseIterable {
 }
 
 @Model
-final class Project {
-    var id: UUID = UUID()
-    var title: String = ""
-    var goal: String?
-    var statusRaw: String = ProjectStatus.active.rawValue
-    var dueDate: Date?
-    var areaId: UUID?
-    var createdAt: Date = Date()
-    var updatedAt: Date = Date()
-    var tags: [String] = []
+public final class Project {
+    public var id: UUID = UUID()
+    public var title: String = ""
+    public var goal: String?
+    public var statusRaw: String = ProjectStatus.active.rawValue
+    public var dueDate: Date?
+    public var areaId: UUID?
+    public var createdAt: Date = Date()
+    public var updatedAt: Date = Date()
+    public var tags: [String] = []
     
     // Relationships (tracked via IDs for flexibility)
-    var taskIds: [UUID] = []
-    var noteIds: [UUID] = []
-    var postIds: [UUID] = []
+    public var taskIds: [UUID] = []
+    public var noteIds: [UUID] = []
+    public var postIds: [UUID] = []
     
-    init(
+    public init(
         title: String,
         goal: String? = nil,
         status: ProjectStatus = .active,
@@ -60,7 +60,7 @@ final class Project {
         self.postIds = []
     }
     
-    var status: ProjectStatus {
+    public var status: ProjectStatus {
         get { ProjectStatus(rawValue: statusRaw) ?? .active }
         set { 
             statusRaw = newValue.rawValue

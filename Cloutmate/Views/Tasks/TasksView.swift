@@ -7,17 +7,18 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct TasksView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @Query(sort: \Task.updatedAt, order: .reverse) private var allTasks: [Task]
-    @Query private var allProjects: [Project]
+    @Query(sort: \CloutmateShared.Task.updatedAt, order: .reverse) private var allTasks: [CloutmateShared.Task]
+    @Query private var allProjects: [CloutmateShared.Project]
     @Query private var allAreas: [Area]
     
     @State private var searchText: String = ""
-    @State private var selectedStatus: TaskStatus?
-    @State private var selectedPriority: TaskPriority?
+    @State private var selectedStatus: CloutmateShared.TaskStatus?
+    @State private var selectedPriority: CloutmateShared.TaskPriority?
     @State private var selectedArea: Area?
     @State private var showUnattachedOnly: Bool = false
     @State private var selectedTasks = Set<UUID>()
@@ -320,10 +321,10 @@ struct TaskStatusBadge: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
-                (status == .done ? Color.green : status == .inProgress ? Color.orange : status == .cancelled ? Color.gray : Color.blue)
+                (status == .done ? Color.kosmicGreen : status == .inProgress ? Color.orange : status == .cancelled ? Color.gray : Color.kosmicBlue)
                     .opacity(0.2)
             )
-            .foregroundColor(status == .done ? .green : status == .inProgress ? .orange : status == .cancelled ? .gray : .blue)
+            .foregroundColor(status == .done ? .kosmicGreen : status == .inProgress ? .orange : status == .cancelled ? .gray : .kosmicBlue)
             .cornerRadius(6)
     }
 }
@@ -560,7 +561,7 @@ struct BulkTaskStatusSheet: View {
                     Button(action: { onUpdate(status); dismiss() }) {
                         HStack {
                             Circle().fill(
-                                status == .done ? Color.green : status == .inProgress ? Color.orange : status == .cancelled ? Color.gray : Color.blue
+                                status == .done ? Color.kosmicGreen : status == .inProgress ? Color.orange : status == .cancelled ? Color.gray : Color.kosmicBlue
                             ).frame(width: 12, height: 12)
                             Text(status.displayName)
                             Spacer()
@@ -613,7 +614,7 @@ struct BulkTaskPrioritySheet: View {
 
 #Preview {
     TasksView()
-        .modelContainer(for: [Task.self, Project.self, Area.self])
+        .modelContainer(for: [CloutmateShared.Task.self, CloutmateShared.Project.self, Area.self])
 }
 
 

@@ -2,7 +2,7 @@
 //  GlassPanel.swift
 //  Cloutmate
 //
-//  Glassmorphic Harmony UI - Glass Panel Component
+//  Minimal Apple Music-inspired Panel Component
 //
 
 import SwiftUI
@@ -11,23 +11,23 @@ struct GlassPanel<Content: View>: View {
     let tier: GlassTier
     let cornerRadius: CGFloat
     let showInnerStroke: Bool
-    let showNoise: Bool
+    let showNoise: Bool // Legacy parameter, no longer used
     let tintColor: Color?
     let content: Content
     
     @Environment(\.accessibilityGlassManager) private var accessibilityManager
-    @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     init(
         tier: GlassTier = .contentCard,
         cornerRadius: CGFloat? = nil,
         showInnerStroke: Bool = true,
-        showNoise: Bool = true,
+        showNoise: Bool = true, // Kept for compatibility
         tintColor: Color? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.tier = tier
-        self.cornerRadius = cornerRadius ?? GlassTierCalculator.cornerRadius(for: tier)
+        self.cornerRadius = cornerRadius ?? 12 // Consistent corner radius
         self.showInnerStroke = showInnerStroke
         self.showNoise = showNoise
         self.tintColor = tintColor
@@ -37,59 +37,83 @@ struct GlassPanel<Content: View>: View {
     var body: some View {
         content
             .background(
-                ZStack {
-                    // Base glass material
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(accessibilityManager.getMaterial(for: tier))
-                    
-                    // Tint overlay
-                    if let tintColor = tintColor {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(tintColor.opacity(tier.lightLevel))
-                    }
-                    
-                    // Noise texture overlay for realism
-                    if showNoise && accessibilityManager.shouldApplyEffects() {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(
-                                LinearGradient(
-                                    gradient: Gradient(colors: [
-                                        Color.white.opacity(0.005),
-                                        Color.black.opacity(0.005)
-                                    ]),
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .blendMode(.overlay)
-                    }
-                    
-                    // Inner stroke for depth
-                    if showInnerStroke {
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(
-                                Color.white.opacity(GlassTierCalculator.innerStrokeOpacity(for: tier)),
-                                lineWidth: 1
-                            )
-                    }
-                    
-                    // Inner shadow for float illusion
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    Color.white.opacity(0.05),
-                                    Color.clear
-                                ]),
-                                startPoint: .top,
-                                endPoint: .center
-                            )
-                        )
-                        .blur(radius: GlassTierCalculator.innerShadowBlur(for: tier))
-                        .offset(y: 2)
-                }
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(backgroundColor)
+                    .overlay(borderStroke)
+                    .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
             )
             .environment(\.glassTier, tier)
+    }
+    
+    // MARK: - Simplified Styling
+    
+    private var backgroundColor: Color {
+        // Get the appropriate background color based on tier
+        switch tier {
+        case .background:
+            return glassColorSystem.backgroundColor()
+        case .sidebar:
+            return glassColorSystem.backgroundElevated()
+        case .contentCard:
+            return glassColorSystem.cardColor()
+        case .overlay:
+            return glassColorSystem.cardElevated()
+        case .floatingAction:
+            return glassColorSystem.cardElevated()
+        }
+    }
+    
+    @ViewBuilder
+    private var borderStroke: some View {
+        if showInnerStroke {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .strokeBorder(glassColorSystem.borderColor(), lineWidth: 1)
+        }
+    }
+    
+    private var shadowColor: Color {
+        switch tier {
+        case .background:
+            return .clear
+        case .sidebar:
+            return Color.black.opacity(0.1)
+        case .contentCard:
+            return Color.black.opacity(0.12)
+        case .overlay:
+            return Color.black.opacity(0.15)
+        case .floatingAction:
+            return Color.black.opacity(0.18)
+        }
+    }
+    
+    private var shadowRadius: CGFloat {
+        switch tier {
+        case .background:
+            return 0
+        case .sidebar:
+            return 4
+        case .contentCard:
+            return 6
+        case .overlay:
+            return 8
+        case .floatingAction:
+            return 12
+        }
+    }
+    
+    private var shadowY: CGFloat {
+        switch tier {
+        case .background:
+            return 0
+        case .sidebar:
+            return 2
+        case .contentCard:
+            return 3
+        case .overlay:
+            return 4
+        case .floatingAction:
+            return 6
+        }
     }
 }
 
@@ -116,15 +140,18 @@ extension View {
 
 #Preview {
     VStack(spacing: 20) {
-        GlassPanel(tier: .contentCard, tintColor: .blue) {
-            Text("Content Card Glass")
+        GlassPanel(tier: .contentCard) {
+            Text("Content Card")
+                .font(.headline)
                 .padding()
         }
         
-        GlassPanel(tier: .overlay, tintColor: .purple) {
-            Text("Overlay Glass")
+        GlassPanel(tier: .overlay) {
+            Text("Overlay Surface")
+                .font(.headline)
                 .padding()
         }
     }
     .padding()
+    .environmentObject(GlassColorSystem())
 }

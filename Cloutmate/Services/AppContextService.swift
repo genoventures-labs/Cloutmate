@@ -8,8 +8,10 @@
 import Foundation
 import SwiftData
 import os.log
+import CloutmateShared
 
-actor AppContextService {
+@MainActor
+final class AppContextService {
     static let shared = AppContextService()
     
     private var cachedContext: String?
@@ -131,9 +133,10 @@ actor AppContextService {
         context += "\n## Drafts & Templates\n"
         context += "- \(drafts.count) drafts\n"
         context += "- \(templates.count) templates\n\n"
-        if !drafts.isEmpty {
+        let recentDrafts = drafts.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(5)
+        if !recentDrafts.isEmpty {
             context += "Recent drafts:\n"
-            for draft in drafts.sorted(by: { $0.updatedAt > $1.updatedAt }).prefix(5) {
+            for draft in recentDrafts {
                 let preview = draft.caption.prefix(50)
                 context += "- \(preview)\n"
             }
@@ -141,10 +144,14 @@ actor AppContextService {
 
         // 7. Notes (recent)
         let notes = try modelContext.fetch(FetchDescriptor<Note>())
-        let recentNotes = notes.filter { !$0.isArchived }.prefix(5)
+        let recentNotes = Array(notes.filter { !$0.isArchived }.prefix(5))
         context += "\n## Recent Notes\n"
-        for note in recentNotes {
-            context += "- \(note.title)\n"
+        if recentNotes.isEmpty {
+            context += "- None\n"
+        } else {
+            for note in recentNotes {
+                context += "- \(note.title)\n"
+            }
         }
 
         // 8. Inbox
@@ -237,10 +244,7 @@ actor AppContextService {
                 let taskTitle = task.title
                 let taskDueDate = task.dueDate
                 let taskPriority = task.priority
-                let priorityName = await MainActor.run { 
-                    taskPriority.displayName 
-                }
-                context += "- \(taskTitle) (Priority: \(priorityName))"
+                context += "- \(taskTitle) (Priority: \(taskPriority.displayName))"
                 if let due = taskDueDate {
                     let formatter = DateFormatter()
                     formatter.dateStyle = .medium
@@ -249,6 +253,16 @@ actor AppContextService {
                 context += "\n"
             }
         }
+        
+        // Update recall snapshot for AI context payloads
+        AIRecallService.shared.recordSnapshot(
+            tasks: Array(tasksDueToday.prefix(10)),
+            projects: Array(activeProjects.prefix(5)),
+            posts: Array(todayPosts.prefix(5)),
+            notes: recentNotes,
+            drafts: Array(recentDrafts),
+            modelContext: modelContext
+        )
         
         // Cache the result
         cachedContext = context
@@ -266,4 +280,3 @@ actor AppContextService {
 extension Logger {
     static let appContext = Logger(subsystem: "com.kosmicapps.Cloutmate", category: "AppContext")
 }
-

@@ -13,7 +13,7 @@ struct AreaInsightsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var areas: [Area]
     @Query private var posts: [CloutmateShared.Post]
-    @Query private var tasks: [Task]
+    @Query private var tasks: [CloutmateShared.Task]
     
     var body: some View {
         ScrollView {
@@ -34,19 +34,19 @@ struct AreaInsightsView: View {
                         icon: "rectangle.stack.fill",
                         title: "Areas",
                         value: "\(areas.count)",
-                        color: .blue
+                        color: .kosmicBlue
                     )
                     SummaryCard(
                         icon: "checkmark.circle",
                         title: "Active Tasks",
                         value: "\(activeTasksCount)",
-                        color: .green
+                        color: .kosmicGreen
                     )
                     SummaryCard(
                         icon: "calendar",
                         title: "Publishing Cadence",
                         value: "\(postsThisWeek)/week avg",
-                        color: .purple
+                        color: .kosmicPurple
                     )
                 }
                 .padding(.horizontal)
@@ -102,7 +102,7 @@ struct AreaHealthCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "rectangle.stack.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.title3)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -145,7 +145,7 @@ struct AreaHealthCard: View {
     
     var healthColor: Color {
         if taskCompletionRate > 0.8 {
-            return .green
+            return .kosmicGreen
         } else if taskCompletionRate > 0.5 {
             return .yellow
         } else {
@@ -156,6 +156,6 @@ struct AreaHealthCard: View {
 
 #Preview {
     AreaInsightsView()
-        .modelContainer(for: [Area.self, Post.self, Task.self])
+        .modelContainer(for: [Area.self, CloutmateShared.Post.self, CloutmateShared.Task.self])
 }
 

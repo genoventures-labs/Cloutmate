@@ -7,15 +7,16 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query private var userCards: [DashboardCard]
-    @Query private var tasks: [Task]
-    @Query private var posts: [Post]
-    @Query private var inboxItems: [InboxItem]
-    @Query private var projects: [Project]
+    @Query private var tasks: [CloutmateShared.Task]
+    @Query private var posts: [CloutmateShared.Post]
+    @Query private var inboxItems: [CloutmateShared.InboxItem]
+    @Query private var projects: [CloutmateShared.Project]
     
     @State private var showSettings = false
     
@@ -79,7 +80,7 @@ struct HomeView: View {
                 if unconvertedInbox > 0 {
                     HStack(spacing: 12) {
                         Image(systemName: "info.circle.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("\(unconvertedInbox) items in inbox waiting")
                                 .font(.subheadline)
@@ -95,11 +96,11 @@ struct HomeView: View {
                         .buttonStyle(.bordered)
                     }
                     .padding(16)
-                    .background(Color.blue.opacity(0.1))
+                    .background(Color.kosmicBlue.opacity(0.1))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                            .stroke(Color.kosmicBlue.opacity(0.2), lineWidth: 1)
                     )
                 }
                 
@@ -205,7 +206,7 @@ struct CODEWorkflowGrid: View {
             CODEButton(
                 step: "Capture",
                 icon: "plus.circle.fill",
-                color: .blue,
+                color: .kosmicBlue,
                 hoveredStep: $hoveredStep
             ) {
                 NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.inbox)
@@ -213,7 +214,7 @@ struct CODEWorkflowGrid: View {
             CODEButton(
                 step: "Organize",
                 icon: "folder.fill",
-                color: .green,
+                color: .kosmicGreen,
                 hoveredStep: $hoveredStep
             ) {
                 NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.projects)
@@ -221,7 +222,7 @@ struct CODEWorkflowGrid: View {
             CODEButton(
                 step: "Distill",
                 icon: "sparkles",
-                color: .purple,
+                color: .kosmicPurple,
                 hoveredStep: $hoveredStep
             ) {
                 NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.resources)
@@ -291,7 +292,7 @@ struct DailyFocusContent: View {
             if !tasks.isEmpty {
                 HStack {
                     Image(systemName: "checkmark.circle")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                     Text("\(tasks.count) tasks due today")
                         .font(.body)
                     Spacer()
@@ -301,7 +302,7 @@ struct DailyFocusContent: View {
             if !posts.isEmpty {
                 HStack {
                     Image(systemName: "square.and.pencil")
-                        .foregroundColor(.purple)
+                        .foregroundColor(.kosmicPurple)
                     Text("\(posts.count) posts scheduled")
                         .font(.body)
                     Spacer()
@@ -326,11 +327,11 @@ struct DashboardCardContent: View {
         HStack {
             Image(systemName: card.type.icon)
                 .font(.system(size: 24, weight: .medium))
-                .foregroundColor(.blue.opacity(0.8))
+                .foregroundColor(.kosmicBlue.opacity(0.8))
                 .frame(width: 40, height: 40)
                 .background(
                     Circle()
-                        .fill(Color.blue.opacity(0.08))
+                        .fill(Color.kosmicBlue.opacity(0.08))
                 )
             
             Text(card.type.rawValue)
@@ -355,7 +356,7 @@ struct DashboardCardContent: View {
                 Spacer()
             }
             HStack {
-                Image(systemName: "checkmark.circle").foregroundColor(.blue)
+                Image(systemName: "checkmark.circle").foregroundColor(.kosmicBlue)
                 Text("\(activeTasksCount) active tasks").font(.body)
                 Spacer()
             }
@@ -378,7 +379,7 @@ struct DashboardCardContent: View {
         AnyView(VStack(alignment: .leading, spacing: 8) {
             ForEach(projects.prefix(3)) { project in
                 HStack {
-                    Circle().fill(.blue).frame(width: 8, height: 8)
+                    Circle().fill(.kosmicBlue).frame(width: 8, height: 8)
                     Text(project.title).font(.body)
                     Spacer()
                 }
@@ -399,7 +400,7 @@ struct DashboardCardContent: View {
             ForEach(upcoming.prefix(3)) { task in
                 HStack {
                     Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(task.status == .done ? .green : .secondary)
+                        .foregroundColor(task.status == .done ? .kosmicGreen : .secondary)
                     Text(task.title).font(.caption).lineLimit(1)
                     Spacer()
                 }
@@ -514,7 +515,7 @@ struct DashboardCardContent: View {
 
 #Preview {
     HomeView()
-        .modelContainer(for: [DashboardCard.self, Task.self, InboxItem.self, Post.self, Project.self])
+        .modelContainer(for: [DashboardCard.self, CloutmateShared.Task.self, CloutmateShared.InboxItem.self, CloutmateShared.Post.self, CloutmateShared.Project.self])
         .environmentObject(GlassColorSystem())
 }
 

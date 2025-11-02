@@ -30,18 +30,20 @@ struct UniversalCaptureMenu: View {
                 }
             }
         } label: {
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .font(.system(size: 14, weight: .medium))
                 Text("New...")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 14, weight: .medium))
+                Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.caption2)
+                    .font(.system(size: 10, weight: .medium))
+                    .opacity(0.6)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .glassPanel(tier: .floatingAction, cornerRadius: 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .glassPanel(tier: .floatingAction, cornerRadius: 10)
         }
         .menuStyle(.borderlessButton)
     }

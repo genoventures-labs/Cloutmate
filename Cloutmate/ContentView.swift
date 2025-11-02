@@ -7,30 +7,54 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct ContentView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @State private var backgroundOffset: CGFloat = 0
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage("appearanceMode") private var appearanceModeRawValue = "system"
+    
+    private var effectiveColorScheme: ColorScheme {
+        let mode = AppearanceMode(rawValue: appearanceModeRawValue) ?? .system
+        switch mode {
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        case .system:
+            return colorScheme
+        }
+    }
     
     var body: some View {
         ZStack {
-            // Tier 0 - Ambient depth background with animated parallax drift
-            glassColorSystem.backgroundGradient()
-                .offset(x: cos(backgroundOffset) * 10, y: sin(backgroundOffset) * 10)
-                .animation(
-                    Animation.linear(duration: 20)
-                        .repeatForever(autoreverses: false),
-                    value: backgroundOffset
-                )
-                .ignoresSafeArea()
+            // Clean flat background with ARTE emotional overlay
+            ZStack {
+                glassColorSystem.backgroundColor()
+                glassColorSystem.emotionalBackgroundShift()
+            }
+            .ignoresSafeArea()
+            .animation(.easeInOut(duration: 2.0), value: glassColorSystem.emotionalState)
             
-            // Main window on top
+            // Main window content
             MainWindowView()
         }
         .onAppear {
-            // Start subtle parallax drift animation
-            backgroundOffset = .pi * 2
+            updateColorScheme()
         }
+        .onChange(of: colorScheme) { _, _ in
+            updateColorScheme()
+        }
+        .onChange(of: appearanceModeRawValue) { _, _ in
+            updateColorScheme()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AppearanceModeChanged"))) { _ in
+            updateColorScheme()
+        }
+    }
+    
+    private func updateColorScheme() {
+        glassColorSystem.currentColorScheme = effectiveColorScheme
     }
 }
 
@@ -38,5 +62,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(GlassColorSystem())
         .environmentObject(AccessibilityGlassManager())
-        .modelContainer(for: [Post.self, Draft.self, Template.self, AIMessage.self, AIConversation.self])
+        .modelContainer(for: [CloutmateShared.Post.self, Draft.self, CloutmateShared.Template.self, AIMessage.self, AIConversation.self])
 }

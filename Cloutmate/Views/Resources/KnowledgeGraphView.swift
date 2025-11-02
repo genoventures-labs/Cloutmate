@@ -7,17 +7,17 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct KnowledgeGraphView: View {
     @Environment(\.modelContext) private var modelContext
-    @Query private var notes: [Note]
-    @Query private var projects: [Project]
-    @Query private var tasks: [Task]
-    @Query private var posts: [Post]
+    @Query private var notes: [CloutmateShared.Note]
+    @Query private var projects: [CloutmateShared.Project]
+    @Query private var tasks: [CloutmateShared.Task]
+    @Query private var posts: [CloutmateShared.Post]
     
     @State private var selectedNode: GraphNode?
     @State private var layoutMode: LayoutMode = .forceDirected
-    @State private var showDetails = false
     
     enum LayoutMode: String, CaseIterable {
         case hierarchical
@@ -81,7 +81,6 @@ struct KnowledgeGraphView: View {
                                  y: 100 + CGFloat(node.id.uuidString.hashValue % 300))
                         .onTapGesture {
                             selectedNode = node
-                            showDetails = true
                         }
                 }
                 
@@ -92,7 +91,7 @@ struct KnowledgeGraphView: View {
                             path.move(to: CGPoint(x: 100, y: 100))
                             path.addLine(to: CGPoint(x: 300, y: 200))
                         }
-                        .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.kosmicBlue.opacity(0.3), lineWidth: 1)
                     }
                 }
             }
@@ -100,10 +99,8 @@ struct KnowledgeGraphView: View {
             .background(Color.clear)
         }
         .navigationTitle("Knowledge Graph")
-        .sheet(isPresented: $showDetails) {
-            if let node = selectedNode {
-                NodeDetailSheet(node: node, notes: notes, projects: projects, tasks: tasks)
-            }
+        .sheet(item: $selectedNode) { node in
+            NodeDetailSheet(node: node, notes: notes, projects: projects, tasks: tasks)
         }
     }
     
@@ -201,9 +198,9 @@ struct GraphNodeView: View {
     
     private func colorForType(_ type: GraphNode.NodeType) -> Color {
         switch type {
-        case .note: return .purple
-        case .project: return .blue
-        case .task: return .green
+        case .note: return .kosmicPurple
+        case .project: return .kosmicBlue
+        case .task: return .kosmicGreen
         }
     }
 }
@@ -252,7 +249,7 @@ struct LegendItem: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.blue)
+                .background(Color.kosmicBlue)
                 .cornerRadius(8)
         }
     }
@@ -292,7 +289,7 @@ struct NodeDetailSheet: View {
                     if backlinkCount > 0 {
                         HStack {
                             Image(systemName: "arrow.triangle.branch")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.kosmicBlue)
                             Text("\(backlinkCount) connections")
                                 .font(.subheadline)
                         }
@@ -341,15 +338,15 @@ struct NodeDetailSheet: View {
     
     private func colorForType(_ type: GraphNode.NodeType) -> Color {
         switch type {
-        case .note: return .purple
-        case .project: return .blue
-        case .task: return .green
+        case .note: return .kosmicPurple
+        case .project: return .kosmicBlue
+        case .task: return .kosmicGreen
         }
     }
 }
 
 #Preview {
     KnowledgeGraphView()
-        .modelContainer(for: [Note.self, Project.self, Task.self])
+        .modelContainer(for: [CloutmateShared.Note.self, CloutmateShared.Project.self, CloutmateShared.Task.self])
 }
 

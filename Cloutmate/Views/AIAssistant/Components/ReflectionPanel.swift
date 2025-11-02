@@ -29,7 +29,7 @@ struct ReflectionPanel: View {
             }) {
                 HStack {
                     Image(systemName: "chart.line.uptrend.xyaxis")
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                         .font(.caption)
                     Text("AI Insights")
                         .font(.caption)
@@ -63,7 +63,7 @@ struct ReflectionPanel: View {
             }
         }
         .padding(12)
-        .background(Color.blue.opacity(0.05))
+        .background(Color.kosmicBlue.opacity(0.05))
         .cornerRadius(10)
     }
     

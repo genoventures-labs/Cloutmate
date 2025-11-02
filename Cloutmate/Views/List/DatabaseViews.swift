@@ -44,8 +44,8 @@ struct KanbanBoardView: View {
     private let columns: [(PostStatus, String, Color)] = [
         (.draft, "Draft", .gray),
         (.scheduled, "Scheduled", .orange),
-        (.publishing, "Publishing", .purple),
-        (.published, "Published", .green),
+        (.publishing, "Publishing", .kosmicPurple),
+        (.published, "Published", .kosmicGreen),
         (.failed, "Failed", .red)
     ]
     
@@ -184,7 +184,7 @@ struct PostGalleryView: View {
                         HStack {
                             ForEach(post.postPlatforms, id: \.self) { platform in
                                 Image(systemName: platform == .threads ? "number" : "f.square")
-                                    .foregroundColor(platform == .threads ? .purple : .blue)
+                                    .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
                             }
                             Spacer()
                             if let date = post.scheduledDate ?? post.publishedDate {
@@ -235,10 +235,10 @@ struct PostTimelineView: View {
                         ForEach(section.value.sorted(by: { ($0.scheduledDate ?? $0.publishedDate ?? Date()) < ($1.scheduledDate ?? $1.publishedDate ?? Date()) })) { post in
                             HStack(alignment: .top, spacing: 12) {
                                 Rectangle()
-                                    .fill(Color.blue)
+                                    .fill(Color.kosmicBlue)
                                     .frame(width: 2)
                                     .overlay(Circle()
-                                        .fill(Color.blue)
+                                        .fill(Color.kosmicBlue)
                                         .frame(width: 10, height: 10)
                                         .offset(x: -4)
                                     )

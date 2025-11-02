@@ -20,7 +20,7 @@ struct AIFloatingButton: View {
                     ZStack {
                         // Gradient background
                         LinearGradient(
-                            colors: [.blue, .purple],
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -41,7 +41,7 @@ struct AIFloatingButton: View {
                             lineWidth: 2
                         )
                 )
-                .shadow(color: .blue.opacity(0.3), radius: 12, x: 0, y: 6)
+                .shadow(color: Color.kosmicBlue.opacity(0.3), radius: 12, x: 0, y: 6)
                 .shadow(color: .black.opacity(0.2), radius: 6, x: 0, y: 3)
         }
         .buttonStyle(.plain)

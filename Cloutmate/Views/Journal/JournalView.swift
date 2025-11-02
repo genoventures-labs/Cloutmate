@@ -9,13 +9,14 @@ import SwiftUI
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
+import CloutmateShared
 
 struct JournalView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Journal.entryDate, order: .reverse) private var allJournals: [Journal]
-    @Query private var allNotes: [Note]
+    @Query private var allNotes: [CloutmateShared.Note]
     @Query private var allAreas: [Area]
-    @Query private var allProjects: [Project]
+    @Query private var allProjects: [CloutmateShared.Project]
     
     @State private var searchText = ""
     @State private var selectedTags: Set<String> = []
@@ -23,7 +24,6 @@ struct JournalView: View {
     @State private var selectedMood: JournalMood?
     @State private var selectedJournals = Set<UUID>()
     @State private var showCreateSheet = false
-    @State private var showJournalSheet = false
     @State private var showRecordingModal = false
     @State private var selectedJournal: Journal?
     
@@ -140,7 +140,6 @@ struct JournalView: View {
                 .contextMenu {
                     Button("Edit") {
                         selectedJournal = journal
-                        showJournalSheet = true
                     }
                     Button("Duplicate") {
                         duplicateJournal(journal)
@@ -228,10 +227,10 @@ struct JournalView: View {
                     HStack(spacing: 2) {
                         Image(systemName: "link")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                         Text("\(linkedCount)")
                             .font(.caption2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.kosmicBlue)
                     }
                 } else {
                     Text("—")
@@ -292,10 +291,8 @@ struct JournalView: View {
         .sheet(isPresented: $showRecordingModal) {
             VoiceRecordModal(mode: .newEntry)
         }
-        .sheet(isPresented: $showJournalSheet) {
-            if let journal = selectedJournal {
-                JournalDetailSheet(journal: journal)
-            }
+        .sheet(item: $selectedJournal) { journal in
+            JournalDetailSheet(journal: journal)
         }
     }
     
@@ -456,14 +453,14 @@ struct JournalDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "sparkles")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.kosmicBlue)
                             Text("AI Generated Content")
                                 .font(.headline)
                         }
                         Text(aiContent)
                             .font(.body)
                             .padding()
-                            .background(Color.blue.opacity(0.05))
+                            .background(Color.kosmicBlue.opacity(0.05))
                             .cornerRadius(8)
                     }
                 }
@@ -613,9 +610,13 @@ struct CreateJournalEntrySheet: View {
                     
                     // Content
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Content")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("Content")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            VoiceInputButton(text: $content)
+                        }
                         TextEditor(text: $content)
                             .font(.body)
                             .frame(minHeight: 300)
@@ -793,7 +794,7 @@ struct JournalAIPanel: View {
                             Text(aiContent)
                                 .font(.body)
                                 .padding()
-                                .background(Color.blue.opacity(0.05))
+                                .background(Color.kosmicBlue.opacity(0.05))
                                 .cornerRadius(8)
                         }
                     }
@@ -875,6 +876,6 @@ struct JournalAIPanel: View {
 
 #Preview {
     JournalView()
-        .modelContainer(for: [Journal.self, Note.self, Area.self, Project.self])
+        .modelContainer(for: [Journal.self, CloutmateShared.Note.self, Area.self, CloutmateShared.Project.self])
 }
 

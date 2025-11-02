@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CloutmateShared
 
 final class ThreadsService {
     static let shared = ThreadsService()
@@ -29,4 +30,3 @@ final class ThreadsService {
         return response.id
     }
 }
-

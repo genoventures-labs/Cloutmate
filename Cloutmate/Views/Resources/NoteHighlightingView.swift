@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 struct NoteHighlightingView: View {
     @Bindable var note: Note
@@ -55,7 +56,7 @@ struct NoteHighlightingView: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 4)
                                 .padding(.vertical, 2)
-                                .background(Color.blue)
+                                .background(Color.kosmicBlue)
                                 .cornerRadius(8)
                         }
                     }

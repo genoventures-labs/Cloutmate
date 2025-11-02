@@ -17,16 +17,53 @@ final class AIMessage: Identifiable {
     @Attribute var toolUsed: String?
     @Attribute var isSystemMessage: Bool = false
     
+    // Emotional continuity tracking
+    @Attribute var emotion: String?
+    @Attribute var emotionScore: Double = 0.0
+    @Attribute var emotionIntensity: Double = 0.0
+    
+    // Chart visualization data (for reflection responses)
+    @Attribute var chartDataEncoded: Data?
+    
     // Inverse relationship
     var conversation: AIConversation?
     
-    init(role: String, content: String, toolUsed: String? = nil, isSystemMessage: Bool = false) {
+    init(role: String, content: String, toolUsed: String? = nil, isSystemMessage: Bool = false, emotion: String? = nil, emotionScore: Double = 0.0, emotionIntensity: Double = 0.0, chartData: ChartData? = nil) {
         self.id = UUID()
         self.role = role
         self.content = content
         self.timestamp = Date()
         self.toolUsed = toolUsed
         self.isSystemMessage = isSystemMessage
+        self.emotion = emotion
+        self.emotionScore = emotionScore
+        self.emotionIntensity = emotionIntensity
+        
+        // Encode chart data if provided
+        if let chartData = chartData {
+            self.chartDataEncoded = try? JSONEncoder().encode(chartData)
+        }
+    }
+    
+    // Helper for chart data access (encoded as Data for SwiftData compatibility)
+    var chartData: ChartData? {
+        get {
+            guard let encoded = chartDataEncoded else { return nil }
+            return try? JSONDecoder().decode(ChartData.self, from: encoded)
+        }
+        set {
+            chartDataEncoded = newValue.flatMap { try? JSONEncoder().encode($0) }
+        }
+    }
+    
+    var chartCollection: ChartCollection? {
+        get {
+            guard let encoded = chartDataEncoded else { return nil }
+            return try? JSONDecoder().decode(ChartCollection.self, from: encoded)
+        }
+        set {
+            chartDataEncoded = newValue.flatMap { try? JSONEncoder().encode($0) }
+        }
     }
 }
 

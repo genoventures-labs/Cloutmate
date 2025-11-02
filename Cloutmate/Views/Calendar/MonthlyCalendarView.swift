@@ -31,7 +31,7 @@ struct MonthlyCalendarView: View {
         VStack(spacing: 0) {
             // Month header with Glass Buttons
             HStack {
-                GlassButton(icon: "chevron.left", style: .iconOnly, tier: .overlay, tintColor: .blue, action: previousMonth)
+                GlassButton(icon: "chevron.left", style: .iconOnly, tintColor: .kosmicBlue, action: previousMonth)
                     .frame(width: 32, height: 32)
                 
                 Spacer()
@@ -41,7 +41,7 @@ struct MonthlyCalendarView: View {
                     .fontWeight(.bold)
                     .foregroundStyle(
                         LinearGradient(
-                            colors: [.blue, .purple],
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -49,7 +49,7 @@ struct MonthlyCalendarView: View {
                 
                 Spacer()
                 
-                GlassButton(icon: "chevron.right", style: .iconOnly, tier: .overlay, tintColor: .blue, action: nextMonth)
+                GlassButton(icon: "chevron.right", style: .iconOnly, tintColor: .kosmicBlue, action: nextMonth)
                     .frame(width: 32, height: 32)
             }
             .padding(.horizontal, 20)
@@ -193,7 +193,7 @@ struct CalendarDayCell: View {
                     ForEach(posts.prefix(2), id: \.id) { post in
                         Image(systemName: post.postPlatforms.contains(.threads) ? "t.square.fill" : "f.square.fill")
                             .font(.system(size: 11))
-                            .foregroundColor(post.postPlatforms.contains(.threads) ? .purple : .blue)
+                            .foregroundColor(post.postPlatforms.contains(.threads) ? .kosmicPurple : .kosmicBlue)
                             .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
                             .onTapGesture {
                                 onPostClick?(post)
@@ -251,9 +251,9 @@ struct CalendarDayCell: View {
     
     private func colorForPost(_ post: CloutmateShared.Post) -> Color {
         if post.postPlatforms.contains(.threads) {
-            return .purple
+            return .kosmicPurple
         } else if post.postPlatforms.contains(.facebook) {
-            return .blue
+            return .kosmicBlue
         }
         return .gray
     }
@@ -274,4 +274,3 @@ struct CalendarDayCell: View {
         selectedPost: $selectedPost
     )
 }
-

@@ -22,7 +22,7 @@ struct DraftConversionAlert: View {
         VStack(spacing: 20) {
             Image(systemName: isScheduled ? "calendar.badge.clock" : "checkmark.circle.fill")
                 .font(.system(size: 48))
-                .foregroundColor(isScheduled ? .blue : .green)
+                .foregroundColor(isScheduled ? .kosmicBlue : .kosmicGreen)
             
             Text(isScheduled ? "Post Scheduled" : "Post Published")
                 .font(.headline)
@@ -57,7 +57,7 @@ struct DraftConversionAlert: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(
                     LinearGradient(
-                        colors: [Color.blue.opacity(0.3), Color.purple.opacity(0.3)],
+                        colors: [Color.kosmicBlue.opacity(0.3), Color.kosmicPurple.opacity(0.3)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),

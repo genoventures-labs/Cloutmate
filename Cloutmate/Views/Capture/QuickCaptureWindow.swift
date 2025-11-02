@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import AppKit
 import Combine
+import CloutmateShared
 
 class QuickCaptureWindowController: ObservableObject {
     static let shared = QuickCaptureWindowController()
@@ -41,7 +42,7 @@ class QuickCaptureWindowController: ObservableObject {
         
         // Get the main app's model container
         let _ = NSApplication.shared.delegate as? NSObject
-        guard let container = try? ModelContainer(for: Schema([InboxItem.self, Task.self, Note.self, Post.self])) else {
+        guard let container = try? ModelContainer(for: Schema([CloutmateShared.InboxItem.self, CloutmateShared.Task.self, CloutmateShared.Note.self, CloutmateShared.Post.self])) else {
             print("Failed to create model container for quick capture")
             return
         }

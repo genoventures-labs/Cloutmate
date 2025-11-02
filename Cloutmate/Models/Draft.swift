@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import CloutmateShared
 
 @Model
 final class Draft {
@@ -52,4 +53,3 @@ final class Draft {
         return post
     }
 }
-

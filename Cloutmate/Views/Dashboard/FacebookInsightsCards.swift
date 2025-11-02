@@ -14,6 +14,7 @@ import os.log
 struct FacebookPageInsightsOverviewCard: View {
     let size: DashboardCardSize
     @Query(filter: #Predicate<PlatformAccount> { $0.platform == "facebook" }) private var facebookPages: [PlatformAccount]
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     @State private var selectedPageID: String? = nil
     @State private var pageInsights: PageInsightsData? = nil
@@ -37,12 +38,42 @@ struct FacebookPageInsightsOverviewCard: View {
                     HStack { Spacer(); ProgressView(); Spacer() }
                 } else if let insights = pageInsights {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    MetricCell(title: "Views", value: formatNumber(insights.pageViewsTotal), icon: "eye.fill", color: KosmicPalette.cyan)
-                    MetricCell(title: "Fans", value: formatNumber(insights.pageFans), icon: "person.3.fill", color: KosmicPalette.violet)
-                    MetricCell(title: "Reach", value: formatNumber(insights.pageReach), icon: "arrow.up.right.circle.fill", color: KosmicPalette.violet)
-                    MetricCell(title: "Impressions", value: formatNumber(insights.pageImpressions), icon: "chart.bar.fill", color: KosmicPalette.cyan)
-                    MetricCell(title: "Engaged Users", value: formatNumber(insights.pageEngagedUsers), icon: "heart.fill", color: KosmicPalette.violet)
-                    MetricCell(title: "Engagements", value: formatNumber(insights.pagePostEngagements), icon: "hand.thumbsup.fill", color: KosmicPalette.cyan)
+                        MetricCell(
+                            title: "Views",
+                            value: formatNumber(insights.pageViewsTotal),
+                            icon: "eye.fill",
+                            color: glassTint(.primary)
+                        )
+                        MetricCell(
+                            title: "Fans",
+                            value: formatNumber(insights.pageFans),
+                            icon: "person.3.fill",
+                            color: glassTint(.accent)
+                        )
+                        MetricCell(
+                            title: "Reach",
+                            value: formatNumber(insights.pageReach),
+                            icon: "arrow.up.right.circle.fill",
+                            color: glassTint(.accent)
+                        )
+                        MetricCell(
+                            title: "Impressions",
+                            value: formatNumber(insights.pageImpressions),
+                            icon: "chart.bar.fill",
+                            color: glassTint(.primary)
+                        )
+                        MetricCell(
+                            title: "Engaged Users",
+                            value: formatNumber(insights.pageEngagedUsers),
+                            icon: "heart.fill",
+                            color: glassTint(.accent)
+                        )
+                        MetricCell(
+                            title: "Engagements",
+                            value: formatNumber(insights.pagePostEngagements),
+                            icon: "hand.thumbsup.fill",
+                            color: glassTint(.primary)
+                        )
                     }
             } else if let err = error {
                 Text("Error: \(err)")
@@ -110,6 +141,10 @@ struct FacebookPageInsightsOverviewCard: View {
         }
         return "\(value)"
     }
+    
+    private func glassTint(_ role: GlassColorSystem.GlassRole) -> Color {
+        glassColorSystem.glassTint(for: role)
+    }
 }
 
 struct MetricCell: View {
@@ -138,11 +173,12 @@ private struct FacebookMetricCardBase: View {
     let metricName: String
     let title: String
     let icon: String
-    let color: Color
+    let role: GlassColorSystem.GlassRole
     
     @Query(filter: #Predicate<PlatformAccount> { $0.platform == "facebook" }) private var facebookPages: [PlatformAccount]
     @State private var pageInsights: PageInsightsData? = nil
     @State private var isLoading = false
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var metricValue: Int {
         guard let insights = pageInsights else { return 0 }
@@ -166,7 +202,7 @@ private struct FacebookMetricCardBase: View {
                 } else {
                     HStack {
                         Image(systemName: icon)
-                            .foregroundColor(color)
+                            .foregroundColor(accentColor)
                             .font(.title3)
                         Text(title)
                             .font(.subheadline)
@@ -175,7 +211,7 @@ private struct FacebookMetricCardBase: View {
                     }
                     Text(formatNumber(metricValue))
                         .font(.system(size: 32, weight: .bold))
-                        .foregroundColor(color)
+                        .foregroundColor(accentColor)
                 }
             }
             .onAppear {
@@ -187,11 +223,11 @@ private struct FacebookMetricCardBase: View {
                     ProgressView()
                 } else {
                     Image(systemName: icon)
-                        .foregroundColor(color)
+                        .foregroundColor(accentColor)
                         .font(.title2)
                     Text(formatNumber(metricValue))
                         .font(.system(size: 24, weight: .bold))
-                        .foregroundColor(color)
+                        .foregroundColor(accentColor)
                     Text(title)
                         .font(.caption2)
                         .foregroundColor(.secondary)
@@ -233,6 +269,10 @@ private struct FacebookMetricCardBase: View {
         }
         return "\(value)"
     }
+    
+    private var accentColor: Color {
+        glassColorSystem.glassTint(for: role)
+    }
 }
 
 // MARK: - Individual Metric Cards
@@ -240,7 +280,13 @@ struct FacebookPageViewsCard: View {
     let size: DashboardCardSize
     
     var body: some View {
-        FacebookMetricCardBase(size: size, metricName: "page_views_total", title: "Page Views", icon: "eye.fill", color: KosmicPalette.cyan)
+        FacebookMetricCardBase(
+            size: size,
+            metricName: "page_views_total",
+            title: "Page Views",
+            icon: "eye.fill",
+            role: .primary
+        )
     }
 }
 
@@ -248,7 +294,13 @@ struct FacebookPageFansCard: View {
     let size: DashboardCardSize
     
     var body: some View {
-        FacebookMetricCardBase(size: size, metricName: "page_fans", title: "Fans", icon: "person.3.fill", color: KosmicPalette.violet)
+        FacebookMetricCardBase(
+            size: size,
+            metricName: "page_fans",
+            title: "Fans",
+            icon: "person.3.fill",
+            role: .accent
+        )
     }
 }
 
@@ -256,7 +308,13 @@ struct FacebookPageReachCard: View {
     let size: DashboardCardSize
     
     var body: some View {
-        FacebookMetricCardBase(size: size, metricName: "page_reach", title: "Reach", icon: "arrow.up.right.circle.fill", color: KosmicPalette.violet)
+        FacebookMetricCardBase(
+            size: size,
+            metricName: "page_reach",
+            title: "Reach",
+            icon: "arrow.up.right.circle.fill",
+            role: .accent
+        )
     }
 }
 
@@ -264,7 +322,13 @@ struct FacebookPageImpressionsCard: View {
     let size: DashboardCardSize
     
     var body: some View {
-        FacebookMetricCardBase(size: size, metricName: "page_impressions", title: "Impressions", icon: "chart.bar.fill", color: KosmicPalette.cyan)
+        FacebookMetricCardBase(
+            size: size,
+            metricName: "page_impressions",
+            title: "Impressions",
+            icon: "chart.bar.fill",
+            role: .primary
+        )
     }
 }
 
@@ -272,7 +336,13 @@ struct FacebookEngagedUsersCard: View {
     let size: DashboardCardSize
     
     var body: some View {
-        FacebookMetricCardBase(size: size, metricName: "page_engaged_users", title: "Engaged Users", icon: "heart.fill", color: KosmicPalette.violet)
+        FacebookMetricCardBase(
+            size: size,
+            metricName: "page_engaged_users",
+            title: "Engaged Users",
+            icon: "heart.fill",
+            role: .accent
+        )
     }
 }
 
@@ -280,7 +350,12 @@ struct FacebookPostEngagementsCard: View {
     let size: DashboardCardSize
     
     var body: some View {
-        FacebookMetricCardBase(size: size, metricName: "page_post_engagements", title: "Post Engagements", icon: "hand.thumbsup.fill", color: KosmicPalette.cyan)
+        FacebookMetricCardBase(
+            size: size,
+            metricName: "page_post_engagements",
+            title: "Post Engagements",
+            icon: "hand.thumbsup.fill",
+            role: .primary
+        )
     }
 }
-

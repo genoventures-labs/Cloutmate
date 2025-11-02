@@ -67,7 +67,7 @@ struct ContentGapAnalyzerView: View {
                             x: .value("Posts", topic.postCount),
                             y: .value("Topic", topic.name)
                         )
-                        .foregroundStyle(topic.isUnderrepresented ? Color.orange.gradient : Color.blue.gradient)
+                        .foregroundStyle(topic.isUnderrepresented ? Color.orange : Color.kosmicBlue)
                     }
                     .frame(height: 220)
                     .chartYAxis {

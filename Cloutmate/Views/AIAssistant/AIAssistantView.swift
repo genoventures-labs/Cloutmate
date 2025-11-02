@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 extension Array where Element: Hashable {
     func removingDuplicates() -> [Element] {
@@ -31,6 +32,10 @@ struct AIAssistantView: View {
     // Toast notifications
     @State private var toastMessage: String?
     @State private var showAIInfo = false
+    @State private var isRecording = false
+    @State private var voiceInputText = ""
+    
+    private let voiceService = VoiceTranscriptionService.shared
     
     var body: some View {
         HSplitView {
@@ -46,28 +51,36 @@ struct AIAssistantView: View {
         .background(Color(.windowBackgroundColor))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: { showAIInfo = true }) {
-                    Image(systemName: "info.circle")
+                // Voice Input
+                Button(action: toggleVoiceInput) {
+                    Image(systemName: isRecording ? "mic.fill" : "mic.circle")
+                        .foregroundColor(isRecording ? .red : .primary)
                 }
+                .help(isRecording ? "Stop recording" : "Voice input")
+                .disabled(viewModel.isLoading)
                 
-                Menu("Platform", systemImage: "globe") {
-                    ForEach(Platform.allCases, id: \.self) { platform in
-                        Button(action: {
-                            viewModel.selectedPlatform = platform
-                        }) {
-                            Label(platform.displayName, systemImage: viewModel.selectedPlatform == platform ? "checkmark" : "")
-                        }
-                    }
+                // Save to Draft
+                Button(action: saveCurrentToDraft) {
+                    Image(systemName: "square.and.arrow.down")
                 }
+                .help("Save to Draft")
+                .disabled(viewModel.messages.isEmpty)
                 
-                Button("New Chat", systemImage: "square.and.pencil") {
+                // New Conversation
+                Button(action: {
                     if !viewModel.messages.isEmpty {
                         showUnsavedAlert = true
                     } else {
                         viewModel.clearMessages()
                     }
+                }) {
+                    Image(systemName: "plus.circle")
                 }
+                .help("New Conversation")
             }
+        }
+        .onAppear {
+            setupVoiceService()
         }
         .alert("AI Assistant", isPresented: $showAIInfo) {
             Button("OK") { }
@@ -221,8 +234,16 @@ struct AIAssistantView: View {
                                 welcomeView
                             } else {
                                 ForEach(viewModel.messages) { message in
-                                    MessageBubble(message: message)
-                                        .id(message.id)
+                                    MessageBubble(
+                                        message: message,
+                                        onEdit: { editedMessage, newContent in
+                                            viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
+                                        },
+                                        onCopy: { copiedContent in
+                                            // Optional: Can show a toast or perform additional actions
+                                        }
+                                    )
+                                    .id(message.id)
                                 }
                             }
                             
@@ -311,7 +332,7 @@ struct AIAssistantView: View {
                 .font(.system(size: 60))
                 .foregroundStyle(
                     LinearGradient(
-                        colors: [.blue, .purple],
+                        colors: [.kosmicBlue, .kosmicPurple],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -340,18 +361,53 @@ struct AIAssistantView: View {
     // MARK: - Quick Action Tools
     
     private var quickActionTools: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
-                ForEach([AITool.brainstorm, .generateCaptions, .improveText, .suggestHashtags, .adjustTone], id: \.self) { tool in
-                    AIToolButton(tool: tool) {
- 		_Concurrency.Task {
-                            await viewModel.executeQuickTool(tool, topic: "Create content for \(viewModel.selectedPlatform.displayName)", modelContext: modelContext)
+        VStack(spacing: 0) {
+            // Platform selector bar
+            HStack(spacing: 8) {
+                Text("Platform:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                ForEach(Platform.allCases, id: \.self) { platform in
+                    Button(action: {
+                        viewModel.selectedPlatform = platform
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: viewModel.selectedPlatform == platform ? "checkmark.circle.fill" : "circle")
+                                .font(.caption2)
+                            Text(platform.displayName)
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(viewModel.selectedPlatform == platform ? Color.kosmicBlue.opacity(0.15) : Color.clear)
+                        .foregroundColor(viewModel.selectedPlatform == platform ? .kosmicBlue : .secondary)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            
+            Divider()
+            
+            // Quick action tools
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach([AITool.brainstorm, .generateCaptions, .improveText, .suggestHashtags, .adjustTone], id: \.self) { tool in
+                        AIToolButton(tool: tool) {
+     		_Concurrency.Task {
+                                await viewModel.executeQuickTool(tool, topic: "Create content for \(viewModel.selectedPlatform.displayName)", modelContext: modelContext)
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
         }
         .background(.ultraThinMaterial)
     }
@@ -359,27 +415,189 @@ struct AIAssistantView: View {
     // MARK: - Input Area
     
     private var inputArea: some View {
-        HStack(spacing: 12) {
-            TextField("Ask me anything...", text: $viewModel.inputText, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(1...4)
-                .onSubmit {
-                    if !viewModel.inputText.isEmpty {
-                        viewModel.sendMessage(viewModel.inputText, modelContext: modelContext)
+        VStack(spacing: 8) {
+            // Voice recording indicator
+            if isRecording {
+                VStack(spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "waveform")
+                            .foregroundColor(.red)
+                            .symbolEffect(.variableColor.iterative, isActive: true)
+                        Text("Listening...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        
+                        // Done button to complete recording
+                        Button(action: completeVoiceInput) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Done")
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.kosmicBlue)
+                            .foregroundColor(.white)
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Cancel button
+                        Button("Cancel") {
+                            voiceService.stopTranscribing()
+                            isRecording = false
+                            voiceInputText = ""
+                            viewModel.inputText = ""
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(.red)
+                    }
+                    
+                    // Show current transcription
+                    if !voiceInputText.isEmpty {
+                        Text(voiceInputText)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.white.opacity(0.5))
+                            .cornerRadius(4)
                     }
                 }
-            
-            Button(action: {
-                viewModel.sendMessage(viewModel.inputText, modelContext: modelContext)
-            }) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title2)
-                    .foregroundColor(viewModel.inputText.isEmpty ? .secondary : .blue)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.red.opacity(0.1))
+                .cornerRadius(8)
             }
-            .buttonStyle(.plain)
-            .disabled(viewModel.inputText.isEmpty)
+            
+            // Text input area
+            HStack(spacing: 12) {
+                ZStack(alignment: .topLeading) {
+                    ChatTextEditor(
+                        text: $viewModel.inputText,
+                        isEditable: !isRecording
+                    ) {
+                        sendCurrentMessage(modelContext: modelContext)
+                    }
+                    .frame(minHeight: 38, maxHeight: 120)
+                    .disabled(isRecording)
+                    
+                    if viewModel.inputText.isEmpty {
+                        Text("Ask me anything...")
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 12)
+                            .padding(.top, 10)
+                    }
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                )
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
+                Button(action: {
+                    sendCurrentMessage(modelContext: modelContext)
+                }) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .kosmicBlue)
+                }
+                .buttonStyle(.plain)
+                .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRecording)
+            }
         }
         .padding()
+    }
+
+    // MARK: - Voice Input & Actions
+
+    private func sendCurrentMessage(modelContext: ModelContext) {
+        let currentText = viewModel.inputText
+        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            viewModel.inputText = ""
+            return
+        }
+        viewModel.sendMessage(currentText, modelContext: modelContext)
+    }
+
+    private func setupVoiceService() {
+        voiceService.onPartial = { [self] partial in
+            DispatchQueue.main.async {
+                voiceInputText = partial
+            }
+        }
+        
+        voiceService.onFinal = { [self] final in
+            DispatchQueue.main.async {
+                voiceInputText = final
+                viewModel.inputText = final
+                isRecording = false
+            }
+        }
+        
+        voiceService.onError = { [self] error in
+            DispatchQueue.main.async {
+                isRecording = false
+                toastMessage = "Voice input error: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func toggleVoiceInput() {
+        if isRecording {
+            // Stop recording and use whatever text we have
+            completeVoiceInput()
+        } else {
+            // Start recording
+            voiceInputText = ""
+            _Concurrency.Task {
+                do {
+                    try await voiceService.requestPermissions()
+                    try voiceService.startTranscribing()
+                    await MainActor.run {
+                        isRecording = true
+                    }
+                } catch {
+                    await MainActor.run {
+                        toastMessage = "Microphone permission required"
+                    }
+                }
+            }
+        }
+    }
+    
+    private func completeVoiceInput() {
+        // Use the current partial text if we have it
+        let finalText = voiceInputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Stop the recording
+        voiceService.stopTranscribing()
+        
+        // Update the input field with whatever we captured
+        if !finalText.isEmpty {
+            viewModel.inputText = finalText
+        }
+        
+        // Reset state
+        isRecording = false
+        voiceInputText = ""
+    }
+    
+    private func saveCurrentToDraft() {
+        guard let conversation = viewModel.currentConversation,
+              let messages = conversation.messages,
+              !messages.isEmpty else {
+            toastMessage = "No messages to save"
+            return
+        }
+        
+        _ = viewModel.exportToDraft(messages: messages, conversation: conversation, modelContext: modelContext)
+        toastMessage = "Saved to Drafts!"
     }
 }
 
@@ -404,7 +622,7 @@ struct ConversationRow: View {
                 if conversation.isPinned {
                     Image(systemName: "pin.fill")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.kosmicBlue)
                 }
                 
                 // Tags
@@ -415,8 +633,8 @@ struct ConversationRow: View {
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.15))
-                                .foregroundColor(.blue)
+                                .background(Color.kosmicBlue.opacity(0.15))
+                                .foregroundColor(.kosmicBlue)
                                 .cornerRadius(4)
                         }
                         if conversation.tags.count > 2 {
@@ -452,9 +670,9 @@ struct ConversationRow: View {
         .background(
             Group {
                 if isSelected {
-                    Color.blue.opacity(0.1)
+                    Color.kosmicBlue.opacity(0.1)
                 } else if conversation.isPinned {
-                    Color.blue.opacity(0.05)
+                    Color.kosmicBlue.opacity(0.05)
                 } else {
                     Color.clear.background(.ultraThinMaterial)
                 }
@@ -463,7 +681,7 @@ struct ConversationRow: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(
-                    conversation.isPinned ? Color.blue.opacity(0.3) : (isSelected ? Color.blue.opacity(0.3) : Color.clear),
+                    conversation.isPinned ? Color.kosmicBlue.opacity(0.3) : (isSelected ? Color.kosmicBlue.opacity(0.3) : Color.clear),
                     lineWidth: conversation.isPinned ? 1.5 : 2
                 )
         )
@@ -480,8 +698,8 @@ struct ConversationRow: View {
                         Image(systemName: "arrow.forward")
                             .font(.caption)
                             .padding(6)
-                            .background(Color.blue.opacity(0.1))
-                            .foregroundColor(.blue)
+                            .background(Color.kosmicBlue.opacity(0.1))
+                            .foregroundColor(.kosmicBlue)
                             .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
@@ -493,8 +711,8 @@ struct ConversationRow: View {
                             Image(systemName: "doc.text")
                                 .font(.caption)
                                 .padding(6)
-                                .background(Color.green.opacity(0.1))
-                                .foregroundColor(.green)
+                            .background(Color.kosmicGreen.opacity(0.1))
+                            .foregroundColor(.kosmicGreen)
                                 .cornerRadius(6)
                         }
                         .buttonStyle(.plain)
@@ -556,3 +774,87 @@ struct ConversationRow: View {
     AIAssistantView()
         .modelContainer(for: [AIMessage.self, AIConversation.self])
 }
+
+#if os(macOS)
+import AppKit
+
+private struct ChatTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    var isEditable: Bool = true
+    var onSubmit: () -> Void
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+    
+    func makeNSView(context: Context) -> NSScrollView {
+        let textView = ChatNSTextView()
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.importsGraphics = false
+        textView.usesAdaptiveColorMappingForDarkAppearance = true
+        textView.drawsBackground = false
+        textView.font = NSFont.preferredFont(forTextStyle: .body)
+        textView.textContainerInset = NSSize(width: 6, height: 8)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: 200)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.backgroundColor = .clear
+        textView.string = text
+        textView.isEditable = isEditable
+        textView.isSelectable = true
+        textView.onSubmit = { onSubmit() }
+
+        let scrollView = NSScrollView()
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = textView
+        context.coordinator.textView = textView
+        return scrollView
+    }
+    
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        guard let textView = context.coordinator.textView else { return }
+        if textView.string != text {
+            textView.string = text
+            textView.selectedRange = NSRange(location: textView.string.count, length: 0)
+        }
+        textView.isEditable = isEditable
+        textView.isSelectable = true
+        textView.onSubmit = { onSubmit() }
+    }
+    
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: ChatTextEditor
+        weak var textView: ChatNSTextView?
+        
+        init(parent: ChatTextEditor) {
+            self.parent = parent
+        }
+        
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            parent.text = textView.string
+        }
+    }
+}
+
+private final class ChatNSTextView: NSTextView {
+    var onSubmit: (() -> Void)?
+    
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 36 { // Return key
+            if event.modifierFlags.contains(.shift) {
+                super.insertNewline(nil)
+            } else {
+                onSubmit?()
+            }
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+}
+#endif

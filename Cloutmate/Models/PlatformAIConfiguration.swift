@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CloutmateShared
 
 struct PlatformAIConfiguration {
     let platform: Platform
@@ -18,23 +19,44 @@ struct PlatformAIConfiguration {
     
     static func configuration(for platform: Platform) -> PlatformAIConfiguration {
         switch platform {
-        case .facebook:
+        case Platform.facebook:
             return PlatformAIConfiguration(
-                platform: .facebook,
-                availableTools: [.brainstorm, .generateCaptions, .suggestHashtags, .improveText, .adjustTone],
+                platform: Platform.facebook,
+                availableTools: [
+                    AITool.brainstorm,
+                    AITool.generateCaptions,
+                    AITool.suggestHashtags,
+                    AITool.improveText,
+                    AITool.adjustTone
+                ],
                 maxCaptionLength: 5000,
                 maxHashtags: 30,
                 tone: "conversational and engaging",
                 captionCount: 5,
                 brainstormCount: 8
             )
-        case .threads:
+        case Platform.threads:
             return PlatformAIConfiguration(
-                platform: .threads,
-                availableTools: [.brainstorm, .generateCaptions, .suggestHashtags, .improveText],
+                platform: Platform.threads,
+                availableTools: [
+                    AITool.brainstorm,
+                    AITool.generateCaptions,
+                    AITool.suggestHashtags,
+                    AITool.improveText
+                ],
                 maxCaptionLength: 500,
                 maxHashtags: 10,
                 tone: "concise and punchy",
+                captionCount: 5,
+                brainstormCount: 8
+            )
+        @unknown default:
+            return PlatformAIConfiguration(
+                platform: platform,
+                availableTools: Array(AITool.allCases),
+                maxCaptionLength: 1000,
+                maxHashtags: 20,
+                tone: "adaptable and engaging",
                 captionCount: 5,
                 brainstormCount: 8
             )

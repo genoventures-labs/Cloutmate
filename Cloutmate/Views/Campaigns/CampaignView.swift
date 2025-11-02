@@ -13,7 +13,7 @@ struct CampaignView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Campaign.createdAt, order: .reverse) private var campaigns: [Campaign]
     @Query private var allPosts: [CloutmateShared.Post]
-    @Query private var projects: [Project]
+    @Query private var projects: [CloutmateShared.Project]
     
     @State private var showCreateSheet = false
     @State private var selectedCampaign: Campaign?
@@ -31,7 +31,7 @@ struct CampaignView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     Spacer()
-                    GlassButton("New Campaign", icon: "plus.circle", tier: .floatingAction, tintColor: .blue, action: { showCreateSheet = true })
+                    GlassButton("New Campaign", icon: "plus.circle", tintColor: .kosmicBlue, action: { showCreateSheet = true })
                 }
                 .padding()
                 
@@ -61,7 +61,7 @@ struct CampaignView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
                             Image(systemName: "list.bullet")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(Color.kosmicBlue)
                             Text("All Campaigns")
                                 .font(.headline)
                         }
@@ -109,7 +109,7 @@ struct CampaignCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "megaphone.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.title3)
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -165,7 +165,7 @@ struct CampaignCard: View {
                         RoundedRectangle(cornerRadius: 4)
                             .fill(
                                 LinearGradient(
-                                    colors: [.blue, .purple],
+                                    colors: [.kosmicBlue, .kosmicPurple],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -253,7 +253,7 @@ struct CampaignHeaderSection: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Image(systemName: "megaphone.fill")
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.largeTitle)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(campaign.title)
@@ -279,7 +279,7 @@ struct CampaignHeaderSection: View {
                     Text("\(posts.filter { $0.postStatus == .published }.count)")
                         .font(.title3)
                         .fontWeight(.bold)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Color.kosmicGreen)
                     Text("Published")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -406,6 +406,5 @@ struct CampaignStatusBadge: View {
 
 #Preview {
     CampaignView()
-        .modelContainer(for: [Campaign.self, Post.self, Project.self])
+        .modelContainer(for: [Campaign.self, CloutmateShared.Post.self, CloutmateShared.Project.self])
 }
-

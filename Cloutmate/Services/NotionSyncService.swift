@@ -7,7 +7,14 @@
 
 import Foundation
 import SwiftData
+import CloutmateShared
 import os.log
+
+// Type aliases to disambiguate from Swift.Concurrency.Task and resolve moved models
+fileprivate typealias PARATask = CloutmateShared.Task
+fileprivate typealias PARANote = CloutmateShared.Note
+fileprivate typealias PARAProject = CloutmateShared.Project
+fileprivate typealias PARAInboxItem = CloutmateShared.InboxItem
 
 final class NotionSyncService {
     static let shared = NotionSyncService()
@@ -123,8 +130,8 @@ final class NotionSyncService {
         page: NotionPage,
         propertyMappings: [String: String],
         context: ModelContext
-    ) throws -> Project {
-        let project = Project(title: "")
+    ) throws -> PARAProject {
+        let project = PARAProject(title: "")
         
         // Apply property mappings
         applyMappingsToProject(project: project, page: page, propertyMappings: propertyMappings)
@@ -147,8 +154,8 @@ final class NotionSyncService {
         page: NotionPage,
         propertyMappings: [String: String],
         context: ModelContext
-    ) throws -> Task {
-        let task = Task(title: "")
+    ) throws -> PARATask {
+        let task = PARATask(title: "")
         
         // Apply property mappings
         applyMappingsToTask(task: task, page: page, propertyMappings: propertyMappings)
@@ -171,8 +178,8 @@ final class NotionSyncService {
         page: NotionPage,
         propertyMappings: [String: String],
         context: ModelContext
-    ) throws -> Note {
-        let note = Note(title: "")
+    ) throws -> PARANote {
+        let note = PARANote(title: "")
         
         // Apply property mappings
         applyMappingsToNote(note: note, page: page, propertyMappings: propertyMappings)
@@ -216,7 +223,7 @@ final class NotionSyncService {
     // MARK: - Property Mapping
     
     private func applyMappingsToProject(
-        project: Project,
+        project: PARAProject,
         page: NotionPage,
         propertyMappings: [String: String]
     ) {
@@ -249,7 +256,7 @@ final class NotionSyncService {
     }
     
     private func applyMappingsToTask(
-        task: Task,
+        task: PARATask,
         page: NotionPage,
         propertyMappings: [String: String]
     ) {
@@ -291,7 +298,7 @@ final class NotionSyncService {
     }
     
     private func applyMappingsToNote(
-        note: Note,
+        note: PARANote,
         page: NotionPage,
         propertyMappings: [String: String]
     ) {
@@ -522,10 +529,10 @@ final class NotionSyncService {
         try context.save()
     }
     
-    private func findProjectInImportedItems(notionId: String, items: [String: Any]) -> Project? {
+    private func findProjectInImportedItems(notionId: String, items: [String: Any]) -> PARAProject? {
         // This is simplified - in reality, we'd need to track Notion IDs
         for item in items.values {
-            if let project = item as? Project {
+            if let project = item as? PARAProject {
                 return project
             }
         }

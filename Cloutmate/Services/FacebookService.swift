@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CloutmateShared
 
 final class FacebookService {
     static let shared = FacebookService()

@@ -50,8 +50,17 @@ class AccessibilityGlassManager: ObservableObject {
             return .thickMaterial
         }
         
-        // Return tier-appropriate material
-        return tier.material
+        return baseMaterial(for: tier)
+    }
+    
+    private func baseMaterial(for tier: GlassTier) -> Material {
+        switch tier {
+        case .background: return .thinMaterial
+        case .sidebar: return .regularMaterial
+        case .contentCard: return .thinMaterial
+        case .overlay: return .ultraThinMaterial
+        case .floatingAction: return .ultraThinMaterial
+        }
     }
     
     // MARK: - Performance Optimization

@@ -23,7 +23,7 @@ struct AIPromptDialog: View {
             HStack {
                 Image(systemName: "sparkles")
                     .font(.title2)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                 Text("AI Assistant")
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -79,8 +79,8 @@ struct AIPromptDialog: View {
                                             .font(.caption)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 6)
-                                            .background(Color.blue.opacity(0.1))
-                                            .foregroundColor(.blue)
+                                            .background(Color.kosmicBlue.opacity(0.1))
+                                            .foregroundColor(.kosmicBlue)
                                             .cornerRadius(12)
                                     }
                                     .buttonStyle(.plain)

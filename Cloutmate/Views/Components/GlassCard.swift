@@ -2,7 +2,7 @@
 //  GlassCard.swift
 //  Cloutmate
 //
-//  Glassmorphic Harmony UI - Glass Card Component
+//  Minimal Apple Music-inspired Card Component
 //
 
 import SwiftUI
@@ -10,7 +10,7 @@ import SwiftUI
 struct GlassCard<Content: View>: View {
     let tier: GlassTier
     let cornerRadius: CGFloat
-    let gradientTint: Color?
+    let gradientTint: Color? // Legacy parameter
     let showHeader: Bool
     let showFooter: Bool
     let headerContent: (() -> AnyView)?
@@ -19,11 +19,12 @@ struct GlassCard<Content: View>: View {
     
     @State private var isHovered = false
     @Environment(\.accessibilityGlassManager) private var accessibilityManager
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     init(
         tier: GlassTier = .contentCard,
         cornerRadius: CGFloat? = nil,
-        gradientTint: Color? = nil,
+        gradientTint: Color? = nil, // Kept for compatibility
         showHeader: Bool = false,
         showFooter: Bool = false,
         headerContent: (() -> AnyView)? = nil,
@@ -31,7 +32,7 @@ struct GlassCard<Content: View>: View {
         @ViewBuilder content: () -> Content
     ) {
         self.tier = tier
-        self.cornerRadius = cornerRadius ?? GlassTierCalculator.cornerRadius(for: tier)
+        self.cornerRadius = cornerRadius ?? 12 // Consistent corner radius
         self.gradientTint = gradientTint
         self.showHeader = showHeader
         self.showFooter = showFooter
@@ -42,61 +43,44 @@ struct GlassCard<Content: View>: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
             if showHeader, let header = headerContent {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     header()
-                        .padding(.horizontal, 16)
-                        .padding(.top, 16)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
                     Divider()
+                        .background(glassColorSystem.dividerColor())
+                        .padding(.horizontal, 20)
                 }
             }
             
-            // Content
             content
-                .padding(.horizontal, showHeader || showFooter ? 16 : 0)
-                .padding(.vertical, showHeader || showFooter ? 16 : 0)
+                .padding(.horizontal, 20)
+                .padding(.vertical, showHeader || showFooter ? 16 : 20)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             
-            // Footer
             if showFooter, let footer = footerContent {
-                VStack(spacing: 8) {
-                    Divider()
-                    footer()
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 16)
-                }
+                Divider()
+                    .background(glassColorSystem.dividerColor())
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                footer()
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 16)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
-        .glassPanel(
-            tier: tier,
-            cornerRadius: cornerRadius,
-            tintColor: gradientTint
-        )
+        .background(cardBackground)
+        .overlay(borderOverlay)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .shadow(
-            color: isHovered ? .black.opacity(0.15) : .black.opacity(0.05),
-            radius: isHovered ? 12 : 4,
-            y: isHovered ? 8 : 2
+            color: shadowColor,
+            radius: shadowRadius,
+            x: 0,
+            y: shadowY
         )
-        .scaleEffect(isHovered ? GlassMotion.Transform.hoverScale : 1.0)
-        .overlay(
-            // Shimmer effect on hover
-            Group {
-                if isHovered && accessibilityManager.shouldApplyEffects() {
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            Color.white.opacity(0),
-                            Color.white.opacity(0.2),
-                            Color.white.opacity(0)
-                        ]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .blendMode(.overlay)
-                }
-            }
-        )
-        .animation(GlassMotion.Easing.spring, value: isHovered)
+        .scaleEffect(isHovered ? 1.003 : 1.0) // Minimal hover scale
+        .animation(.easeInOut(duration: 0.2), value: isHovered)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -122,18 +106,50 @@ extension GlassCard {
     }
 }
 
+// MARK: - Private helpers
+private extension GlassCard {
+    var cardBackground: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(glassColorSystem.cardColor())
+    }
+    
+    var borderOverlay: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .strokeBorder(glassColorSystem.borderColor(), lineWidth: 1)
+    }
+    
+    var shadowColor: Color {
+        isHovered ? Color.black.opacity(0.08) : Color.black.opacity(0.05)
+    }
+    
+    var shadowRadius: CGFloat {
+        isHovered ? 6 : 4
+    }
+    
+    var shadowY: CGFloat {
+        isHovered ? 3 : 2
+    }
+}
+
 #Preview {
-    VStack(spacing: 16) {
-        GlassCard(gradientTint: .blue) {
-            Text("Simple Glass Card")
+    VStack(spacing: 20) {
+        GlassCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Content Card")
+                    .font(.system(size: 20, weight: .semibold))
+                Text("Clean minimal design matching Apple Music aesthetic.")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
         }
         
-        GlassCard(
-            showHeader: true,
-            headerContent: { AnyView(Text("Header").font(.headline)) }
-        ) {
-            Text("Card with Header")
+        GlassCard(showHeader: true, headerContent: { AnyView(Text("With Header").font(.headline)) }) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Item 1")
+                Text("Item 2")
+            }
         }
     }
     .padding()
+    .environmentObject(GlassColorSystem())
 }

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import CloutmateShared
 
 enum SearchCategory: Hashable {
     case conversations
@@ -51,11 +52,11 @@ struct CommandPaletteView: View {
     
     @Query(sort: \AIConversation.createdAt, order: .reverse) private var conversations: [AIConversation]
     @Query(sort: \Draft.updatedAt, order: .reverse) private var drafts: [Draft]
-    @Query(sort: \Post.createdAt, order: .reverse) private var posts: [Post]
-    @Query(sort: \Project.updatedAt, order: .reverse) private var projects: [Project]
-    @Query(sort: \Task.createdAt, order: .reverse) private var tasks: [Task]
-    @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
-    @Query(sort: \InboxItem.createdAt, order: .reverse) private var inboxItems: [InboxItem]
+    @Query(sort: \CloutmateShared.Post.createdAt, order: .reverse) private var posts: [CloutmateShared.Post]
+    @Query(sort: \CloutmateShared.Project.updatedAt, order: .reverse) private var projects: [CloutmateShared.Project]
+    @Query(sort: \CloutmateShared.Task.createdAt, order: .reverse) private var tasks: [CloutmateShared.Task]
+    @Query(sort: \CloutmateShared.Note.updatedAt, order: .reverse) private var notes: [CloutmateShared.Note]
+    @Query(sort: \CloutmateShared.InboxItem.createdAt, order: .reverse) private var inboxItems: [CloutmateShared.InboxItem]
     
     @State private var searchText = ""
     @FocusState private var isSearchFocused: Bool
@@ -356,7 +357,7 @@ struct SearchResultRow: View {
             HStack(spacing: 12) {
                 Image(systemName: result.category.icon)
                     .font(.title3)
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                     .frame(width: 24)
                 
                 VStack(alignment: .leading, spacing: 4) {

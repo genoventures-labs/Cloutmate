@@ -52,7 +52,7 @@ struct TemplateLibraryView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     Spacer()
-                    GlassButton("New Template", icon: "plus.circle", tier: .floatingAction, tintColor: .blue, action: { showingCreateSheet = true })
+                    GlassButton("New Template", icon: "plus.circle", tintColor: .kosmicBlue, action: { showingCreateSheet = true })
                 }
                 .padding()
                 
@@ -86,7 +86,7 @@ struct TemplateLibraryView: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Image(systemName: type.icon)
-                                    .foregroundStyle(.blue.gradient)
+                                    .foregroundStyle(Color.kosmicBlue)
                                     .font(.title3)
                                 Text(type.displayName)
                                     .font(.headline)
@@ -126,7 +126,7 @@ struct TemplateCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: template.type.icon)
-                    .foregroundStyle(.blue.gradient)
+                    .foregroundStyle(Color.kosmicBlue)
                     .font(.title3)
                 Text(template.title)
                     .font(.headline)
@@ -134,7 +134,7 @@ struct TemplateCard: View {
                 if template.isBuiltIn {
                     Label("Built-in", systemImage: "checkmark.seal.fill")
                         .font(.caption2)
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Color.kosmicBlue)
                 }
             }
             
@@ -148,7 +148,7 @@ struct TemplateCard: View {
             if template.usageCount > 0 {
                 Text("Used \(template.usageCount) times")
                     .font(.caption2)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.kosmicBlue)
             }
         }
         .padding()
@@ -168,7 +168,7 @@ struct TemplateDetailSheet: View {
                     // Header
                     HStack {
                         Image(systemName: template.type.icon)
-                            .foregroundStyle(.blue.gradient)
+                            .foregroundStyle(Color.kosmicBlue)
                             .font(.largeTitle)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(template.title)
@@ -282,4 +282,3 @@ struct PARACreateTemplateSheet: View {
     TemplateLibraryView()
         .modelContainer(for: [PARATemplate.self])
 }
-

@@ -32,7 +32,7 @@ struct NotionDatabaseSelectorView: View {
                     HStack {
                         Image(systemName: "externaldrive")
                             .font(.title2)
-                            .foregroundStyle(.blue.gradient)
+                            .foregroundStyle(Color.kosmicBlue)
                         Text("Select Notion Databases")
                             .font(.title2)
                             .fontWeight(.bold)
@@ -199,7 +199,7 @@ struct DatabaseCard: View {
             Button(action: onToggle) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
-                    .foregroundStyle(isSelected ? .blue : .secondary)
+                    .foregroundStyle(isSelected ? Color.kosmicBlue : .secondary)
             }
             .buttonStyle(.plain)
             
