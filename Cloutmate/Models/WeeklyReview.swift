@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 /// Represents the lifecycle state of a weekly review ritual.
 enum WeeklyReviewStatus: String, Codable, CaseIterable {

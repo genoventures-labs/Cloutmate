@@ -46,8 +46,12 @@ struct CloutmateApp: App {
                         startPublishingTimer()
                         checkAndRunMigration()
                         registerGlobalHotkey()
-                        startARTE()
                         startRitualSystemsIfNeeded()
+                        // Start ARTE after other systems
+                        _Concurrency.Task { @MainActor in
+                            try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds to ensure SwiftData is ready
+                            startARTE()
+                        }
                     }
             }
             .modelContainer(CloutmateApp.sharedModelContainer)
@@ -98,6 +102,41 @@ struct CloutmateApp: App {
                 }
                 .keyboardShortcut(",", modifiers: .command)
             }
+            
+            // Aurora Toolbar Commands (⌘⇧1-6)
+            CommandGroup(after: .textEditing) {
+                Divider()
+                
+                Button("Create Task") {
+                    NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.createTask)
+                }
+                .keyboardShortcut("1", modifiers: [.command, .shift])
+                
+                Button("Create Project") {
+                    NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.createProject)
+                }
+                .keyboardShortcut("2", modifiers: [.command, .shift])
+                
+                Button("Create Note") {
+                    NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.createNote)
+                }
+                .keyboardShortcut("3", modifiers: [.command, .shift])
+                
+                Button("Create Reminder") {
+                    NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.createReminder)
+                }
+                .keyboardShortcut("4", modifiers: [.command, .shift])
+                
+                Button("Analyze Document") {
+                    NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.analyzeDocument)
+                }
+                .keyboardShortcut("5", modifiers: [.command, .shift])
+                
+                Button("Analyze Image") {
+                    NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.analyzeImage)
+                }
+                .keyboardShortcut("6", modifiers: [.command, .shift])
+            }
         }
     }
     
@@ -113,6 +152,21 @@ struct CloutmateApp: App {
         let context = CloutmateApp.sharedModelContainer.mainContext
         focusRitualManager.start(modelContext: context)
         smartNudgeService.start(modelContext: context)
+
+        if UserDefaults.standard.bool(forKey: "predictiveModeEnabled") {
+            _Concurrency.Task { @MainActor in
+                await CognitionPredictor.shared.start(modelContext: context)
+                await DriftMonitor.shared.start(modelContext: context)
+                await PredictiveContextManager.shared.start(modelContext: context)
+                await AdaptiveScheduler.shared.start(modelContext: context)
+                if CalendarSyncSettings.shared.syncEnabled {
+                    await CalendarSyncService.shared.start(modelContext: context)
+                }
+                if ContextGuardSettings.shared.isGuardEnabled {
+                    ContextSwitchGuard.shared.start(modelContext: context)
+                }
+            }
+        }
     }
     
     private func checkAndPublishScheduledPosts() {
@@ -195,6 +249,51 @@ struct CloutmateApp: App {
             }
             
             print("Global hotkey ⌥Space registered successfully")
+            
+            // Register Cmd+Shift+A for Aurora Spotlight
+            var spotlightHotKeyRef: EventHotKeyRef?
+            let spotlightKeyCode = UInt32(kVK_ANSI_A)
+            let spotlightModifiers = UInt32(cmdKey | shiftKey)
+            
+            var spotlightEventType = EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyPressed)
+            )
+            
+            let spotlightHandlerStatus = InstallEventHandler(
+                GetApplicationEventTarget(),
+                { _, _, _ in
+                    _Concurrency.Task { @MainActor in
+                        AuroraSpotlightWindowController.shared.toggle()
+                    }
+                    return noErr
+                },
+                1,
+                &spotlightEventType,
+                nil,
+                nil
+            )
+            
+            guard spotlightHandlerStatus == noErr else {
+                print("Failed to install Aurora Spotlight event handler")
+                return
+            }
+            
+            let spotlightRegisterStatus = RegisterEventHotKey(
+                spotlightKeyCode,
+                spotlightModifiers,
+                EventHotKeyID(signature: OSType(("CLMT" as NSString).utf8String!.pointee), id: 2),
+                GetApplicationEventTarget(),
+                0,
+                &spotlightHotKeyRef
+            )
+            
+            guard spotlightRegisterStatus == noErr else {
+                print("Failed to register Aurora Spotlight hotkey")
+                return
+            }
+            
+            print("Global hotkey ⌘⇧A (Aurora Spotlight) registered successfully")
         }
     }
     
@@ -207,14 +306,19 @@ struct CloutmateApp: App {
             themeManager.start(modelContext: context)
             
             // Subscribe to theme changes to update GlassColorSystem
+            // Debounce to prevent rapid UI update cycles
             themeManager.$currentState
+                .removeDuplicates()
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
                 .sink { [weak glassColorSystem] state in
                     glassColorSystem?.updateEmotionalState(state, intensity: themeManager.intensity)
                 }
                 .store(in: &themeManager.cancellables)
             
-            // Subscribe to intensity changes
+            // Subscribe to intensity changes (debounced to prevent cycles)
             themeManager.$intensity
+                .removeDuplicates()
+                .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
                 .sink { [weak glassColorSystem] intensity in
                     glassColorSystem?.emotionalIntensity = intensity
                 }
@@ -256,6 +360,7 @@ extension CloutmateApp {
             CloutmateShared.Task.self,
             CloutmateShared.Project.self,
             CloutmateShared.InboxItem.self,
+            CloutmateShared.Reminder.self,
             // App-local PARA models
             Area.self,
             // App-specific models
@@ -291,7 +396,13 @@ extension CloutmateApp {
             FocusRitual.self,
             RitualCompletion.self,
             WeeklyReview.self,
-            SmartNudge.self
+            SmartNudge.self,
+            // Phase 9 models (Predictive Cognition)
+            FocusForecast.self,
+            DriftEvent.self,
+            EnergyWindow.self,
+            // Context-aware create sheet models
+            CreateActionUsage.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"

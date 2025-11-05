@@ -89,7 +89,8 @@ struct Sidebar: View {
             Spacer()
             
             GlassButton(icon: "plus", style: .iconOnly, role: .accent, tintColor: glassColorSystem.glassTint(for: .accent)) {
-                NotificationCenter.default.post(name: .openComposer, object: nil)
+                // Pass current tab context in notification
+                NotificationCenter.default.post(name: .openContextualCreate, object: selectedTab)
             }
         }
         .padding(.horizontal, 20)
@@ -103,7 +104,8 @@ struct Sidebar: View {
         isExpanded: Binding<Bool>,
         tabs: [TabIdentifier]
     ) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let accentColor = glassColorSystem.emotionalAccent()
+        return VStack(alignment: .leading, spacing: 0) {
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                     isExpanded.wrappedValue.toggle()
@@ -112,18 +114,18 @@ struct Sidebar: View {
                 HStack(spacing: 8) {
                     Image(systemName: icon)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.kosmicBlue)
+                        .foregroundStyle(accentColor)
                     
                     Text(label)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.kosmicBlue)
+                        .foregroundStyle(accentColor.opacity(0.9))
                         .textCase(.uppercase)
                     
                     Spacer()
                     
                     Image(systemName: isExpanded.wrappedValue ? "chevron.down" : "chevron.right")
                         .font(.system(size: 8, weight: .medium))
-                        .foregroundStyle(Color.kosmicBlue.opacity(0.7))
+                        .foregroundStyle(accentColor.opacity(0.7))
                 }
                 .padding(.top, 16)
                 .padding(.bottom, 4)

@@ -66,18 +66,31 @@ enum TabIdentifier: String, CaseIterable, Comparable {
 }
 
 struct MainWindowView: View {
+    @Environment(\.modelContext) private var modelContext
+
     @State private var selectedTab: TabIdentifier = .home
     @State private var composerViewModel = ComposerViewModel()
     @State private var previousTab: TabIdentifier = .home
     @State private var isTransitioning = false
     @State private var showCommandPalette = false
     @State private var sidebarWidth: CGFloat = 240
+    @State private var pendingTab: TabIdentifier?
+    @State private var pendingDecision: InterceptDecision?
+    @State private var guardMessage: String = ""
+    @State private var showContextualCreateSheet = false
+    @State private var contextualCreateTab: TabIdentifier = .home
     
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
                 // Sidebar
-                Sidebar(selectedTab: $selectedTab, composerViewModel: composerViewModel)
+                Sidebar(
+                    selectedTab: Binding(
+                        get: { selectedTab },
+                        set: { attemptTabSwitch(to: $0) }
+                    ),
+                    composerViewModel: composerViewModel
+                )
                     .frame(width: sidebarWidth)
                 
                 // Resizer
@@ -97,26 +110,43 @@ struct MainWindowView: View {
         .sheet(isPresented: $composerViewModel.isPresented) {
             ComposerWindow()
         }
+        .sheet(isPresented: $showContextualCreateSheet) {
+            ContextualCreateSheet(currentTab: contextualCreateTab)
+        }
         .overlay {
             if showCommandPalette {
                 CommandPaletteView(isPresented: $showCommandPalette)
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openComposer)) { _ in
-            composerViewModel.present()
+        .onReceive(NotificationCenter.default.publisher(for: .openComposer)) { notification in
+            // Check if we're in Posts view - if so, open ComposerWindow directly
+            if selectedTab == .posts {
+                composerViewModel.present()
+            } else {
+                // Otherwise open contextual create sheet
+                contextualCreateTab = selectedTab
+                showContextualCreateSheet = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openContextualCreate)) { notification in
+            if let tab = notification.object as? TabIdentifier {
+                contextualCreateTab = tab
+                showContextualCreateSheet = true
+            } else {
+                contextualCreateTab = selectedTab
+                showContextualCreateSheet = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchTab)) { notification in
             if let tab = notification.object as? TabIdentifier {
-                withAnimation(GlassMotion.Easing.tabSwitch) {
-                    previousTab = selectedTab
-                    selectedTab = tab
-                }
+                attemptTabSwitch(to: tab)
             }
         }
-        .onChange(of: selectedTab) { oldValue, newValue in
-            previousTab = oldValue
-        }
         .task {
+            ContextSwitchGuard.shared.start(modelContext: modelContext)
+            // Broadcast initial tab
+            NotificationCenter.default.post(name: NSNotification.Name("CurrentTabUpdated"), object: selectedTab)
+            
             NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "k" {
                     showCommandPalette = true
@@ -125,6 +155,7 @@ struct MainWindowView: View {
                 return event
             }
         }
+        .overlay(guardOverlay, alignment: .center)
     }
     
     @ViewBuilder
@@ -172,6 +203,94 @@ struct MainWindowView: View {
             InsightsView()
         case .settings:
             SettingsView()
+        }
+    }
+
+    private var guardOverlay: some View {
+        Group {
+            if let decision = pendingDecision,
+               let message = guardMessageForCurrentPrompt,
+               let delay = delayForDecision(decision) {
+                ZStack {
+                    Color.black.opacity(0.25)
+                        .ignoresSafeArea()
+                        .transition(.opacity)
+
+                    ContextSwitchPrompt(
+                        message: message,
+                        decision: decision,
+                        delay: delay,
+                        onConfirm: confirmPendingSwitch,
+                        onCancel: cancelPendingSwitch
+                    )
+                }
+                .transition(.opacity)
+            }
+        }
+    }
+
+    private func attemptTabSwitch(to newTab: TabIdentifier) {
+        guard selectedTab != newTab else { return }
+
+        let decision = ContextSwitchGuard.shared.shouldInterceptSwitch(
+            from: selectedTab,
+            to: newTab,
+            modelContext: modelContext
+        )
+
+        switch decision {
+        case .allow:
+            completeTabSwitch(to: newTab)
+        case .softPrompt(_, let message), .strongPrompt(_, let message):
+            pendingTab = newTab
+            pendingDecision = decision
+            guardMessage = message
+        }
+    }
+
+    private func completeTabSwitch(to newTab: TabIdentifier) {
+        withAnimation(GlassMotion.Easing.tabSwitch) {
+            previousTab = selectedTab
+            selectedTab = newTab
+        }
+        pendingTab = nil
+        pendingDecision = nil
+        guardMessage = ""
+        
+        // Broadcast tab change for Aurora integration
+        NotificationCenter.default.post(name: NSNotification.Name("CurrentTabUpdated"), object: newTab)
+    }
+
+    private func confirmPendingSwitch() {
+        if let tab = pendingTab {
+            completeTabSwitch(to: tab)
+        } else {
+            cancelPendingSwitch()
+        }
+    }
+
+    private func cancelPendingSwitch() {
+        pendingTab = nil
+        pendingDecision = nil
+        guardMessage = ""
+    }
+
+    private var guardMessageForCurrentPrompt: String? {
+        guard let decision = pendingDecision else { return nil }
+        switch decision {
+        case .softPrompt(_, let message), .strongPrompt(_, let message):
+            return message
+        case .allow:
+            return nil
+        }
+    }
+
+    private func delayForDecision(_ decision: InterceptDecision) -> TimeInterval? {
+        switch decision {
+        case .softPrompt(let delay, _), .strongPrompt(let delay, _):
+            return delay
+        case .allow:
+            return nil
         }
     }
 }

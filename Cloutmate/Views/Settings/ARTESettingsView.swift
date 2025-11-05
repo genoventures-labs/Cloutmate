@@ -391,7 +391,7 @@ struct ARTESettingsView: View {
                         metricRow(
                             label: "Status",
                             value: metrics.isWithinTargets ? "✅ Optimal" : "⚠️ Needs Optimization",
-                            valueColor: metrics.isWithinTargets ? .green : .orange
+                            valueColor: metrics.isWithinTargets ? .kosmicGreen : .orange
                         )
                     }
                 } else {

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 @Model
 final class AIFeedbackEvent {
@@ -76,9 +77,10 @@ final class AIFeedbackLogger {
             AIRecallService.shared.boostImportance(
                 for: result.affectedObjectIDs,
                 amount: 0.05,
+                engagementIncrement: engagementIncrement(for: action),
                 modelContext: modelContext
             )
-            
+
             // Boost CPS priority (feedback loop)
             PriorityEngine.shared.boostScore(
                 for: result.affectedObjectIDs,
@@ -115,6 +117,24 @@ final class AIFeedbackLogger {
                 detail: event.resultMessage,
                 timestamp: event.createdAt
             )
+        }
+    }
+    
+    private func engagementIncrement(for action: AIIntentAction) -> Double {
+        switch action {
+        case .createTask, .updateTask, .deleteTask,
+             .createNote, .updateNote, .deleteNote,
+             .createProject, .updateProject, .deleteProject,
+             .convertInboxItem, .addInboxItem:
+            return 0.3
+        case .createPost, .publishPost:
+            return 0.25
+        case .archiveTasks, .summarizePosts, .generateReport, .predictScheduling:
+            return 0.2
+        case .digestConversation, .digestAllConversations, .searchConversations:
+            return 0.1
+        default:
+            return 0.15
         }
     }
     

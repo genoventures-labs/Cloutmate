@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 /// Priority score tracking for CPS (Contextual Priority System)
 @Model

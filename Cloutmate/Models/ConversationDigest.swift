@@ -61,5 +61,27 @@ struct ConversationSummaryContext: Sendable {
     let keyTopics: [String]
     let messageCount: Int
     let emotionalTone: String
+    let emotionWeight: Double
+}
+
+/// Intent cluster extracted from conversation patterns
+struct IntentCluster: Sendable, Identifiable {
+    let id = UUID()
+    let name: String
+    let topics: [String]
+    let conversationCount: Int
+    let dominantEmotions: [String]
+    let description: String
+}
+
+/// Summary of intent clusters from recent conversations
+struct IntentClusterSummary: Sendable {
+    let clusters: [IntentCluster]
+    let primaryCluster: String?
+    let secondaryCluster: String?
+    let confidence: Double  // 0.0 to 1.0
+    let shouldAbstain: Bool  // True if confidence < 0.4
+    let disambiguatingQuestions: [String]?  // Questions to ask when abstaining
+    let tieBreaker: String?  // CPS priority or action verb used for tie-breaking
 }
 

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import os
+import Combine
 import CloutmateShared
 
 // MARK: - Adaptive Context Contract
@@ -21,6 +22,9 @@ struct AIPayloadContext: Sendable {
     var pastConversations: [ConversationSummaryContext]?
     var memoryThemes: [ThemeSummary]?
     var narrativeSummary: String?
+    var intentClusters: IntentClusterSummary?
+    var conversationBreadcrumbs: ConversationBreadcrumbs?
+    var cognitiveHealth: CognitiveHealthSnapshot?
     var metadata: [String: String]
     
     init(
@@ -32,6 +36,9 @@ struct AIPayloadContext: Sendable {
         pastConversations: [ConversationSummaryContext]? = nil,
         memoryThemes: [ThemeSummary]? = nil,
         narrativeSummary: String? = nil,
+        intentClusters: IntentClusterSummary? = nil,
+        conversationBreadcrumbs: ConversationBreadcrumbs? = nil,
+        cognitiveHealth: CognitiveHealthSnapshot? = nil,
         metadata: [String: String] = [:]
     ) {
         self.recall = recall
@@ -42,10 +49,19 @@ struct AIPayloadContext: Sendable {
         self.pastConversations = pastConversations
         self.memoryThemes = memoryThemes
         self.narrativeSummary = narrativeSummary
+        self.intentClusters = intentClusters
+        self.conversationBreadcrumbs = conversationBreadcrumbs
+        self.cognitiveHealth = cognitiveHealth
         self.metadata = metadata
     }
     
     static let empty = AIPayloadContext()
+}
+
+struct ConversationBreadcrumbs: Sendable {
+    let lastEmotion: String?
+    let lastTopic: String?
+    let lastUpdated: Date?
 }
 
 /// Focus session context for AI payload
@@ -136,6 +152,9 @@ enum RecallObjectType: String, Codable, Sendable {
     case note
     case draft
     case inbox
+    case image
+    case document
+    case reminder
     case unknown
     
     var displayName: String {
@@ -146,6 +165,9 @@ enum RecallObjectType: String, Codable, Sendable {
         case .note: return "Note"
         case .draft: return "Draft"
         case .inbox: return "Inbox"
+        case .image: return "Image"
+        case .document: return "Document"
+        case .reminder: return "Reminder"
         case .unknown: return "Item"
         }
     }
@@ -177,6 +199,8 @@ final class RecallIndexEntry {
     var emotionScore: Double
     var emotionIntensity: Double
     var emotionKeywords: [String]
+    var engagementScore: Double = 0.0
+    var lastEngagementAt: Date?
     
     init(
         objectId: UUID,
@@ -191,7 +215,9 @@ final class RecallIndexEntry {
         emotion: String? = nil,
         emotionScore: Double = 0.0,
         emotionIntensity: Double = 0.0,
-        emotionKeywords: [String] = []
+        emotionKeywords: [String] = [],
+        engagementScore: Double = 0.0,
+        lastEngagementAt: Date? = nil
     ) {
         self.objectId = objectId
         self.objectType = objectType.rawValue
@@ -206,18 +232,30 @@ final class RecallIndexEntry {
         self.emotionScore = emotionScore
         self.emotionIntensity = emotionIntensity
         self.emotionKeywords = emotionKeywords
+        self.engagementScore = engagementScore
+        self.lastEngagementAt = lastEngagementAt
     }
     
     func score(using weights: AIConfig.RecallWeights, referenceDate: Date = Date()) -> Double {
         let elapsed = referenceDate.timeIntervalSince(lastViewedAt)
         let decayWindow = max(1.0, weights.recencyHalfLifeHours * 3600.0)
-        let recencyScore = max(0.0, min(1.0, 1.0 - (elapsed / decayWindow)))
-        let frequencyScore = max(0.0, min(1.0, Double(accessCount) / max(1.0, weights.frequencyNormalizationFactor)))
-        let clampedImportance = max(0.0, min(1.0, importance))
-        
-        return (weights.recencyWeight * recencyScore)
+        let recencyScore = clamp(1.0 - (elapsed / decayWindow))
+        let frequencyScore = clamp(Double(accessCount) / max(1.0, weights.frequencyNormalizationFactor))
+        let clampedImportance = clamp(importance)
+
+        let baseScore = (weights.recencyWeight * recencyScore)
         + (weights.frequencyWeight * frequencyScore)
         + (weights.importanceWeight * clampedImportance)
+
+        let ageDays = max(0.0, referenceDate.timeIntervalSince(lastUpdatedAt) / (60 * 60 * 24))
+        let decayedImportance = clampedImportance * exp(-ageDays / 90.0)
+        let importanceMultiplier = max(0.25, decayedImportance)
+
+        let engagementMultiplier = self.engagementMultiplier(referenceDate: referenceDate)
+        let emotionalMultiplier = self.emotionalMultiplier
+
+        let finalScore = baseScore * importanceMultiplier * engagementMultiplier * emotionalMultiplier
+        return clamp(finalScore)
     }
     
     func matches(query: String) -> Bool {
@@ -229,6 +267,43 @@ final class RecallIndexEntry {
         }
         let tokens = normalizedQuery.split(separator: " ")
         return tokens.isEmpty || tokens.allSatisfy { haystack.contains($0) }
+    }
+
+    func registerEngagement(increment: Double, timestamp: Date) {
+        guard increment > 0 else { return }
+        let decayed = decayedEngagement(at: timestamp)
+        engagementScore = min(1.0, decayed + increment)
+        lastEngagementAt = timestamp
+    }
+
+    private func decayedEngagement(at referenceDate: Date) -> Double {
+        guard engagementScore > 0 else { return 0 }
+        let last = lastEngagementAt ?? lastViewedAt
+        let elapsed = max(0.0, referenceDate.timeIntervalSince(last))
+        if elapsed == 0 { return engagementScore }
+        let halfLife: TimeInterval = 14 * 24 * 60 * 60
+        let decayFactor = pow(0.5, elapsed / halfLife)
+        return engagementScore * decayFactor
+    }
+
+    private func engagementMultiplier(referenceDate: Date) -> Double {
+        let effective = decayedEngagement(at: referenceDate)
+        guard effective > 0 else { return 1.0 }
+        return 1.0 + min(0.5, effective)
+    }
+
+    private var emotionalMultiplier: Double {
+        if abs(emotionScore) > 0.6 || emotionIntensity > 0.6 {
+            return 1.2
+        }
+        if abs(emotionScore) > 0.3 || emotionIntensity > 0.3 {
+            return 1.1
+        }
+        return 1.0
+    }
+
+    private func clamp(_ value: Double) -> Double {
+        max(0.0, min(1.0, value))
     }
 }
 
@@ -371,7 +446,9 @@ final class AIRecallService {
     
     private var cache: [UUID: RecallIndexEntry] = [:]
     private var lastCacheRefresh: Date?
-    private let cacheValidity: TimeInterval = 300 // 5 minutes
+    private let cacheValidity: TimeInterval = 15 * 60
+    private var lastDecayRun: Date?
+    private var lastPruneRun: Date?
     
     private init() {}
     
@@ -408,6 +485,18 @@ final class AIRecallService {
             modelContext: modelContext,
             incrementAccess: true
         )
+        
+        // Automatically create memory graph node if feature is enabled
+        if config.featureFlags.memoryGraphEnabled {
+            _Concurrency.Task { @MainActor in
+                do {
+                    _ = try await MemoryGraphService.shared.findOrCreateNode(for: object, modelContext: modelContext)
+                    AIDebug.log("MemoryGraph: Auto-created node for \(object.recallObjectType.rawValue) '\(object.recallTitle)'")
+                } catch {
+                    AIDebug.log("MemoryGraph: Failed to auto-create node: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     func registerUpdated(_ object: any RecallTrackable, modelContext: ModelContext) {
@@ -494,9 +583,24 @@ final class AIRecallService {
         return top.map { RecallSnippet(entry: $0.entry, score: $0.score) }
     }
     
+    func allEntries(modelContext: ModelContext) -> [RecallIndexEntry] {
+        guard config.featureFlags.recallEnabled else { return [] }
+        refreshCacheIfNeeded(modelContext: modelContext)
+        if cache.isEmpty {
+            let descriptor = FetchDescriptor<RecallIndexEntry>()
+            let entries = (try? modelContext.fetch(descriptor)) ?? []
+            for entry in entries {
+                cache[entry.objectId] = entry
+            }
+            return entries
+        }
+        return Array(cache.values)
+    }
+    
     func boostImportance(
         for objectIDs: [UUID],
         amount: Double = 0.05,
+        engagementIncrement: Double = 0.0,
         modelContext: ModelContext
     ) {
         guard config.featureFlags.recallEnabled, !objectIDs.isEmpty else { return }
@@ -513,6 +617,9 @@ final class AIRecallService {
                 didChange = true
             }
             entry.lastViewedAt = now
+            if engagementIncrement > 0 {
+                entry.registerEngagement(increment: engagementIncrement, timestamp: now)
+            }
             cache[objectID] = entry
             AIDebug.log("Recall importance boosted for \(objectID.uuidString)")
         }
@@ -546,6 +653,124 @@ final class AIRecallService {
         
         // Remove CPS scores for deleted objects
         PriorityEngine.shared.removeScores(for: Array(objectIDs), modelContext: modelContext)
+    }
+    
+    func indexImageAnalysis(
+        userMessage: AIMessage,
+        analysis: String,
+        modelContext: ModelContext
+    ) {
+        guard config.featureFlags.recallEnabled else { return }
+        refreshCacheIfNeeded(modelContext: modelContext)
+        let trimmedAnalysis = analysis.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAnalysis.isEmpty else { return }
+        let timestamp = userMessage.timestamp ?? Date()
+        let objectId = userMessage.id
+        let emotionalSnapshot = EmotionAnalyzer.analyzeTone(text: trimmedAnalysis)
+        let title = makeImageTitle(from: userMessage, analysis: trimmedAnalysis)
+        let detail = truncatedText(trimmedAnalysis, limit: 240)
+        let keywords = extractImageKeywords(from: trimmedAnalysis)
+        let importanceBaseline = 0.35
+        let existingEntry = entry(for: objectId, modelContext: modelContext)
+        let entry = existingEntry ?? RecallIndexEntry(
+            objectId: objectId,
+            objectType: .image,
+            title: title,
+            detail: detail,
+            keywords: keywords,
+            accessCount: 0,
+            lastViewedAt: timestamp,
+            lastUpdatedAt: timestamp,
+            importance: importanceBaseline,
+            emotion: emotionalSnapshot.primaryEmotion.rawValue,
+            emotionScore: emotionalSnapshot.valence,
+            emotionIntensity: emotionalSnapshot.intensity,
+            emotionKeywords: emotionalSnapshot.keywords
+        )
+        entry.title = title
+        entry.detail = detail
+        entry.keywords = keywords
+        entry.lastViewedAt = timestamp
+        entry.lastUpdatedAt = timestamp
+        entry.importance = max(entry.importance, importanceBaseline)
+        entry.emotion = emotionalSnapshot.primaryEmotion.rawValue
+        entry.emotionScore = emotionalSnapshot.valence
+        entry.emotionIntensity = emotionalSnapshot.intensity
+        entry.emotionKeywords = emotionalSnapshot.keywords
+        if existingEntry == nil {
+            modelContext.insert(entry)
+        }
+        cache[objectId] = entry
+        ConceptTracker.shared.trackConcepts(
+            in: trimmedAnalysis,
+            fromObjectId: objectId,
+            contextType: RecallObjectType.image.rawValue,
+            modelContext: modelContext
+        )
+        do {
+            try modelContext.save()
+        } catch {
+            AIDebug.log("Failed to index image analysis: \(error.localizedDescription)")
+        }
+    }
+
+    func indexDocumentSummary(
+        userMessage: AIMessage,
+        summary: String,
+        modelContext: ModelContext
+    ) {
+        guard config.featureFlags.recallEnabled else { return }
+        refreshCacheIfNeeded(modelContext: modelContext)
+        let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSummary.isEmpty else { return }
+        let timestamp = userMessage.timestamp ?? Date()
+        let objectId = userMessage.id
+        let emotionalSnapshot = EmotionAnalyzer.analyzeTone(text: trimmedSummary)
+        let title = makeDocumentTitle(from: userMessage, summary: trimmedSummary)
+        let detail = truncatedText(trimmedSummary, limit: 240)
+        let keywords = extractDocumentKeywords(from: trimmedSummary, fileName: userMessage.documentFileName)
+        let importanceBaseline = 0.4
+        let existingEntry = entry(for: objectId, modelContext: modelContext)
+        let entry = existingEntry ?? RecallIndexEntry(
+            objectId: objectId,
+            objectType: .document,
+            title: title,
+            detail: detail,
+            keywords: keywords,
+            accessCount: 0,
+            lastViewedAt: timestamp,
+            lastUpdatedAt: timestamp,
+            importance: importanceBaseline,
+            emotion: emotionalSnapshot.primaryEmotion.rawValue,
+            emotionScore: emotionalSnapshot.valence,
+            emotionIntensity: emotionalSnapshot.intensity,
+            emotionKeywords: emotionalSnapshot.keywords
+        )
+        entry.title = title
+        entry.detail = detail
+        entry.keywords = keywords
+        entry.lastViewedAt = timestamp
+        entry.lastUpdatedAt = timestamp
+        entry.importance = max(entry.importance, importanceBaseline)
+        entry.emotion = emotionalSnapshot.primaryEmotion.rawValue
+        entry.emotionScore = emotionalSnapshot.valence
+        entry.emotionIntensity = emotionalSnapshot.intensity
+        entry.emotionKeywords = emotionalSnapshot.keywords
+        if existingEntry == nil {
+            modelContext.insert(entry)
+        }
+        cache[objectId] = entry
+        ConceptTracker.shared.trackConcepts(
+            in: trimmedSummary,
+            fromObjectId: objectId,
+            contextType: RecallObjectType.document.rawValue,
+            modelContext: modelContext
+        )
+        do {
+            try modelContext.save()
+        } catch {
+            AIDebug.log("Failed to index document summary: \(error.localizedDescription)")
+        }
     }
     
     private func register(
@@ -603,6 +828,7 @@ final class AIRecallService {
         switch interaction {
         case .created:
             entry.accessCount = max(1, entry.accessCount + 1)
+            entry.registerEngagement(increment: 0.12, timestamp: timestamp)
             // Track concepts on creation
             ConceptTracker.shared.trackConcepts(
                 in: contentForAnalysis,
@@ -619,6 +845,7 @@ final class AIRecallService {
             entry.emotionScore = emotionalSnapshot.valence
             entry.emotionIntensity = emotionalSnapshot.intensity
             entry.emotionKeywords = emotionalSnapshot.keywords
+            entry.registerEngagement(increment: 0.08, timestamp: timestamp)
             // Re-track concepts on update
             ConceptTracker.shared.trackConcepts(
                 in: contentForAnalysis,
@@ -671,6 +898,7 @@ final class AIRecallService {
             cache = Dictionary(uniqueKeysWithValues: entries.map { ($0.objectId, $0) })
             lastCacheRefresh = Date()
         }
+        applyAmbientDecayIfNeeded(modelContext: modelContext)
     }
 }
 
@@ -690,6 +918,80 @@ private func truncatedText(_ text: String, limit: Int = 120) -> String {
     let index = text.index(text.startIndex, offsetBy: limit)
     let prefix = text[text.startIndex..<index]
     return String(prefix) + "…"
+}
+
+private func makeImageTitle(from message: AIMessage, analysis: String) -> String {
+    if let fileName = message.imageFileName?.trimmingCharacters(in: .whitespacesAndNewlines), !fileName.isEmpty {
+        return "Image: \(fileName)"
+    }
+    let summary = analysis.split(whereSeparator: { ".!?".contains($0) }).first.map(String.init) ?? analysis
+    let cleaned = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+    let snippet = cleaned.isEmpty ? "Attachment" : truncatedText(cleaned, limit: 60)
+    return "Image: \(snippet)"
+}
+
+private func makeDocumentTitle(from message: AIMessage, summary: String) -> String {
+    if let fileName = message.documentFileName?.trimmingCharacters(in: .whitespacesAndNewlines), !fileName.isEmpty {
+        return "Document: \(fileName)"
+    }
+    let leadSentence = summary.split(whereSeparator: { ".!?".contains($0) }).first.map(String.init) ?? summary
+    let cleaned = leadSentence.trimmingCharacters(in: .whitespacesAndNewlines)
+    let snippet = cleaned.isEmpty ? "Attachment" : truncatedText(cleaned, limit: 60)
+    return "Document: \(snippet)"
+}
+
+private func extractImageKeywords(from text: String, limit: Int = 8) -> [String] {
+    let stopWords: Set<String> = [
+        "this", "that", "with", "from", "have", "about", "there", "their", "which", "while",
+        "where", "what", "when", "your", "into", "over", "under", "through", "many", "some",
+        "really", "looks", "looking", "thing", "things", "it's", "its", "just", "like", "them",
+        "they", "you're", "you", "here", "there's"
+    ]
+    let separators = CharacterSet.alphanumerics.inverted
+    let tokens = text
+        .lowercased()
+        .components(separatedBy: separators)
+        .filter { $0.count > 3 && !stopWords.contains($0) }
+    var seen: Set<String> = []
+    var keywords: [String] = []
+    for token in tokens {
+        if !seen.contains(token) {
+            seen.insert(token)
+            keywords.append(token)
+        }
+        if keywords.count >= limit { break }
+    }
+    return keywords
+}
+
+private func extractDocumentKeywords(from text: String, fileName: String?, limit: Int = 10) -> [String] {
+    var stopWords: Set<String> = [
+        "this", "that", "with", "from", "have", "about", "there", "their", "which", "while",
+        "where", "what", "when", "your", "into", "over", "under", "through", "many", "some",
+        "really", "just", "like", "them", "they", "you're", "you", "here", "there's", "document",
+        "summary", "section", "chapter", "pages", "page", "report", "notes", "file"
+    ]
+    let separators = CharacterSet.alphanumerics.inverted
+    var tokens: [String] = []
+    if let fileName = fileName?.lowercased(), !fileName.isEmpty {
+        let normalized = fileName.replacingOccurrences(of: ".", with: " ")
+        tokens.append(contentsOf: normalized.components(separatedBy: separators))
+    }
+    tokens.append(contentsOf: text.lowercased().components(separatedBy: separators))
+    let filtered = tokens.filter { token in
+        let cleaned = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.count > 3 && !stopWords.contains(cleaned)
+    }
+    var seen: Set<String> = []
+    var keywords: [String] = []
+    for token in filtered {
+        if !seen.contains(token) {
+            seen.insert(token)
+            keywords.append(token)
+        }
+        if keywords.count >= limit { break }
+    }
+    return keywords
 }
 
 // MARK: - Model Conformances
@@ -831,5 +1133,96 @@ extension Post: RecallTrackable {
             values.append(campaignId.uuidString)
         }
         return values
+    }
+}
+
+extension Reminder: RecallTrackable {
+    var recallObjectId: UUID { id }
+    var recallObjectType: RecallObjectType { .reminder }
+    var recallTitle: String { title }
+    var recallDetail: String {
+        if let notes, !notes.isEmpty {
+            return notes
+        }
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .short
+        return "Reminder: \(dateFormatter.string(from: reminderDate))"
+    }
+    var recallUpdatedAt: Date { updatedAt }
+    var recallImportance: Double {
+        if isCompleted {
+            return 0.2
+        }
+        // Higher importance for reminders coming up soon
+        let daysUntil = Calendar.current.dateComponents([.day], from: Date(), to: reminderDate).day ?? 0
+        if daysUntil <= 1 {
+            return 0.9
+        } else if daysUntil <= 7 {
+            return 0.7
+        }
+        return 0.5
+    }
+    var recallKeywords: [String] {
+        var values: [String] = ["reminder"]
+        if let notes, !notes.isEmpty {
+            // Extract keywords from notes
+            let words = notes.lowercased().components(separatedBy: .whitespacesAndNewlines)
+            values.append(contentsOf: words.filter { $0.count > 3 }.prefix(5))
+        }
+        return values
+    }
+}
+
+@MainActor
+private extension AIRecallService {
+    func applyAmbientDecayIfNeeded(modelContext: ModelContext) {
+        let now = Date()
+        if let lastRun = lastDecayRun {
+            let interval = now.timeIntervalSince(lastRun)
+            guard interval >= 6 * 3600 else { return }
+            let deltaDays = interval / (60 * 60 * 24)
+            guard deltaDays > 0 else { return }
+            var didChange = false
+            for entry in cache.values where entry.lastViewedAt <= lastRun {
+                let factor = exp(-deltaDays / 90.0)
+                let newImportance = max(0.0, entry.importance * factor)
+                if abs(newImportance - entry.importance) > 0.0001 {
+                    entry.importance = newImportance
+                    didChange = true
+                }
+            }
+            if didChange {
+                do {
+                    try modelContext.save()
+                } catch {
+                    AIDebug.log("Failed to apply ambient decay: \(error.localizedDescription)")
+                }
+            }
+        }
+        lastDecayRun = now
+        applyPruningIfNeeded(referenceDate: now, modelContext: modelContext)
+    }
+
+    func applyPruningIfNeeded(referenceDate: Date, modelContext: ModelContext) {
+        if let lastPruneRun, referenceDate.timeIntervalSince(lastPruneRun) < 7 * 24 * 3600 {
+            return
+        }
+        let staleThreshold = referenceDate.addingTimeInterval(-90 * 24 * 3600)
+        let candidates = cache.values.filter { $0.importance < 0.1 && $0.lastViewedAt < staleThreshold }
+        guard !candidates.isEmpty else {
+            lastPruneRun = referenceDate
+            return
+        }
+        for entry in candidates {
+            modelContext.delete(entry)
+            cache.removeValue(forKey: entry.objectId)
+        }
+        do {
+            try modelContext.save()
+        } catch {
+            AIDebug.log("Failed to prune stale recall entries: \(error.localizedDescription)")
+        }
+        lastPruneRun = referenceDate
     }
 }

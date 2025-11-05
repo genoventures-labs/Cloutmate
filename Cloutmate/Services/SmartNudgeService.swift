@@ -48,6 +48,31 @@ final class SmartNudgeService: ObservableObject {
         latestNudge = nil
     }
 
+    /// Deliver a predictive cognition nudge immediately, bypassing scheduled evaluations.
+    func deliverPredictiveNudge(
+        trigger: SmartNudgeTrigger,
+        tone: SmartNudgeTone,
+        message: String,
+        detail: String? = nil,
+        metadata: [String: String] = [:],
+        modelContext: ModelContext
+    ) {
+        let nudge = SmartNudge(
+            trigger: trigger,
+            tone: tone,
+            message: message,
+            detail: detail,
+            metadata: metadata
+        )
+
+        nudge.markDelivered()
+        modelContext.insert(nudge)
+        latestNudge = nudge
+        RitualAnalytics.shared.recordNudge(nudge, modelContext: modelContext)
+        saveContext(modelContext)
+        logger.info("Delivering predictive nudge with trigger \(trigger.rawValue)")
+    }
+
     // MARK: - Evaluation
 
     private func scheduleEvaluationTimer(modelContext: ModelContext) {

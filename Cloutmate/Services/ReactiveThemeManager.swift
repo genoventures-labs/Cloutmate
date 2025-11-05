@@ -138,13 +138,16 @@ final class ReactiveThemeManager: ObservableObject {
         // Immediate first check
         updateState(modelContext: modelContext)
         
-        // Schedule timer
+        // Schedule timer (re-enabled with conservative cadence)
+        stopPolling()
         pollingTimer = Timer.scheduledTimer(withTimeInterval: currentPollingInterval, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            Task { @MainActor in
+            _Concurrency.Task { @MainActor in
                 self.updateState(modelContext: modelContext)
             }
         }
+        // Reduce scheduling pressure
+        pollingTimer?.tolerance = currentPollingInterval * 0.2
         
         logger.info("ARTE: Polling started (interval: \(self.currentPollingInterval)s)")
     }

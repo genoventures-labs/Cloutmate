@@ -7,6 +7,7 @@
 
 import Foundation
 import CloutmateShared
+import Combine
 
 enum AITool: String, CaseIterable {
     case brainstorm = "Brainstorm Ideas"

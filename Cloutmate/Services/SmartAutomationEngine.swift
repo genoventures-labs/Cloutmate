@@ -22,6 +22,23 @@ final class SmartAutomationEngine {
     
     private init() {}
     
+    func getPendingSuggestions(
+        limit: Int = 1,
+        modelContext: ModelContext
+    ) -> [WorkflowPattern] {
+        var descriptor = FetchDescriptor<WorkflowPattern>(
+            predicate: #Predicate { pattern in
+                pattern.isActive &&
+                !pattern.userDismissedSuggestion &&
+                !pattern.userAcceptedSuggestion &&
+                pattern.confidence >= 0.7
+            },
+            sortBy: [SortDescriptor(\WorkflowPattern.confidence, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
     // MARK: - Pattern Detection
     
     /// Analyze user behavior and detect recurring patterns

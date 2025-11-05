@@ -10,5 +10,8 @@ import Foundation
 extension Notification.Name {
     static let openComposer = Notification.Name("openComposer")
     static let switchTab = Notification.Name("switchTab")
+    static let focusSessionStatusChanged = Notification.Name("focusSessionStatusChanged")
+    static let openContextualCreate = Notification.Name("openContextualCreate")
+    static let currentTabUpdated = Notification.Name("CurrentTabUpdated")
 }
 

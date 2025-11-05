@@ -99,6 +99,51 @@ struct MessageBubble: View {
     
     private var messageContentView: some View {
         VStack(alignment: isSystemMessage ? .center : .leading, spacing: 12) {
+            if let documentName = message.documentFileName {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
+                        Image(systemName: "doc.text.fill")
+                            .foregroundColor(isUser ? .white.opacity(0.9) : .kosmicBlue)
+                            .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(documentName)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(isUser ? .white : .primary)
+                            Text(documentMetadataLine(for: message))
+                                .font(.caption2)
+                                .foregroundColor(isUser ? .white.opacity(0.85) : .secondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    if let preview = message.documentTextPreview?.trimmingCharacters(in: .whitespacesAndNewlines), !preview.isEmpty {
+                        Text(preview)
+                            .font(.caption2)
+                            .foregroundColor(isUser ? .white.opacity(0.85) : .secondary)
+                            .lineLimit(4)
+                            .multilineTextAlignment(.leading)
+                    }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(isUser ? Color.white.opacity(0.12) : Color.gray.opacity(0.08))
+                )
+            }
+
+            if let imageData = message.imageData,
+               let image = NSImage(data: imageData) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 320, maxHeight: 320)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(isUser ? 0.3 : 0.15), lineWidth: 1)
+                    )
+            }
+            
             // Message text with markdown rendering
             if let content = message.content, !content.isEmpty {
                 if isUser {
@@ -189,6 +234,48 @@ struct MessageBubble: View {
                 }
             }
             
+            // Document summary with source model indicator (assistant messages only)
+            if !isUser, let summary = message.documentSummary, !summary.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    if let attributedSummary = try? AttributedString(
+                        markdown: summary,
+                        options: AttributedString.MarkdownParsingOptions(
+                            allowsExtendedAttributes: true,
+                            interpretedSyntax: .full
+                        )
+                    ) {
+                        Text(attributedSummary)
+                            .foregroundColor(isSystemMessage ? .secondary : .primary)
+                            .textSelection(.enabled)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(6)
+                            .lineLimit(nil)
+                            .tint(.kosmicBlue)
+                    } else {
+                        Text(summary)
+                            .foregroundColor(isSystemMessage ? .secondary : .primary)
+                            .textSelection(.enabled)
+                            .multilineTextAlignment(.leading)
+                            .lineSpacing(6)
+                            .lineLimit(nil)
+                    }
+                    
+                    // Powered by indicator (subtle, at bottom)
+                    if let sourceModel = message.documentSourceModel, !sourceModel.isEmpty {
+                        HStack(spacing: 4) {
+                            Text("Powered by")
+                                .font(.caption2)
+                                .foregroundColor(.secondary.opacity(0.7))
+                            Text(sourceModelBadgeLabel(for: sourceModel))
+                                .font(.caption2)
+                                .fontWeight(.medium)
+                                .foregroundColor(sourceModelColor(for: sourceModel).opacity(0.8))
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+            }
+            
             // Chart visualization (for reflection responses)
             if !isUser, let chartData = message.chartData {
                 ReflectionChartView(chartData: chartData)
@@ -196,6 +283,15 @@ struct MessageBubble: View {
             } else if !isUser, let chartCollection = message.chartCollection {
                 ChartCollectionView(collection: chartCollection)
                     .padding(.top, 8)
+            }
+            
+            if isUser,
+               let docSummary = message.documentSummary?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !docSummary.isEmpty {
+                Text("Aurora summarized: \(truncatedSummary(docSummary))")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.85))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             
             // Action buttons inside the message
@@ -232,6 +328,24 @@ struct MessageBubble: View {
                 }
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+            }
+            
+            // Powered by indicator for document summaries
+            if !isUser,
+               let sourceModel = message.documentSourceModel,
+               !sourceModel.isEmpty,
+               message.documentFileName != nil {
+                HStack(spacing: 4) {
+                    Text("Powered by")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Text(sourceModelBadgeLabel(for: sourceModel))
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundColor(sourceModelColor(for: sourceModel))
+                }
+                .padding(.top, 4)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.horizontal, 16)
@@ -339,6 +453,28 @@ struct MessageBubble: View {
         return sections.isEmpty ? [content] : sections
     }
     
+    private func documentMetadataLine(for message: AIMessage) -> String {
+        var parts: [String] = []
+        if let mime = message.documentMimeType, !mime.isEmpty {
+            parts.append(mime)
+        }
+        if let urlString = message.documentSourceURL,
+           let url = URL(string: urlString) {
+            let host = url.host ?? url.absoluteString
+            parts.append(host)
+        }
+        if parts.isEmpty {
+            parts.append("Uploaded document")
+        }
+        return parts.joined(separator: " • ")
+    }
+    
+    private func truncatedSummary(_ summary: String, limit: Int = 220) -> String {
+        guard summary.count > limit else { return summary }
+        let index = summary.index(summary.startIndex, offsetBy: limit)
+        return String(summary[..<index]) + "…"
+    }
+    
     // MARK: - Actions
     
     private func submitEdit() {
@@ -370,6 +506,34 @@ struct MessageBubble: View {
         
         // Call callback if provided
         onCopy?(content)
+    }
+    
+    // MARK: - Source Model Helpers
+    
+    private func sourceModelBadgeLabel(for sourceModel: String) -> String {
+        switch sourceModel.lowercased() {
+        case "gemini":
+            return "Gemini"
+        case "applellm":
+            return "Apple Intelligence"
+        case "offline":
+            return "Offline"
+        default:
+            return sourceModel
+        }
+    }
+    
+    private func sourceModelColor(for sourceModel: String) -> Color {
+        switch sourceModel.lowercased() {
+        case "gemini":
+            return .kosmicBlue
+        case "applellm":
+            return .kosmicPurple
+        case "offline":
+            return .orange
+        default:
+            return .secondary
+        }
     }
 }
 

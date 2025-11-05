@@ -19,56 +19,66 @@ struct EmotionalHeatmapView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 24) {
+            VStack(spacing: 24) {
                 // Current Emotional State
                 if let snapshot = snapshot {
                     GroupBox {
-                        VStack(spacing: 16) {
-                            Label("Current Emotional State", systemImage: "heart.text.square")
-                                .font(.headline)
-                            
-                            HStack(spacing: 32) {
-                                VStack {
-                                    Image(systemName: emotionIcon(snapshot.dominantEmotion))
-                                        .font(.system(size: 60))
-                                        .foregroundColor(emotionColor(snapshot.dominantEmotion))
-                                    
-                                    Text(snapshot.dominantEmotion.rawValue.capitalized)
-                                        .font(.title2.bold())
-                                }
+                        if hasMeaningfulSnapshot(snapshot) {
+                            VStack(spacing: 16) {
+                                Label("Current Emotional State", systemImage: "heart.text.square")
+                                    .font(.headline)
                                 
-                                Divider()
-                                
-                                VStack(alignment: .leading, spacing: 12) {
-                                    HStack {
-                                        Text("Trend:")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        Text(snapshot.emotionalTrend.rawValue.capitalized)
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(trendColor(snapshot.emotionalTrend))
+                                HStack(spacing: 32) {
+                                    VStack {
+                                        Image(systemName: emotionIcon(snapshot.dominantEmotion))
+                                            .font(.system(size: 60))
+                                            .foregroundColor(emotionColor(snapshot.dominantEmotion))
+                                        
+                                        Text(snapshot.dominantEmotion.rawValue.capitalized)
+                                            .font(.title2.bold())
                                     }
                                     
-                                    HStack {
-                                        Text("Valence:")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        Text(String(format: "%.2f", snapshot.emotionalSnapshot.valence))
-                                            .font(.subheadline.bold())
-                                    }
+                                    Divider()
                                     
-                                    HStack {
-                                        Text("Intensity:")
-                                            .font(.subheadline)
-                                            .foregroundColor(.secondary)
-                                        Text(String(format: "%.1f%%", snapshot.emotionalSnapshot.intensity * 100))
-                                            .font(.subheadline.bold())
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        HStack {
+                                            Text("Trend:")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                            Text(snapshot.emotionalTrend.rawValue.capitalized)
+                                                .font(.subheadline.bold())
+                                                .foregroundColor(trendColor(snapshot.emotionalTrend))
+                                        }
+                                        
+                                        HStack {
+                                            Text("Valence:")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                            Text(String(format: "%.2f", snapshot.emotionalSnapshot.valence))
+                                                .font(.subheadline.bold())
+                                        }
+                                        
+                                        HStack {
+                                            Text("Intensity:")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                            Text(String(format: "%.1f%%", snapshot.emotionalSnapshot.intensity * 100))
+                                                .font(.subheadline.bold())
+                                        }
                                     }
                                 }
+                                .padding()
                             }
                             .padding()
+                        } else {
+                            ContentUnavailableView(
+                                "No Emotional Signals",
+                                systemImage: "heart.slash",
+                                description: Text("Chat with Aurora or log reflections to see your current emotional state.")
+                            )
+                            .frame(maxWidth: .infinity)
+                            .padding()
                         }
-                        .padding()
                     }
                     .padding(.horizontal)
                 }
@@ -79,22 +89,22 @@ struct EmotionalHeatmapView: View {
                         Label("Emotional Valence Over Time", systemImage: "chart.line.uptrend.xyaxis")
                             .font(.headline)
                         
-                        if !emotionalTrend.isEmpty {
+                        if !emotionalTrend.isEmpty && hasMeaningfulTrend {
                             Chart(emotionalTrend, id: \.date) { dataPoint in
                                 LineMark(
-                                    x: .value("Date", dataPoint.date),
+                                    x: .value("Date", dataPoint.date, unit: .day),
                                     y: .value("Valence", dataPoint.valence)
                                 )
                                 .foregroundStyle(valenceColor(dataPoint.valence))
-                                .interpolationMethod(.catmullRom)
                                 
                                 PointMark(
-                                    x: .value("Date", dataPoint.date),
+                                    x: .value("Date", dataPoint.date, unit: .day),
                                     y: .value("Valence", dataPoint.valence)
                                 )
                                 .foregroundStyle(emotionColor(dataPoint.emotion))
                                 .symbolSize(80)
                             }
+                            .transaction { $0.animation = nil }
                             .frame(height: 250)
                             .chartYScale(domain: -1...1)
                             .chartYAxis {
@@ -126,7 +136,7 @@ struct EmotionalHeatmapView: View {
                         Label("Emotion Distribution", systemImage: "chart.pie")
                             .font(.headline)
                         
-                        if !emotionalTrend.isEmpty {
+                        if !emotionalTrend.isEmpty && hasMeaningfulTrend {
                             let emotionCounts = Dictionary(grouping: emotionalTrend, by: { $0.emotion })
                                 .mapValues { $0.count }
                                 .sorted { $0.value > $1.value }
@@ -146,12 +156,10 @@ struct EmotionalHeatmapView: View {
                                         .foregroundColor(.secondary)
                                     
                                     // Percentage bar
-                                    GeometryReader { geometry in
                                         RoundedRectangle(cornerRadius: 4)
                                             .fill(emotionColor(emotion).opacity(0.3))
-                                            .frame(width: geometry.size.width * (Double(count) / Double(emotionalTrend.count)))
-                                    }
-                                    .frame(width: 100, height: 8)
+                                        .frame(width: emotionBarWidth(for: count), height: 8)
+                                        .frame(width: 100, alignment: .leading)
                                 }
                                 .padding(.vertical, 4)
                                 
@@ -159,6 +167,12 @@ struct EmotionalHeatmapView: View {
                                     Divider()
                                 }
                             }
+                        } else {
+                            ContentUnavailableView(
+                                "No Emotion Distribution",
+                                systemImage: "chart.pie",
+                                description: Text("Keep interacting with Aurora to build richer emotional data.")
+                            )
                         }
                     }
                     .padding()
@@ -171,7 +185,15 @@ struct EmotionalHeatmapView: View {
                         Label("Emotional Calendar", systemImage: "calendar")
                             .font(.headline)
                         
-                        EmotionalCalendarView(emotionalData: emotionalTrend)
+                        if hasMeaningfulTrend {
+                            EmotionalCalendarView(emotionalData: emotionalTrend)
+                        } else {
+                            ContentUnavailableView(
+                                "No Emotional Timeline",
+                                systemImage: "calendar",
+                                description: Text("Once emotional data is captured, your monthly heatmap will appear here.")
+                            )
+                        }
                     }
                     .padding()
                 }
@@ -180,6 +202,9 @@ struct EmotionalHeatmapView: View {
             .padding(.vertical)
         }
         .task {
+            loadData()
+        }
+        .onChange(of: timeRange) { _ in
             loadData()
         }
     }
@@ -239,6 +264,23 @@ struct EmotionalHeatmapView: View {
         case .declining: return .orange
         case .volatile: return .kosmicPurple
         }
+    }
+
+    private func emotionBarWidth(for count: Int) -> CGFloat {
+        guard !emotionalTrend.isEmpty else { return 0 }
+        let ratio = max(0, min(1, Double(count) / Double(emotionalTrend.count)))
+        return CGFloat(ratio) * 100
+    }
+
+    private var hasMeaningfulTrend: Bool {
+        emotionalTrend.contains { abs($0.valence) > 0.05 || $0.emotion != .neutral }
+    }
+
+    private func hasMeaningfulSnapshot(_ snapshot: AnalyticsSnapshot) -> Bool {
+        abs(snapshot.emotionalSnapshot.valence) > 0.05 ||
+        snapshot.emotionalSnapshot.intensity > 0.05 ||
+        snapshot.dominantEmotion != .neutral ||
+        snapshot.emotionalTrend != .stable
     }
 }
 

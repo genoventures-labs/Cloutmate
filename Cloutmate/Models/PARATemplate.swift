@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 enum TemplateType: String, Codable, CaseIterable {
     case project

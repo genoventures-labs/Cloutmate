@@ -22,6 +22,14 @@ struct InsightsView: View {
     @State private var selectedTab: InsightTab = .overview
     @State private var autoRefreshTimer: Timer?
     @State private var ritualTrend: [(Date, Double)] = []
+    @State private var topConcepts: [(name: String, salience: Double, count: Int)] = []
+    @State private var isBuildingGraph: Bool = false
+    @State private var showingMemoryGraphInfo: Bool = false
+    @State private var memoryGraphError: String?
+    @State private var hasMemoryGraphData: Bool = false
+    @State private var memoryGraphNodeCount: Int = 0
+    @State private var memoryGraphThemeCount: Int = 0
+    @State private var graphActivityMessage: String = "Building memory graph…"
     
     var body: some View {
         VStack(spacing: 0) {
@@ -45,20 +53,26 @@ struct InsightsView: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
             
-            // Tab view
-            TabView(selection: $selectedTab) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        cognitiveOverviewSection
-                    }
+            // Tab picker (segmented) and on-demand rendering
+            Picker("Tab", selection: $selectedTab) {
+                ForEach(InsightTab.allCases, id: \.self) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 8)
+
+            Group {
+                switch selectedTab {
+                case .overview:
+                    ScrollView {
+                        OverviewTabView(snapshot: currentSnapshot, ritualTrend: ritualTrend)
                     .padding(28)
                 }
                 .background(Color(.windowBackgroundColor))
-                .tabItem {
-                    Label("Overview", systemImage: "brain.head.profile")
-                }
-                .tag(InsightTab.overview)
                 
+                case .memoryGraph:
                 ScrollView {
                     VStack(alignment: .leading, spacing: 32) {
                         memoryGraphSection
@@ -66,64 +80,110 @@ struct InsightsView: View {
                     .padding(28)
                 }
                 .background(Color(.windowBackgroundColor))
-                .tabItem {
-                    Label("Memory Graph", systemImage: "network")
+                .task {
+                    await checkMemoryGraphData()
                 }
-                .tag(InsightTab.memoryGraph)
                 
+                case .focus:
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        focusAnalyticsSection
-                    }
+                        FocusTabView(snapshot: currentSnapshot, timeRange: selectedTimeRange)
                     .padding(28)
                 }
                 .background(Color(.windowBackgroundColor))
-                .tabItem {
-                    Label("Focus", systemImage: "chart.bar.fill")
-                }
-                .tag(InsightTab.focus)
                 
+                case .emotional:
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        emotionalHeatmapSection
-                    }
+                        EmotionalTabView(snapshot: currentSnapshot, timeRange: selectedTimeRange)
                     .padding(28)
                 }
                 .background(Color(.windowBackgroundColor))
-                .tabItem {
-                    Label("Emotional", systemImage: "heart.circle.fill")
-                }
-                .tag(InsightTab.emotional)
                 
+                case .learning:
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        learningLoopSection
-                    }
+                        LearningTabView(snapshot: currentSnapshot, timeRange: selectedTimeRange)
                     .padding(28)
                 }
                 .background(Color(.windowBackgroundColor))
-                .tabItem {
-                    Label("Learning", systemImage: "sparkles")
-                }
-                .tag(InsightTab.learning)
                 
+                case .connections:
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        connectionsSection
-                    }
+                        ConnectionsTabView(snapshot: currentSnapshot, topConcepts: topConcepts, timeRange: selectedTimeRange)
                     .padding(28)
                 }
                 .background(Color(.windowBackgroundColor))
-                .tabItem {
-                    Label("Connections", systemImage: "link.circle.fill")
                 }
-                .tag(InsightTab.connections)
             }
         }
         .task {
             await loadAnalytics()
+            await checkMemoryGraphData()
             await MainActor.run {
                 startAutoRefresh()
+            }
+        }
+        .onChange(of: selectedTab) { _, _ in
+            if selectedTab == .memoryGraph {
+                _Concurrency.Task { @MainActor in
+                    await checkMemoryGraphData()
+                }
+            }
+        }
+        .sheet(isPresented: $showingMemoryGraphInfo) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: memoryGraphError != nil ? "exclamationmark.triangle.fill" : "network")
+                        .foregroundColor(memoryGraphError != nil ? .orange : KosmicPalette.cyan)
+                    Text(memoryGraphError != nil ? "Memory Graph Error" : "About Memory Graph")
+                        .font(.system(size: 20, weight: .bold))
+                    Spacer()
+                }
+                
+                if let error = memoryGraphError {
+                    Text(error)
+                        .font(.system(size: 13))
+                        .foregroundColor(.orange)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color.orange.opacity(0.1))
+                        .cornerRadius(8)
+                } else {
+                    Text("The Memory Graph connects your tasks, notes, drafts, and posts into a knowledge map. Aurora uses it to surface recurring themes and relationships. You can build it from your existing data at any time; it updates over time as you work.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    if memoryGraphError != nil {
+                        Button("Dismiss") {
+                            memoryGraphError = nil
+                            showingMemoryGraphInfo = false
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    Spacer()
+                    Button("Close") {
+                        memoryGraphError = nil
+                        showingMemoryGraphInfo = false
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(24)
+            .frame(width: 520)
+        }
+        .overlay(alignment: .center) {
+            if isBuildingGraph {
+                ZStack {
+                    Color.black.opacity(0.1).ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text(graphActivityMessage)
+                            .font(.system(size: 13))
+                    }
+                    .padding(16)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(12)
+                }
             }
         }
         .onDisappear {
@@ -225,7 +285,7 @@ struct InsightsView: View {
             
             // ARTE Status Indicator (Phase 7)
             EmotionalStateIndicator()
-            
+
             // Focus Ritual Metrics
             if currentSnapshot != nil {
                 focusRitualsCard
@@ -265,10 +325,135 @@ struct InsightsView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
+                if hasMemoryGraphData {
+                    Button {
+                        _Concurrency.Task { await buildMemoryGraph() }
+                    } label: {
+                        Label("Rebuild", systemImage: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(8)
+                    .disabled(isBuildingGraph)
+                }
             }
             
-            ConceptGraphView()
-                .frame(height: 600)
+            Group {
+                // Show build card if no data exists
+                if !hasMemoryGraphData {
+                    GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "network")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(KosmicPalette.cyan)
+                                Text("Build Your Memory Graph")
+                                    .font(.system(size: 18, weight: .bold))
+                                Spacer()
+                            }
+                            Text("Connect tasks, notes, posts, and concepts into a knowledge map. This helps Aurora surface patterns and themes over time.")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            HStack(spacing: 12) {
+                                Button {
+                                    _Concurrency.Task { await buildMemoryGraph() }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "wand.and.stars")
+                                        Text("Build Memory Graph")
+                                    }
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(KosmicPalette.violet)
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+
+                                Button {
+                                    showingMemoryGraphInfo = true
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "questionmark.circle")
+                                        Text("What is this?")
+                                    }
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(Color.secondary.opacity(0.1))
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(20)
+                    }
+                } else if memoryGraphThemeCount == 0 {
+                    GlassPanel(tier: .contentCard, cornerRadius: 16) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(KosmicPalette.cyan)
+                                Text("No Themes Detected Yet")
+                                    .font(.system(size: 18, weight: .bold))
+                                Spacer()
+                            }
+                            Text("We’ve indexed \(memoryGraphNodeCount) memories but haven’t found confident themes yet. Try extracting themes or rebuilding the graph to discover new patterns.")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+
+                            HStack(spacing: 12) {
+                                Button {
+                                    _Concurrency.Task { await runThemeExtraction() }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "wand.and.rays")
+                                        Text("Extract Themes")
+                                    }
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(KosmicPalette.violet)
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isBuildingGraph)
+
+                                Button {
+                                    _Concurrency.Task { await buildMemoryGraph() }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "arrow.clockwise")
+                                        Text("Rebuild Graph")
+                                    }
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(Color.secondary.opacity(0.1))
+                                    .cornerRadius(8)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(isBuildingGraph)
+                            }
+                        }
+                        .padding(20)
+                    }
+                } else {
+                    ConceptGraphView()
+                        .frame(height: 600)
+                }
+            }
         }
     }
     
@@ -364,9 +549,9 @@ struct InsightsView: View {
                         Spacer()
                     }
                     
-                    if let concepts = getTopConcepts() {
+                    if !topConcepts.isEmpty {
                         VStack(spacing: 12) {
-                            ForEach(concepts, id: \.name) { concept in
+                            ForEach(topConcepts, id: \.name) { concept in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(concept.name)
@@ -499,6 +684,7 @@ struct InsightsView: View {
         await MainActor.run {
             currentSnapshot = snapshot
             ritualTrend = AnalyticsEngine.shared.getRitualCompletionTrend(days: 14, modelContext: modelContext)
+            topConcepts = fetchTopConcepts()
             isLoading = false
         }
     }
@@ -582,26 +768,22 @@ struct InsightsView: View {
     }
     
     private func getTopConcepts() -> [(name: String, salience: Double, count: Int)]? {
-        guard let snapshot = currentSnapshot else { return nil }
+        // Deprecated: use pre-fetched topConcepts state instead
+        return topConcepts.isEmpty ? nil : topConcepts
+    }
         
-        // Fetch actual concepts from ConceptNode
+    private func fetchTopConcepts() -> [(name: String, salience: Double, count: Int)] {
         let conceptDescriptor = FetchDescriptor<ConceptNode>(
             sortBy: [SortDescriptor(\ConceptNode.relevanceWeight, order: .reverse)]
         )
-        
-        guard let concepts = try? modelContext.fetch(conceptDescriptor) else {
-            return nil
-        }
-        
-        let topConcepts = concepts.prefix(5).map { concept -> (name: String, salience: Double, count: Int) in
+        let concepts = (try? modelContext.fetch(conceptDescriptor)) ?? []
+        return Array(concepts.prefix(5).map { concept in
             (
                 name: concept.concept,
                 salience: concept.relevanceWeight,
                 count: concept.mentionCount
             )
-        }
-        
-        return topConcepts.isEmpty ? nil : Array(topConcepts)
+        })
     }
     
     private func exportWeeklyReflection() {
@@ -636,6 +818,172 @@ struct InsightsView: View {
     private func stopAutoRefresh() {
         autoRefreshTimer?.invalidate()
         autoRefreshTimer = nil
+    }
+
+    // MARK: - Memory Graph Utilities
+
+    @MainActor
+    private func checkMemoryGraphData() {
+        let nodeDescriptor = FetchDescriptor<MemoryNode>()
+        let themeDescriptor = FetchDescriptor<ThemeNode>()
+        let nodes = (try? modelContext.fetch(nodeDescriptor)) ?? []
+        let themes = (try? modelContext.fetch(themeDescriptor)) ?? []
+        memoryGraphNodeCount = nodes.count
+        memoryGraphThemeCount = themes.count
+        hasMemoryGraphData = !nodes.isEmpty
+        Logger.insights.info("Memory graph data check: nodes=\(memoryGraphNodeCount), themes=\(memoryGraphThemeCount), hasData=\(hasMemoryGraphData)")
+    }
+    
+    // MARK: - Memory Graph Builder
+    private func buildMemoryGraph() async {
+        guard AIConfigService.shared.config.featureFlags.memoryGraphEnabled else {
+            await MainActor.run {
+                memoryGraphError = "Memory Graph is disabled. Enable AIMemoryGraphEnabled in AIConfig.plist to use this feature."
+                showingMemoryGraphInfo = true
+            }
+            return
+        }
+        if isBuildingGraph { return }
+        await MainActor.run {
+            graphActivityMessage = "Building memory graph…"
+            isBuildingGraph = true
+        }
+        defer {
+            _Concurrency.Task { @MainActor in
+                isBuildingGraph = false
+                graphActivityMessage = "Building memory graph…"
+            }
+        }
+        
+        let ctx = modelContext
+        let logger = Logger(subsystem: "com.kosmicapps.Cloutmate", category: "Insights")
+        logger.info("Building memory graph from existing data...")
+        
+        do {
+            // Fetch a reasonable batch from each type
+            var taskDescriptor = FetchDescriptor<Task>(sortBy: [SortDescriptor(\Task.updatedAt, order: .reverse)])
+            taskDescriptor.fetchLimit = 50
+            let tasks = (try? ctx.fetch(taskDescriptor)) ?? []
+
+            var noteDescriptor = FetchDescriptor<Note>(sortBy: [SortDescriptor(\Note.updatedAt, order: .reverse)])
+            noteDescriptor.fetchLimit = 50
+            let notes = (try? ctx.fetch(noteDescriptor)) ?? []
+
+            var draftDescriptor = FetchDescriptor<Draft>(sortBy: [SortDescriptor(\Draft.updatedAt, order: .reverse)])
+            draftDescriptor.fetchLimit = 50
+            let drafts = (try? ctx.fetch(draftDescriptor)) ?? []
+
+            var postDescriptor = FetchDescriptor<Post>(sortBy: [SortDescriptor(\Post.updatedAt, order: .reverse)])
+            postDescriptor.fetchLimit = 50
+            let posts = (try? ctx.fetch(postDescriptor)) ?? []
+            
+            logger.info("Found \(tasks.count) tasks, \(notes.count) notes, \(drafts.count) drafts, \(posts.count) posts")
+            
+            let objects: [any RecallTrackable] = tasks + notes + drafts + posts
+            if objects.isEmpty {
+                logger.info("No objects found to create nodes from")
+                await MainActor.run {
+                    memoryGraphError = "No tasks, notes, drafts, or posts found. Create some content first."
+                    showingMemoryGraphInfo = true
+                }
+                return
+            }
+            
+            logger.info("Creating memory graph nodes for \(objects.count) objects...")
+            
+            // Create/find nodes
+            var createdCount = 0
+            var existingCount = 0
+            
+            // Fetch all existing nodes to check against
+            let allNodesDescriptor = FetchDescriptor<MemoryNode>()
+            let allNodes = (try? ctx.fetch(allNodesDescriptor)) ?? []
+            let existingNodeIds = Set(allNodes.compactMap { $0.objectId })
+            
+            for (index, object) in objects.enumerated() {
+                // Check if node already exists
+                if existingNodeIds.contains(object.recallObjectId) {
+                    existingCount += 1
+                    continue
+                }
+                
+                _ = try await MemoryGraphService.shared.findOrCreateNode(for: object, modelContext: ctx)
+                createdCount += 1
+                
+                // Save periodically to avoid memory pressure
+                if index % 10 == 0 {
+                    try? ctx.save()
+                }
+            }
+            
+            logger.info("Created \(createdCount) new nodes, \(existingCount) already existed")
+            
+            // Optionally connect similar nodes (lightweight pass)
+            var nodeDescriptor = FetchDescriptor<MemoryNode>()
+            nodeDescriptor.fetchLimit = 25
+            let seedNodes: [MemoryNode] = (try? ctx.fetch(nodeDescriptor)) ?? []
+            
+            logger.info("Linking \(seedNodes.count) seed nodes...")
+            
+            var edgeCount = 0
+            for node in seedNodes {
+                let similars = MemoryGraphService.shared.findSimilarNodes(to: node.id, threshold: 0.85, limit: 3, modelContext: ctx)
+                for similar in similars {
+                    _ = try? MemoryGraphService.shared.createEdge(from: node.id, to: similar.id, type: .similarTo, weight: 0.6, reason: "Auto-linked: embedding similarity", modelContext: ctx)
+                    edgeCount += 1
+                }
+            }
+            
+            logger.info("Created \(edgeCount) edges between similar nodes")
+            
+            try? ctx.save()
+            logger.info("Memory graph build complete!")
+            
+            // Run theme extraction so the graph has clusters to display
+            await runThemeExtraction(afterBuild: true, context: ctx)
+        } catch {
+            logger.error("Memory graph build failed: \(error.localizedDescription)")
+            await MainActor.run {
+                memoryGraphError = "Failed to build memory graph: \(error.localizedDescription)"
+                showingMemoryGraphInfo = true
+            }
+        }
+    }
+
+    private func runThemeExtraction(afterBuild: Bool = false, context: ModelContext? = nil) async {
+        let ctx = context ?? modelContext
+        if !afterBuild {
+            guard AIConfigService.shared.config.featureFlags.memoryGraphEnabled else {
+                await MainActor.run {
+                    memoryGraphError = "Memory Graph is disabled. Enable AIMemoryGraphEnabled in AIConfig.plist to use this feature."
+                    showingMemoryGraphInfo = true
+                }
+                return
+            }
+            if isBuildingGraph { return }
+            await MainActor.run {
+                graphActivityMessage = "Extracting themes…"
+                isBuildingGraph = true
+            }
+        } else {
+            await MainActor.run {
+                graphActivityMessage = "Extracting themes…"
+            }
+        }
+        defer {
+            if !afterBuild {
+                _Concurrency.Task { @MainActor in
+                    isBuildingGraph = false
+                    graphActivityMessage = "Building memory graph…"
+                }
+            }
+        }
+        Logger.insights.info("Running theme extraction pipeline")
+        await ThemeExtractionPipeline.shared.extractThemesOnNarrative(modelContext: ctx)
+        await MainActor.run {
+            checkMemoryGraphData()
+        }
+        await loadAnalytics()
     }
 }
 
@@ -681,21 +1029,15 @@ extension InsightsView {
                                 x: .value("Date", point.0, unit: .day),
                                 y: .value("Completion", point.1)
                             )
-                            .interpolationMethod(.catmullRom)
                             .foregroundStyle(KosmicPalette.violet)
                             AreaMark(
                                 x: .value("Date", point.0, unit: .day),
                                 y: .value("Completion", point.1)
                             )
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [KosmicPalette.violet.opacity(0.35), .clear],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .foregroundStyle(KosmicPalette.violet.opacity(0.2))
                         }
                     }
+                    .transaction { $0.animation = nil }
                     .frame(height: 120)
                 } else {
                     Text("Complete a few rituals to unlock consistency insights.")

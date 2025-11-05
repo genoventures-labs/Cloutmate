@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 /// Types of triggers that can generate a smart nudge.
 enum SmartNudgeTrigger: String, Codable, CaseIterable {

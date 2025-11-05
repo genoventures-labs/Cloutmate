@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import CloutmateShared
+import AppKit
 
 extension Array where Element: Hashable {
     func removingDuplicates() -> [Element] {
@@ -34,8 +35,14 @@ struct AIAssistantView: View {
     @State private var showAIInfo = false
     @State private var isRecording = false
     @State private var voiceInputText = ""
+    @FocusState private var isInputFocused: Bool
+    @State private var showMicroFeedback: ToolbarAction? = nil
+    @State private var showCreateSheet = false
+    @State private var contextualCreateTab: TabIdentifier = .home
     
     private let voiceService = VoiceTranscriptionService.shared
+    private let tintManager = ArteTintManager.shared
+    private let usageTracker = ToolbarUsageTracker.shared
     
     var body: some View {
         HSplitView {
@@ -81,6 +88,30 @@ struct AIAssistantView: View {
         }
         .onAppear {
             setupVoiceService()
+            setupKeyboardHandlers()
+            // Listen for keyboard shortcuts
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("AuroraToolbarAction"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let action = notification.object as? ToolbarAction {
+                    handleToolbarAction(action)
+                }
+            }
+            // Listen for current tab updates
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("CurrentTabUpdated"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let tab = notification.object as? TabIdentifier {
+                    contextualCreateTab = tab
+                }
+            }
+        }
+        .sheet(isPresented: $showCreateSheet) {
+            ContextualCreateSheet(currentTab: contextualCreateTab)
         }
         .alert("AI Assistant", isPresented: $showAIInfo) {
             Button("OK") { }
@@ -248,14 +279,15 @@ struct AIAssistantView: View {
                             }
                             
                             if viewModel.isLoading {
-                                HStack {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                    Text("AI is thinking...")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
+                                ThinkingIndicator(
+                                    activity: viewModel.displayedActivity,
+                                    sourceModel: viewModel.currentSourceModel
+                                )
                                 .padding()
+                            } else if !viewModel.messages.isEmpty {
+                                // Idle intelligence: subtle presence when waiting for input
+                                IdleIndicator()
+                                    .padding(.top, 8)
                             }
                         }
                         .padding(.vertical, 16)
@@ -296,13 +328,13 @@ struct AIAssistantView: View {
             }
             
             Divider()
-                .overlay(Color.white.opacity(0.2))
+                .overlay(Color.white.opacity(0.1))
             
-            // Quick Action Tools
-            quickActionTools
+            // Core Capabilities Toolbar
+            coreCapabilitiesToolbar
             
             Divider()
-                .overlay(Color.white.opacity(0.2))
+                .overlay(Color.white.opacity(0.1))
             
             // Status Banner
             if let status = viewModel.currentStatus {
@@ -321,6 +353,21 @@ struct AIAssistantView: View {
             
             // Input Area
             inputArea
+            
+            // Contextual Hint Bar
+            if viewModel.inputText.isEmpty && !viewModel.isLoading {
+                HStack {
+                    Text("You can @mention a project or attach a doc")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .opacity(0.6)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
+                .padding(.bottom, 8)
+                .transition(.opacity)
+            }
         }
     }
     
@@ -343,14 +390,14 @@ struct AIAssistantView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Text("I can help you brainstorm, generate hooks, write captions, improve text, suggest hashtags, and more!")
+                Text("I can help you create tasks, projects, notes, reminders, analyze documents, and more!")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 60)
             }
             
-            Text("Select a tool above or ask me anything below")
+            Text("Use the toolbar above or ask me anything below")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -358,64 +405,117 @@ struct AIAssistantView: View {
         .padding()
     }
     
-    // MARK: - Quick Action Tools
+    // MARK: - Core Capabilities Toolbar
     
-    private var quickActionTools: some View {
-        VStack(spacing: 0) {
-            // Platform selector bar
-            HStack(spacing: 8) {
-                Text("Platform:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                ForEach(Platform.allCases, id: \.self) { platform in
-                    Button(action: {
-                        viewModel.selectedPlatform = platform
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: viewModel.selectedPlatform == platform ? "checkmark.circle.fill" : "circle")
-                                .font(.caption2)
-                            Text(platform.displayName)
-                                .font(.caption)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(viewModel.selectedPlatform == platform ? Color.kosmicBlue.opacity(0.15) : Color.clear)
-                        .foregroundColor(viewModel.selectedPlatform == platform ? .kosmicBlue : .secondary)
-                        .cornerRadius(6)
-                    }
-                    .buttonStyle(.plain)
-                }
-                
-                Spacer()
+    private var coreCapabilitiesToolbar: some View {
+        let orderedActions = usageTracker.orderedActions()
+        let tintColor = tintManager.combinedTintColor(activity: viewModel.currentActivity)
+        
+        return HStack(spacing: 12) {
+            ForEach(orderedActions, id: \.self) { action in
+                toolbarButton(for: action, tintColor: tintColor)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
             
-            Divider()
-            
-            // Quick action tools
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach([AITool.brainstorm, .generateCaptions, .improveText, .suggestHashtags, .adjustTone], id: \.self) { tool in
-                        AIToolButton(tool: tool) {
-     		_Concurrency.Task {
-                                await viewModel.executeQuickTool(tool, topic: "Create content for \(viewModel.selectedPlatform.displayName)", modelContext: modelContext)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial)
+    }
+    
+    private func toolbarButton(for action: ToolbarAction, tintColor: Color) -> some View {
+        Button(action: {
+            handleToolbarAction(action)
+        }) {
+            Image(systemName: action.icon)
+                .font(.title3)
+                .symbolEffect(.pulse, isActive: showMicroFeedback == action)
+        }
+        .buttonStyle(ToolbarButtonStyle(tintColor: tintColor, isDisabled: viewModel.isLoading))
+        .help(action.rawValue)
+        .keyboardShortcut(keyboardShortcut(for: action), modifiers: [.command, .shift])
+    }
+    
+    private func keyboardShortcut(for action: ToolbarAction) -> KeyEquivalent {
+        switch action {
+        case .createTask: return "1"
+        case .createProject: return "2"
+        case .createNote: return "3"
+        case .createReminder: return "4"
+        case .analyzeDocument: return "5"
+        case .analyzeImage: return "6"
+        }
+    }
+    
+    private func handleToolbarAction(_ action: ToolbarAction) {
+        guard !viewModel.isLoading else { return }
+        
+        // Track usage
+        usageTracker.trackUsage(action)
+        
+        // Show micro-feedback
+        showMicroFeedback = action
+        _Concurrency.Task {
+            try? await _Concurrency.Task.sleep(nanoseconds: 500_000_000) // 0.5s
+            await MainActor.run {
+                showMicroFeedback = nil
             }
         }
-        .background(.ultraThinMaterial)
+        
+        // Handle action
+        switch action {
+        case .createTask:
+            viewModel.inputText = "Create a task"
+            sendCurrentMessage(modelContext: modelContext)
+            
+        case .createProject:
+            viewModel.inputText = "Create a project"
+            sendCurrentMessage(modelContext: modelContext)
+            
+        case .createNote:
+            viewModel.inputText = "Create a note"
+            sendCurrentMessage(modelContext: modelContext)
+            
+        case .createReminder:
+            viewModel.inputText = "Create a reminder"
+            sendCurrentMessage(modelContext: modelContext)
+            
+        case .analyzeDocument:
+            presentDocumentSourceChooser()
+            
+        case .analyzeImage:
+            attachImageFromPicker()
+        }
+        
+        // Clear input after sending
+        if action != .analyzeDocument && action != .analyzeImage {
+            viewModel.inputText = ""
+        }
     }
     
     // MARK: - Input Area
     
     private var inputArea: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 12) {
+            // Platform selector (moved from toolbar)
+            HStack(spacing: 8) {
+                Text("Platform:")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                Picker("Platform", selection: $viewModel.selectedPlatform) {
+                    ForEach(Platform.allCases, id: \.self) { platform in
+                        Text(platform.displayName).tag(platform)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .controlSize(.small)
+                .frame(maxWidth: 200)
+                
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
             // Voice recording indicator
             if isRecording {
                 VStack(spacing: 8) {
@@ -472,45 +572,123 @@ struct AIAssistantView: View {
                 .cornerRadius(8)
             }
             
+            if let document = viewModel.pendingDocumentAttachment {
+                HStack(spacing: 12) {
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 32))
+                        .foregroundColor(.kosmicBlue)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(document.fileName)
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                        Text(documentDetailText(for: document))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button(action: viewModel.clearPendingDocument) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove document")
+                }
+                .padding(8)
+                .background(Color.gray.opacity(0.08))
+                .cornerRadius(8)
+            } else if let attachment = viewModel.pendingImageAttachment {
+                HStack(spacing: 12) {
+                    Image(nsImage: attachment.preview)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 72)
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                        )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(attachment.fileName ?? "Attached Image")
+                            .font(.caption)
+                            .foregroundColor(.primary)
+                        Text(attachment.mimeType)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button(action: viewModel.clearPendingImage) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Remove image")
+                }
+                .padding(8)
+                .background(Color.gray.opacity(0.08))
+                .cornerRadius(8)
+            }
+
             // Text input area
             HStack(spacing: 12) {
-                ZStack(alignment: .topLeading) {
-                    ChatTextEditor(
-                        text: $viewModel.inputText,
-                        isEditable: !isRecording
-                    ) {
-                        sendCurrentMessage(modelContext: modelContext)
+                let attachmentIconName: String = {
+                    if viewModel.pendingDocumentAttachment != nil {
+                        return "paperclip.circle.fill"
                     }
+                    if viewModel.pendingImageAttachment != nil {
+                        return "photo.fill"
+                    }
+                    return "paperclip.circle"
+                }()
+                Menu {
+                    Button("Document (filters only documents)", action: presentDocumentSourceChooser)
+                        .disabled(viewModel.pendingDocumentAttachment != nil || viewModel.isLoading)
+                    Divider()
+                    Button("Image From Computer", action: attachImageFromPicker)
+                    Button("Image From Photos", action: attachImageFromPhotos)
+                } label: {
+                    Image(systemName: attachmentIconName)
+                        .font(.title3)
+                        .foregroundColor(.kosmicBlue)
+                }
+                .menuStyle(BorderlessButtonMenuStyle())
+                .help("Attach file")
+                .disabled(isRecording || viewModel.isLoading)
+                ZStack(alignment: .topLeading) {
+                    MentionInputField(
+                        text: $viewModel.inputText,
+                        isFocused: $isInputFocused,
+                        placeholder: "Ask me anything...",
+                        onSubmit: {
+                            sendCurrentMessage(modelContext: modelContext)
+                        },
+                        linkedContext: $viewModel.linkedContext
+                    )
                     .frame(minHeight: 38, maxHeight: 120)
                     .disabled(isRecording)
-                    
-                    if viewModel.inputText.isEmpty {
-                        Text("Ask me anything...")
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 12)
-                            .padding(.top, 10)
-                    }
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
+                    )
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(nsColor: .textBackgroundColor))
+                    )
                 }
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
-                )
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(nsColor: .textBackgroundColor))
-                )
+                let hasAttachment = viewModel.pendingImageAttachment != nil || viewModel.pendingDocumentAttachment != nil
+                let canSend = !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasAttachment
                 Button(action: {
                     sendCurrentMessage(modelContext: modelContext)
                 }) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.title2)
-                        .foregroundColor(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .kosmicBlue)
+                        .foregroundColor(canSend ? .kosmicBlue : .secondary)
                 }
                 .buttonStyle(.plain)
-                .disabled(viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isRecording)
+                .disabled(!canSend || isRecording)
             }
         }
-        .padding()
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
     }
 
     // MARK: - Voice Input & Actions
@@ -518,11 +696,175 @@ struct AIAssistantView: View {
     private func sendCurrentMessage(modelContext: ModelContext) {
         let currentText = viewModel.inputText
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        let attachment = viewModel.pendingImageAttachment
+        let documentAttachment = viewModel.pendingDocumentAttachment
+        guard !trimmed.isEmpty || attachment != nil || documentAttachment != nil else {
             viewModel.inputText = ""
             return
         }
-        viewModel.sendMessage(currentText, modelContext: modelContext)
+        viewModel.sendMessage(
+            currentText,
+            modelContext: modelContext,
+            image: attachment,
+            document: documentAttachment
+        )
+    }
+
+    private func presentDocumentSourceChooser() {
+        _Concurrency.Task { @MainActor in
+            let alert = NSAlert()
+            alert.messageText = "Add Document"
+            alert.informativeText = "Choose how you want to bring this document into the chat."
+            alert.addButton(withTitle: "From Computer")
+            alert.addButton(withTitle: "From URL")
+            alert.addButton(withTitle: "Cancel")
+            alert.alertStyle = .informational
+            let response = alert.runModal()
+            switch response {
+            case .alertFirstButtonReturn:
+                attachDocumentFromPicker()
+            case .alertSecondButtonReturn:
+                promptDocumentURL()
+            default:
+                break
+            }
+        }
+    }
+
+    private func attachImageFromPicker() {
+        _Concurrency.Task {
+            do {
+                let attachment = try await ImageAttachmentService.shared.loadFromFilePicker()
+                await MainActor.run {
+                    viewModel.attachImage(attachment)
+                }
+            } catch ImageAttachmentService.AttachmentError.noImageSelected {
+                // Ignore cancellations
+            } catch {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func attachImageFromPhotos() {
+        _Concurrency.Task {
+            do {
+                let attachment = try await ImageAttachmentService.shared.loadFromPhotosLibrary()
+                await MainActor.run {
+                    viewModel.attachImage(attachment)
+                }
+            } catch ImageAttachmentService.AttachmentError.noImageSelected {
+                // Ignore cancellations
+            } catch {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func attachDocumentFromPicker() {
+        _Concurrency.Task {
+            do {
+                let attachment = try await DocumentAttachmentService.shared.loadFromFilePicker()
+                await MainActor.run {
+                    if !viewModel.attachDocument(attachment) {
+                        if viewModel.isLoading {
+                            toastMessage = "Aurora is already processing a document. Please wait for her to finish."
+                        } else if viewModel.pendingDocumentAttachment != nil {
+                            toastMessage = "Due to Aurora's sanity, we only allow her to process a single file at a time."
+                        }
+                    }
+                }
+            } catch DocumentAttachmentService.DocumentError.noDocumentSelected {
+                // Ignore cancellations
+            } catch let error as DocumentAttachmentService.DocumentError {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            } catch {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func attachDocumentFromURL(_ url: URL) {
+        _Concurrency.Task {
+            do {
+                let attachment = try await DocumentAttachmentService.shared.loadFromURL(url)
+                await MainActor.run {
+                    if !viewModel.attachDocument(attachment) {
+                        if viewModel.isLoading {
+                            toastMessage = "Aurora is already processing a document. Please wait for her to finish."
+                        } else if viewModel.pendingDocumentAttachment != nil {
+                            toastMessage = "Due to Aurora's sanity, we only allow her to process a single file at a time."
+                        }
+                    }
+                }
+            } catch let error as DocumentAttachmentService.DocumentError {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            } catch {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private func promptDocumentURL() {
+        let alert = NSAlert()
+        alert.messageText = "Import Document from URL"
+        alert.informativeText = "Paste a link to a PDF, Markdown, or text file."
+        alert.addButton(withTitle: "Import")
+        alert.addButton(withTitle: "Cancel")
+        let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        inputField.placeholderString = "https://example.com/report.pdf"
+        alert.accessoryView = inputField
+        let response = alert.runModal()
+        guard response == .alertFirstButtonReturn else { return }
+        let value = inputField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: value), !value.isEmpty else {
+            toastMessage = "That URL doesn't look right."
+            return
+        }
+        attachDocumentFromURL(url)
+    }
+
+    private func handleImagePaste(_ image: NSImage) {
+        _Concurrency.Task {
+            do {
+                let attachment = try await ImageAttachmentService.shared.validateAndPrepare(image, preferredFileName: nil)
+                await MainActor.run {
+                    viewModel.attachImage(attachment)
+                }
+            } catch {
+                await MainActor.run {
+                    toastMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func documentDetailText(for attachment: DocumentAttachmentService.DocumentAttachment) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        let sizeLabel = formatter.string(fromByteCount: Int64(attachment.sizeInBytes))
+        var parts: [String] = [attachment.mimeType, sizeLabel]
+        if let pages = attachment.pageCount, pages > 0 {
+            parts.append("\(pages) page\(pages == 1 ? "" : "s")")
+        }
+        if let url = attachment.sourceURL {
+            let host = url.host ?? url.absoluteString
+            parts.append(host)
+        }
+        return parts.joined(separator: " • ")
     }
 
     private func setupVoiceService() {
@@ -545,6 +887,26 @@ struct AIAssistantView: View {
                 isRecording = false
                 toastMessage = "Voice input error: \(error.localizedDescription)"
             }
+        }
+    }
+    
+    private func setupKeyboardHandlers() {
+        // Set up keyboard monitoring for "+" key combo
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Check for Cmd+N or "+" key when input is focused
+            if isInputFocused {
+                // Cmd+N
+                if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "n" {
+                    showCreateSheet = true
+                    return nil
+                }
+                // "+" key (equality key on most keyboards)
+                if event.charactersIgnoringModifiers == "+" || event.charactersIgnoringModifiers == "=" {
+                    showCreateSheet = true
+                    return nil
+                }
+            }
+            return event
         }
     }
     
@@ -782,6 +1144,7 @@ private struct ChatTextEditor: NSViewRepresentable {
     @Binding var text: String
     var isEditable: Bool = true
     var onSubmit: () -> Void
+    var onImagePaste: ((NSImage) -> Void)? = nil
     
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -805,6 +1168,7 @@ private struct ChatTextEditor: NSViewRepresentable {
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.onSubmit = { onSubmit() }
+        textView.onImagePaste = onImagePaste
 
         let scrollView = NSScrollView()
         scrollView.drawsBackground = false
@@ -825,6 +1189,7 @@ private struct ChatTextEditor: NSViewRepresentable {
         textView.isEditable = isEditable
         textView.isSelectable = true
         textView.onSubmit = { onSubmit() }
+        textView.onImagePaste = onImagePaste
     }
     
     final class Coordinator: NSObject, NSTextViewDelegate {
@@ -844,6 +1209,7 @@ private struct ChatTextEditor: NSViewRepresentable {
 
 private final class ChatNSTextView: NSTextView {
     var onSubmit: (() -> Void)?
+    var onImagePaste: ((NSImage) -> Void)?
     
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 36 { // Return key
@@ -855,6 +1221,14 @@ private final class ChatNSTextView: NSTextView {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    override func paste(_ sender: Any?) {
+        if let image = NSImage(pasteboard: .general) {
+            onImagePaste?(image)
+            return
+        }
+        super.paste(sender)
     }
 }
 #endif

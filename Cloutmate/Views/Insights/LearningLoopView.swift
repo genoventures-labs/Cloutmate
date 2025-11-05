@@ -20,7 +20,7 @@ struct LearningLoopView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 24) {
+            VStack(spacing: 24) {
                 // Learning Score Overview
                 if let snapshot = snapshot {
                     GroupBox {
@@ -38,11 +38,7 @@ struct LearningLoopView: View {
                                         Circle()
                                             .trim(from: 0, to: snapshot.learningScore)
                                             .stroke(
-                                                LinearGradient(
-                                                    colors: [.kosmicBlue, .kosmicPurple],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                ),
+                                                Color.kosmicBlue,
                                                 style: StrokeStyle(lineWidth: 20, lineCap: .round)
                                             )
                                             .frame(width: 120, height: 120)
@@ -109,15 +105,9 @@ struct LearningLoopView: View {
                                     innerRadius: .ratio(0.5),
                                     angularInset: 2
                                 )
-                                .foregroundStyle(by: .value("Type", actionType))
-                                .annotation(position: .overlay) {
-                                    if events.count > 2 {
-                                        Text("\(events.count)")
-                                            .font(.caption.bold())
-                                            .foregroundColor(.white)
-                                    }
-                                }
+                                .foregroundStyle(colorForEventType(actionType))
                             }
+                            .transaction { $0.animation = nil }
                             .frame(height: 250)
                             
                             // Legend
@@ -221,6 +211,9 @@ struct LearningLoopView: View {
             .padding(.vertical)
         }
         .task {
+            loadData()
+        }
+        .onChange(of: timeRange) { _ in
             loadData()
         }
     }

@@ -31,61 +31,76 @@ struct NudgeOverlayView: View {
 
     private func overlay(for nudge: SmartNudge) -> some View {
         VStack {
-            Spacer().frame(height: 16)
+            Spacer().frame(height: 20)
 
-            HStack {
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(spacing: 10) {
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
                         Image(systemName: icon(for: nudge.tone))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(color(for: nudge.tone))
+                            .frame(width: 28)
+                        
+                        VStack(alignment: .leading, spacing: 6) {
                         Text(nudge.message)
-                            .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(.primary)
-                    }
+                                .fixedSize(horizontal: false, vertical: true)
 
                     if let detail = nudge.detail {
                         Text(detail)
-                            .font(.system(size: 13))
+                                    .font(.system(size: 14, weight: .regular))
                             .foregroundColor(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
                     }
+                    .padding(.bottom, 4)
 
                     HStack(spacing: 12) {
                         Button {
                             handleResponse(.accepted, for: nudge)
                         } label: {
                             Text("Let's do it")
-                                .font(.system(size: 13, weight: .bold))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
+                                .font(.system(size: 14, weight: .semibold))
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
                         }
                         .buttonStyle(.borderedProminent)
+                        .controlSize(.regular)
 
                         Button {
                             handleResponse(.snoozed, for: nudge)
                         } label: {
                             Text("Remind me later")
-                                .font(.system(size: 13, weight: .semibold))
+                                .font(.system(size: 14, weight: .medium))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.regular)
 
                         Button("Dismiss") {
                             handleResponse(.dismissed, for: nudge)
                         }
                         .buttonStyle(.plain)
-                        .font(.system(size: 12, weight: .regular))
+                        .font(.system(size: 13, weight: .regular))
                         .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
                     }
                 }
                 Spacer()
             }
-            .padding(18)
+            .padding(20)
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(color(for: nudge.tone).opacity(0.12))
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.ultraThickMaterial)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 18)
-                            .stroke(color(for: nudge.tone).opacity(0.3))
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(color(for: nudge.tone).opacity(0.4), lineWidth: 1.5)
                     )
+                    .shadow(color: color(for: nudge.tone).opacity(0.2), radius: 12, x: 0, y: 4)
             )
             .padding(.horizontal, 24)
 
@@ -118,7 +133,7 @@ struct NudgeOverlayView: View {
         case .calm: return KosmicPalette.cyan
         case .energized: return KosmicPalette.violet
         case .gentle: return .orange
-        case .focused: return .blue
+        case .focused: return .kosmicBlue
         case .reflective: return .purple
         }
     }

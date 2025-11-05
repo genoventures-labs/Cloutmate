@@ -59,7 +59,7 @@ struct EveningRitualView: View {
                 .foregroundColor(.secondary)
             HStack(spacing: 12) {
                 Label("\(ritual.streakCount) evening streak", systemImage: "moon.stars.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(.kosmicBlue)
                     .font(.system(size: 13, weight: .semibold))
                 Text("Window ends at \(ritual.windowEnd.formatted(date: .omitted, time: .shortened))")
                     .font(.system(size: 13))
@@ -74,7 +74,7 @@ struct EveningRitualView: View {
                 Label("Outcome Summary", systemImage: "checkmark.circle")
                     .font(.system(size: 18, weight: .semibold))
 
-                counterRow(title: "Done", value: $doneCount, color: .green)
+                counterRow(title: "Done", value: $doneCount, color: .kosmicGreen)
                 counterRow(title: "Deferred", value: $deferredCount, color: .orange)
                 counterRow(title: "Dropped", value: $droppedCount, color: .red)
 
@@ -193,7 +193,7 @@ struct EveningRitualView: View {
             case .success:
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                     Text("Reflection saved. Aurora updated your momentum tracker.")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.secondary)

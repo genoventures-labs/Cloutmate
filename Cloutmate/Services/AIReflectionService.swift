@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 import os.log
 
 /// Service for introspective queries about user patterns and analytics

@@ -259,6 +259,26 @@ final class ConceptTracker {
         let topNodes = getTopConcepts(limit: limit, modelContext: modelContext)
         return topNodes.map { ConceptSummary(from: $0) }
     }
+
+    func getLinkingSuggestions(limit: Int = 3, modelContext: ModelContext) -> [ConceptLinkingSuggestion] {
+        guard config.featureFlags.narrativeEnabled else { return [] }
+        let candidates = getTopConcepts(limit: limit * 3, modelContext: modelContext)
+        let suggestions = candidates.compactMap { node -> ConceptLinkingSuggestion? in
+            let uniqueObjects = Array(Set(node.linkedObjects))
+            guard uniqueObjects.count >= 3 else { return nil }
+            let normalized = node.normalizedConcept
+            let topObjects = Array(uniqueObjects.prefix(5))
+            return ConceptLinkingSuggestion(
+                concept: node.concept,
+                normalizedConcept: normalized,
+                objectIDs: topObjects,
+                contextTypes: node.contextTypes,
+                relevance: node.relevanceWeight
+            )
+        }
+        .sorted { $0.relevance > $1.relevance }
+        return Array(suggestions.prefix(limit))
+    }
     
     // MARK: - Cache Management
     
@@ -294,5 +314,13 @@ final class ConceptTracker {
             logger.error("Failed to decay concepts: \(error.localizedDescription)")
         }
     }
+}
+
+struct ConceptLinkingSuggestion: Sendable {
+    let concept: String
+    let normalizedConcept: String
+    let objectIDs: [UUID]
+    let contextTypes: [String]
+    let relevance: Double
 }
 

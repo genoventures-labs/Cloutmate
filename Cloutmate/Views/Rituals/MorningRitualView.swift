@@ -162,13 +162,13 @@ struct MorningRitualView: View {
     private var successBanner: some View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
+                .foregroundColor(.kosmicGreen)
             Text("Committed. Aurora will track your focus momentum for the next 12 hours.")
                 .font(.system(size: 13, weight: .medium))
             Spacer()
         }
         .padding(12)
-        .background(Color.green.opacity(0.1))
+        .background(Color.kosmicGreen.opacity(0.1))
         .cornerRadius(10)
     }
 

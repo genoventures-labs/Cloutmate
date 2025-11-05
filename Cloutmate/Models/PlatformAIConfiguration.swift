@@ -7,6 +7,7 @@
 
 import Foundation
 import CloutmateShared
+import Combine
 
 struct PlatformAIConfiguration {
     let platform: Platform

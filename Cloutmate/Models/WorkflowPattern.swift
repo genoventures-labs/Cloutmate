@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 /// A detected recurring pattern in user behavior
 @Model

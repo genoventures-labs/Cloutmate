@@ -39,6 +39,9 @@ final class FocusSession {
     // Metadata
     var createdAt: Date
     var cpsScoreAtStart: Double?         // CPS score when session started (if linked to object)
+    var scheduledTime: Date?
+    var calendarEventId: String?
+    var wasRescheduled: Bool
     
     init(
         objective: String,
@@ -60,6 +63,9 @@ final class FocusSession {
         self.itemsCompleted = []
         self.createdAt = Date()
         self.cpsScoreAtStart = nil
+        self.scheduledTime = nil
+        self.calendarEventId = nil
+        self.wasRescheduled = false
     }
     
     var status: FocusSessionStatus {

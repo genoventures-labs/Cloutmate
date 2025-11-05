@@ -20,7 +20,7 @@ struct ProductivityMetricsView: View {
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 24) {
+            VStack(spacing: 24) {
                 // Completion Rate Trend
                 GroupBox {
                     VStack(alignment: .leading, spacing: 16) {
@@ -30,19 +30,18 @@ struct ProductivityMetricsView: View {
                         if !productivityTrend.isEmpty {
                             Chart(productivityTrend, id: \.date) { dataPoint in
                                 LineMark(
-                                    x: .value("Date", dataPoint.date),
+                                    x: .value("Date", dataPoint.date, unit: .day),
                                     y: .value("Rate", dataPoint.completionRate * 100)
                                 )
                                 .foregroundStyle(Color.kosmicGreen)
-                                .interpolationMethod(.catmullRom)
                                 
                                 AreaMark(
-                                    x: .value("Date", dataPoint.date),
+                                    x: .value("Date", dataPoint.date, unit: .day),
                                     y: .value("Rate", dataPoint.completionRate * 100)
                                 )
                                 .foregroundStyle(Color.kosmicGreen.opacity(0.2))
-                                .interpolationMethod(.catmullRom)
                             }
+                            .transaction { $0.animation = nil }
                             .frame(height: 200)
                             .chartYAxis {
                                 AxisMarks(position: .leading) { value in
@@ -76,11 +75,12 @@ struct ProductivityMetricsView: View {
                         if !focusTrend.isEmpty {
                             Chart(focusTrend, id: \.date) { dataPoint in
                                 BarMark(
-                                    x: .value("Date", dataPoint.date),
+                                    x: .value("Date", dataPoint.date, unit: .day),
                                     y: .value("Minutes", dataPoint.minutes)
                                 )
                                 .foregroundStyle(Color.kosmicBlue)
                             }
+                            .transaction { $0.animation = nil }
                             .frame(height: 200)
                             .chartYAxis {
                                 AxisMarks(position: .leading) { value in
@@ -179,6 +179,9 @@ struct ProductivityMetricsView: View {
             .padding(.vertical)
         }
         .task {
+            loadData()
+        }
+        .onChange(of: timeRange) { _ in
             loadData()
         }
     }

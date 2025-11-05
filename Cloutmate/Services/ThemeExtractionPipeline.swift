@@ -60,6 +60,9 @@ final class ThemeExtractionPipeline {
         
         // Check for theme decay
         await decayInactiveThemes(modelContext: modelContext)
+        
+        // Remove duplicate themes with identical membership
+        await deduplicateThemes(modelContext: modelContext)
     }
     
     // MARK: - Similarity Edge Creation
@@ -119,22 +122,35 @@ final class ThemeExtractionPipeline {
         
         let centroid = calculateCentroid(embeddings)
         
-        // Generate theme label and description using AI
+        // Generate theme label and description using AI or fallback
         let content = nodes.map { $0.content }.joined(separator: "\n")
-        guard let (label, description) = await generateThemeLabel(for: content) else {
+        let (label, description) = await generateThemeLabel(for: content) ?? fallbackThemeSummary(for: nodes)
+        
+        let sortedMemberIds = nodes.map { $0.id }.sorted { $0.uuidString < $1.uuidString }
+        if let existingTheme = findExistingTheme(with: sortedMemberIds, modelContext: modelContext) {
+            // Access label immediately while object is in context
+            let existingLabel = existingTheme.label
+            update(theme: existingTheme,
+                   label: label,
+                   description: description,
+                   centroid: centroid,
+                   nodes: nodes,
+                   memberIds: sortedMemberIds)
+            try? modelContext.save()
+            AIDebug.log("ThemeExtraction: Updated existing theme '\(existingLabel)' with \(nodes.count) members")
             return
         }
         
         // Create theme node
         let theme = ThemeNode(label: label, themeDescription: description)
         theme.setCentroid(centroid)
-        theme.memberNodeIds = nodes.map { $0.id }
+        theme.memberNodeIds = sortedMemberIds
         theme.coherence = calculateCoherence(for: nodes)
         theme.salience = Double(nodes.count) / 10.0 // Initial estimate
         theme.momentum = 1.0 // New theme has positive momentum
-        
-        // Extract keywords from nodes
         theme.keywords = extractKeywords(from: nodes)
+        theme.isActive = true
+        theme.decayStarted = false
         
         modelContext.insert(theme)
         try? modelContext.save()
@@ -164,6 +180,14 @@ final class ThemeExtractionPipeline {
         // Create or update themes for each cluster
         for cluster in clusters {
             await formNewTheme(from: cluster, modelContext: modelContext)
+        }
+        
+        // If no clusters were found, create a fallback theme so the UI has something to display
+        if clusters.isEmpty,
+           memoryGraph.getActiveThemes(modelContext: modelContext).isEmpty,
+           !nodesWithEmbeddings.isEmpty {
+            let fallbackNodes = Array(nodesWithEmbeddings.prefix(min(5, nodesWithEmbeddings.count)))
+            await formNewTheme(from: fallbackNodes, modelContext: modelContext)
         }
     }
     
@@ -276,8 +300,12 @@ final class ThemeExtractionPipeline {
         let themes = memoryGraph.getActiveThemes(modelContext: modelContext)
         
         for theme in themes {
+            // Access memberNodeIds immediately while object is in context
+            let memberNodeIds = theme.memberNodeIds
+            let previousCount = memberNodeIds.count
+            
             // Fetch member nodes
-            let members = theme.memberNodeIds.compactMap { nodeId in
+            let members = memberNodeIds.compactMap { nodeId in
                 memoryGraph.findSimilarNodes(to: nodeId, threshold: 0.0, limit: 1, modelContext: modelContext).first
             }
             
@@ -285,7 +313,6 @@ final class ThemeExtractionPipeline {
             theme.coherence = calculateCoherence(for: members)
             
             // Calculate momentum (change in membership)
-            let previousCount = theme.memberNodeIds.count
             let currentCount = members.count
             theme.momentum = Double(currentCount - previousCount) / Double(max(previousCount, 1))
             
@@ -293,7 +320,10 @@ final class ThemeExtractionPipeline {
             theme.recalculateSalience()
             theme.lastUpdateAt = Date()
             
-            AIDebug.log("ThemeExtraction: Updated theme '\(theme.label)' - salience: \(String(format: "%.2f", theme.salience))")
+            // Access label and salience immediately for logging
+            let label = theme.label
+            let salience = theme.salience
+            AIDebug.log("ThemeExtraction: Updated theme '\(label)' - salience: \(String(format: "%.2f", salience))")
         }
         
         try? modelContext.save()
@@ -305,10 +335,12 @@ final class ThemeExtractionPipeline {
         let allThemes = memoryGraph.getActiveThemes(modelContext: modelContext)
         
         for theme in allThemes {
+            // Access label immediately while object is in context
+            let label = theme.label
             if theme.shouldDecay() {
                 theme.beginDecay()
-                AIDebug.log("ThemeExtraction: Theme '\(theme.label)' marked for decay")
-                logger.info("Theme decaying: \(theme.label)")
+                AIDebug.log("ThemeExtraction: Theme '\(label)' marked for decay")
+                logger.info("Theme decaying: \(label)")
             }
         }
         
@@ -395,5 +427,109 @@ final class ThemeExtractionPipeline {
         
         return nil
     }
+
+    private func fallbackThemeSummary(for nodes: [MemoryNode]) -> (label: String, description: String) {
+        let keywords = extractKeywords(from: nodes)
+        if !keywords.isEmpty {
+            let labelWords = keywords.prefix(3).map { $0.capitalized }
+            let label = labelWords.joined(separator: " ")
+            let description = "Cluster of \(nodes.count) memories around \(keywords.joined(separator: ", "))."
+            return (label.isEmpty ? "Emerging Theme" : label, description)
+        }
+        let label = nodes.first?.label ?? "Emerging Theme"
+        let description = "Cluster of \(nodes.count) related memories."
+        return (label, description)
+    }
+    
+    private func deduplicateThemes(modelContext: ModelContext) async {
+        let descriptor = FetchDescriptor<ThemeNode>()
+        guard let themes = try? modelContext.fetch(descriptor), !themes.isEmpty else { return }
+        
+        // Extract theme data into plain structures to avoid SwiftData fault issues
+        struct ThemeData {
+            let theme: ThemeNode
+            let key: String
+            let lastUpdateAt: Date
+            let salience: Double
+        }
+        
+        var themeData: [ThemeData] = []
+        for theme in themes {
+            // Access all properties immediately while object is in context
+            let sortedIds = theme.memberNodeIds.map { $0.uuidString }.sorted()
+            let key = sortedIds.joined(separator: "|")
+            guard !key.isEmpty else { continue }
+            themeData.append(ThemeData(
+                theme: theme,
+                key: key,
+                lastUpdateAt: theme.lastUpdateAt,
+                salience: theme.salience
+            ))
+        }
+        
+        var seen: [String: ThemeData] = [:]
+        var toDelete: [ThemeNode] = []
+        
+        for data in themeData {
+            if let existing = seen[data.key] {
+                // Keep the theme with the most recent update (or higher salience if equal)
+                let keepExisting = existing.lastUpdateAt >= data.lastUpdateAt && existing.salience >= data.salience
+                if keepExisting {
+                    toDelete.append(data.theme)
+                } else {
+                    toDelete.append(existing.theme)
+                    seen[data.key] = data
+                }
+            } else {
+                seen[data.key] = data
+            }
+        }
+        
+        if !toDelete.isEmpty {
+            for theme in toDelete {
+                modelContext.delete(theme)
+            }
+            try? modelContext.save()
+            AIDebug.log("ThemeExtraction: Deduplicated themes - kept \(seen.count) unique clusters")
+        }
+    }
+    
+    private func findExistingTheme(with memberIds: [UUID], modelContext: ModelContext) -> ThemeNode? {
+        let descriptor = FetchDescriptor<ThemeNode>()
+        let themes = (try? modelContext.fetch(descriptor)) ?? []
+        let targetSet = Set(memberIds)
+        
+        // Access memberNodeIds immediately while objects are in context
+        for theme in themes {
+            let themeMemberSet = Set(theme.memberNodeIds)
+            if themeMemberSet == targetSet {
+                return theme
+            }
+        }
+        
+        return nil
+    }
+    
+    private func update(theme: ThemeNode,
+                        label: String,
+                        description: String,
+                        centroid: [Float],
+                        nodes: [MemoryNode],
+                        memberIds: [UUID]) {
+        let previousCount = theme.memberNodeIds.count
+        theme.label = label
+        theme.themeDescription = description
+        theme.setCentroid(centroid)
+        theme.memberNodeIds = memberIds
+        theme.coherence = calculateCoherence(for: nodes)
+        theme.keywords = extractKeywords(from: nodes)
+        let currentCount = memberIds.count
+        theme.momentum = Double(currentCount - previousCount) / Double(max(previousCount, 1))
+        theme.recalculateSalience()
+        theme.lastUpdateAt = Date()
+        theme.isActive = true
+        theme.decayStarted = false
+    }
 }
+
 

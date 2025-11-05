@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 import CloutmateShared
 import os.log
 
@@ -59,6 +60,11 @@ struct AnalyticsSnapshot: Identifiable, Sendable {
     let eveningRitualStreak: Int
     let lastWeeklyReview: Date?
     let nudgeResponseRate: Double
+    // Predictive cognition metrics (Phase 9)
+    let latestForecast: FocusForecast?
+    let driftEventsCount: Int
+    let predictionAccuracy: Double
+    let toneAdaptations: Int
 }
 
 /// Emotional trend over time
@@ -155,6 +161,7 @@ final class AnalyticsEngine {
             customRange: customRange,
             modelContext: modelContext
         )
+        let cognitionMetrics = gatherCognitionMetrics(modelContext: modelContext)
         
         return AnalyticsSnapshot(
             startDate: startDate,
@@ -187,7 +194,11 @@ final class AnalyticsEngine {
             morningRitualStreak: ritualSummary.morningStreak,
             eveningRitualStreak: ritualSummary.eveningStreak,
             lastWeeklyReview: ritualSummary.lastWeeklyReview,
-            nudgeResponseRate: ritualSummary.nudgeResponseRate
+            nudgeResponseRate: ritualSummary.nudgeResponseRate,
+            latestForecast: cognitionMetrics.forecast,
+            driftEventsCount: cognitionMetrics.driftCount,
+            predictionAccuracy: cognitionMetrics.accuracy,
+            toneAdaptations: cognitionMetrics.adaptations
         )
     }
     
@@ -204,10 +215,27 @@ final class AnalyticsEngine {
             return (0, 0, 0.0, 0.0, [])
         }
         
-        let tasks = allTasks // Simplified - filter by date later if createdAt is optional
+        // Filter tasks by date range - include tasks created or completed in range
+        let tasks = allTasks.filter { task in
+            let wasCreated = task.createdAt >= start && task.createdAt <= end
+            let wasCompleted: Bool
+            if let completedAt = task.completedAt {
+                wasCompleted = task.status == .done && completedAt >= start && completedAt <= end
+            } else {
+                wasCompleted = task.status == .done && task.createdAt >= start && task.createdAt <= end
+            }
+            return wasCreated || wasCompleted
+        }
         
-        let completed = tasks.filter { $0.status == .done }.count
-        let created = tasks.count
+        // Count completed tasks that finished in this range
+        let completed = tasks.filter { task in
+            guard task.status == .done else { return false }
+            let completionDate = task.completedAt ?? task.createdAt
+            return completionDate >= start && completionDate <= end
+        }.count
+        
+        // Count created tasks in this range
+        let created = tasks.filter { $0.createdAt >= start && $0.createdAt <= end }.count
         let completionRate = created > 0 ? Double(completed) / Double(created) : 0.0
         
         // Get priority scores
@@ -465,6 +493,31 @@ final class AnalyticsEngine {
         modelContext: ModelContext
     ) -> [(date: Date, completionRate: Double)] {
         RitualAnalytics.shared.completionTrend(days: days, modelContext: modelContext)
+    }
+
+    // MARK: - Cognition Metrics (Phase 9)
+
+    private func gatherCognitionMetrics(
+        modelContext: ModelContext
+    ) -> (forecast: FocusForecast?, driftCount: Int, accuracy: Double, adaptations: Int) {
+        var forecastDescriptor = FetchDescriptor<FocusForecast>(
+            sortBy: [SortDescriptor(\.generatedAt, order: .reverse)]
+        )
+        forecastDescriptor.fetchLimit = 1
+        let latestForecast = try? modelContext.fetch(forecastDescriptor).first
+
+        let driftWindowStart = Calendar.current.date(byAdding: .hour, value: -24, to: Date()) ?? Date().addingTimeInterval(-86_400)
+        let driftDescriptor = FetchDescriptor<DriftEvent>(
+            predicate: #Predicate { event in
+                event.detectedAt >= driftWindowStart
+            }
+        )
+        let driftEvents = (try? modelContext.fetch(driftDescriptor)) ?? []
+
+        let accuracy = CognitionAnalytics.shared.calculateForecastAccuracy(days: 7, modelContext: modelContext)
+        let adaptations = ToneProfileCache.shared.recentAdaptationCount()
+
+        return (latestForecast ?? nil, driftEvents.count, accuracy, adaptations)
     }
 }
 

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import os.log
+import Combine
 import CloutmateShared
 
 @MainActor
@@ -269,6 +270,11 @@ final class AppContextService {
         cacheTimestamp = Date()
         
         return context
+    }
+    
+    func contextFreshness() -> TimeInterval? {
+        guard let timestamp = cacheTimestamp else { return nil }
+        return Date().timeIntervalSince(timestamp)
     }
     
     func invalidateCache() {

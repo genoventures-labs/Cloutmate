@@ -17,8 +17,12 @@ final class PriorityEngine {
     
     private let logger = Logger(subsystem: "com.kosmicapps.Cloutmate", category: "CPS")
     private var cache: [UUID: PriorityScore] = [:]
-    private var lastCacheRefresh: Date?
+    private var _lastCacheRefresh: Date?
     private let cacheValidity: TimeInterval = 300 // 5 minutes
+    
+    var lastSyncTime: Date? {
+        _lastCacheRefresh
+    }
     
     private init() {}
     
@@ -277,14 +281,14 @@ final class PriorityEngine {
     }
     
     private func refreshCacheIfNeeded(modelContext: ModelContext) {
-        guard cache.isEmpty || (lastCacheRefresh == nil || Date().timeIntervalSince(lastCacheRefresh ?? .distantPast) > cacheValidity) else {
+        guard cache.isEmpty || (_lastCacheRefresh == nil || Date().timeIntervalSince(_lastCacheRefresh ?? .distantPast) > cacheValidity) else {
             return
         }
         
         let descriptor = FetchDescriptor<PriorityScore>()
         if let scores = try? modelContext.fetch(descriptor) {
             cache = Dictionary(uniqueKeysWithValues: scores.map { ($0.objectId, $0) })
-            lastCacheRefresh = Date()
+            _lastCacheRefresh = Date()
             let cacheCount = cache.count
             if cacheCount == 0 {
                 logger.info("CPS cache initialized (empty - scores will be created as you use the app)")
@@ -373,6 +377,68 @@ final class PriorityEngine {
         default:
             return nil
         }
+    }
+}
+
+extension PriorityEngine {
+    func applyMomentumModifier(metrics: MomentumMetrics, modelContext: ModelContext) {
+        guard config.featureFlags.cpsEnabled else { return }
+        guard MomentumSettings.shared.adjustmentsEnabled else { return }
+
+        refreshCacheIfNeeded(modelContext: modelContext)
+
+        let descriptor = FetchDescriptor<PriorityScore>()
+        guard let scores = try? modelContext.fetch(descriptor) else { return }
+
+        for score in scores {
+            adjust(score: score, with: metrics)
+            score.recalculate(using: weights)
+            cache[score.objectId] = score
+        }
+
+        do {
+            try modelContext.save()
+            logger.debug("CPS momentum modifier applied for flow state: \(metrics.flowState.rawValue)")
+        } catch {
+            logger.error("Failed to apply momentum modifier: \(error.localizedDescription)")
+        }
+    }
+
+    private func adjust(score: PriorityScore, with metrics: MomentumMetrics) {
+        switch metrics.flowState {
+        case .highFlow:
+            if score.totalScore < 0.4 {
+                score.manualBoost = clamp(score.manualBoost + 0.05)
+            } else if score.totalScore > 0.75 {
+                score.manualBoost = clamp(score.manualBoost - 0.02)
+            }
+        case .steadyFlow:
+            if score.totalScore.between(0.4, 0.7) {
+                score.manualBoost = clamp(score.manualBoost + 0.02)
+            }
+        case .slowingFlow:
+            if score.totalScore > 0.65 {
+                score.manualBoost = clamp(score.manualBoost + 0.05)
+            } else if score.totalScore < 0.4 {
+                score.manualBoost = clamp(score.manualBoost - 0.04)
+            }
+        case .stalled:
+            if score.totalScore > 0.6 {
+                score.manualBoost = clamp(score.manualBoost + 0.07)
+            } else {
+                score.manualBoost = clamp(score.manualBoost - 0.06)
+            }
+        }
+    }
+
+    private func clamp(_ value: Double) -> Double {
+        return max(0.0, min(1.0, value))
+    }
+}
+
+private extension Double {
+    func between(_ lower: Double, _ upper: Double) -> Bool {
+        return self >= lower && self <= upper
     }
 }
 

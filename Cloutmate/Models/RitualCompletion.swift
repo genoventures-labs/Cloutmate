@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 /// Represents the outcome of a ritual completion.
 enum RitualCompletionOutcome: String, Codable, CaseIterable {

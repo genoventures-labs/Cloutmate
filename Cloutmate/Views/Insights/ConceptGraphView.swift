@@ -13,7 +13,7 @@ struct ConceptGraphView: View {
     @State private var themes: [ThemeNode] = []
     @State private var nodes: [MemoryNode] = []
     @State private var edges: [MemoryEdge] = []
-    @State private var selectedTheme: ThemeNode?
+    @State private var selectedThemeID: UUID?
     @State private var selectedNode: MemoryNode?
     @State private var graphVisualization: String = ""
     @State private var showDebugConsole = false
@@ -43,9 +43,9 @@ struct ConceptGraphView: View {
                         description: Text("Enable Memory Graph in settings and start creating content")
                     )
                 } else {
-                    List(themes, id: \.id, selection: $selectedTheme) { theme in
+                    List(themes, id: \.id, selection: $selectedThemeID) { theme in
                         ThemeRowView(theme: theme)
-                            .tag(theme)
+                            .tag(theme.id)
                     }
                 }
             }
@@ -100,6 +100,11 @@ struct ConceptGraphView: View {
         }
     }
     
+    private var selectedTheme: ThemeNode? {
+        guard let selectedThemeID else { return nil }
+        return themes.first(where: { $0.id == selectedThemeID })
+    }
+    
     private func refreshGraph() {
         // Load themes
         themes = MemoryGraphService.shared.getActiveThemes(modelContext: modelContext)
@@ -111,6 +116,10 @@ struct ConceptGraphView: View {
         // Load all edges
         let edgeDescriptor = FetchDescriptor<MemoryEdge>()
         edges = (try? modelContext.fetch(edgeDescriptor)) ?? []
+
+        if let selectedThemeID, !themes.contains(where: { $0.id == selectedThemeID }) {
+            self.selectedThemeID = themes.first?.id
+        }
     }
     
     private func exportGraphToDOT() {

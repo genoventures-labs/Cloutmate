@@ -57,6 +57,7 @@ final class FocusSessionService {
             targetObjectId: targetObjectId,
             targetObjectType: targetObjectType
         )
+        session.scheduledTime = session.startTime
         
         // Capture CPS score if linked to object
         if let objectId = targetObjectId {
@@ -69,6 +70,7 @@ final class FocusSessionService {
             try modelContext.save()
             logger.info("Focus session started: \(session.objective) for \(session.plannedDuration / 60) minutes")
             AIDebug.log("Focus session started: \(session.id.uuidString)")
+            NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
         } catch {
             logger.error("Failed to save focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
@@ -123,6 +125,8 @@ final class FocusSessionService {
             
             // Log to feedback system
             _ = AIFeedbackLogger.shared.recordFocusSession(session: session, modelContext: modelContext)
+
+            NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
         } catch {
             logger.error("Failed to commit focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
@@ -159,6 +163,8 @@ final class FocusSessionService {
             
             // Log to feedback system
             _ = AIFeedbackLogger.shared.recordFocusSession(session: session, modelContext: modelContext)
+
+            NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
         } catch {
             logger.error("Failed to abandon focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed

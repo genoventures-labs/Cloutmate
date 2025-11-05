@@ -27,8 +27,8 @@ enum CampaignStatus: String, Codable, CaseIterable {
     var color: Color {
         switch self {
         case .draft: return .gray
-        case .scheduled: return .blue
-        case .active: return .green
+        case .scheduled: return .kosmicBlue
+        case .active: return .kosmicGreen
         case .completed: return .purple
         }
     }

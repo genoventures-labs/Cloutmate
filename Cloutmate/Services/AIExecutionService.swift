@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import os.log
+import Combine
 import CloutmateShared
 
 @MainActor

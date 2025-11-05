@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 
 /// A narrative snapshot capturing workspace patterns and themes
 @Model

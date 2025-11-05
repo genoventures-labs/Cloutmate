@@ -10,6 +10,8 @@ import Combine
 import AppKit
 
 class GlassColorSystem: ObservableObject {
+    static private(set) var active: GlassColorSystem?
+    
     @Published var isTimeBasedShiftingEnabled: Bool = true
     @Published var currentColorScheme: ColorScheme = .dark
     
@@ -60,27 +62,32 @@ class GlassColorSystem: ObservableObject {
     
     /// Main background color
     func backgroundColor() -> Color {
-        currentColorScheme == .dark ? Palette.Dark.background : Palette.Light.background
+        let base = currentColorScheme == .dark ? Palette.Dark.background : Palette.Light.background
+        return applyEmotionalModulation(to: base, blendFactor: 0.05)
     }
     
     /// Elevated background (sidebar)
     func backgroundElevated() -> Color {
-        currentColorScheme == .dark ? Palette.Dark.backgroundElevated : Palette.Light.backgroundElevated
+        let base = currentColorScheme == .dark ? Palette.Dark.backgroundElevated : Palette.Light.backgroundElevated
+        return applyEmotionalModulation(to: base, blendFactor: 0.08)
     }
     
     /// Secondary background
     func backgroundSecondary() -> Color {
-        currentColorScheme == .dark ? Palette.Dark.backgroundSecondary : Palette.Light.backgroundSecondary
+        let base = currentColorScheme == .dark ? Palette.Dark.backgroundSecondary : Palette.Light.backgroundSecondary
+        return applyEmotionalModulation(to: base, blendFactor: 0.1)
     }
     
     /// Card background
     func cardColor() -> Color {
-        currentColorScheme == .dark ? Palette.Dark.card : Palette.Light.card
+        let base = currentColorScheme == .dark ? Palette.Dark.card : Palette.Light.card
+        return applyEmotionalModulation(to: base, blendFactor: 0.18)
     }
     
     /// Elevated card background
     func cardElevated() -> Color {
-        currentColorScheme == .dark ? Palette.Dark.cardElevated : Palette.Light.cardElevated
+        let base = currentColorScheme == .dark ? Palette.Dark.cardElevated : Palette.Light.cardElevated
+        return applyEmotionalModulation(to: base, blendFactor: 0.22)
     }
     
     /// Border color (subtle)
@@ -112,15 +119,16 @@ class GlassColorSystem: ObservableObject {
     func glassTint(for role: GlassRole) -> Color {
         switch role {
         case .primary:
-            return Palette.accentPrimary
+            return emotionalAccent()
         case .accent:
-            return Palette.accentSecondary
+            return applyEmotionalModulation(to: Palette.accentSecondary, blendFactor: 0.25)
         case .success:
-            return Palette.success
+            return applyEmotionalModulation(to: Palette.success, blendFactor: 0.12)
         case .danger:
-            return Palette.danger
+            return applyEmotionalModulation(to: Palette.danger, blendFactor: 0.12)
         case .surface:
-            return currentColorScheme == .dark ? Palette.Dark.backgroundSecondary : Palette.Light.backgroundSecondary
+            let base = currentColorScheme == .dark ? Palette.Dark.backgroundSecondary : Palette.Light.backgroundSecondary
+            return applyEmotionalModulation(to: base, blendFactor: 0.12)
         }
     }
     
@@ -128,15 +136,16 @@ class GlassColorSystem: ObservableObject {
     func buttonColor(for role: GlassRole) -> Color {
         switch role {
         case .primary:
-            return Palette.accentPrimary
+            return emotionalAccent()
         case .accent:
-            return Palette.accentSecondary
+            return applyEmotionalModulation(to: Palette.accentSecondary, blendFactor: 0.32)
         case .success:
-            return Palette.success
+            return applyEmotionalModulation(to: Palette.success, blendFactor: 0.18)
         case .danger:
-            return Palette.danger
+            return applyEmotionalModulation(to: Palette.danger, blendFactor: 0.18)
         case .surface:
-            return currentColorScheme == .dark ? Palette.Dark.cardElevated : Palette.Light.cardElevated
+            let base = currentColorScheme == .dark ? Palette.Dark.cardElevated : Palette.Light.cardElevated
+            return applyEmotionalModulation(to: base, blendFactor: 0.16)
         }
     }
     
@@ -217,17 +226,12 @@ class GlassColorSystem: ObservableObject {
     // MARK: - ARTE Emotional Modulation (Phase 7)
     
     /// Apply emotional modulation to a color
-    func applyEmotionalModulation(to color: Color) -> Color {
+    func applyEmotionalModulation(to color: Color, blendFactor: Double? = nil) -> Color {
         guard isARTEEnabled else { return color }
-        
-        let palette = EmotionalPalette.palette(for: emotionalState)
-        let intensity = emotionalIntensity
-        
-        // Adjust color based on emotional palette
-        // This is a simplified version - modulates saturation and brightness
-        return color
-            .adjustSaturation(by: palette.accentSaturation * intensity)
-            .adjustContrast(by: palette.contrastModifier)
+        let blend = blendFactor ?? (0.18 * emotionalIntensity)
+        guard blend > .ulpOfOne else { return color }
+        let clampedBlend = min(max(blend, 0.0), 0.6)
+        return color.mixed(with: emotionalAccent(), amount: clampedBlend)
     }
     
     /// Get emotionally-modulated accent color
@@ -235,12 +239,14 @@ class GlassColorSystem: ObservableObject {
         guard isARTEEnabled else { return Palette.accentPrimary }
         
         let palette = EmotionalPalette.palette(for: emotionalState)
-        let baseAccent = Palette.accentPrimary
-        
-        // Shift hue based on emotional state
-        return baseAccent
-            .adjustHue(to: palette.accentHue)
-            .adjustSaturation(by: palette.accentSaturation * emotionalIntensity)
+        let hue = palette.accentHue / 360.0
+        let saturationBaseDark = 0.55 + (palette.accentSaturation * 0.35 * emotionalIntensity)
+        let saturationBaseLight = 0.5 + (palette.accentSaturation * 0.25 * emotionalIntensity)
+        let brightnessDark = 0.75 + (0.15 * emotionalIntensity)
+        let brightnessLight = 0.65 + (0.2 * emotionalIntensity)
+        let saturation = currentColorScheme == .dark ? min(1.0, saturationBaseDark) : min(1.0, saturationBaseLight)
+        let brightness = currentColorScheme == .dark ? min(1.0, brightnessDark) : min(1.0, brightnessLight)
+        return Color(hue: hue, saturation: saturation, brightness: brightness, opacity: 1.0)
     }
     
     /// Get emotionally-modulated shadow tone
@@ -289,6 +295,7 @@ class GlassColorSystem: ObservableObject {
     
     // MARK: - Lifecycle
     init() {
+        GlassColorSystem.active = self
         // Initialize with system appearance
         updateColorScheme()
         
@@ -304,6 +311,12 @@ class GlassColorSystem: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    deinit {
+        if GlassColorSystem.active === self {
+            GlassColorSystem.active = nil
+        }
     }
     
     private func updateColorScheme() {
@@ -348,24 +361,81 @@ extension Color {
     
     // MARK: - ARTE Color Manipulation
     
-    /// Adjust saturation by multiplier
+    /// Blend this color with another using linear interpolation.
+    func mixed(with other: Color, amount: Double) -> Color {
+        guard let first = rgbaComponents(), let second = other.rgbaComponents() else {
+            return self
+        }
+        let t = clamp(amount)
+        return Color(
+            red: first.red + (second.red - first.red) * t,
+            green: first.green + (second.green - first.green) * t,
+            blue: first.blue + (second.blue - first.blue) * t,
+            opacity: first.alpha + (second.alpha - first.alpha) * t
+        )
+    }
+    
+    /// Adjust saturation by multiplier.
     func adjustSaturation(by multiplier: Double) -> Color {
-        // Simplified saturation adjustment
-        // In production, would use HSB color space conversion
-        return self
+        guard var hsb = hsbComponents() else { return self }
+        hsb.saturation = clamp(hsb.saturation * multiplier)
+        return Color(hue: hsb.hue, saturation: hsb.saturation, brightness: hsb.brightness, opacity: hsb.alpha)
     }
     
-    /// Adjust contrast by multiplier
+    /// Adjust contrast by multiplier around the midpoint.
     func adjustContrast(by multiplier: Double) -> Color {
-        // Simplified contrast adjustment
-        // In production, would adjust lightness in LAB color space
-        return self
+        guard var hsb = hsbComponents() else { return self }
+        let adjusted = 0.5 + (hsb.brightness - 0.5) * multiplier
+        hsb.brightness = clamp(adjusted)
+        return Color(hue: hsb.hue, saturation: hsb.saturation, brightness: hsb.brightness, opacity: hsb.alpha)
     }
     
-    /// Adjust hue to target value (0-360)
+    /// Adjust hue to target value (0-360 degrees).
     func adjustHue(to targetHue: Double) -> Color {
-        // Simplified hue adjustment
-        // In production, would use HSB color space conversion
-        return self
+        guard var hsb = hsbComponents() else { return self }
+        let normalizedHue = (targetHue / 360.0).truncatingRemainder(dividingBy: 1.0)
+        hsb.hue = normalizedHue < 0 ? normalizedHue + 1.0 : normalizedHue
+        return Color(hue: hsb.hue, saturation: hsb.saturation, brightness: hsb.brightness, opacity: hsb.alpha)
+    }
+    
+    // MARK: - Private helpers
+    private func rgbaComponents() -> (red: Double, green: Double, blue: Double, alpha: Double)? {
+        guard let nsColor = nsColor(), let converted = nsColor.usingColorSpace(.deviceRGB) else { return nil }
+        return (
+            red: Double(converted.redComponent),
+            green: Double(converted.greenComponent),
+            blue: Double(converted.blueComponent),
+            alpha: Double(converted.alphaComponent)
+        )
+    }
+    
+    private func hsbComponents() -> (hue: Double, saturation: Double, brightness: Double, alpha: Double)? {
+        guard let nsColor = nsColor(), let converted = nsColor.usingColorSpace(.deviceRGB) else { return nil }
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        converted.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        return (
+            hue: Double(hue),
+            saturation: Double(saturation),
+            brightness: Double(brightness),
+            alpha: Double(alpha)
+        )
+    }
+    
+    private func nsColor() -> NSColor? {
+        #if os(macOS)
+        guard let cgColor = self.cgColor else { return nil }
+        let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let converted = cgColor.converted(to: sRGB, intent: .defaultIntent, options: nil) ?? cgColor
+        return NSColor(cgColor: converted)
+        #else
+        return nil
+        #endif
+    }
+    
+    private func clamp(_ value: Double, lower: Double = 0.0, upper: Double = 1.0) -> Double {
+        min(max(value, lower), upper)
     }
 }

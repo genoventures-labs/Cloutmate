@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 import CloutmateShared
+import Combine
 
 // Type aliases to disambiguate from Swift.Concurrency.Task and resolve moved models
 fileprivate typealias PARATask = CloutmateShared.Task
@@ -36,6 +37,7 @@ enum AIIntentAction {
     case digestConversation(UUID)
     case digestAllConversations
     case searchConversations(query: String)
+    case createReminder(ReminderCreationRequest)
     
     var displayName: String {
         switch self {
@@ -65,6 +67,7 @@ enum AIIntentAction {
         case .digestConversation: return "Digest Conversation"
         case .digestAllConversations: return "Digest All Conversations"
         case .searchConversations: return "Search Conversations"
+        case .createReminder: return "Create Reminder"
         }
     }
     
@@ -175,6 +178,19 @@ enum AIIntentAction {
             return [:]
         case .searchConversations(let query):
             return ["query": query]
+        case .createReminder(let request):
+            var data: [String: String] = ["title": request.title]
+            if let notes = request.notes, !notes.isEmpty {
+                data["notes"] = notes
+            }
+            data["reminderDate"] = isoString(from: request.reminderDate)
+            if let taskId = request.taskId {
+                data["taskId"] = taskId.uuidString
+            }
+            if let projectId = request.projectId {
+                data["projectId"] = projectId.uuidString
+            }
+            return data
         }
     }
 }
@@ -262,6 +278,14 @@ struct ProjectUpdateRequest {
 struct PostPublishRequest {
     let postId: UUID
     let notes: String?
+}
+
+struct ReminderCreationRequest {
+    let title: String
+    let notes: String?
+    let reminderDate: Date
+    let taskId: UUID?
+    let projectId: UUID?
 }
 
 struct AIActionResult {
@@ -891,6 +915,34 @@ final class AIActionRouter {
                 affectedObjectIDs: results.map { $0.conversationId },
                 metadata: action.metadata
             )
+        
+        case let .createReminder(request):
+            let reminder = CloutmateShared.Reminder(
+                title: request.title,
+                notes: request.notes,
+                reminderDate: request.reminderDate,
+                taskId: request.taskId,
+                projectId: request.projectId
+            )
+            modelContext.insert(reminder)
+            try? modelContext.save()
+            
+            // Schedule notification
+            ReminderService.shared.scheduleReminder(reminder)
+            
+            // Register in recall system
+            AIRecallService.shared.registerCreated(reminder, modelContext: modelContext)
+            
+            let detail = "Title: \(reminder.title)\nDate: \(reminder.reminderDate.formatted(date: .abbreviated, time: .shortened))"
+            return AIActionResult(
+                title: action.displayName,
+                message: "Reminder created",
+                markdown: "⏰ **Reminder created**\n\n\(detail)",
+                details: [detail],
+                itemsAffected: 1,
+                affectedObjectIDs: [reminder.id],
+                metadata: action.metadata
+            )
         }
     }
 }
@@ -1112,6 +1164,30 @@ extension AIIntentAction {
             guard let query = executionIntent.searchQuery,
                   !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
             self = .searchConversations(query: query)
+        case .createReminder:
+            guard let title = executionIntent.reminderTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !title.isEmpty,
+                  let dateString = executionIntent.reminderDate ?? executionIntent.reminderTime else {
+                return nil
+            }
+            // Parse date/time - simplified for now, assume ISO8601 or relative date
+            let reminderDate: Date
+            if let parsedDate = parseISODate(dateString) {
+                reminderDate = parsedDate
+            } else {
+                // Fallback to current date + 1 hour if parsing fails
+                reminderDate = Date().addingTimeInterval(3600)
+            }
+            let taskId = executionIntent.reminderTaskId.flatMap(UUID.init(uuidString:))
+            let projectId = executionIntent.reminderProjectId.flatMap(UUID.init(uuidString:))
+            let request = ReminderCreationRequest(
+                title: title,
+                notes: executionIntent.reminderNotes,
+                reminderDate: reminderDate,
+                taskId: taskId,
+                projectId: projectId
+            )
+            self = .createReminder(request)
         }
     }
 }

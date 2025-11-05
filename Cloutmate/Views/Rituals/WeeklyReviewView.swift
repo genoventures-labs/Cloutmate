@@ -346,7 +346,7 @@ struct WeeklyReviewView: View {
             case .success:
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.kosmicGreen)
                     Text("Weekly review saved. Aurora updated your Clarity Index.")
                         .font(.system(size: 13))
                         .foregroundColor(.secondary)

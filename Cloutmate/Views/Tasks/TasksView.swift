@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import AppKit
 import CloutmateShared
 
 struct TasksView: View {
@@ -29,6 +30,15 @@ struct TasksView: View {
     
     @State private var showBulkStatusSheet = false
     @State private var showBulkPrioritySheet = false
+    
+    // Sorting state
+    @State private var sortColumn: SortColumn = .updated
+    @State private var sortOrder: SortOrder = .reverse
+    @State private var lastSortUpdate: (column: SortColumn, timestamp: Date)?
+    
+    enum SortColumn: String, CaseIterable {
+        case title, status, priority, dueDate, project, area, effort, updated
+    }
     
     private var filteredTasks: [Task] {
         var filtered = allTasks
@@ -56,7 +66,15 @@ struct TasksView: View {
             filtered = filtered.filter { $0.projectId == nil }
         }
         
-        return filtered
+        // Apply manual sorting
+        let sorted = filtered.sorted { task1, task2 in
+            let comparison = compareTasks(task1, task2, by: sortColumn)
+            // When forward, return true when task1 < task2 (orderedAscending)
+            // When reverse, return true when task1 > task2 (orderedDescending)
+            return sortOrder == .forward ? comparison == .orderedAscending : comparison == .orderedDescending
+        }
+        
+        return sorted
     }
     
     var body: some View {
@@ -85,6 +103,10 @@ struct TasksView: View {
                 applyBulkPriority(newPriority)
             }
         }
+        .overlay(alignment: .top) {
+            ClickableTableHeadersView(sortColumn: $sortColumn, sortOrder: $sortOrder)
+                .frame(height: 0)
+        }
     }
     
     private var searchAndFiltersSection: some View {
@@ -112,7 +134,7 @@ struct TasksView: View {
                         }
                     )
                     
-                    ForEach(TaskStatus.allCases, id: \.self) { status in
+                    ForEach(CloutmateShared.TaskStatus.allCases, id: \.self) { status in
                         FilterChip(
                             title: status.displayName,
                             isSelected: selectedStatus == status,
@@ -120,7 +142,7 @@ struct TasksView: View {
                         )
                     }
                     
-                    ForEach(TaskPriority.allCases, id: \.self) { priority in
+                    ForEach(CloutmateShared.TaskPriority.allCases, id: \.self) { priority in
                         FilterChip(
                             title: priority.displayName,
                             isSelected: selectedPriority == priority,
@@ -174,6 +196,11 @@ struct TasksView: View {
                             .lineLimit(2)
                     }
                 }
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    taskToEdit = task
+                    showEditSheet = true
+                }
                 .contextMenu {
                     Button("Edit") {
                         taskToEdit = task
@@ -187,23 +214,40 @@ struct TasksView: View {
             .width(min: 220, ideal: 320)
             
             TableColumn("Status") { task in
-                TaskStatusBadge(status: task.status)
+                InteractiveTaskStatusBadge(task: task)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        taskToEdit = task
+                        showEditSheet = true
+                    }
             }
-            .width(min: 110)
+            .width(min: 110, ideal: 110)
             
             TableColumn("Priority") { task in
-                TaskPriorityBadge(priority: task.priority)
+                InteractiveTaskPriorityBadge(task: task)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        taskToEdit = task
+                        showEditSheet = true
+                    }
             }
-            .width(min: 110)
+            .width(min: 110, ideal: 110)
             
             TableColumn("Due Date") { task in
-                if let due = task.dueDate {
-                    Text(due, format: .dateTime.month().day())
-                } else {
-                    Text("—").foregroundColor(.secondary)
+                Group {
+                    if let due = task.dueDate {
+                        Text(due, format: .dateTime.month().day())
+                    } else {
+                        Text("—").foregroundColor(.secondary)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    taskToEdit = task
+                    showEditSheet = true
                 }
             }
-            .width(min: 120)
+            .width(min: 120, ideal: 120)
             
             TableColumn("Project") { task in
                 if let pid = task.projectId, let project = allProjects.first(where: { $0.id == pid }) {
@@ -212,7 +256,7 @@ struct TasksView: View {
                     Text("—").foregroundColor(.secondary)
                 }
             }
-            .width(min: 140)
+            .width(min: 140, ideal: 140)
             
             TableColumn("Area") { task in
                 if let aid = task.areaId, let area = allAreas.first(where: { $0.id == aid }) {
@@ -221,17 +265,52 @@ struct TasksView: View {
                     Text("—").foregroundColor(.secondary)
                 }
             }
-            .width(min: 140)
+            .width(min: 140, ideal: 140)
             
             TableColumn("Effort") { task in
                 Text(task.effort ?? "—").font(.caption).foregroundColor(.secondary)
             }
-            .width(min: 90)
+            .width(min: 90, ideal: 90)
             
             TableColumn("Updated") { task in
                 Text(task.updatedAt, style: .relative).font(.caption).foregroundColor(.secondary)
             }
-            .width(min: 120)
+            .width(min: 120, ideal: 120)
+        }
+    }
+    
+    private func compareTasks(_ task1: CloutmateShared.Task, _ task2: CloutmateShared.Task, by column: SortColumn) -> ComparisonResult {
+        switch column {
+        case .title:
+            return task1.title.localizedCompare(task2.title)
+        case .status:
+            return task1.status.rawValue.localizedCompare(task2.status.rawValue)
+        case .priority:
+            let priorityOrder: [CloutmateShared.TaskPriority: Int] = [.high: 3, .medium: 2, .low: 1]
+            let p1 = priorityOrder[task1.priority] ?? 0
+            let p2 = priorityOrder[task2.priority] ?? 0
+            return p1 == p2 ? .orderedSame : (p1 > p2 ? .orderedDescending : .orderedAscending)
+        case .dueDate:
+            switch (task1.dueDate, task2.dueDate) {
+            case (nil, nil): return .orderedSame
+            case (nil, _): return .orderedDescending
+            case (_, nil): return .orderedAscending
+            case (let d1?, let d2?): return d1.compare(d2)
+            }
+        case .project:
+            let p1Title = task1.projectId.flatMap { pid in allProjects.first(where: { $0.id == pid })?.title } ?? ""
+            let p2Title = task2.projectId.flatMap { pid in allProjects.first(where: { $0.id == pid })?.title } ?? ""
+            return p1Title.localizedCompare(p2Title)
+        case .area:
+            let a1Title = task1.areaId.flatMap { aid in allAreas.first(where: { $0.id == aid })?.title } ?? ""
+            let a2Title = task2.areaId.flatMap { aid in allAreas.first(where: { $0.id == aid })?.title } ?? ""
+            return a1Title.localizedCompare(a2Title)
+        case .effort:
+            let e1 = task1.effort ?? ""
+            let e2 = task2.effort ?? ""
+            return e1.localizedCompare(e2)
+        case .updated:
+            return task1.updatedAt.compare(task2.updatedAt)
         }
     }
     
@@ -261,14 +340,14 @@ struct TasksView: View {
     }
     
     // MARK: - Actions
-    private func deleteTask(_ task: Task) {
+    private func deleteTask(_ task: CloutmateShared.Task) {
         modelContext.delete(task)
         if selectedTasks.contains(task.id) { selectedTasks.remove(task.id) }
         try? modelContext.save()
     }
     
-    private func duplicateTask(_ task: Task) {
-        let copy = Task(
+    private func duplicateTask(_ task: CloutmateShared.Task) {
+        let copy = CloutmateShared.Task(
             title: task.title,
             notes: task.notes,
             status: task.status,
@@ -289,14 +368,14 @@ struct TasksView: View {
         try? modelContext.save()
     }
     
-    private func applyBulkStatus(_ newStatus: TaskStatus) {
+    private func applyBulkStatus(_ newStatus: CloutmateShared.TaskStatus) {
         let tasksToUpdate = filteredTasks.filter { selectedTasks.contains($0.id) }
         for task in tasksToUpdate { task.status = newStatus }
         selectedTasks.removeAll()
         try? modelContext.save()
     }
     
-    private func applyBulkPriority(_ newPriority: TaskPriority) {
+    private func applyBulkPriority(_ newPriority: CloutmateShared.TaskPriority) {
         let tasksToUpdate = filteredTasks.filter { selectedTasks.contains($0.id) }
         for task in tasksToUpdate { task.priority = newPriority }
         selectedTasks.removeAll()
@@ -313,7 +392,7 @@ struct TasksView: View {
 
 // MARK: - Badges
 struct TaskStatusBadge: View {
-    let status: TaskStatus
+    let status: CloutmateShared.TaskStatus
     var body: some View {
         Text(status.displayName)
             .font(.caption)
@@ -330,7 +409,7 @@ struct TaskStatusBadge: View {
 }
 
 struct TaskPriorityBadge: View {
-    let priority: TaskPriority
+    let priority: CloutmateShared.TaskPriority
     var body: some View {
         Text(priority.displayName)
             .font(.caption)
@@ -343,17 +422,72 @@ struct TaskPriorityBadge: View {
     }
 }
 
+// MARK: - Interactive Badges
+struct InteractiveTaskStatusBadge: View {
+    @Bindable var task: CloutmateShared.Task
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            ForEach(CloutmateShared.TaskStatus.allCases, id: \.self) { status in
+                Button(action: {
+                    task.status = status
+                    task.updatedAt = Date()
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Text(status.displayName)
+                        if task.status == status {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            TaskStatusBadge(status: task.status)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct InteractiveTaskPriorityBadge: View {
+    @Bindable var task: CloutmateShared.Task
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            ForEach(CloutmateShared.TaskPriority.allCases, id: \.self) { priority in
+                Button(action: {
+                    task.priority = priority
+                    task.updatedAt = Date()
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Text(priority.displayName)
+                        if task.priority == priority {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            TaskPriorityBadge(priority: task.priority)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Create / Edit Sheets
 struct CreateTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var allProjects: [Project]
+    @Query private var allProjects: [CloutmateShared.Project]
     @Query private var allAreas: [Area]
     
     @State private var title: String = ""
     @State private var notes: String = ""
-    @State private var status: TaskStatus = .todo
-    @State private var priority: TaskPriority = .medium
+    @State private var status: CloutmateShared.TaskStatus = .todo
+    @State private var priority: CloutmateShared.TaskPriority = .medium
     @State private var hasDueDate: Bool = false
     @State private var dueDate: Date = Date()
     @State private var projectId: UUID?
@@ -372,14 +506,14 @@ struct CreateTaskSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Status").font(.caption).foregroundColor(.secondary)
                         Picker("Status", selection: $status) {
-                            ForEach(TaskStatus.allCases, id: \.self) { s in Text(s.displayName).tag(s) }
+                            ForEach(CloutmateShared.TaskStatus.allCases, id: \.self) { s in Text(s.displayName).tag(s) }
                         }.pickerStyle(.segmented)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Priority").font(.caption).foregroundColor(.secondary)
                         Picker("Priority", selection: $priority) {
-                            ForEach(TaskPriority.allCases, id: \.self) { p in Text(p.displayName).tag(p) }
+                            ForEach(CloutmateShared.TaskPriority.allCases, id: \.self) { p in Text(p.displayName).tag(p) }
                         }.pickerStyle(.segmented)
                     }
                     
@@ -436,7 +570,7 @@ struct CreateTaskSheet: View {
     }
     
     private func createTask() {
-        let task = Task(
+        let task = CloutmateShared.Task(
             title: title,
             notes: notes.isEmpty ? nil : notes,
             status: status,
@@ -455,10 +589,10 @@ struct CreateTaskSheet: View {
 struct EditTaskSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Query private var allProjects: [Project]
+    @Query private var allProjects: [CloutmateShared.Project]
     @Query private var allAreas: [Area]
     
-    @Bindable var task: Task
+    @Bindable var task: CloutmateShared.Task
     
     @State private var hasDueDate: Bool = false
     
@@ -474,14 +608,14 @@ struct EditTaskSheet: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Status").font(.caption).foregroundColor(.secondary)
                         Picker("Status", selection: $task.status) {
-                            ForEach(TaskStatus.allCases, id: \.self) { s in Text(s.displayName).tag(s) }
+                            ForEach(CloutmateShared.TaskStatus.allCases, id: \.self) { s in Text(s.displayName).tag(s) }
                         }.pickerStyle(.segmented)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Priority").font(.caption).foregroundColor(.secondary)
                         Picker("Priority", selection: $task.priority) {
-                            ForEach(TaskPriority.allCases, id: \.self) { p in Text(p.displayName).tag(p) }
+                            ForEach(CloutmateShared.TaskPriority.allCases, id: \.self) { p in Text(p.displayName).tag(p) }
                         }.pickerStyle(.segmented)
                     }
                     
@@ -548,8 +682,8 @@ struct EditTaskSheet: View {
 // MARK: - Bulk Sheets
 struct BulkTaskStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let tasks: [Task]
-    let onUpdate: (TaskStatus) -> Void
+    let tasks: [CloutmateShared.Task]
+    let onUpdate: (CloutmateShared.TaskStatus) -> Void
     
     var body: some View {
         NavigationStack {
@@ -557,7 +691,7 @@ struct BulkTaskStatusSheet: View {
                 Text("Change status for \(tasks.count) task\(tasks.count == 1 ? "" : "s")")
                     .font(.headline)
                 
-                ForEach(TaskStatus.allCases, id: \.self) { status in
+                ForEach(CloutmateShared.TaskStatus.allCases, id: \.self) { status in
                     Button(action: { onUpdate(status); dismiss() }) {
                         HStack {
                             Circle().fill(
@@ -582,8 +716,8 @@ struct BulkTaskStatusSheet: View {
 
 struct BulkTaskPrioritySheet: View {
     @Environment(\.dismiss) private var dismiss
-    let tasks: [Task]
-    let onUpdate: (TaskPriority) -> Void
+    let tasks: [CloutmateShared.Task]
+    let onUpdate: (CloutmateShared.TaskPriority) -> Void
     
     var body: some View {
         NavigationStack {
@@ -591,7 +725,7 @@ struct BulkTaskPrioritySheet: View {
                 Text("Change priority for \(tasks.count) task\(tasks.count == 1 ? "" : "s")")
                     .font(.headline)
                 
-                ForEach(TaskPriority.allCases, id: \.self) { priority in
+                ForEach(CloutmateShared.TaskPriority.allCases, id: \.self) { priority in
                     Button(action: { onUpdate(priority); dismiss() }) {
                         HStack {
                             Circle().fill(priority.color).frame(width: 12, height: 12)
@@ -612,9 +746,179 @@ struct BulkTaskPrioritySheet: View {
     }
 }
 
+// MARK: - Clickable Table Headers
+struct ClickableTableHeadersView: NSViewRepresentable {
+    @Binding var sortColumn: TasksView.SortColumn
+    @Binding var sortOrder: SortOrder
+    
+    func makeNSView(context: Context) -> NSView {
+        let view = HeadersTrackingView(sortColumn: $sortColumn, sortOrder: $sortOrder)
+        return view
+    }
+    
+    func updateNSView(_ nsView: NSView, context: Context) {
+        // No-op
+    }
+}
+
+class HeadersTrackingView: NSView {
+    @Binding var sortColumn: TasksView.SortColumn
+    @Binding var sortOrder: SortOrder
+    private var trackedTableView: NSTableView?
+    
+    init(sortColumn: Binding<TasksView.SortColumn>, sortOrder: Binding<SortOrder>) {
+        _sortColumn = sortColumn
+        _sortOrder = sortOrder
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        
+        // Try to find table view after a delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            self.findAndSetupTableView()
+        }
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    func findAndSetupTableView() {
+        guard let window = self.window else { return }
+        guard let contentView = window.contentView else { return }
+        
+        if let tableView = findTableView(in: contentView), tableView != trackedTableView {
+            trackedTableView = tableView
+            setupClickableHeaders(tableView)
+        }
+    }
+    
+    func findTableView(in view: NSView) -> NSTableView? {
+        if let tableView = view as? NSTableView {
+            return tableView
+        }
+        for subview in view.subviews {
+            if let tableView = findTableView(in: subview) {
+                return tableView
+            }
+        }
+        return nil
+    }
+    
+    func setupClickableHeaders(_ tableView: NSTableView) {
+        // Update column titles with sort indicators first
+        updateColumnTitles(tableView)
+        
+        // Create a custom header view
+        let customHeader = ClickableTaskHeaderView(
+            tableView: tableView,
+            sortColumn: $sortColumn,
+            sortOrder: $sortOrder,
+            updateHandler: { [weak self] in
+                self?.updateColumnTitles(tableView)
+            }
+        )
+        
+        // Set the frame to match existing header
+        if let existingHeader = tableView.headerView {
+            customHeader.frame = existingHeader.frame
+        }
+        
+        // Replace the header
+        tableView.headerView = customHeader
+    }
+    
+    func updateColumnTitles(_ tableView: NSTableView) {
+        let columnMap: [TasksView.SortColumn: Int] = [
+            .title: 0, .status: 1, .priority: 2, .dueDate: 3,
+            .project: 4, .area: 5, .effort: 6, .updated: 7
+        ]
+        
+        for (columnEnum, index) in columnMap where index < tableView.tableColumns.count {
+            let column = tableView.tableColumns[index]
+            let baseTitle = column.title.replacingOccurrences(of: " ↑", with: "").replacingOccurrences(of: " ↓", with: "")
+            
+            if sortColumn == columnEnum {
+                let indicator = sortOrder == .forward ? " ↑" : " ↓"
+                column.title = baseTitle + indicator
+            } else {
+                column.title = baseTitle
+            }
+        }
+    }
+}
+
+class ClickableTaskHeaderView: NSTableHeaderView {
+    weak var myTableView: NSTableView?
+    @Binding var sortColumn: TasksView.SortColumn
+    @Binding var sortOrder: SortOrder
+    var updateHandler: (() -> Void)?
+    
+    init(
+        tableView: NSTableView,
+        sortColumn: Binding<TasksView.SortColumn>,
+        sortOrder: Binding<SortOrder>,
+        updateHandler: @escaping () -> Void
+    ) {
+        self.myTableView = tableView
+        _sortColumn = sortColumn
+        _sortOrder = sortOrder
+        self.updateHandler = updateHandler
+        super.init(frame: .zero)
+    }
+    
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        guard let tableView = myTableView else {
+            super.mouseDown(with: event)
+            return
+        }
+        
+        let location = self.convert(event.locationInWindow, from: nil)
+        let columnIndex = column(at: NSPoint(x: location.x, y: 0))
+        
+        if columnIndex >= 0 && columnIndex < tableView.tableColumns.count {
+            let column = tableView.tableColumns[columnIndex]
+            handleColumnClick(columnTitle: column.title)
+            updateHandler?()
+        }
+        
+        super.mouseDown(with: event)
+    }
+    
+    private func handleColumnClick(columnTitle: String) {
+        // Map column titles to SortColumn enum
+        let columnMap: [String: TasksView.SortColumn] = [
+            "Title": .title,
+            "Status": .status,
+            "Priority": .priority,
+            "Due Date": .dueDate,
+            "Project": .project,
+            "Area": .area,
+            "Effort": .effort,
+            "Updated": .updated
+        ]
+        
+        let baseTitle = columnTitle.replacingOccurrences(of: " ↑", with: "").replacingOccurrences(of: " ↓", with: "")
+        
+        if let clickedColumn = columnMap[baseTitle] {
+            if sortColumn == clickedColumn {
+                // Toggle order if same column clicked
+                sortOrder = sortOrder == .forward ? .reverse : .forward
+            } else {
+                // Switch to new column with ascending order
+                sortColumn = clickedColumn
+                sortOrder = .forward
+            }
+        }
+    }
+}
+
 #Preview {
     TasksView()
         .modelContainer(for: [CloutmateShared.Task.self, CloutmateShared.Project.self, Area.self])
 }
-
 

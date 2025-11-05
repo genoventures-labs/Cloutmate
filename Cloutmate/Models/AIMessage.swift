@@ -24,11 +24,50 @@ final class AIMessage: Identifiable {
     
     // Chart visualization data (for reflection responses)
     @Attribute var chartDataEncoded: Data?
+
+    // Image attachment support
+    @Attribute var imageData: Data?
+    @Attribute var imageMimeType: String?
+    @Attribute var imageAnalysis: String?
+    @Attribute var imageFileName: String?
+
+    // Confidence tracking for assistant responses
+    @Attribute var confidenceScore: Double?
+
+    // Document attachment support
+    @Attribute var documentData: Data?
+    @Attribute var documentMimeType: String?
+    @Attribute var documentSummary: String?
+    @Attribute var documentFileName: String?
+    @Attribute var documentTextPreview: String?
+    @Attribute var documentSourceURL: String?
+    @Attribute var documentSourceModel: String? // "Gemini", "AppleLLM", or "Offline"
     
     // Inverse relationship
     var conversation: AIConversation?
     
-    init(role: String, content: String, toolUsed: String? = nil, isSystemMessage: Bool = false, emotion: String? = nil, emotionScore: Double = 0.0, emotionIntensity: Double = 0.0, chartData: ChartData? = nil) {
+    init(
+        role: String,
+        content: String,
+        toolUsed: String? = nil,
+        isSystemMessage: Bool = false,
+        emotion: String? = nil,
+        emotionScore: Double = 0.0,
+        emotionIntensity: Double = 0.0,
+        chartData: ChartData? = nil,
+        imageData: Data? = nil,
+        imageMimeType: String? = nil,
+        imageAnalysis: String? = nil,
+        imageFileName: String? = nil,
+        confidenceScore: Double? = nil,
+        documentData: Data? = nil,
+        documentMimeType: String? = nil,
+        documentSummary: String? = nil,
+        documentFileName: String? = nil,
+        documentTextPreview: String? = nil,
+        documentSourceURL: String? = nil,
+        documentSourceModel: String? = nil
+    ) {
         self.id = UUID()
         self.role = role
         self.content = content
@@ -38,6 +77,18 @@ final class AIMessage: Identifiable {
         self.emotion = emotion
         self.emotionScore = emotionScore
         self.emotionIntensity = emotionIntensity
+        self.imageData = imageData
+        self.imageMimeType = imageMimeType
+        self.imageAnalysis = imageAnalysis
+        self.imageFileName = imageFileName
+        self.confidenceScore = confidenceScore
+        self.documentData = documentData
+        self.documentMimeType = documentMimeType
+        self.documentSummary = documentSummary
+        self.documentFileName = documentFileName
+        self.documentTextPreview = documentTextPreview
+        self.documentSourceURL = documentSourceURL
+        self.documentSourceModel = documentSourceModel
         
         // Encode chart data if provided
         if let chartData = chartData {
@@ -77,6 +128,7 @@ final class AIConversation: Identifiable {
     @Attribute var summary: String?
     @Attribute var lastSummaryGeneratedAt: Date?
     @Attribute var tagsData: Data?
+    @Attribute var pendingSuggestionPatternId: UUID?
     
     // Make relationship optional for CloudKit compatibility
     @Relationship(deleteRule: .cascade, inverse: \AIMessage.conversation)

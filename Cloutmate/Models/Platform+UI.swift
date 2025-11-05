@@ -7,6 +7,7 @@
 
 import SwiftUI
 import CloutmateShared
+import Combine
 
 extension Platform {
     var iconName: String {
