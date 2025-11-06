@@ -414,7 +414,7 @@ struct WeeklyReviewView: View {
         let cpsSummary = topCPSItems.map { "- \($0.title) (score \(String(format: "%.2f", $0.score)))" }.joined(separator: "\n")
         let prompt = "Summarize weekly focus shifts based on these priority items:\n\(cpsSummary). Provide 2-3 concise insights."
         do {
-            let response = try await GeminiService.shared.generateResponse(for: prompt)
+            let response = try await CoreResponseService.shared.generateResponse(for: prompt)
             await MainActor.run {
                 insightsDraft = response
                 isGeneratingInsights = false

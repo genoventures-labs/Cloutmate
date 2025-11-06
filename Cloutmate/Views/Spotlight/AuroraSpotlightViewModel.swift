@@ -19,7 +19,7 @@ final class AuroraSpotlightViewModel {
     var isExecutionRequest = false
     var executionConfirmation: String?
     
-    private let geminiService = GeminiService.shared
+    private let coreResponseService = CoreResponseService.shared
     private let aiSettings = AISettings.shared
     private var aiAssistantViewModel: AIAssistantViewModel?
     
@@ -79,7 +79,7 @@ final class AuroraSpotlightViewModel {
                 }
             }
             
-            if let intent = try await geminiService.detectExecutionIntent(input: trimmedText, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
+            if let intent = try await coreResponseService.detectExecutionIntent(input: trimmedText, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
                 detectedExecution = true
                 await MainActor.run {
                     isExecutionRequest = true

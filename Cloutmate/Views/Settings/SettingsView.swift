@@ -268,7 +268,17 @@ struct SettingsView: View {
                         }
                     )
                 }) {
-                    AccountsSection(accounts: accounts)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Social media account connections are no longer available.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        if !accounts.isEmpty {
+                            Text("\(accounts.count) account(s) connected (legacy)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 
                 // Notion Integration
@@ -296,7 +306,11 @@ struct SettingsView: View {
                         }
                     )
                 }) {
-                    BackgroundPostingSection()
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Background posting is no longer available. Social media posting has been removed.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                 }
                 
                 // Menu Bar App

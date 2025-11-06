@@ -1,8 +1,9 @@
 # Aurora - AI Assistant Knowledge Base
 
-**Last Updated:** December 2024  
+**Last Updated:** January 2025  
 **Current Phase:** 9 (Predictive Reflection Engine Complete)  
-**Status:** ✅ Fully Operational
+**Status:** ✅ Fully Operational  
+**AI Engine:** Powered by Ollama (local LLM) - requires Ollama running locally with llama3.1 model
 
 ---
 
@@ -59,10 +60,12 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 
 **Document & Media Analysis:**
 - **Document Analysis** - Analyze PDFs, Markdown, text files, and RTF documents with context-aware responses
-- **Image Analysis** - Analyze images (PNG, JPEG, WEBP, HEIC, HEIF) with Gemini vision capabilities
+- **Image Analysis** - Analyze images (PNG, JPEG, WEBP, HEIC, HEIF) with vision capabilities
 - Extracts text from documents, provides summaries with action items
 - Indexes analyses in recall system for future reference
-- **Smart Routing Fallback** - Intelligent tiered routing with network-aware auto-promotion ensures zero interruptions (Gemini → Apple LLM → Offline)
+- **Powered by Ollama** - Local LLM processing ensures privacy and reliability (requires Ollama running locally with llama3.1 model)
+- **Adaptive Model Selection** - Aurora automatically switches between different Ollama models based on task complexity and requirements. For coding tasks, she prefers code-specific models (like codellama). For complex analytical tasks or large documents (>10K chars), she prefers larger models. For vision tasks, she prefers vision-capable models (like llama3.2-vision). When she switches models, she naturally informs you in her response. You can also manually select a preferred model in Settings → AI Assistant.
+- **Airplane Mode** - Complete offline operation. When enabled in Settings, Aurora runs entirely locally with zero network access. All cognition capabilities (recall, priority ranking, focus tracking, pattern recognition, predictions) work identically whether online or offline.
 
 **Cognitive Load Management:**
 - **Confidence Scoring** - Self-aware confidence metrics (low/medium/high) based on recall quality, context freshness, and intent signals
@@ -76,6 +79,16 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - Suggest hashtags
 - Improve existing text
 - Adjust tone and style
+
+**Conversation Management:**
+- **Pinned Conversations** - Pin important conversations to the top of your list for quick access
+- **Auto-Generated Summaries** - Conversations with 5+ messages automatically get 2-3 sentence summaries
+- **Topic Tagging** - Conversations are automatically categorized with 1-3 relevant tags (Content Strategy, Copywriting, Social Media, etc.)
+- **Export to Drafts** - Instantly convert AI-generated content into draft posts
+- **Smart Recap** - Generate inline summaries for long conversations (10+ messages)
+- **Enhanced Search** - Search across titles, message content, and summaries with date and tag filtering
+- **Global Search (⌘+K)** - Universal search across conversations, drafts, and posts from anywhere in the app
+- **Cross-Conversation Insights** - Sidebar panel analyzes all conversations to detect patterns and recurring themes
 
 **Quick Access:**
 - **Aurora Spotlight** - Quick access overlay (Cmd+Shift+A) for instant conversations and executions
@@ -237,7 +250,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 
 ### Document & Media Analysis
 - "Analyze this document" → Analyzes attached PDF/Markdown/text file with context
-- "What's in this image?" → Analyzes attached image with Gemini vision
+- "What's in this image?" → Analyzes attached image with Ollama vision capabilities
 - "Can you read this file?" → Processes document and provides summary
 - "Tell me about this PDF" → Extracts and analyzes PDF content
 
@@ -248,7 +261,16 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - Reminders appear in Calendar tab alongside tasks and posts
 - Uses same notification system as focus sessions (in-app notifications)
 
-### Quick Access (NEW - Aurora Spotlight)
+### Conversation Management
+- **Pin conversations** - Right-click any conversation → "Pin to Top" to keep important chats at the top
+- **View summaries** - Auto-generated summaries appear below conversation titles (for conversations with 5+ messages)
+- **Refresh summaries** - Right-click → "Refresh Summary" to regenerate conversation summaries
+- **Filter by tags** - Use the tag dropdown in the search bar to filter conversations by topic
+- **Export content** - Right-click → "Export to Drafts" to convert AI-generated content into draft posts
+- **Smart recaps** - Click "Summarize Chat" button (appears for conversations with 10+ messages) to generate inline summaries
+- **Global search** - Press ⌘+K anywhere in the app to search across conversations, drafts, and posts
+
+### Quick Access (Aurora Spotlight)
 - **Cmd+Shift+A** → Opens Aurora Spotlight quick access overlay
 - Type any question or command directly in Spotlight
 - Conversations persist to AI Assistant tab
@@ -355,17 +377,15 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 ### Document & Image Analysis
 - When users attach documents (PDF, Markdown, text) or images, analyze them with full app context
 - For documents: Start with one-sentence headline, provide 2 paragraphs covering main narrative, standout details, and emotional/strategic implications. Call out action items and open questions.
-- For images: Use Gemini vision to understand content, integrate with app context for relevant analysis
+- For images: Analyze image content when possible, integrate with app context for relevant analysis
 - Mention if document was truncated due to size limits
 - Index analyses in recall system for future reference
-- **Smart Routing Fallback System:** Intelligent tiered routing with network-aware auto-promotion ensures Aurora always responds, even during API outages:
-  - **Tier 1 (Gemini - Primary):** Full semantic analysis with task extraction. Handles heavy summarization, reasoning, multimodal analysis. Default for complex documents or when network is available.
-  - **Tier 2 (Apple LLM - Secondary):** On-device summarization using Apple Intelligence (macOS 14+). Private, fast, no API calls. Auto-promoted to "Gemini replacement mode" when network is down/degraded or preferred for short documents. Ideal for quick semantic extraction and natural phrasing.
-  - **Tier 3 (Offline/Template - Tertiary):** Template-based summarization using heuristic key-phrase clustering. Final fallback when both AI tiers unavailable. No LLM dependency.
-  - **Smart Routing:** FallbackRoutingService monitors network connectivity and tracks failures. Automatically determines optimal tier based on document complexity, network status, and failure history. Prefers Apple LLM for short docs, Gemini for complex ones.
-  - **Auto-Promotion:** When network unavailable or degraded, Apple LLM automatically replaces Gemini as primary tier. After 2 consecutive Gemini failures, system auto-promotes to fallback tiers.
-  - **UX Transparency:** All summaries include "Powered by" indicator showing which tier generated the summary (Gemini, Apple Intelligence, or Offline). Adaptive messaging explains routing decisions based on network status.
-  - **Benefits:** Zero "retry later" interruptions, full continuity even offline, instant feel with on-device processing, privacy-friendly local inference, transparent cognition path indicators.
+- **Powered by Ollama:** Aurora uses Ollama (local LLM) running on your machine for all AI processing. This ensures:
+  - **Privacy:** All processing happens locally on your device
+  - **Reliability:** No dependency on external API services or network connectivity
+  - **Speed:** Local processing provides fast responses without network latency
+  - **Control:** You control the model and can customize it to your needs
+- **Requirements:** Ollama must be running locally with the `llama3.1` model installed (`ollama pull llama3.1`)
 - **CRITICAL: When document analysis includes execution requests:**
   - If the user asks you to CREATE something (project, tasks, notes) based on the document, you MUST actually execute those actions using the Action Router, not just describe what you would do
   - Examples: "Create a project with tasks from this document" → ACTUALLY create the project and tasks. "Break this into 10 tasks" → ACTUALLY create those 10 tasks
@@ -479,17 +499,17 @@ Every AI request includes `AIPayloadContext`:
 ### System Prompt Locations
 
 1. **Simple Conversational** (`generateResponse()`)
-   - **Location:** `Cloutmate/Services/GeminiService.swift`, lines 137-159
+   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`
    - **Use Case:** Basic chat responses, content brainstorming
    - **Knowledge Level:** High-level capabilities overview
 
 2. **Main AI Assistant** (`generateResponseWithAppContext()`)
-   - **Location:** `Cloutmate/Services/GeminiService.swift`, lines 217-281
+   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`, `buildSystemPrompt()` method
    - **Use Case:** Primary assistant responses with full context
    - **Knowledge Level:** Complete architecture with behavioral instructions
 
 3. **Execution Intent Detection** (`detectExecutionIntent()`)
-   - **Location:** `Cloutmate/Services/GeminiService.swift`, lines 565-628
+   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`
    - **Use Case:** Parsing natural language into structured operations
    - **Knowledge Level:** Complete operation schema
 
@@ -556,12 +576,15 @@ Aurora's knowledge is documented across these files:
 - ✅ Intelligent conversation compression and style adaptation
 - ✅ Creating reminders with in-app notifications (Calendar integration)
 - ✅ Quick access via Aurora Spotlight overlay (Cmd+Shift+A)
+- ✅ **Complete offline operation via Airplane Mode** - Full cognition loop works identically with zero network access
+- ✅ **Adaptive Model Selection** - Automatically switches between Ollama models based on task complexity (coding, vision, complex analysis)
 
 **She serves as a true cognitive operating system—one that anticipates, adapts, and grows with users.** 🧠✨
 
 ---
 
-**Last Updated:** December 2024  
+**Last Updated:** January 2025  
 **Maintained By:** Development Team  
-**For Questions:** See `AURORA_KNOWLEDGE_BASE_UPDATED.md` for detailed technical documentation
+**AI Engine:** Ollama (local LLM) - All processing happens locally on your device for privacy and reliability. Requires Ollama running locally with llama3.1 model (or your preferred model in Settings → AI Assistant).  
+**For Questions:** See `AURORA_INTRO.md` for conversational introduction, `AURORA_README.md` for complete technical documentation
 

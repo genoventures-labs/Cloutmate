@@ -30,7 +30,7 @@ struct DashboardView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Dashboard")
                             .font(.system(size: 28, weight: .bold))
-                        Text("Plan your pipeline and publishing at a glance")
+                        Text("Your workspace overview and productivity insights")
                             .metricLabelStyle()
                     }
                     Spacer()
@@ -40,13 +40,6 @@ struct DashboardView: View {
                     .help("Dashboard Settings")
                 }
                 
-                // Hero: Social Overview
-                if isVisible(.socialOverview) {
-                    SocialOverviewCard(size: .large)
-                        .heroCard()
-                        .frame(minWidth: 420, maxWidth: 520)
-                        .padding(.top, 8)
-                }
                 
                 // Sections grid
                 LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
@@ -129,27 +122,16 @@ struct DashboardView: View {
                     }
 
                     DashboardSectionPanel(
-                        title: "Social",
-                        icon: "chart.bar.fill",
+                        title: "Content",
+                        icon: "doc.text.fill",
                         accent: glassAccent(for: .primary),
                         isCollapsed: $socialCollapsed
                     ) {
-                        if anyVisible([.contentPerformance, .platformComparison]) {
-                            VStack(spacing: 12) {
-                                if isVisible(.contentPerformance) {
-                                    ContentPerformanceCard(size: size(for: .contentPerformance, fallback: .medium))
-                                }
-                                if isVisible(.platformComparison) {
-                                    PlatformComparisonCard(size: size(for: .platformComparison, fallback: .medium))
-                                }
-                            }
-                        } else {
-                            sectionEmptyBanner(
-                                primary: "No social cards enabled",
-                                secondary: "Add publishing insights from Dashboard Settings when needed.",
-                                accent: glassAccent(for: .primary)
-                            )
-                        }
+                        sectionEmptyBanner(
+                            primary: "Content insights coming soon",
+                            secondary: "View artifact analytics in the Insights tab.",
+                            accent: glassAccent(for: .primary)
+                        )
                     }
                 }
                 .padding(.top, 4)
@@ -215,7 +197,6 @@ struct DashboardView: View {
         var position = dashboardCards.map { $0.position }.max() ?? -1
         
         let defaultCards: [(DashboardCardType, DashboardCardSize)] = [
-            (.socialOverview, .large),
             (.todayOverview, .medium),
             (.inboxCount, .small),
             (.upcomingTasks, .medium),
@@ -230,9 +211,6 @@ struct DashboardView: View {
         for (type, size) in defaultCards where !existingTypes.contains(type) {
             position += 1
             let card = DashboardCard(cardType: type, position: position, size: size)
-            if type == .socialOverview {
-                card.isVisible = true
-            }
             modelContext.insert(card)
             inserted = true
         }

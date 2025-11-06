@@ -2,73 +2,100 @@
 //  ContentAnalyticsView.swift
 //  Cloutmate
 //
-//  Phase 6.1 - Content Analytics & Impact Tracking
+//  Content Analytics View - Full implementation for artifact-based analytics
 //
 
 import SwiftUI
 import SwiftData
-import CloutmateShared
 import Charts
+import CloutmateShared
 
 struct ContentAnalyticsView: View {
     @Environment(\.modelContext) private var modelContext
-    let snapshot: AnalyticsSnapshot?
+    let snapshot: AnalyticsSnapshot
     let timeRange: AnalyticsTimeRange
     
-    @State private var posts: [Post] = []
-    @State private var publishingTrend: [(date: Date, count: Int)] = []
-    @State private var engagementData: [(platform: String, engagement: Double)] = []
+    @State private var artifactTrend: [(date: Date, count: Int)] = []
+    @State private var formatDistribution: [(format: OutputFormat, count: Int)] = []
+    @State private var stateDistribution: [(state: ArtifactState, count: Int)] = []
+    @State private var recentArtifacts: [CloutmateShared.Artifact] = []
     
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 24) {
-                // Publishing Stats
-                if let snapshot = snapshot {
-                    HStack(spacing: 16) {
-                        StatCard(
-                            title: "Posts Published",
-                            value: "\(snapshot.postsPublished)",
-                            icon: "checkmark.circle.fill",
-                            color: .kosmicGreen
-                        )
-                        
-                        StatCard(
-                            title: "Drafts Created",
-                            value: "\(snapshot.draftsCreated)",
-                            icon: "doc.text.fill",
-                            color: .kosmicBlue
-                        )
-                        
-                        StatCard(
-                            title: "Avg Engagement",
-                            value: String(format: "%.1f", snapshot.avgEngagement),
-                            icon: "heart.fill",
-                            color: .red
-                        )
-                    }
-                    .padding(.horizontal)
+            VStack(spacing: 24) {
+                // Header Stats
+                HStack(spacing: 16) {
+                    ContentMetricCard(
+                        title: "Total Artifacts",
+                        value: "\(artifactTrend.reduce(0) { $0 + $1.count })",
+                        subtitle: "created",
+                        icon: "doc.text.fill",
+                        color: .kosmicBlue
+                    )
+                    
+                    ContentMetricCard(
+                        title: "Published",
+                        value: "\(stateDistribution.first(where: { $0.state == .final })?.count ?? 0)",
+                        subtitle: "final state",
+                        icon: "checkmark.circle.fill",
+                        color: .kosmicGreen
+                    )
+                    
+                    ContentMetricCard(
+                        title: "Formats",
+                        value: "\(formatDistribution.count)",
+                        subtitle: "types used",
+                        icon: "square.stack.3d.up.fill",
+                        color: .kosmicPurple
+                    )
                 }
+                .padding(.horizontal)
                 
-                // Publishing Trend
+                // Artifact Creation Trend
                 GroupBox {
                     VStack(alignment: .leading, spacing: 16) {
-                        Label("Publishing Trend", systemImage: "chart.line.uptrend.xyaxis")
+                        Label("Artifact Creation Trend", systemImage: "chart.line.uptrend.xyaxis")
                             .font(.headline)
                         
-                        if !publishingTrend.isEmpty {
-                            Chart(publishingTrend, id: \.date) { dataPoint in
-                                BarMark(
-                                    x: .value("Date", dataPoint.date),
-                                    y: .value("Posts", dataPoint.count)
+                        if !artifactTrend.isEmpty {
+                            Chart(artifactTrend, id: \.date) { dataPoint in
+                                LineMark(
+                                    x: .value("Date", dataPoint.date, unit: .day),
+                                    y: .value("Count", dataPoint.count)
                                 )
-                                .foregroundStyle(Color.kosmicGreen)
+                                .foregroundStyle(Color.kosmicBlue)
+                                .interpolationMethod(.catmullRom)
+                                
+                                AreaMark(
+                                    x: .value("Date", dataPoint.date, unit: .day),
+                                    y: .value("Count", dataPoint.count)
+                                )
+                                .foregroundStyle(Color.kosmicBlue.opacity(0.2))
+                                .interpolationMethod(.catmullRom)
                             }
+                            .transaction { $0.animation = nil }
                             .frame(height: 200)
+                            .chartYAxis {
+                                AxisMarks(position: .leading) { value in
+                                    AxisValueLabel {
+                                        if let count = value.as(Int.self) {
+                                            Text("\(count)")
+                                        }
+                                    }
+                                    AxisGridLine()
+                                }
+                            }
+                            .chartXAxis {
+                                AxisMarks { value in
+                                    AxisValueLabel(format: .dateTime.month().day())
+                                    AxisGridLine()
+                                }
+                            }
                         } else {
                             ContentUnavailableView(
-                                "No Publishing Data",
-                                systemImage: "chart.bar",
-                                description: Text("Publish posts to see trends")
+                                "No Trend Data",
+                                systemImage: "chart.line.downtrend.xyaxis",
+                                description: Text("Create artifacts to see trends")
                             )
                             .frame(height: 200)
                         }
@@ -77,59 +104,117 @@ struct ContentAnalyticsView: View {
                 }
                 .padding(.horizontal)
                 
-                // Engagement by Platform
+                // Format Distribution
                 GroupBox {
                     VStack(alignment: .leading, spacing: 16) {
-                        Label("Engagement by Platform", systemImage: "chart.bar.xaxis")
+                        Label("Format Distribution", systemImage: "square.stack.3d.up.fill")
                             .font(.headline)
                         
-                        if !engagementData.isEmpty {
-                            Chart(engagementData, id: \.platform) { data in
+                        if !formatDistribution.isEmpty {
+                            Chart(formatDistribution, id: \.format) { data in
                                 BarMark(
-                                    x: .value("Engagement", data.engagement),
-                                    y: .value("Platform", data.platform)
+                                    x: .value("Format", data.format.displayName),
+                                    y: .value("Count", data.count)
                                 )
-                                .foregroundStyle(by: .value("Platform", data.platform))
+                                .foregroundStyle(formatColor(for: data.format))
+                                .cornerRadius(8)
                             }
-                            .frame(height: 150)
+                            .frame(height: 200)
+                            .chartYAxis {
+                                AxisMarks(position: .leading) { value in
+                                    AxisValueLabel {
+                                        if let count = value.as(Int.self) {
+                                            Text("\(count)")
+                                        }
+                                    }
+                                    AxisGridLine()
+                                }
+                            }
+                            .chartXAxis {
+                                AxisMarks { _ in
+                                    AxisGridLine()
+                                    AxisTick()
+                                    AxisValueLabel()
+                                }
+                            }
                         } else {
                             ContentUnavailableView(
-                                "No Platform Data",
-                                systemImage: "chart.bar.xaxis",
-                                description: Text("Publish to multiple platforms to compare engagement")
+                                "No Format Data",
+                                systemImage: "square.stack",
+                                description: Text("Create artifacts with different formats")
                             )
-                            .frame(height: 150)
+                            .frame(height: 200)
                         }
                     }
                     .padding()
                 }
                 .padding(.horizontal)
                 
-                // Top Performing Posts
-                if let snapshot = snapshot, !snapshot.topPerformingPosts.isEmpty {
+                // State Distribution
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Label("State Distribution", systemImage: "circle.grid.2x2.fill")
+                            .font(.headline)
+                        
+                        if !stateDistribution.isEmpty {
+                            Chart(stateDistribution, id: \.state) { data in
+                                SectorMark(
+                                    angle: .value("Count", data.count),
+                                    innerRadius: .ratio(0.5),
+                                    angularInset: 2
+                                )
+                                .foregroundStyle(stateColor(for: data.state))
+                                .annotation(position: .overlay) {
+                                    Text("\(data.count)")
+                                        .font(.caption)
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(height: 250)
+                        } else {
+                            ContentUnavailableView(
+                                "No State Data",
+                                systemImage: "circle.grid",
+                                description: Text("Create artifacts to see state distribution")
+                            )
+                            .frame(height: 250)
+                        }
+                    }
+                    .padding()
+                }
+                .padding(.horizontal)
+                
+                // Recent Artifacts
+                if !recentArtifacts.isEmpty {
                     GroupBox {
                         VStack(alignment: .leading, spacing: 12) {
-                            Label("Top Performing Posts", systemImage: "star.fill")
+                            Label("Recent Artifacts", systemImage: "clock.fill")
                                 .font(.headline)
                             
-                            ForEach(snapshot.topPerformingPosts.indices, id: \.self) { index in
-                                let post = snapshot.topPerformingPosts[index]
-                                
+                            ForEach(recentArtifacts.prefix(10)) { artifact in
                                 HStack {
-                                    Text("#\(index + 1)")
-                                        .font(.headline)
-                                        .foregroundColor(.yellow)
-                                        .frame(width: 30)
-                                    
-                                    Text(post)
-                                        .font(.body)
-                                        .lineLimit(2)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(artifact.title.isEmpty ? "Untitled" : artifact.title)
+                                            .font(.body)
+                                        HStack(spacing: 8) {
+                                            Text(artifact.format.displayName)
+                                                .font(.caption)
+                                                .foregroundColor(formatColor(for: artifact.format))
+                                            Text("•")
+                                                .foregroundColor(.secondary)
+                                            Text(artifact.createdAt, format: .dateTime.month().day())
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
                                     
                                     Spacer()
+                                    
+                                    ArtifactStateBadge(state: artifact.artifactState)
                                 }
                                 .padding(.vertical, 4)
                                 
-                                if index < snapshot.topPerformingPosts.count - 1 {
+                                if artifact.id != recentArtifacts.prefix(10).last?.id {
                                     Divider()
                                 }
                             }
@@ -138,43 +223,13 @@ struct ContentAnalyticsView: View {
                     }
                     .padding(.horizontal)
                 }
-                
-                // Recent Posts
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Recent Posts", systemImage: "doc.text.below.ecg")
-                            .font(.headline)
-                        
-                        if !posts.isEmpty {
-                            ForEach(posts.prefix(10), id: \.id) { post in
-                                AnalyticsPostRow(post: post)
-                                
-                                if post.id != posts.prefix(10).last?.id {
-                                    Divider()
-                                }
-                            }
-                        } else {
-                            ContentUnavailableView(
-                                "No Posts Yet",
-                                systemImage: "doc.text",
-                                description: Text("Create your first post to see analytics")
-                            )
-                        }
-                    }
-                    .padding()
-                }
-                .padding(.horizontal)
-                
-                // Content Insights
-                GroupBox("Content Insights") {
-                    ContentInsightsSection(posts: posts)
-                        .padding()
-                }
-                .padding(.horizontal)
             }
             .padding(.vertical)
         }
         .task {
+            loadData()
+        }
+        .onChange(of: timeRange) { _ in
             loadData()
         }
     }
@@ -182,209 +237,157 @@ struct ContentAnalyticsView: View {
     private func loadData() {
         let (startDate, endDate) = timeRange.dateRange
         
-        // Load posts
-        let postDescriptor = FetchDescriptor<Post>(
-            sortBy: [SortDescriptor(\Post.scheduledDate, order: .reverse)]
+        // Load artifacts in date range - fetch all and filter in memory to avoid predicate issues
+        let artifactDescriptor = FetchDescriptor<CloutmateShared.Artifact>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        let allPosts = (try? modelContext.fetch(postDescriptor)) ?? []
         
-        // Filter by date manually if needed
-        posts = allPosts
+        guard let allArtifacts = try? modelContext.fetch(artifactDescriptor) else {
+            return
+        }
         
-        // Calculate publishing trend
-        let days = timeRange == .thisWeek ? 7 : 30
-        var trend: [(Date, Int)] = []
+        // Filter by date range in memory
+        let artifacts = allArtifacts.filter { artifact in
+            artifact.createdAt >= startDate && artifact.createdAt <= endDate
+        }
+        
+        // Calculate artifact trend (grouped by day)
         let calendar = Calendar.current
-        
-        for dayOffset in 0..<days {
-            let date = calendar.date(byAdding: .day, value: -dayOffset, to: Date())!
-            let startOfDay = calendar.startOfDay(for: date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-            
-            let count = posts.filter { post in
-                guard let publishedAt = post.publishedDate else { return false }
-                return publishedAt >= startOfDay && publishedAt < endOfDay
-            }.count
-            
-            trend.append((startOfDay, count))
+        var trendDict: [Date: Int] = [:]
+        for artifact in artifacts {
+            let day = calendar.startOfDay(for: artifact.createdAt)
+            trendDict[day, default: 0] += 1
         }
-        publishingTrend = trend.reversed()
         
-        // Calculate engagement by platform
-        let publishedPosts = posts.filter { $0.status == "published" }
+        artifactTrend = trendDict.map { (date: $0.key, count: $0.value) }
+            .sorted { $0.date < $1.date }
         
-        // Simplified - single engagement metric per platform
-        let platformEngagement = publishedPosts.reduce(into: [String: (total: Int, count: Int)]()) { dict, post in
-            let platform = post.platforms.first ?? "unknown"
-            let engagement = (post.likes ?? 0) + (post.comments ?? 0)
-            if dict[platform] == nil {
-                dict[platform] = (engagement, 1)
-            } else {
-                dict[platform]?.total += engagement
-                dict[platform]?.count += 1
+        // Calculate format distribution
+        var formatCounts: [OutputFormat: Int] = [:]
+        for artifact in artifacts {
+            formatCounts[artifact.format, default: 0] += 1
+        }
+        
+        formatDistribution = formatCounts.map { (format: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
+        
+        // Calculate state distribution (filter out archived)
+        var stateCounts: [ArtifactState: Int] = [:]
+        for artifact in artifacts {
+            if artifact.artifactState != .archived {
+                stateCounts[artifact.artifactState, default: 0] += 1
             }
         }
         
-        engagementData = platformEngagement.map { platform, data in
-            let avgEngagement = Double(data.total) / Double(data.count)
-            return (platform.capitalized, avgEngagement)
-        }.sorted { $0.engagement > $1.engagement }
-    }
-}
-
-// MARK: - Analytics Post Row
-
-struct AnalyticsPostRow: View {
-    let post: Post
-    
-    var body: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(post.caption)
-                    .font(.headline)
-                    .lineLimit(2)
-                
-                HStack {
-                    Image(systemName: platformIcon)
-                        .foregroundColor(platformColor)
-                    Text(post.platforms.first ?? "Unknown")
-                    
-                    Spacer()
-                    
-                    if post.status == "published" {
-                        HStack(spacing: 8) {
-                            Label("\(post.likes ?? 0)", systemImage: "heart.fill")
-                            Label("\(post.comments ?? 0)", systemImage: "bubble.left.fill")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    }
-                }
-                .font(.caption)
-                
-                Text(post.status.capitalized)
-                    .font(.caption.bold())
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(statusColor.opacity(0.2))
-                    .cornerRadius(4)
-            }
-        }
-        .padding(.vertical, 4)
+        stateDistribution = stateCounts.map { (state: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count }
+        
+        // Get recent artifacts
+        recentArtifacts = Array(artifacts.prefix(10))
     }
     
-    private var platformIcon: String {
-        let platform = post.platforms.first ?? ""
-        switch platform.lowercased() {
-        case "facebook": return "f.circle.fill"
-        case "threads": return "text.bubble.fill"
-        default: return "square.grid.2x2"
+    private func formatColor(for format: OutputFormat) -> Color {
+        switch format {
+        case .brief: return .kosmicCyan
+        case .summary: return .kosmicBlue
+        case .reflection: return .kosmicPurple
+        case .report: return .kosmicPurple
+        case .releaseNote: return .kosmicGreen
+        case .lessonLearned: return .orange
         }
     }
     
-    private var platformColor: Color {
-        let platform = post.platforms.first ?? ""
-        switch platform.lowercased() {
-        case "facebook": return .kosmicBlue
-        case "threads": return .kosmicPurple
-        default: return .gray
-        }
-    }
-    
-    private var statusColor: Color {
-        switch post.status.lowercased() {
-        case "draft": return .gray
-        case "scheduled": return .kosmicBlue
-        case "published": return .kosmicGreen
-        case "archived": return .orange
-        default: return .gray
+    private func stateColor(for state: ArtifactState) -> Color {
+        switch state {
+        case .idea: return .gray
+        case .draft: return .kosmicBlue
+        case .final: return .kosmicGreen
+        case .published: return .kosmicGreen
+        case .archived: return .secondary
         }
     }
 }
 
-// MARK: - Content Insights Section
-
-struct ContentInsightsSection: View {
-    let posts: [Post]
-    
-    private var publishedPosts: [Post] {
-        posts.filter { post in post.status == "published" }
-    }
-    
-    private var totalEngagement: Int {
-        publishedPosts.reduce(0) { result, post in
-            result + (post.likes ?? 0) + (post.comments ?? 0)
-        }
-    }
-    
-    private var platformEngagement: [String: Int] {
-        var engagement: [String: Int] = [:]
-        for post in publishedPosts {
-            let platform = post.platforms.first ?? "Unknown"
-            let postEngagement = (post.likes ?? 0) + (post.comments ?? 0)
-            engagement[platform, default: 0] += postEngagement
-        }
-        return engagement
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if !posts.isEmpty {
-                if !publishedPosts.isEmpty {
-                    InsightRow(
-                        icon: "heart.fill",
-                        text: "Your content generated \(totalEngagement) total engagements",
-                        color: .red
-                    )
-                    
-                    let avgEngagement = Double(totalEngagement) / Double(publishedPosts.count)
-                    InsightRow(
-                        icon: "chart.line.uptrend.xyaxis",
-                        text: String(format: "Average %.1f engagements per post", avgEngagement),
-                        color: .kosmicBlue
-                    )
-                    
-                    if let best = platformEngagement.max(by: { $0.value < $1.value }) {
-                        InsightRow(
-                            icon: "star.fill",
-                            text: "\(best.key.capitalized) is your top performing platform with \(best.value) engagements",
-                            color: .yellow
-                        )
-                    }
-                }
-            } else {
-                Text("Publish posts to see personalized insights")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
-}
-
-// MARK: - Insight Row
-
-struct InsightRow: View {
+struct ContentMetricCard: View {
+    let title: String
+    let value: String
+    let subtitle: String
     let icon: String
-    let text: String
     let color: Color
     
     var body: some View {
-        HStack(alignment: .top) {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .font(.caption)
-            Text(text)
-                .font(.body)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+                Spacer()
+            }
+            
+            Text(value)
+                .font(.title.bold())
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
-        .padding(.vertical, 4)
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
     }
 }
 
 #Preview {
     ContentAnalyticsView(
-        snapshot: nil,
+        snapshot: AnalyticsSnapshot(
+            startDate: Date(),
+            endDate: Date(),
+            tasksCompleted: 0,
+            tasksCreated: 0,
+            completionRate: 0,
+            avgPriorityScore: 0,
+            topPriorityItems: [],
+            focusSessionsCount: 0,
+            totalFocusMinutes: 0,
+            avgSessionLength: 0,
+            focusCompletionRate: 0,
+            emotionalSnapshot: EmotionalSnapshot(
+                primaryEmotion: .calm,
+                secondaryEmotion: nil,
+                valence: 0.7,
+                intensity: 0.7,
+                keywords: []
+            ),
+            emotionalTrend: .stable,
+            dominantEmotion: .calm,
+            postsPublished: 0,
+            draftsCreated: 0,
+            avgEngagement: 0,
+            topPerformingPosts: [],
+            feedbackEventsCount: 0,
+            positiveEvents: 0,
+            negativeEvents: 0,
+            learningScore: 0,
+            activeThemes: 0,
+            memoryNodes: 0,
+            conceptCount: 0,
+            graphDensity: 0,
+            ritualCompletionRate: 0,
+            morningRitualStreak: 0,
+            eveningRitualStreak: 0,
+            lastWeeklyReview: nil,
+            nudgeResponseRate: 0,
+            latestForecast: nil,
+            driftEventsCount: 0,
+            predictionAccuracy: 0,
+            toneAdaptations: 0
+        ),
         timeRange: .thisWeek
     )
-    .modelContainer(for: [Post.self])
+    .modelContainer(for: [CloutmateShared.Artifact.self])
 }
-

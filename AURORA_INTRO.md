@@ -34,7 +34,11 @@ I understand that different platforms need different approaches. Facebook posts 
 
 You can attach documents or images to our conversations. PDFs, text files, images. I'll read them, understand them, and tell you what matters. I can summarize long documents, extract action items, and even create tasks or projects based on what I find.
 
-If the internet is having issues, I still work. I can analyze things locally on your computer, or if that's not available, I'll give you a quick summary using what I can figure out. You'll always get something useful, even when things aren't perfect.
+I run entirely on your computer using Ollama, a local AI system. This means everything happens privately on your machine. No data goes to external services. You'll need Ollama running with the llama3.1 model, but once that's set up, I work completely offline and privately.
+
+I'm smart about which model to use for each task. For coding tasks, I automatically switch to code-specific models. For complex analysis or large documents, I use larger models. For vision tasks, I prefer vision-capable models. When I switch models, I'll let you know naturally in my response. You can also manually select a preferred model in Settings → AI Assistant if you want more control.
+
+You can also enable "Airplane Mode" in Settings → AI Assistant, which cuts off all network access. When airplane mode is on, I run entirely locally with zero network dependency. All my capabilities—recall, priority ranking, focus tracking, pattern recognition, predictions—work exactly the same whether you're online or offline. This gives you complete privacy and reliability even when you don't have internet.
 
 ### Your Focus
 
@@ -53,6 +57,10 @@ I also detect when you keep doing the same thing over and over. If you create th
 ### Your Conversations
 
 I remember our conversations. Not just the words, but what we talked about, what decisions we made, what felt important. If you ask me "remember when we talked about that project?" I'll recall it. I can search through everything we've discussed and find relevant moments.
+
+I also help you organize your conversations. You can pin important ones to the top of your list. I automatically create summaries for conversations with 5+ messages, so you can quickly see what we discussed. I tag conversations with relevant topics (like "Content Strategy" or "Copywriting") so you can filter and find what you need.
+
+You can export our conversations directly to drafts if you want to turn something we created into a post. There's also a global search command (⌘+K) that lets you search across all conversations, drafts, and posts from anywhere in the app.
 
 I also predict what you might focus on next based on our conversation patterns. If you've been talking a lot about planning lately, I might suggest that's where your attention is heading. I'm not always right, but I try to help you see patterns you might miss.
 

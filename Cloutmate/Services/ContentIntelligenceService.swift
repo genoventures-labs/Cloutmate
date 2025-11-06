@@ -21,27 +21,14 @@ final class ContentIntelligenceService {
         
         os_log("Running intelligence pipelines for post %@", log: .default, type: .info, post.id.uuidString)
         
-        // Update hashtag performance
-        await HashtagPerformanceService.shared.trackHashtagPerformance(post: post, context: context)
+        // Note: These services were removed as part of social media posting removal
+        // Intelligence pipelines can be re-implemented when needed for artifacts
+        // TODO: Re-implement intelligence features for artifact-based content
         
-        // Refresh optimal posting times
-        let descriptor = FetchDescriptor<Post>(
-            predicate: #Predicate { $0.status == "published" }
-        )
-        if let publishedPosts = try? context.fetch(descriptor) {
-            await BestTimeOptimizerService.shared.learnFromHistory(posts: publishedPosts, context: context)
-        }
-        
-        // Refresh evergreen detection
-        let allPostsDescriptor = FetchDescriptor<Post>(
-            sortBy: [SortDescriptor<Post>(\.publishedDate, order: .reverse)]
-        )
-        if let allPosts = try? context.fetch(allPostsDescriptor) {
-            _ = await ContentRecyclingService.shared.identifyEvergreenContent(
-                posts: allPosts,
-                context: context
-            )
-        }
+        // Previous implementations:
+        // - HashtagPerformanceService.shared.trackHashtagPerformance(post: post, context: context)
+        // - BestTimeOptimizerService.shared.learnFromHistory(posts: publishedPosts, context: context)
+        // - ContentRecyclingService.shared.identifyEvergreenContent(posts: allPosts, context: context)
     }
 }
 

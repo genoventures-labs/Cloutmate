@@ -594,21 +594,6 @@ struct ProjectHeaderSection: View {
     }
 }
 
-private struct ProjectStatusBadge: View {
-    let status: ProjectStatus
-    
-    var body: some View {
-        Text(status.displayName)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(status.color.opacity(0.2))
-            .foregroundColor(status.color)
-            .cornerRadius(6)
-    }
-}
-
 struct ProjectTasksSection: View {
     let tasks: [Task]
     

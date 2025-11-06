@@ -23,27 +23,6 @@ enum DashboardCardType: String, Codable, CaseIterable {
     case areasHealth = "Areas Health"
     case notesActivity = "Notes Activity"
     
-    // Social Publishing Cards
-    case scheduledPosts = "Scheduled Posts"
-    case draftCount = "Drafts"
-    case recentInsights = "Recent Insights"
-    case postingStreak = "Posting Streak"
-    case topPerformingPost = "Top Post"
-    
-    // Social Media Insights
-    case socialOverview = "Social Overview"
-    case contentPerformance = "Content Performance"
-    case platformComparison = "Platform Comparison"
-    
-    // Facebook Page Insights (Individual)
-    case facebookPageViews = "Page Views"
-    case facebookPageFans = "Page Fans"
-    case facebookPageReach = "Page Reach"
-    case facebookPageImpressions = "Page Impressions"
-    case facebookEngagedUsers = "Engaged Users"
-    case facebookPostEngagements = "Post Engagements"
-    case facebookPageInsightsOverview = "Facebook Insights"
-    
     // Productivity Insights
     case upcomingDeadlines = "Upcoming Deadlines"
     case workloadBalance = "Workload Balance"
@@ -66,21 +45,6 @@ enum DashboardCardType: String, Codable, CaseIterable {
         case .tasksOverview: return "list.clipboard.fill"
         case .areasHealth: return "heart.circle.fill"
         case .notesActivity: return "book.fill"
-        case .scheduledPosts: return "calendar"
-        case .draftCount: return "doc.text.fill"
-        case .recentInsights: return "chart.line.uptrend.xyaxis"
-        case .postingStreak: return "flame.fill"
-        case .topPerformingPost: return "star.fill"
-        case .socialOverview: return "chart.bar.fill"
-        case .contentPerformance: return "trophy.fill"
-        case .platformComparison: return "square.grid.2x2.fill"
-        case .facebookPageViews: return "eye.fill"
-        case .facebookPageFans: return "person.3.fill"
-        case .facebookPageReach: return "arrow.up.right.circle.fill"
-        case .facebookPageImpressions: return "chart.bar.fill"
-        case .facebookEngagedUsers: return "heart.fill"
-        case .facebookPostEngagements: return "hand.thumbsup.fill"
-        case .facebookPageInsightsOverview: return "chart.line.uptrend.xyaxis.circle.fill"
         case .upcomingDeadlines: return "clock.badge.fill"
         case .workloadBalance: return "scalemass.fill"
         case .completionRate: return "chart.pie.fill"
@@ -93,10 +57,10 @@ enum DashboardCardType: String, Codable, CaseIterable {
     var defaultSize: DashboardCardSize {
         switch self {
         // Large cards - detailed overviews
-        case .todayOverview, .activeProjects, .projectsOverview, .socialOverview, .facebookPageInsightsOverview: return .large
+        case .todayOverview, .activeProjects, .projectsOverview: return .large
         
         // Medium cards - moderate detail
-        case .quickCapture, .aiSuggestions, .tasksOverview, .areasHealth, .contentPerformance, .workloadBalance, .completionRate: return .medium
+        case .quickCapture, .aiSuggestions, .tasksOverview, .areasHealth, .workloadBalance, .completionRate: return .medium
         
         // Small cards - quick metrics
         default: return .small

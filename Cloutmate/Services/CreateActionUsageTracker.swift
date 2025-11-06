@@ -52,9 +52,12 @@ final class CreateActionUsageTracker {
             startDate = Date.distantPast
         }
         
+        // Extract rawValue before predicate
+        let tabRawValue = tab.rawValue
+        
         let descriptor = FetchDescriptor<CreateActionUsage>(
             predicate: #Predicate { usage in
-                usage.tabRaw == tab.rawValue && usage.timestamp >= startDate
+                usage.tabRaw == tabRawValue && usage.timestamp >= startDate
             },
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
@@ -79,9 +82,12 @@ final class CreateActionUsageTracker {
         in tab: TabIdentifier,
         modelContext: ModelContext
     ) -> String? {
+        // Extract rawValue before predicate
+        let tabRawValue = tab.rawValue
+        
         let descriptor = FetchDescriptor<CreateActionUsage>(
             predicate: #Predicate { usage in
-                usage.tabRaw == tab.rawValue
+                usage.tabRaw == tabRawValue
             },
             sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
         )
@@ -114,9 +120,12 @@ final class CreateActionUsageTracker {
             startDate = Date.distantPast
         }
         
+        // Extract rawValue before predicate
+        let tabRawValue = tab.rawValue
+        
         let descriptor = FetchDescriptor<CreateActionUsage>(
             predicate: #Predicate { usage in
-                usage.tabRaw == tab.rawValue &&
+                usage.tabRaw == tabRawValue &&
                 usage.actionType == actionType &&
                 usage.timestamp >= startDate
             }

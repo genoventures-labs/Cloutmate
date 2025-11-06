@@ -247,7 +247,7 @@ struct EveningRitualView: View {
         let prompt = "Summarize a creator's day in one sentence based on this reflection: \(summary). Emphasize focus momentum."
 
         do {
-            let response = try await GeminiService.shared.generateResponse(for: prompt)
+            let response = try await CoreResponseService.shared.generateResponse(for: prompt)
             await MainActor.run {
                 aiRecap = response
                 isGeneratingRecap = false

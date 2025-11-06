@@ -19,7 +19,7 @@ struct MenuBarPopoverView: View {
                 Text("Capture").tag(0)
                 Text("Tasks").tag(1)
                 Text("Quick Post").tag(2)
-                Text("Upcoming").tag(3)
+                Text("Artifacts").tag(3)
                 Text("Settings").tag(4)
             }
             .pickerStyle(.segmented)
@@ -75,6 +75,6 @@ struct MenuBarPopoverView: View {
 
 #Preview {
     MenuBarPopoverView()
-        .modelContainer(for: [CloutmateShared.Post.self, CloutmateShared.Draft.self])
+        .modelContainer(for: [CloutmateShared.Post.self, CloutmateShared.Artifact.self])
 }
 

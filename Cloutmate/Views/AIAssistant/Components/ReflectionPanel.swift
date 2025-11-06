@@ -70,12 +70,24 @@ struct ReflectionPanel: View {
     private func loadInsights() async {
         isLoading = true
         
-        let conversationData = conversations.map { conversation in
-            (conversation.title ?? "Untitled", conversation.tags)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        
+        let conversationContexts = conversations.map { conversation in
+            ConversationSummaryContext(
+                conversationId: conversation.id,
+                title: conversation.title ?? "Untitled",
+                date: dateFormatter.string(from: conversation.createdAt ?? Date()),
+                summary: conversation.summary ?? "",
+                keyTopics: conversation.tags,
+                messageCount: conversation.messages?.count ?? 0,
+                emotionalTone: "neutral",
+                emotionWeight: 0.0
+            )
         }
         
         do {
-            let result = try await GeminiService.shared.generateInsights(conversations: conversationData)
+            let result = try await CoreResponseService.shared.generateInsights(conversations: conversationContexts)
             await MainActor.run {
                 insights = result
                 isLoading = false

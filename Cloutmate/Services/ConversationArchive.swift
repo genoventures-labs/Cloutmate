@@ -102,8 +102,7 @@ final class ConversationArchive {
         """
         
         do {
-            let gemini = GeminiService.shared
-            let summary = try await gemini.generateResponse(for: prompt)
+            let summary = try await CoreResponseService.shared.generateResponse(for: prompt)
             return summary.trimmingCharacters(in: .whitespacesAndNewlines)
         } catch {
             // Fallback: generate basic summary
@@ -350,8 +349,7 @@ final class ConversationArchive {
         """
         
         do {
-            let gemini = GeminiService.shared
-            let response = try await gemini.generateResponse(for: clusterPrompt)
+            let response = try await CoreResponseService.shared.generateResponse(for: clusterPrompt, modelContext: modelContext)
             
             // Parse JSON response
             let cleaned = response

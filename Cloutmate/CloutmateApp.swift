@@ -52,13 +52,18 @@ struct CloutmateApp: App {
                             try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds to ensure SwiftData is ready
                             startARTE()
                         }
+                        // Perform hybrid bridge health check (core implementation)
+                        _Concurrency.Task {
+                            let apiKey = AISettings.shared.ollamaCloudAPIKey
+                            _ = await HybridBridgeService.shared.performHealthCheck(apiKey: apiKey)
+                        }
                     }
             }
             .modelContainer(CloutmateApp.sharedModelContainer)
             .defaultSize(width: 900, height: 650)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("New Post") {
+                Button("New Artifact") {
                     NotificationCenter.default.post(name: .openComposer, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
@@ -77,7 +82,7 @@ struct CloutmateApp: App {
                 }
                 .keyboardShortcut("2", modifiers: .command)
                 
-                Button("Posts") {
+                Button("Artifacts") {
                     NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.posts)
                 }
                 .keyboardShortcut("3", modifiers: .command)
@@ -170,6 +175,8 @@ struct CloutmateApp: App {
     }
     
     private func checkAndPublishScheduledPosts() {
+        // Note: Social media posting was removed, so scheduled posts are no longer published automatically
+        // This function is kept for compatibility but does not perform actual publishing
         _Concurrency.Task { @MainActor in
             let context = CloutmateApp.sharedModelContainer.mainContext
             let descriptor = FetchDescriptor<Post>(
@@ -182,7 +189,9 @@ struct CloutmateApp: App {
             let now = Date()
             
             for post in scheduledPosts where post.scheduledDate ?? Date.distantFuture <= now {
-                await PublishingService.shared.publishPost(post, context: context)
+                post.postStatus = .failed
+                post.lastError = "Social media posting has been removed. Use artifacts instead."
+                try? context.save()
             }
         }
     }
@@ -342,6 +351,7 @@ extension CloutmateApp {
         let schema = Schema([
             // Shared models used in the app (publicly accessible)
             CloutmateShared.Post.self,
+            CloutmateShared.Artifact.self,  // New Artifact model for cognitive workspace
             Draft.self,  // Draft is app-local, not in CloutmateShared
             CloutmateShared.Template.self,
             CloutmateShared.PlatformAccount.self,
@@ -402,7 +412,9 @@ extension CloutmateApp {
             DriftEvent.self,
             EnergyWindow.self,
             // Context-aware create sheet models
-            CreateActionUsage.self
+            CreateActionUsage.self,
+            // Hybrid Bridge models
+            PerformanceMemory.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"

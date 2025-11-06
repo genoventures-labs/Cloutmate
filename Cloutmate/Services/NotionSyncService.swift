@@ -33,56 +33,78 @@ final class NotionSyncService {
     ) async throws {
         os_log("Starting import for database: %{public}@", log: .default, type: .info, databaseId)
         
-        // Fetch database structure
-        let database = try await notionService.getDatabase(
-            databaseId: databaseId,
-            accessToken: accessToken
-        )
-        
-        // Query all pages from the database
-        let pages = try await notionService.queryDatabase(
-            databaseId: databaseId,
-            accessToken: accessToken
-        )
-        
-        os_log("Found %d pages to import", log: .default, type: .info, pages.results.count)
-        
-        // Track imported items for relationship building
-        var importedItems: [String: Any] = [:] // [notionPageId: CloutmateModel]
-        
-        // Convert each page to the appropriate Cloutmate model
-        for page in pages.results {
-            let importedItem = try await importPage(
-                page: page,
+        do {
+            // Fetch database structure
+            let database = try await notionService.getDatabase(
+                databaseId: databaseId,
+                accessToken: accessToken
+            )
+            
+            Logger.notion.info("Fetched database structure: \(databaseId)")
+            
+            // Query all pages from the database
+            let pages = try await notionService.queryDatabase(
+                databaseId: databaseId,
+                accessToken: accessToken
+            )
+            
+            os_log("Found %d pages to import", log: .default, type: .info, pages.results.count)
+            
+            // Track imported items for relationship building
+            var importedItems: [String: Any] = [:] // [notionPageId: CloutmateModel]
+            
+            // Convert each page to the appropriate Cloutmate model
+            for page in pages.results {
+                do {
+                    let importedItem = try await importPage(
+                        page: page,
+                        cloutmateType: cloutmateType,
+                        propertyMappings: propertyMappings,
+                        context: context,
+                        databaseTitle: extractTitle(database.title)
+                    )
+                    importedItems[page.id] = importedItem
+                } catch {
+                    Logger.notion.error("Failed to import page \(page.id): \(error.localizedDescription)")
+                    // Continue with other pages even if one fails
+                }
+            }
+            
+            // Build relationships after all items are imported
+            try buildRelationships(
+                pages: pages.results,
+                importedItems: importedItems,
                 cloutmateType: cloutmateType,
                 propertyMappings: propertyMappings,
-                context: context,
-                databaseTitle: extractTitle(database.title)
+                context: context
             )
-            importedItems[page.id] = importedItem
+            
+            // Save sync configuration
+            let config = NotionSyncConfig(
+                databaseId: databaseId,
+                cloutmateType: cloutmateType,
+                propertyMappings: propertyMappings
+            )
+            let extractedTitle = extractTitle(database.title)
+            config.databaseTitle = extractedTitle.isEmpty ? nil : extractedTitle
+            config.workspaceId = await getWorkspaceId(accessToken: accessToken)
+            context.insert(config)
+            
+            try context.save()
+            os_log("Import completed successfully for database: %{public}@ (title: %{public}@)", log: .default, type: .info, databaseId, extractedTitle)
+        } catch NotionAPIError.tokenExpired {
+            Logger.notion.error("Notion access token expired during import")
+            throw NotionAPIError.tokenExpired
+        } catch NotionAPIError.networkError(let error) {
+            Logger.notion.error("Network error during import: \(error.localizedDescription)")
+            throw NotionAPIError.networkError(error)
+        } catch NotionAPIError.apiError(let detail) {
+            Logger.notion.error("Notion API error during import: \(detail.message)")
+            throw NotionAPIError.apiError(detail)
+        } catch {
+            Logger.notion.error("Unexpected error during import: \(error.localizedDescription)")
+            throw error
         }
-        
-        // Build relationships after all items are imported
-        try buildRelationships(
-            pages: pages.results,
-            importedItems: importedItems,
-            cloutmateType: cloutmateType,
-            propertyMappings: propertyMappings,
-            context: context
-        )
-        
-        // Save sync configuration
-        let config = NotionSyncConfig(
-            databaseId: databaseId,
-            cloutmateType: cloutmateType,
-            propertyMappings: propertyMappings
-        )
-        config.databaseTitle = extractTitle(database.title)
-        config.workspaceId = await getWorkspaceId(accessToken: accessToken)
-        context.insert(config)
-        
-        try context.save()
-        os_log("Import completed successfully", log: .default, type: .info)
     }
     
     // MARK: - Page Import
@@ -395,7 +417,11 @@ final class NotionSyncService {
     }
     
     private func extractTitle(_ richTexts: [NotionRichText]) -> String {
-        richTexts.compactMap { $0.plainText }.joined()
+        let title = richTexts.compactMap { $0.plainText }.joined()
+        if title.isEmpty {
+            Logger.notion.debug("Empty title extracted from NotionRichText array")
+        }
+        return title
     }
     
     private func extractTitle(_ value: NotionPropertyValue) -> String {

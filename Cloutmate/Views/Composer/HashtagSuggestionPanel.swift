@@ -150,15 +150,17 @@ struct HashtagSuggestionPanel: View {
             }
         }
         
-        // Load top performing hashtags
-        let topHashtags = await HashtagPerformanceService.shared.getTopPerformingHashtags(
-            platform: platform,
-            limit: 10,
-            context: modelContext
+        // Note: HashtagPerformanceService was removed as part of social media posting removal
+        // Load top performing hashtags directly from SwiftData
+        var hashtagDescriptor = FetchDescriptor<HashtagPerformance>(
+            sortBy: [SortDescriptor(\.averageEngagement, order: .reverse)]
         )
-        
-        await MainActor.run {
-            self.topHashtags = topHashtags
+        hashtagDescriptor.fetchLimit = 10
+        if let hashtags = try? modelContext.fetch(hashtagDescriptor) {
+            let filtered = hashtags.filter { $0.platform == platform.rawValue }
+            await MainActor.run {
+                self.topHashtags = Array(filtered.prefix(10))
+            }
         }
         
         await loadSuggestions()
@@ -172,20 +174,20 @@ struct HashtagSuggestionPanel: View {
             return
         }
         
-        let suggested = await HashtagPerformanceService.shared.suggestHashtags(
-            for: caption,
-            platform: platform,
-            context: modelContext
-        )
+        // Note: HashtagPerformanceService was removed as part of social media posting removal
+        // Extract hashtags from caption (simple implementation)
+        let words = caption.components(separatedBy: .whitespacesAndNewlines)
+        let hashtags = words.filter { $0.hasPrefix("#") }
         
         // Load performance data for suggestions
         var suggestionObjects: [HashtagSuggestion] = []
         
-        for hashtag in suggested {
+        for hashtag in hashtags {
             let cleaned = hashtag.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+            let platformRawValue = platform.rawValue
             let descriptor = FetchDescriptor<HashtagPerformance>(
-                predicate: #Predicate {
-                    $0.hashtag == cleaned && $0.platform == platform.rawValue
+                predicate: #Predicate<HashtagPerformance> { performance in
+                    performance.hashtag == cleaned && performance.platform == platformRawValue
                 }
             )
             

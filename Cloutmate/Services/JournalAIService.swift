@@ -9,7 +9,7 @@ import Foundation
 
 actor JournalAIService {
     static let shared = JournalAIService()
-    private let geminiService = GeminiService.shared
+    private let coreResponseService = CoreResponseService.shared
     
     private init() {}
     
@@ -39,7 +39,7 @@ actor JournalAIService {
         
         do {
             let fullPrompt = "\(systemPrompt)\n\nUser prompt: \(prompt)\n\nGenerate journal content:"
-            let response = try await geminiService.generateResponse(for: fullPrompt, context: context)
+            let response = try await coreResponseService.generateResponse(for: fullPrompt, context: context)
             return response
         } catch {
             return "Unable to generate content at this time."
@@ -77,7 +77,7 @@ actor JournalAIService {
         """
         
         do {
-            let response = try await geminiService.generateResponse(for: prompt, context: "")
+            let response = try await coreResponseService.generateResponse(for: prompt, context: "")
             return response
         } catch {
             return "Unable to analyze entries at this time."
@@ -107,7 +107,7 @@ actor JournalAIService {
         """
         
         do {
-            let response = try await geminiService.generateResponse(for: prompt, context: "")
+            let response = try await coreResponseService.generateResponse(for: prompt, context: "")
             return response
         } catch {
             return "Unable to generate ideas at this time."
@@ -135,7 +135,7 @@ actor JournalAIService {
         """
         
         do {
-            let response = try await geminiService.generateResponse(for: prompt, context: "")
+            let response = try await coreResponseService.generateResponse(for: prompt, context: "")
             return response
         } catch {
             return "Unable to summarize entries at this time."

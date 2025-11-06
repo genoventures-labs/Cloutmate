@@ -1,6 +1,6 @@
 # Aurora's Knowledge Base - Complete System Architecture
 
-**Last Updated:** December 2024  
+**Last Updated:** January 2025  
 **Build Status:** ✅ BUILD SUCCEEDED  
 **Current Phase:** 9 (Predictive Reflection Engine Complete)
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-Aurora is now fully aware of her complete architecture spanning 9 major development phases plus extensions. Her system prompts have been comprehensively updated across all GeminiService functions to reflect accurate capabilities, including:
+Aurora is now fully aware of her complete architecture spanning 9 major development phases plus extensions. Her system prompts have been comprehensively updated across all OllamaBridgeService functions to reflect accurate capabilities, including:
 
 - **Phase 1-5:** Recall, Emotional Continuity, CPS, Focus Mode, Narrative Engine, Cross-Conversation Memory
 - **Phase 5++:** Intent Cluster Prediction for conversation pattern analysis
@@ -48,7 +48,7 @@ Your Core Capabilities (All Fully Implemented):
 - Predictive Cognition: Anticipates focus drift, fatigue risk, and energy trends before they occur. Generates cognitive forecasts every 1-4 hours, detects real-time drift during focus sessions, and adapts ARTE tone proactively (Phase 9)
 - Temporal Intelligence: Adaptive scheduling, calendar sync, context switching guard, momentum tracking (Phase 9 extensions)
 - Document & Image Analysis: Analyze attached documents (PDF, Markdown, text) and images with context-aware responses
-- Smart Routing Fallback: Intelligent tiered routing (Gemini → Apple LLM → Offline) with network-aware auto-promotion ensures zero interruptions
+- Smart Routing Fallback: Intelligent tiered routing (Ollama → Apple LLM → Offline) with network-aware auto-promotion ensures zero interruptions
 - Confidence Scoring: Self-aware confidence metrics based on recall quality, context freshness, and intent signals
 - Conversation Compression: Intelligent summarization of long conversations to manage context window limits
 - Cognitive Health: Self-introspection metrics for memory density, stale entries, and context pressure
@@ -408,7 +408,8 @@ Your Core Capabilities (All Fully Implemented):
   - Supports file picker, Photos library (macOS 13+), and clipboard
   - Automatic compression and resizing (max 20 MB)
   - Normalizes images and provides preview thumbnails
-- **GeminiService.analyzeDocument()** - Analyzes documents with full app context
+- **OllamaBridgeService.analyzeDocument()** - Analyzes documents with full app context (primary engine)
+  - Powered by Ollama (local LLM) for privacy and reliability
   - Reads document like a close friend who cares about what it means
   - Provides one-sentence headline, 2 paragraphs covering main narrative, standout details, and emotional/strategic implications
   - Calls out action items and open questions
@@ -416,31 +417,32 @@ Your Core Capabilities (All Fully Implemented):
   - Handles truncated documents gracefully
   - Chunks large documents (8 chunks max) and summarizes each chunk
   - **SMART ROUTING FALLBACK SYSTEM (ENHANCED):** Intelligent tiered routing with network-aware auto-promotion:
-    1. **Tier 1 (Gemini - Primary):** Full semantic analysis with task extraction capabilities. Handles heavy summarization, reasoning, multimodal analysis. Default for complex documents (>20K chars or >100 lines) or when network is available.
-    2. **Tier 2 (Apple LLM - Secondary):** On-device summarization using Apple Intelligence (macOS 14+). Private, fast, no API calls. Auto-promoted to "Gemini replacement mode" when network is down/degraded or preferred for short documents (<5K chars). Ideal for quick semantic extraction and natural phrasing.
+    1. **Tier 1 (Ollama - Primary):** Full semantic analysis with task extraction capabilities using local LLM. Handles heavy summarization, reasoning, multimodal analysis. Default for all documents when Ollama is available. Requires Ollama running locally with llama3.1 model (or your preferred model).
+    2. **Tier 2 (Apple LLM - Secondary):** On-device summarization using Apple Intelligence (macOS 14+). Private, fast, no API calls. Auto-promoted when Ollama is unavailable or preferred for short documents (<5K chars). Ideal for quick semantic extraction and natural phrasing.
     3. **Tier 3 (Offline/Template - Tertiary):** Template-based summarization using heuristic key-phrase clustering and sentence ranking. Final fallback when both AI tiers unavailable. No LLM dependency.
   - **FallbackRoutingService:** Smart routing orchestrator that:
     - Monitors network connectivity using NWPathMonitor
-    - Tracks consecutive Gemini failures (auto-promotes after 2 failures)
+    - Tracks consecutive Ollama failures (auto-promotes after 2 failures)
     - Determines optimal tier based on document complexity, network status, and failure history
-    - Implements adaptive weighting: prefers Apple LLM for short docs, Gemini for complex ones
+    - Implements adaptive weighting: prefers Apple LLM for short docs, Ollama for complex ones
   - **Network-Aware Auto-Promotion:**
-    - When network unavailable: Auto-promotes Apple LLM to Tier 1 (Gemini replacement mode)
+    - When Ollama unavailable: Auto-promotes Apple LLM to Tier 1 (Ollama replacement mode)
     - When network degraded (rate-limited): Auto-promotes Apple LLM after threshold failures
     - Ensures zero "retry later" interruptions - Aurora always responds
   - **UX Transparency:**
-    - All summaries include source model tracking (`sourceModel` field: "Gemini", "AppleLLM", or "Offline")
+    - All summaries include source model tracking (`sourceModel` field: "Ollama", "AppleLLM", or "Offline")
     - Subtle "Powered by" indicator at bottom of summaries showing which tier generated the summary
     - Adaptive messaging: Different transparency messages based on network status
     - Diagnostic logging: Prints source model for debugging and user awareness
   - **Benefits:**
-    - Full continuity: Document summaries work even when Gemini is down
+    - Full continuity: Document summaries work even when Ollama is down
     - Instant feel: Apple LLM is on-device and lightning-fast
     - Privacy-friendly: Local inference for sensitive documents
     - No cloud dependency: Works offline with graceful degradation
     - Transparent: Users always know which cognition path was used
-- **GeminiService.analyzeImage()** - Analyzes images with context-aware responses
-  - Uses Gemini's vision capabilities to understand image content
+- **OllamaBridgeService.analyzeImage()** - Analyzes images with context-aware responses
+  - Uses Ollama's vision-capable models (like llama3.2-vision) to understand image content
+  - Aurora automatically selects vision-capable models for image analysis tasks
   - Integrates with app context and payload for relevant analysis
   - Indexes analysis in recall system for future reference
 
@@ -459,11 +461,50 @@ Your Core Capabilities (All Fully Implemented):
   - Medium: Softer language like "I think" or "It looks like"
   - Low: Transparent uncertainty, shares what she knows, suggests next steps
 
+**Conversation Management Features:**
+- **Pinned Conversations** - Pin important conversations to the top of your list for quick access
+  - Right-click any conversation → "Pin to Top" to keep important chats visible
+  - Visual indicators: Blue highlight border and pin icon (📌)
+  - Pinned conversations always appear first in the list
+- **Auto-Generated Summaries** - Conversations with 5+ messages automatically get 2-3 sentence summaries
+  - Summaries appear below conversation titles
+  - Triggered automatically when conversation reaches 5+ messages
+  - Right-click → "Refresh Summary" to regenerate
+  - Uses OllamaBridgeService to generate summaries
+- **Topic Tagging** - Conversations are automatically categorized with 1-3 relevant tags
+  - Tags include: Content Strategy, Copywriting, Social Media, Engagement, Analytics, Brainstorming, etc.
+  - Tags appear as colored chips in conversation rows
+  - Filter by tags using the dropdown in the search bar
+- **Export to Drafts** - Instantly convert AI-generated content into draft posts
+  - Right-click conversation → "Export to Drafts"
+  - Or use the floating action button (hover over conversation)
+  - Exports all assistant messages with conversation metadata
+- **Smart Recap** - Generate inline summaries for long conversations
+  - Appears for conversations with 10+ messages
+  - Click "Summarize Chat" button to generate summary
+  - Summary appears as a special system message (centered, yellow-tinted)
+- **Enhanced Search** - Search across titles, message content, and summaries
+  - Date filtering: All, Today, This Week, This Month, Older
+  - Tag filtering: Filter by any combination of tags
+  - Sorting: Pinned conversations always appear first
+- **Global Search (⌘+K)** - Universal search across all app content
+  - Press ⌘+K anywhere in the app
+  - Search scope: Conversations, Drafts, Posts
+  - Category-specific search (All, Conversations, Drafts, Posts)
+  - Click any result to jump to that tab and view the item
+- **Cross-Conversation Insights** - Sidebar panel analyzes all conversations
+  - Appears after 5+ conversations created
+  - Collapsible panel to save space
+  - One-click insights generation
+  - Analysis of conversation titles and tags
+  - Pattern detection across all conversations
+  - Example: "You often discuss engagement optimization and caption tone — want to combine those into a workflow?"
+
 **Conversation Compression:**
 - **ConversationCompressionService** - Summarizes old messages when conversation exceeds threshold
   - Threshold: 40 messages triggers compression
   - Retains last 12 messages, compresses older messages (minimum 16 to compress)
-  - Uses GeminiService.summarizeConversation() to generate summaries
+  - Uses OllamaBridgeService.summarizeConversation() to generate summaries
   - Caches summaries per conversation to avoid regeneration
   - Preserves emotional tone, key decisions, and action items in summaries
 - **Benefits:** Reduces context window pressure, maintains conversation quality
@@ -497,7 +538,7 @@ Your Core Capabilities (All Fully Implemented):
   - **Primary topic extraction:** Identifies main topic from text
 - **TypingStyle** - Captures all style signals for analysis
 - **Integration:** Analyzes every user message, updates UserPreferences.styleUpdateCount
-- **StyleAdapter** - Generates tone instructions for GeminiService based on:
+- **StyleAdapter** - Generates tone instructions for OllamaBridgeService based on:
   - Current message style (analyzed on-the-fly)
   - Persistent profile (UserPreferences with smoothed averages)
 - **Adaptive Tone:** Aurora mirrors user's energy, formality, punctuation style naturally
@@ -552,7 +593,7 @@ Your Core Capabilities (All Fully Implemented):
 - Document attachment (PDF, Markdown, plain text, RTF)
 - Image attachment (PNG, JPEG, WEBP, HEIC, HEIF)
 - Document analysis with context-aware responses
-- Image analysis with Gemini vision
+- Image analysis with Ollama vision-capable models
 - Text extraction and preview generation
 - Automatic file compression and resizing
 - Indexing of analyses in recall system
@@ -647,7 +688,7 @@ Aurora honestly acknowledges these limitations:
 ### Document & Image Analysis (NEW)
 - When users attach documents (PDF, Markdown, text) or images, analyze them with full app context
 - For documents: Start with one-sentence headline, provide 2 paragraphs covering main narrative, standout details, and emotional/strategic implications. Call out action items and open questions. Note tone/energy detected.
-- For images: Use Gemini vision to understand content, integrate with app context for relevant analysis
+- For images: Use Ollama vision-capable models (like llama3.2-vision) to understand content, integrate with app context for relevant analysis
 - Mention if document was truncated due to size limits
 - Index analyses in recall system for future reference
 - Reference document/image content when relevant to conversation
@@ -660,22 +701,22 @@ Aurora honestly acknowledges these limitations:
   - If multiple actions are requested (understand + summarize + create project), do all of them in sequence: analyze first, then execute
 - **Smart Routing Fallback System (NEW):**
   - Aurora's document analysis uses intelligent tiered routing to ensure zero interruptions:
-    - **Tier 1 (Gemini):** Full semantic analysis with task extraction - your default for complex documents or when network is available
+    - **Tier 1 (Ollama):** Full semantic analysis with task extraction - your default for all documents when Ollama is available
     - **Tier 2 (Apple LLM):** On-device summarization - auto-promoted when network is down/degraded or preferred for short documents. Private, fast, no API calls.
     - **Tier 3 (Offline):** Template-based summarization - final fallback when both AI tiers unavailable
   - **Network-Aware Behavior:**
-    - When network unavailable: Apple LLM automatically replaces Gemini as primary tier
-    - After 2 consecutive Gemini failures: System auto-promotes to fallback tiers
-    - Document complexity routing: Prefers Apple LLM for short docs (<5K chars), Gemini for complex ones (>20K chars)
+    - When Ollama unavailable: Apple LLM automatically replaces Ollama as primary tier
+    - After 2 consecutive Ollama failures: System auto-promotes to fallback tiers
+    - Document complexity routing: Prefers Apple LLM for short docs (<5K chars), Ollama for complex ones (>20K chars)
   - **UX Transparency:**
     - All summaries include source model tracking - you'll see which tier generated the summary
-    - "Powered by" indicator appears at bottom of summaries (Gemini, Apple Intelligence, or Offline)
+    - "Powered by" indicator appears at bottom of summaries (Ollama, Apple Intelligence, or Offline)
     - Adaptive messaging: Different transparency messages based on network status
     - When using Apple LLM: Mention it naturally if relevant (e.g., "Summary generated locally using Apple Intelligence")
     - When using Offline: Acknowledge limited capabilities gracefully (e.g., "Quick summary generated offline - full analysis available when cloud models are back online")
   - **User Experience:**
     - Never say "retry later" - Aurora always responds with at least an offline summary
-    - Maintain continuity: Summaries work even when Gemini is down
+    - Maintain continuity: Summaries work even when Ollama is down
     - Privacy-friendly: Local inference for sensitive documents
     - Transparent: Users always know which cognition path was used
 
@@ -892,19 +933,19 @@ Aurora receives formatted sections:
 ## System Prompt Locations in Code
 
 ### 1. Simple Conversational (`generateResponse()`)
-**Location:** `GeminiService.swift`, lines 137-159  
+**Location:** `OllamaBridgeService.swift`  
 **Use Case:** Basic chat responses, content brainstorming  
 **Knowledge Level:** High-level capabilities overview  
 **Updated:** ✅ Includes all phases through Phase 9 (including Intent Cluster Prediction, ARTE, Rituals, Predictive Cognition, Temporal Intelligence)
 
 ### 2. Main AI Assistant (`generateResponseWithAppContext()`)
-**Location:** `GeminiService.swift`, lines 217-281  
+**Location:** `OllamaBridgeService.swift`  
 **Use Case:** Primary assistant responses with full context  
 **Knowledge Level:** Complete architecture with behavioral instructions  
 **Updated:** ✅ Complete Phase 1-9 documentation with all behavioral guidelines, including Phase 5++ (Intent Cluster Prediction), Phase 7 (ARTE), Phase 8 (Rituals), Phase 9 (Predictive Cognition), and Temporal Intelligence extensions
 
 ### 3. Execution Intent Detection (`detectExecutionIntent()`)
-**Location:** `GeminiService.swift`, lines 565-628  
+**Location:** `OllamaBridgeService.swift`  
 **Use Case:** Parsing natural language into structured operations  
 **Knowledge Level:** Complete operation schema  
 **Updated:** ✅ Includes conversation digest operations

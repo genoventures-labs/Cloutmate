@@ -121,3 +121,22 @@ public final class Post {
     }
 }
 
+// MARK: - Backward Compatibility Extensions
+
+extension Post {
+    /// Compatibility property for gradual migration
+    public var artifactTitle: String {
+        let lines = caption.components(separatedBy: .newlines)
+        return lines.first?.trimmingCharacters(in: .whitespaces) ?? ""
+    }
+    
+    /// Compatibility property for gradual migration
+    public var artifactContent: String {
+        let lines = caption.components(separatedBy: .newlines)
+        if lines.count > 1 {
+            return lines.dropFirst().joined(separator: "\n").trimmingCharacters(in: .whitespaces)
+        }
+        return lines.first?.count ?? 0 > 50 ? String(lines.first!.dropFirst(50)) : ""
+    }
+}
+

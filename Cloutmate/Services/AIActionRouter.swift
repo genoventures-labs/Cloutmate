@@ -514,7 +514,9 @@ final class AIActionRouter {
             guard let post = fetchPost(by: request.postId, context: modelContext) else {
                 throw ExecutionError.notFound("Post not found")
             }
-            await PublishingService.shared.publishPost(post, context: modelContext)
+            // Note: PublishingService was removed as part of social media posting removal
+            // For now, just update the post status locally
+            // TODO: Re-implement publishing when needed for artifact-based content
             post.postStatus = .published
             post.publishedDate = Date()
             AIRecallService.shared.registerUpdated(post, modelContext: modelContext)
@@ -950,7 +952,7 @@ final class AIActionRouter {
 // MARK: - Intent Conversion Helpers
 
 extension AIIntentAction {
-    init?(from executionIntent: GeminiService.ExecutionIntent) {
+    init?(from executionIntent: ExecutionIntent) {
         switch executionIntent.operation {
         case .archiveTasks:
             let criteria = AIExecutionService.ArchiveCriteria(rawValue: executionIntent.criteria ?? "completed") ?? .completed

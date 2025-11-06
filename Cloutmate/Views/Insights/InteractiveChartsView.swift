@@ -16,7 +16,6 @@ struct InteractiveChartsView: View {
     
     enum ChartType: String, CaseIterable {
         case engagement = "Engagement Trends"
-        case platforms = "Platform Compare"
         case content = "Content Type"
     }
     
@@ -45,10 +44,6 @@ struct InteractiveChartsView: View {
                     switch selectedChartType {
                     case .engagement:
                         EngagementTrendsChart(posts: posts, selectedPost: $selectedPost)
-                            .frame(height: 320)
-                            .padding()
-                    case .platforms:
-                        PlatformComparisonChart(posts: posts, selectedPost: $selectedPost)
                             .frame(height: 320)
                             .padding()
                     case .content:

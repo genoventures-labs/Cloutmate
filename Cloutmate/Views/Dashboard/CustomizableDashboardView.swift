@@ -20,7 +20,6 @@ struct CustomizableDashboardView: View {
     @AppStorage("dashboard.section.projects.collapsed") private var projectsCollapsed = false
     @AppStorage("dashboard.section.areas.collapsed") private var areasCollapsed = false
     @AppStorage("dashboard.section.resources.collapsed") private var resourcesCollapsed = false
-    @AppStorage("dashboard.section.social.collapsed") private var socialCollapsed = false
     
     var body: some View {
         ScrollView {
@@ -30,7 +29,7 @@ struct CustomizableDashboardView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Dashboard")
                             .font(.system(size: 28, weight: .bold))
-                        Text("Plan your pipeline and publishing at a glance")
+                        Text("Your workspace overview and productivity insights")
                             .metricLabelStyle()
                     }
                     Spacer()
@@ -40,9 +39,9 @@ struct CustomizableDashboardView: View {
                     .help("Dashboard Settings")
                 }
                 
-                // Hero: Social Overview (centered, elevated)
-                if isVisible(.socialOverview) {
-                    SocialOverviewCard(size: .large)
+                // Hero: Today Overview (centered, elevated)
+                if isVisible(.todayOverview) {
+                    TodayOverviewCard(size: .large)
                         .heroCard()
                         .frame(minWidth: 420, maxWidth: 520)
                         .padding(.top, 8)
@@ -126,37 +125,11 @@ struct CustomizableDashboardView: View {
                             )
                         }
                     }
-
-                    DashboardSectionPanel(
-                        title: "Social",
-                        icon: "chart.bar.fill",
-                        accent: glassTint(.primary),
-                        isCollapsed: $socialCollapsed
-                    ) {
-                        if anyVisible([.contentPerformance, .platformComparison]) {
-                            VStack(spacing: 12) {
-                                if isVisible(.contentPerformance) {
-                                    ContentPerformanceCard(size: size(for: .contentPerformance, fallback: .medium))
-                                }
-                                if isVisible(.platformComparison) {
-                                    PlatformComparisonCard(size: size(for: .platformComparison, fallback: .medium))
-                                }
-                            }
-                        } else {
-                            sectionEmptyBanner(
-                                primary: "No social cards enabled",
-                                secondary: "Add publishing insights from Dashboard Settings when needed.",
-                                accent: glassTint(.primary)
-                            )
-                        }
-                    }
                 }
-                .padding(.top, 4)
             }
-            .padding(28)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 32)
         }
-        .background(Color.clear)
-        .navigationTitle("Dashboard")
         .sheet(isPresented: $showSettings) {
             DashboardSettingsView()
         }
@@ -168,8 +141,7 @@ struct CustomizableDashboardView: View {
     private func ensureDefaultCards() {
         if userCards.isEmpty {
             let defaults: [(DashboardCardType, DashboardCardSize)] = [
-                (.socialOverview, .large),
-                (.todayOverview, .medium),
+                (.todayOverview, .large),
                 (.inboxCount, .small),
                 (.upcomingTasks, .medium),
                 (.upcomingDeadlines, .medium),
@@ -181,9 +153,6 @@ struct CustomizableDashboardView: View {
             
             for (index, entry) in defaults.enumerated() {
                 let card = DashboardCard(cardType: entry.0, position: index, size: entry.1)
-                if entry.0 == .socialOverview {
-                    card.isVisible = true
-                }
                 modelContext.insert(card)
             }
             
@@ -272,10 +241,6 @@ struct DashboardCardView: View {
                     ActiveProjectsCard(size: cardSize)
                 case .upcomingTasks:
                     UpcomingTasksCard(size: cardSize)
-                case .scheduledPosts:
-                    ScheduledPostsCard(size: cardSize)
-                case .draftCount:
-                    DraftCountCard(size: cardSize)
                 case .recentNotes:
                     RecentNotesCard(size: cardSize)
                 
@@ -289,30 +254,6 @@ struct DashboardCardView: View {
                 case .notesActivity:
                     NotesActivityCard(size: cardSize)
                 
-                // Social Media Insights
-                case .socialOverview:
-                    SocialOverviewCard(size: cardSize)
-                case .contentPerformance:
-                    ContentPerformanceCard(size: cardSize)
-                case .platformComparison:
-                    PlatformComparisonCard(size: cardSize)
-                
-                // Facebook Page Insights
-                case .facebookPageInsightsOverview:
-                    FacebookPageInsightsOverviewCard(size: cardSize)
-                case .facebookPageViews:
-                    FacebookPageViewsCard(size: cardSize)
-                case .facebookPageFans:
-                    FacebookPageFansCard(size: cardSize)
-                case .facebookPageReach:
-                    FacebookPageReachCard(size: cardSize)
-                case .facebookPageImpressions:
-                    FacebookPageImpressionsCard(size: cardSize)
-                case .facebookEngagedUsers:
-                    FacebookEngagedUsersCard(size: cardSize)
-                case .facebookPostEngagements:
-                    FacebookPostEngagementsCard(size: cardSize)
-                
                 // Productivity Insights
                 case .upcomingDeadlines:
                     UpcomingDeadlinesCard(size: cardSize)
@@ -324,16 +265,16 @@ struct DashboardCardView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("This card arrives soon")
                             .metricLabelStyle()
-                        Text("We’re polishing it for the next update.")
+                        Text("We're polishing it for the next update.")
                             .metricLabelStyle()
                     }
                 
                 // Legacy cards
-                case .postingStreak, .topPerformingPost, .recentInsights, .areasOverview, .workloadBalance, .inboxTrend:
+                case .workloadBalance, .inboxTrend, .areasOverview:
                     VStack(alignment: .leading, spacing: 6) {
                         Text("This card arrives soon")
                             .metricLabelStyle()
-                        Text("We’re polishing it for the next update.")
+                        Text("We're polishing it for the next update.")
                             .metricLabelStyle()
                     }
                 }

@@ -13,14 +13,18 @@ import CloutmateShared
 struct DraftsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Draft.updatedAt, order: .reverse) private var allDrafts: [Draft]
+    @Query(sort: \CloutmateShared.Artifact.updatedAt, order: .reverse) private var allArtifacts: [CloutmateShared.Artifact]
     @Query(sort: \Template.name) private var templates: [Template]
     
     @State private var searchText = ""
     @State private var showArchived: Bool = false
     @State private var selectedDrafts = Set<UUID>()
+    @State private var selectedArtifacts = Set<UUID>()
     @State private var selectedDraft: Draft?
+    @State private var selectedArtifact: CloutmateShared.Artifact?
     @State private var showTemplates = false
     @State private var showComposer = false
+    @State private var showArtifactComposer = false
     @State private var draftToConvert: Draft?
     @State private var showConversionAlert = false
     @State private var conversionResult: DraftConversionResult?
@@ -28,6 +32,10 @@ struct DraftsView: View {
     @State private var showAutoCleanInfo = false
     @State private var autoCleanEnabled = UserDefaults.standard.bool(forKey: "autoCleanDrafts")
     @State private var showCreateDraftSheet = false
+    
+    var draftArtifacts: [CloutmateShared.Artifact] {
+        allArtifacts.filter { $0.artifactState == .draft }
+    }
     
     var draftsToShow: [Draft] {
         allDrafts.filter { draft in
@@ -45,13 +53,30 @@ struct DraftsView: View {
         }
     }
     
+    var artifactsToShow: [CloutmateShared.Artifact] {
+        draftArtifacts.filter { artifact in
+            if !searchText.isEmpty {
+                let matchesSearch = artifact.title.localizedCaseInsensitiveContains(searchText) ||
+                                  artifact.content.localizedCaseInsensitiveContains(searchText) ||
+                                  artifact.tags.joined(separator: " ").localizedCaseInsensitiveContains(searchText)
+                if !matchesSearch { return false }
+            }
+            
+            if artifact.artifactState == .archived {
+                return showArchived
+            } else {
+                return !showArchived
+            }
+        }
+    }
+    
     private var searchAndFiltersSection: some View {
         VStack(spacing: 12) {
             // Search bar
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("Search drafts...", text: $searchText)
+                TextField("Search drafts & artifacts...", text: $searchText)
             }
             .padding(8)
             .background(Color.secondary.opacity(0.1))
@@ -77,94 +102,172 @@ struct DraftsView: View {
         .padding()
     }
     
-    private var tableSection: some View {
-        Table(draftsToShow, selection: $selectedDrafts) {
-            TableColumn("Content") { draft in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(draft.caption.isEmpty ? "Untitled Draft" : draft.caption)
-                        .font(.body)
-                        .fontWeight(draft.caption.isEmpty ? .regular : .medium)
-                        .lineLimit(2)
-                    
-                    if !draft.caption.isEmpty {
-                        Text("\(draft.caption.count) characters")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
+    private var selectionBinding: Binding<Set<UUID>> {
+        Binding(
+            get: {
+                var ids = Set<UUID>()
+                ids.formUnion(selectedDrafts)
+                ids.formUnion(selectedArtifacts)
+                return ids
+            },
+            set: { newSelection in
+                selectedDrafts.removeAll()
+                selectedArtifacts.removeAll()
+                for id in newSelection {
+                    if draftsToShow.contains(where: { $0.id == id }) {
+                        selectedDrafts.insert(id)
+                    } else if artifactsToShow.contains(where: { $0.id == id }) {
+                        selectedArtifacts.insert(id)
                     }
                 }
-                .contextMenu {
-                    Button("Convert to Post") {
-                        convertToPost(draft)
+            }
+        )
+    }
+    
+    private var tableSection: some View {
+        Table(combinedItems, selection: selectionBinding) {
+            TableColumn("Content") { listItem in
+                switch listItem {
+                case .draft(let draft):
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(draft.caption.isEmpty ? "Untitled Draft" : draft.caption)
+                            .font(.body)
+                            .fontWeight(draft.caption.isEmpty ? .regular : .medium)
+                            .lineLimit(2)
+                        
+                        if !draft.caption.isEmpty {
+                            Text("\(draft.caption.count) characters")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    Button("Duplicate") {
-                        duplicateDraft(draft)
+                    .contextMenu {
+                        Button("Convert to Artifact") {
+                            convertDraftToArtifact(draft)
+                        }
+                        Button("Duplicate") {
+                            duplicateDraft(draft)
+                        }
+                        Button(draft.isArchived ? "Unarchive" : "Archive") {
+                            toggleArchive(draft)
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            deleteDraft(draft)
+                        }
                     }
-                    Button(draft.isArchived ? "Unarchive" : "Archive") {
-                        toggleArchive(draft)
+                case .artifact(let artifact):
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(artifact.title.isEmpty ? "Untitled Artifact" : artifact.title)
+                            .font(.body)
+                            .fontWeight(artifact.title.isEmpty ? .regular : .medium)
+                            .lineLimit(2)
+                        
+                        if !artifact.content.isEmpty {
+                            Text("\(artifact.content.count) characters")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    Divider()
-                    Button("Delete", role: .destructive) {
-                        deleteDraft(draft)
+                    .contextMenu {
+                        Button("Edit") {
+                            selectedArtifact = artifact
+                        }
+                        Button("Duplicate") {
+                            duplicateArtifact(artifact)
+                        }
+                        Button(artifact.artifactState == .archived ? "Unarchive" : "Archive") {
+                            toggleArchiveArtifact(artifact)
+                        }
+                        Divider()
+                        Button("Delete", role: .destructive) {
+                            deleteArtifact(artifact)
+                        }
                     }
                 }
             }
             .width(min: 200, ideal: 300)
             
-            TableColumn("Status") { draft in
-                if draft.scheduledOrPublishedDate != nil {
-                    let isScheduled = draft.associatedPostID != nil
-                    let statusText = isScheduled ? "Scheduled" : "Published"
-                    let statusColor = isScheduled ? Color.kosmicBlue : Color.kosmicGreen
-                    
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 8, height: 8)
-                        Text(statusText)
+            TableColumn("Status") { listItem in
+                switch listItem {
+                case .draft(let draft):
+                    if draft.scheduledOrPublishedDate != nil {
+                        let isScheduled = draft.associatedPostID != nil
+                        let statusText = isScheduled ? "Scheduled" : "Published"
+                        let statusColor = isScheduled ? Color.kosmicBlue : Color.kosmicGreen
+                        
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 8, height: 8)
+                            Text(statusText)
+                                .font(.caption)
+                                .foregroundColor(statusColor)
+                        }
+                    } else if draft.caption.isEmpty {
+                        Text("Empty")
                             .font(.caption)
-                            .foregroundColor(statusColor)
+                            .foregroundColor(.orange)
+                    } else {
+                        Text("Ready")
+                            .font(.caption)
+                            .foregroundColor(.kosmicGreen)
                     }
-                } else if draft.caption.isEmpty {
-                    Text("Empty")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                } else {
-                    Text("Ready")
-                        .font(.caption)
-                        .foregroundColor(.kosmicGreen)
+                case .artifact(let artifact):
+                    ArtifactStateBadge(state: artifact.artifactState)
                 }
             }
             .width(min: 100)
             
-            TableColumn("Tags") { draft in
-                if !draft.tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 4) {
-                            ForEach(draft.tags.prefix(3), id: \.self) { tag in
-                                Text("#\(tag)")
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.kosmicBlue.opacity(0.1))
-                                    .foregroundColor(.kosmicBlue)
-                                    .cornerRadius(4)
-                            }
-                            if draft.tags.count > 3 {
-                                Text("+\(draft.tags.count - 3)")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
+            TableColumn("Tags") { listItem in
+                let tags: [String] = {
+                    switch listItem {
+                    case .draft(let draft):
+                        return draft.tags
+                    case .artifact(let artifact):
+                        return artifact.tags
+                    }
+                }()
+                
+                Group {
+                    if !tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 4) {
+                                ForEach(tags.prefix(3), id: \.self) { tag in
+                                    Text("#\(tag)")
+                                        .font(.caption2)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.kosmicBlue.opacity(0.1))
+                                        .foregroundColor(.kosmicBlue)
+                                        .cornerRadius(4)
+                                }
+                                if tags.count > 3 {
+                                    Text("+\(tags.count - 3)")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
+                    } else {
+                        Text("—")
+                            .foregroundColor(.secondary)
                     }
-                } else {
-                    Text("—")
-                        .foregroundColor(.secondary)
                 }
             }
             .width(min: 150)
             
-            TableColumn("Updated") { draft in
-                Text(draft.updatedAt, style: .relative)
+            TableColumn("Updated") { listItem in
+                let date: Date = {
+                    switch listItem {
+                    case .draft(let draft):
+                        return draft.updatedAt
+                    case .artifact(let artifact):
+                        return artifact.updatedAt
+                    }
+                }()
+                
+                Text(date, style: .relative)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -172,15 +275,45 @@ struct DraftsView: View {
         }
     }
     
+    enum DraftItem: Identifiable {
+        case draft(Draft)
+        case artifact(CloutmateShared.Artifact)
+        
+        var id: UUID {
+            switch self {
+            case .draft(let draft): return draft.id
+            case .artifact(let artifact): return artifact.id
+            }
+        }
+        
+        var updatedAt: Date {
+            switch self {
+            case .draft(let draft): return draft.updatedAt
+            case .artifact(let artifact): return artifact.updatedAt
+            }
+        }
+    }
+    
+    var combinedItems: [DraftItem] {
+        var items: [DraftItem] = []
+        items.append(contentsOf: draftsToShow.map { .draft($0) })
+        items.append(contentsOf: artifactsToShow.map { .artifact($0) })
+        return items.sorted { item1, item2 in
+            let date1 = item1.updatedAt
+            let date2 = item2.updatedAt
+            return date1 > date2
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             searchAndFiltersSection
             
-            if draftsToShow.isEmpty {
+            if combinedItems.isEmpty {
                 ContentUnavailableView(
-                    allDrafts.isEmpty ? "No Drafts" : "No matches",
+                    (allDrafts.isEmpty && draftArtifacts.isEmpty) ? "No Drafts" : "No matches",
                     systemImage: "doc.text",
-                    description: Text(allDrafts.isEmpty ? "Create a draft to get started" : "Try a different search or filter")
+                    description: Text((allDrafts.isEmpty && draftArtifacts.isEmpty) ? "Create a draft or artifact to get started" : "Try a different search or filter")
                 )
                 .frame(maxHeight: .infinity)
             } else {
@@ -191,27 +324,35 @@ struct DraftsView: View {
         .navigationTitle("Drafts")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if !selectedDrafts.isEmpty {
+                if !selectedDrafts.isEmpty || !selectedArtifacts.isEmpty {
                     Menu("Actions") {
-                        Button("Convert Selected to Posts", systemImage: "paperplane") {
-                            convertSelectedToPosts()
+                        Button("Convert Selected to Artifacts", systemImage: "sparkles") {
+                            convertSelectedToArtifacts()
                         }
                         Button("Archive Selected", systemImage: "archivebox") {
-                            archiveSelectedDrafts()
+                            archiveSelected()
                         }
                         Button("Delete Selected", systemImage: "trash", role: .destructive) {
-                            deleteSelectedDrafts()
+                            deleteSelected()
                         }
                     }
                 }
                 
-                Button(action: { showCreateDraftSheet = true }) {
-                    Label("New Draft", systemImage: "plus")
+                Menu("New") {
+                    Button(action: { showCreateDraftSheet = true }) {
+                        Label("New Draft", systemImage: "doc.text")
+                    }
+                    Button(action: { showArtifactComposer = true }) {
+                        Label("New Artifact", systemImage: "sparkles")
+                    }
                 }
             }
         }
         .sheet(isPresented: $showCreateDraftSheet) {
             CreateDraftSheet()
+        }
+        .sheet(isPresented: $showArtifactComposer) {
+            ArtifactComposerView()
         }
         .sheet(isPresented: $showTemplates) {
             TemplateManagementView()
@@ -226,6 +367,9 @@ struct DraftsView: View {
                 }
             )
             .frame(width: 700, height: 800)
+        }
+        .sheet(item: $selectedArtifact) { artifact in
+            ArtifactComposerView(existingArtifact: artifact)
         }
         .alert("", isPresented: $showConversionAlert, presenting: conversionResult) { result in
             Button("Keep Draft") {
@@ -289,6 +433,20 @@ struct DraftsView: View {
         try? modelContext.save()
     }
     
+    private func archiveSelectedArtifacts() {
+        let artifactsToArchive = artifactsToShow.filter { selectedArtifacts.contains($0.id) }
+        for artifact in artifactsToArchive {
+            artifact.artifactState = .archived
+        }
+        selectedArtifacts.removeAll()
+        try? modelContext.save()
+    }
+    
+    private func archiveSelected() {
+        archiveSelectedDrafts()
+        archiveSelectedArtifacts()
+    }
+    
     private func deleteSelectedDrafts() {
         let draftsToDelete = draftsToShow.filter { selectedDrafts.contains($0.id) }
         for draft in draftsToDelete {
@@ -298,6 +456,20 @@ struct DraftsView: View {
         try? modelContext.save()
     }
     
+    private func deleteSelectedArtifacts() {
+        let artifactsToDelete = artifactsToShow.filter { selectedArtifacts.contains($0.id) }
+        for artifact in artifactsToDelete {
+            modelContext.delete(artifact)
+        }
+        selectedArtifacts.removeAll()
+        try? modelContext.save()
+    }
+    
+    private func deleteSelected() {
+        deleteSelectedDrafts()
+        deleteSelectedArtifacts()
+    }
+    
     private func convertSelectedToPosts() {
         let draftsToConvert = draftsToShow.filter { selectedDrafts.contains($0.id) }
         for draft in draftsToConvert.prefix(1) {
@@ -305,10 +477,56 @@ struct DraftsView: View {
         }
     }
     
+    private func convertSelectedToArtifacts() {
+        let draftsToConvert = draftsToShow.filter { selectedDrafts.contains($0.id) }
+        for draft in draftsToConvert {
+            convertDraftToArtifact(draft)
+        }
+    }
+    
     private func convertToPost(_ draft: Draft) {
-        // Open the composer window with this draft's content
-        // Using sheet(item:) automatically shows/hides based on draftToConvert
         draftToConvert = draft
+    }
+    
+    private func convertDraftToArtifact(_ draft: Draft) {
+        let artifact = ArtifactMigrationService.shared.migrateDraftToArtifact(draft, context: modelContext)
+        modelContext.insert(artifact)
+        try? modelContext.save()
+    }
+    
+    private func deleteArtifact(_ artifact: CloutmateShared.Artifact) {
+        withAnimation {
+            if selectedArtifacts.contains(artifact.id) {
+                selectedArtifacts.remove(artifact.id)
+            }
+            modelContext.delete(artifact)
+            try? modelContext.save()
+        }
+    }
+    
+    private func duplicateArtifact(_ artifact: CloutmateShared.Artifact) {
+        let newArtifact = Artifact(
+            title: artifact.title,
+            content: artifact.content,
+            mediaURLs: artifact.mediaURLs,
+            outputFormat: artifact.format,
+            state: .draft,
+            tags: artifact.tags
+        )
+        modelContext.insert(newArtifact)
+        try? modelContext.save()
+    }
+    
+    private func toggleArchiveArtifact(_ artifact: CloutmateShared.Artifact) {
+        if artifact.artifactState == .archived {
+            artifact.artifactState = .draft
+        } else {
+            artifact.artifactState = .archived
+        }
+        if selectedArtifacts.contains(artifact.id) {
+            selectedArtifacts.remove(artifact.id)
+        }
+        try? modelContext.save()
     }
     
     private func applyTemplate(_ template: CloutmateShared.Template, to draft: Draft) {

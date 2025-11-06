@@ -13,5 +13,12 @@ extension Notification.Name {
     static let focusSessionStatusChanged = Notification.Name("focusSessionStatusChanged")
     static let openContextualCreate = Notification.Name("openContextualCreate")
     static let currentTabUpdated = Notification.Name("CurrentTabUpdated")
+    static let showCreateNote = Notification.Name("showCreateNote")
+    static let showCreateTask = Notification.Name("showCreateTask")
+    static let showCreateProject = Notification.Name("showCreateProject")
+    static let showQuickCapture = Notification.Name("showQuickCapture")
+    static let showVoiceMemo = Notification.Name("showVoiceMemo")
+    static let showArtifactComposer = Notification.Name("showArtifactComposer")
+    static let openNoteDetail = Notification.Name("openNoteDetail")
 }
 

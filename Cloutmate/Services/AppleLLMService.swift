@@ -87,12 +87,12 @@ actor AppleLLMService {
         
         if let prompt = userPrompt?.trimmingCharacters(in: .whitespacesAndNewlines),
            !prompt.isEmpty {
-            formattedSummary += "\n\n(Note: This is a local summary. For detailed analysis or task extraction, please retry when Gemini is available.)"
+            formattedSummary += "\n\n(Note: This is a local summary. For detailed analysis or task extraction, please retry when Ollama is available.)"
         }
         
         // Check if text was truncated
         if text.count >= maxContextLength {
-            formattedSummary += "\n\n⚠️ Document was truncated for local processing. Full analysis available when Gemini is back online."
+            formattedSummary += "\n\n⚠️ Document was truncated for local processing. Full analysis available when Ollama is back online."
         }
         
         return formattedSummary
@@ -135,7 +135,7 @@ actor AppleLLMService {
         
         \(summary)
         
-        ⚠️ This is a quick local summary. For full semantic analysis or task extraction, please retry when Gemini is available.
+        ⚠️ This is a quick local summary. For full semantic analysis or task extraction, please retry when Ollama is available.
         """
     }
     

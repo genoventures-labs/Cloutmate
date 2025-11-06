@@ -12,17 +12,21 @@ import CloutmateShared
 struct UnifiedCalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \CloutmateShared.Post.scheduledDate) private var posts: [CloutmateShared.Post]
+    @Query(sort: \CloutmateShared.Artifact.publishedAt) private var artifacts: [CloutmateShared.Artifact]
     @Query(sort: \CloutmateShared.Task.dueDate) private var tasks: [CloutmateShared.Task]
     
     @State private var selectedDate = Date()
     @State private var isWeeklyView = false
     @State private var showingComposer = false
+    @State private var showingArtifactComposer = false
     @State private var prefilledDate: Date?
     @State private var selectedPost: CloutmateShared.Post?
+    @State private var selectedArtifact: CloutmateShared.Artifact?
     @State private var selectedTask: Task?
     @State private var draggedItem: Any?
     @State private var showConflictWarning = false
     @State private var conflictDate: Date?
+    @State private var showDrawer = false
     
     var body: some View {
         ZStack {
@@ -30,74 +34,94 @@ struct UnifiedCalendarView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // View toggle with Glass Buttons
-                HStack(spacing: 8) {
-                    GlassButton(
-                        "Monthly",
-                        style: .pill,
-                        role: !isWeeklyView ? .primary : .surface,
-                        tintColor: !isWeeklyView ? Color(red: 0.36, green: 0.66, blue: 1.0) : Color.white.opacity(0.35),
-                        action: { isWeeklyView = false }
-                    )
+                // Header with toggle
+                VStack(spacing: 16) {
+                    CalendarViewToggle(isWeeklyView: $isWeeklyView)
+                        .padding(.horizontal)
+                        .padding(.top)
                     
-                    GlassButton(
-                        "Weekly",
-                        style: .pill,
-                        role: isWeeklyView ? .primary : .surface,
-                        tintColor: isWeeklyView ? Color(red: 0.36, green: 0.66, blue: 1.0) : Color.white.opacity(0.35),
-                        action: { isWeeklyView = true }
-                    )
-                    
-                    Spacer()
+                    if isWeeklyView {
+                        UnifiedWeeklyCalendarView(
+                            posts: posts,
+                            artifacts: artifacts,
+                            tasks: tasks,
+                            selectedDate: $selectedDate,
+                            showingComposer: $showingComposer,
+                            showingArtifactComposer: $showingArtifactComposer,
+                            prefilledDate: $prefilledDate,
+                            selectedPost: $selectedPost,
+                            selectedArtifact: $selectedArtifact,
+                            selectedTask: $selectedTask,
+                            showDrawer: $showDrawer
+                        )
+                        .background(Color.clear)
+                    } else {
+                        UnifiedMonthlyCalendarView(
+                            posts: posts,
+                            artifacts: artifacts,
+                            tasks: tasks,
+                            selectedDate: $selectedDate,
+                            showingComposer: $showingComposer,
+                            showingArtifactComposer: $showingArtifactComposer,
+                            prefilledDate: $prefilledDate,
+                            selectedPost: $selectedPost,
+                            selectedArtifact: $selectedArtifact,
+                            selectedTask: $selectedTask,
+                            showDrawer: $showDrawer
+                        )
+                        .background(Color.clear)
+                    }
                 }
-                .padding()
-                
-                if isWeeklyView {
-                    UnifiedWeeklyCalendarView(
-                        posts: posts,
-                        tasks: tasks,
-                        selectedDate: $selectedDate,
-                        showingComposer: $showingComposer,
-                        prefilledDate: $prefilledDate,
-                        selectedPost: $selectedPost,
-                        selectedTask: $selectedTask
-                    )
-                    .background(Color.clear)
-                } else {
-                    UnifiedMonthlyCalendarView(
-                        posts: posts,
-                        tasks: tasks,
-                        selectedDate: $selectedDate,
-                        showingComposer: $showingComposer,
-                        prefilledDate: $prefilledDate,
-                        selectedPost: $selectedPost,
-                        selectedTask: $selectedTask
-                    )
-                    .background(Color.clear)
-                }
+            }
+            
+            // Daily Snapshot Drawer overlay
+            if showDrawer {
+                DailySnapshotDrawer(
+                    date: selectedDate,
+                    isPresented: $showDrawer
+                )
+                .transition(.move(edge: .trailing))
             }
         }
         .navigationTitle("Calendar")
         .sheet(isPresented: $showingComposer) {
             ComposerWindow(prefilledDate: prefilledDate)
         }
+        .sheet(isPresented: $showingArtifactComposer) {
+            ArtifactComposerView(prefilledDate: prefilledDate)
+        }
         .sheet(item: $selectedPost) { post in
             PostPreviewSheet(post: Binding.constant(post))
+        }
+        .sheet(item: $selectedArtifact) { artifact in
+            ArtifactPreviewSheet(artifact: Binding.constant(artifact))
         }
         .sheet(item: $selectedTask) { task in
             TaskDetailSheet(task: task)
         }
+        .onAppear {
+            // Set up keyboard navigation
+            setupKeyboardNavigation()
+        }
+    }
+    
+    private func setupKeyboardNavigation() {
+        // Keyboard navigation will be handled by the calendar views
     }
 }
 
 struct UnifiedWeeklyCalendarView: View {
     let posts: [CloutmateShared.Post]
+    let artifacts: [CloutmateShared.Artifact]
     let tasks: [Task]
     @Binding var selectedDate: Date
     @Binding var showingComposer: Bool
+    @Binding var showingArtifactComposer: Bool
     @Binding var prefilledDate: Date?
     @Binding var selectedPost: CloutmateShared.Post?
+    @Binding var selectedArtifact: CloutmateShared.Artifact?
     @Binding var selectedTask: Task?
+    @Binding var showDrawer: Bool
     
     @State private var displayedWeek = Date()
     @State private var showItemListSheet = false
@@ -108,33 +132,18 @@ struct UnifiedWeeklyCalendarView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Week header
-            HStack {
-                GlassButton(icon: "chevron.left", style: .iconOnly, tintColor: .kosmicBlue, action: previousWeek)
-                    .frame(width: 32, height: 32)
-                
-                Spacer()
-                
-                Text(weekRangeText)
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.kosmicBlue, .kosmicPurple],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                
-                Spacer()
-                
-                GlassButton(icon: "chevron.right", style: .iconOnly, tintColor: .kosmicBlue, action: nextWeek)
-                    .frame(width: 32, height: 32)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            // Week header using new CalendarHeaderView
+            CalendarHeaderView(
+                title: weekRangeText,
+                onPrevious: previousWeek,
+                onNext: nextWeek,
+                onQuickAction: {
+                    NotificationCenter.default.post(name: .openContextualCreate, object: TabIdentifier.calendar)
+                }
+            )
             .glassPanel(tier: .overlay, cornerRadius: 12)
             .padding(.horizontal)
+            .padding(.bottom, 8)
             
             // Days with items
             ScrollView {
@@ -147,21 +156,24 @@ struct UnifiedWeeklyCalendarView: View {
                             onPostClick: { post in
                                 selectedPost = post
                             },
+                            onArtifactClick: { artifact in
+                                selectedArtifact = artifact
+                            },
                             onTaskClick: { task in
                                 selectedTask = task
                             }
                         )
                         .onTapGesture {
-                            selectedDate = date
-                            selectedDateForList = date
-                            itemsForSelectedDate = itemsForDate(date)
-                            showItemListSheet = true
+                            withAnimation(GlassMotion.Easing.modalOpen) {
+                                selectedDate = date
+                                showDrawer = true
+                            }
                         }
                         .onTapGesture(count: 2) {
                             let today = Date()
                             if calendar.isDateInToday(date) || date > today {
                                 prefilledDate = date
-                                showingComposer = true
+                                showingArtifactComposer = true
                             }
                         }
                     }
@@ -197,16 +209,28 @@ struct UnifiedWeeklyCalendarView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d"
         let start = formatter.string(from: weekInterval.start)
-        formatter.dateFormat = "d, yyyy"
-        let end = formatter.string(from: weekInterval.end)
         
-        return "\(start) - \(end)"
+        // Get end date (last day of week)
+        if let endDate = calendar.date(byAdding: .day, value: 6, to: weekInterval.start) {
+            let endYear = calendar.component(.year, from: endDate)
+            let startYear = calendar.component(.year, from: weekInterval.start)
+            
+            if endYear == startYear {
+                formatter.dateFormat = "d, yyyy"
+            } else {
+                formatter.dateFormat = "MMM d, yyyy"
+            }
+            let end = formatter.string(from: endDate)
+            return "\(start) - \(end)"
+        }
+        
+        return start
     }
     
     private func itemsForDate(_ date: Date) -> [CalendarItem] {
         var items: [CalendarItem] = []
         
-        // Add posts
+        // Add posts (backward compatibility)
         let dayPosts = posts.filter { post in
             if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
                 return true
@@ -217,6 +241,19 @@ struct UnifiedWeeklyCalendarView: View {
             return false
         }
         items.append(contentsOf: dayPosts.map { CalendarItem.post($0) })
+        
+        // Add artifacts
+        let dayArtifacts = artifacts.filter { artifact in
+            if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
+                return true
+            }
+            if artifact.artifactState == .published || artifact.artifactState == .final,
+               calendar.isDate(artifact.createdAt, inSameDayAs: date) {
+                return true
+            }
+            return false
+        }
+        items.append(contentsOf: dayArtifacts.map { CalendarItem.artifact($0) })
         
         // Add tasks
         let dayTasks = tasks.filter { task in
@@ -250,12 +287,16 @@ struct UnifiedWeeklyCalendarView: View {
 
 struct UnifiedMonthlyCalendarView: View {
     let posts: [CloutmateShared.Post]
+    let artifacts: [CloutmateShared.Artifact]
     let tasks: [Task]
     @Binding var selectedDate: Date
     @Binding var showingComposer: Bool
+    @Binding var showingArtifactComposer: Bool
     @Binding var prefilledDate: Date?
     @Binding var selectedPost: CloutmateShared.Post?
+    @Binding var selectedArtifact: CloutmateShared.Artifact?
     @Binding var selectedTask: Task?
+    @Binding var showDrawer: Bool
     
     @State private var currentMonth = Date()
     @State private var showItemListSheet = false
@@ -266,33 +307,18 @@ struct UnifiedMonthlyCalendarView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Month header
-            HStack {
-                GlassButton(icon: "chevron.left", style: .iconOnly, tintColor: .kosmicBlue, action: previousMonth)
-                    .frame(width: 32, height: 32)
-                
-                Spacer()
-                
-                Text(monthText)
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.kosmicBlue, .kosmicPurple],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                
-                Spacer()
-                
-                GlassButton(icon: "chevron.right", style: .iconOnly, tintColor: .kosmicBlue, action: nextMonth)
-                    .frame(width: 32, height: 32)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+            // Month header using new CalendarHeaderView
+            CalendarHeaderView(
+                title: monthText,
+                onPrevious: previousMonth,
+                onNext: nextMonth,
+                onQuickAction: {
+                    NotificationCenter.default.post(name: .openContextualCreate, object: TabIdentifier.calendar)
+                }
+            )
             .glassPanel(tier: .overlay, cornerRadius: 12)
             .padding(.horizontal)
+            .padding(.bottom, 8)
             
             // Calendar grid
             ScrollView {
@@ -309,19 +335,19 @@ struct UnifiedMonthlyCalendarView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Calendar days
+                    // Calendar days using new CalendarDayCellV2
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
                         ForEach(calendarDays, id: \.self) { date in
-                            UnifiedCalendarDayCell(
+                            CalendarDayCellV2(
                                 date: date,
                                 items: itemsForDate(date),
                                 isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                                 isCurrentMonth: calendar.component(.month, from: date) == calendar.component(.month, from: currentMonth),
                                 onTap: {
-                                    selectedDate = date
-                                    selectedDateForList = date
-                                    itemsForSelectedDate = itemsForDate(date)
-                                    showItemListSheet = true
+                                    withAnimation(GlassMotion.Easing.modalOpen) {
+                                        selectedDate = date
+                                        showDrawer = true
+                                    }
                                 }
                             )
                         }
@@ -370,7 +396,7 @@ struct UnifiedMonthlyCalendarView: View {
     private func itemsForDate(_ date: Date) -> [CalendarItem] {
         var items: [CalendarItem] = []
         
-        // Add posts
+        // Add posts (backward compatibility)
         let dayPosts = posts.filter { post in
             if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
                 return true
@@ -381,6 +407,19 @@ struct UnifiedMonthlyCalendarView: View {
             return false
         }
         items.append(contentsOf: dayPosts.map { CalendarItem.post($0) })
+        
+        // Add artifacts
+        let dayArtifacts = artifacts.filter { artifact in
+            if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
+                return true
+            }
+            if artifact.artifactState == .published || artifact.artifactState == .final,
+               calendar.isDate(artifact.createdAt, inSameDayAs: date) {
+                return true
+            }
+            return false
+        }
+        items.append(contentsOf: dayArtifacts.map { CalendarItem.artifact($0) })
         
         // Add tasks
         let dayTasks = tasks.filter { task in
@@ -407,12 +446,15 @@ struct UnifiedMonthlyCalendarView: View {
 
 enum CalendarItem: Identifiable {
     case post(CloutmateShared.Post)
+    case artifact(CloutmateShared.Artifact)
     case task(Task)
     
     var id: UUID {
         switch self {
         case .post(let post):
             return post.id
+        case .artifact(let artifact):
+            return artifact.id
         case .task(let task):
             return task.id
         }
@@ -422,6 +464,8 @@ enum CalendarItem: Identifiable {
         switch self {
         case .post(let post):
             return post.scheduledDate ?? post.publishedDate ?? Date()
+        case .artifact(let artifact):
+            return artifact.publishedAt ?? artifact.createdAt
         case .task(let task):
             return task.dueDate ?? Date()
         }
@@ -433,6 +477,7 @@ struct UnifiedDayColumn: View {
     let items: [CalendarItem]
     let isSelected: Bool
     var onPostClick: ((CloutmateShared.Post) -> Void)?
+    var onArtifactClick: ((CloutmateShared.Artifact) -> Void)?
     var onTaskClick: ((Task) -> Void)?
     
     @State private var isHovered = false
@@ -453,6 +498,7 @@ struct UnifiedDayColumn: View {
                 // Show count with badges
                 HStack(spacing: 4) {
                     let postCount = items.filter { if case .post = $0 { return true }; return false }.count
+                    let artifactCount = items.filter { if case .artifact = $0 { return true }; return false }.count
                     let taskCount = items.filter { if case .task = $0 { return true }; return false }.count
                     
                     if postCount > 0 {
@@ -463,6 +509,17 @@ struct UnifiedDayColumn: View {
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.kosmicBlue)
+                            .cornerRadius(8)
+                    }
+                    
+                    if artifactCount > 0 {
+                        Text("\(artifactCount)")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.kosmicPurple)
                             .cornerRadius(8)
                     }
                     
@@ -497,6 +554,10 @@ struct UnifiedDayColumn: View {
                 case .post(let post):
                     PostCard(post: post, onTap: {
                         onPostClick?(post)
+                    })
+                case .artifact(let artifact):
+                    ArtifactCard(artifact: artifact, onTap: {
+                        onArtifactClick?(artifact)
                     })
                 case .task(let task):
                     TaskCard(task: task, onTap: {
@@ -619,7 +680,7 @@ struct UnifiedCalendarListSheet: View {
                         .padding()
                     } else {
                         VStack(alignment: .leading, spacing: 12) {
-                            // Posts
+                            // Posts (backward compatibility)
                             let posts = items.compactMap { if case .post(let p) = $0 { return p }; return nil }
                             if !posts.isEmpty {
                                 Text("Posts")
@@ -628,6 +689,19 @@ struct UnifiedCalendarListSheet: View {
                                 
                                 ForEach(posts) { post in
                                     PostPreviewRow(post: post)
+                                        .padding(.horizontal)
+                                }
+                            }
+                            
+                            // Artifacts
+                            let artifacts = items.compactMap { if case .artifact(let a) = $0 { return a }; return nil }
+                            if !artifacts.isEmpty {
+                                Text("Artifacts")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                
+                                ForEach(artifacts) { artifact in
+                                    ArtifactPreviewRow(artifact: artifact)
                                         .padding(.horizontal)
                                 }
                             }
@@ -744,6 +818,11 @@ struct UnifiedCalendarDayCell: View {
                             .fill(Color.kosmicBlue)
                             .frame(width: 4, height: 4)
                     }
+                    if items.filter({ if case .artifact = $0 { return true }; return false }).count > 0 {
+                        Circle()
+                            .fill(Color.kosmicPurple)
+                            .frame(width: 4, height: 4)
+                    }
                     if taskCount > 0 {
                         Circle()
                             .fill(Color.kosmicGreen)
@@ -767,5 +846,163 @@ struct UnifiedCalendarDayCell: View {
 
 #Preview {
     UnifiedCalendarView()
-        .modelContainer(for: [CloutmateShared.Post.self, CloutmateShared.Task.self])
+        .modelContainer(for: [CloutmateShared.Post.self, CloutmateShared.Artifact.self, CloutmateShared.Task.self])
+}
+
+// MARK: - Artifact Card Components
+
+struct ArtifactCard: View {
+    let artifact: CloutmateShared.Artifact
+    var onTap: (() -> Void)?
+    
+    @State private var isHovering = false
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            // Format badge
+            Image(systemName: formatIcon)
+                .font(.system(size: 15))
+                .foregroundColor(formatColor)
+                .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+            
+            // Time
+            if let publishedAt = artifact.publishedAt {
+                Text(publishedAt, style: .time)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.accentColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.15), Color.accentColor.opacity(0.1)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .cornerRadius(6)
+            }
+            
+            // Title/content preview
+            Text(artifact.title.isEmpty ? artifact.content : artifact.title)
+                .lineLimit(1)
+                .font(.caption)
+                .foregroundColor(.primary)
+            
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            Group {
+                if isHovering {
+                    LinearGradient(
+                        colors: [Color.kosmicPurple.opacity(0.12), Color.kosmicPurple.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                } else {
+                    LinearGradient(
+                        colors: [Color.secondary.opacity(0.12), Color.secondary.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                }
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    isHovering ? Color.kosmicPurple.opacity(0.4) : Color.kosmicPurple.opacity(0.2),
+                    lineWidth: isHovering ? 1.5 : 1
+                )
+        )
+        .cornerRadius(12)
+        .shadow(
+            color: isHovering ? Color.kosmicPurple.opacity(0.3) : .black.opacity(0.05),
+            radius: isHovering ? 4 : 2,
+            x: 0,
+            y: isHovering ? 2 : 1
+        )
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isHovering = hovering
+            }
+        }
+        .onTapGesture {
+            onTap?()
+        }
+    }
+    
+    private var formatIcon: String {
+        switch artifact.format {
+        case .brief: return "doc.text"
+        case .summary: return "doc.text.below.ecg"
+        case .reflection: return "brain.head.profile"
+        case .report: return "doc.text.magnifyingglass"
+        case .releaseNote: return "megaphone"
+        case .lessonLearned: return "lightbulb"
+        }
+    }
+    
+    private var formatColor: Color {
+        switch artifact.format {
+        case .brief: return .kosmicCyan
+        case .summary: return .kosmicBlue
+        case .reflection: return .kosmicPurple
+        case .report: return .kosmicPurple
+        case .releaseNote: return .kosmicGreen
+        case .lessonLearned: return .orange
+        }
+    }
+}
+
+struct ArtifactPreviewRow: View {
+    let artifact: CloutmateShared.Artifact
+    
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(artifact.title.isEmpty ? artifact.content.prefix(50).description : artifact.title)
+                    .lineLimit(2)
+                    .font(.body)
+                
+                if let publishedAt = artifact.publishedAt {
+                    Text(publishedAt, style: .time)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            ArtifactStateBadge(state: artifact.artifactState)
+        }
+        .padding()
+        .glassPanel(tier: .contentCard, cornerRadius: 8)
+    }
+}
+
+struct ArtifactStateBadge: View {
+    let state: ArtifactState
+    
+    var body: some View {
+        Text(state.displayName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(stateColor.opacity(0.2))
+            .foregroundColor(stateColor)
+            .cornerRadius(6)
+    }
+    
+    private var stateColor: Color {
+        switch state {
+        case .idea: return .gray
+        case .draft: return .kosmicBlue
+        case .final: return .kosmicPurple
+        case .published: return .kosmicGreen
+        case .archived: return .secondary
+        }
+    }
 }

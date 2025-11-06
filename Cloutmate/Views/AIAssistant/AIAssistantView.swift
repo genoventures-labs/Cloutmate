@@ -116,7 +116,7 @@ struct AIAssistantView: View {
         .alert("AI Assistant", isPresented: $showAIInfo) {
             Button("OK") { }
         } message: {
-            Text("Powered by Google Gemini, Cloutmate's AI is context-aware of your tasks, projects, posts, and notes. It can help extract tasks, suggest projects, and answer questions about your work. Your API key is stored securely in Keychain.")
+            Text("Powered by Ollama (local LLM), Aurora is context-aware of your tasks, projects, posts, and notes. She can help extract tasks, suggest projects, and answer questions about your work. Requires Ollama running locally with the llama3.1 model.")
         }
         .alert("Unsaved Changes", isPresented: $showUnsavedAlert) {
             Button("Cancel", role: .cancel) {}

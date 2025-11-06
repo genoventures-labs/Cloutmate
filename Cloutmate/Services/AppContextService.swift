@@ -189,7 +189,37 @@ final class AppContextService {
         context += "\n## PARA Templates\n"
         context += "- Templates: \(paraTemplates.count)\n"
         
-        // 12. Post Performance (recent analytics)
+        // 12. Notion Integration
+        let notionConfigs = try modelContext.fetch(FetchDescriptor<NotionSyncConfig>())
+        let activeNotionConfigs = notionConfigs.filter { $0.isActive }
+        context += "\n## Notion Integration\n"
+        if activeNotionConfigs.isEmpty {
+            context += "- No active Notion database syncs\n"
+        } else {
+            context += "- \(activeNotionConfigs.count) active database sync(s)\n"
+            for config in activeNotionConfigs {
+                let dbTitle = config.databaseTitle ?? "Unnamed Database"
+                context += "- \(dbTitle) (\(config.cloutmateType))"
+                if let lastSynced = config.lastSyncedAt {
+                    let formatter = RelativeDateTimeFormatter()
+                    formatter.unitsStyle = .abbreviated
+                    context += " - Last synced \(formatter.localizedString(for: lastSynced, relativeTo: Date()))"
+                } else {
+                    context += " - Never synced"
+                }
+                if !config.autoSync {
+                    context += " [Manual sync only]"
+                }
+                context += "\n"
+            }
+        }
+        
+        // Check if Notion is connected (has token)
+        if KeychainService.shared.hasToken(forAccount: "notion_access_token") {
+            context += "- Notion account connected\n"
+        }
+        
+        // 13. Post Performance (recent analytics)
         let publishedPosts = posts.filter { $0.publishedDate != nil }
         if !publishedPosts.isEmpty {
             context += "\n## Post Performance\n"

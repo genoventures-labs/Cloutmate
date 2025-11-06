@@ -1,164 +1,303 @@
-<!-- 7ec47a1a-b3f9-4982-a122-1a0904969b65 2a68c1f7-a759-4187-ad24-f02e307ca6d9 -->
-# Aurora AI Assistant UI Redesign - Apple-Aligned
+<!-- 7ec47a1a-b3f9-4982-a122-1a0904969b65 8584a962-7f59-41f9-9f73-86afaa70ebd2 -->
+# Aurora Humanization Implementation Plan
 
-## Overview
+## Goal
+Make Aurora feel as humanly as possible through natural typing patterns, emotional expression, conversational quirks, memory behaviors, and proactive interactions.
 
-Transform the AI Assistant view to align with Apple design language while maintaining Cloutmate branding. Prioritize Aurora's core capabilities, fix UI issues, and add intelligent features like ARTE state-based tinting and contextual hints.
+## Implementation Strategy
+We'll implement features one at a time, starting with quick wins and progressing to advanced behaviors.
 
-## Core Changes
+---
 
-### 1. Toolbar Redesign - Core Capabilities Focus
+## Phase 1: Quick Wins (Foundation)
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+### 1. Typing Simulation Engine
+**File:** `Cloutmate/Services/TypingSimulationService.swift`
+- Variable typing speed based on response complexity
+- Word-by-word or chunk-by-chunk message streaming
+- Simulated pauses mid-sentence ("thinking pauses")
+- Backspace simulation for corrections
 
-Replace the social media-focused toolbar with Aurora's core capabilities:
+**UI Changes:**
+- `AIAssistantView.swift` - Show typing indicator with variable speed
+- `MessageBubble.swift` - Stream text appearance instead of instant display
 
-- **Primary Actions (Icon-only, prominent):**
-  - Create Task (`checkmark.circle.fill`)
-  - Create Project (`folder.fill`)
-  - Create Note (`note.text`)
-  - Create Reminder (`bell.fill`)
-  - Analyze Document (`doc.text.magnifyingglass`)
-  - Analyze Image (`photo.fill`)
+### 2. Natural Response Timing
+**File:** `Cloutmate/Services/ResponseTimingService.swift`
+- Context-aware delays (longer for complex tasks, instant for acknowledgments)
+- Processing time estimation based on message complexity
+- Adaptive thinking indicators based on actual processing time
 
-- **Secondary Actions (Labeled, accessible):**
-  - Platform selector moved to input area
-  - Content tools (brainstorm, captions, hashtags, tone) moved to secondary menu or input area
+**Integration:**
+- `AIAssistantViewModel.swift` - Integrate timing logic
+- `ThinkingIndicator.swift` - Show appropriate duration
 
-- **Toolbar Layout:**
-  - Horizontal bar with icon-only buttons
-  - Subtle hover states with tooltips
-  - ARTE state-based tinting (see below)
-  - Spacing: 12pt between items, 16pt padding
+### 3. Contractions & Casual Language
+**File:** `Cloutmate/Services/LanguagePersonalityService.swift`
+- Natural contraction usage ("I'm", "you're", "can't", "won't")
+- Casual language matching user's formality level
+- Punctuation personality (varied ellipses, parentheses, exclamation marks)
 
-### 2. Fix Double Placeholder Issue
+**Integration:**
+- `GeminiService.swift` - Update system prompts for natural language
+- `StyleAdapter.swift` - Enhance style adaptation
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (inputArea, ~line 580)**
+### 4. Typography Emotion
+**File:** `Cloutmate/Services/TypographyEmotionService.swift`
+- Subtle emphasis variations (italics, bold for emphasis)
+- Punctuation patterns that convey emotion
+- Capitalization for excitement (sparingly)
 
-Remove the overlay Text placeholder (`"Ask me anything..."`) since `MentionInputField` already provides its own placeholder. Keep only the `MentionInputField` placeholder.
+**UI Changes:**
+- `MessageBubble.swift` - Apply typography styling based on emotion
 
-### 3. ARTE State-Based Toolbar Tinting
+---
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+## Phase 2: Medium Complexity (Personality)
 
-Integrate with ARTE emotional states:
+### 5. Verbal Fillers & Self-Corrections
+**File:** `Cloutmate/Services/ConversationalQuirksService.swift`
+- Occasional "hmm", "actually", "you know" based on confidence
+- Self-corrections: "Wait, let me reconsider..." when confidence is low
+- Personality markers: preferred phrases, signature expressions
 
-- **Focused state:** Toolbar icons tinted with `kosmicBlue` (from EmotionalPalette)
-- **Idle/Calm state:** Neutral gray (`Color.secondary`)
-- **Analyzing state:** Warm amber (`Color.orange.opacity(0.8)`)
+**Integration:**
+- `GeminiService.swift` - Add to system prompts
+- `AIAssistantViewModel.swift` - Confidence-based quirk injection
 
-Access `viewModel.currentActivity` or ARTE state from `GlassColorSystem` to determine tint color dynamically.
+### 6. Proactive Check-ins
+**File:** `Cloutmate/Services/ProactiveBehaviorService.swift`
+- Check-ins after absence: "Haven't seen you in a while..."
+- Pattern recognition: "You usually work on this around [time]"
+- Anticipation: "Are you about to start a focus session?"
+- Contextual awareness: "I notice you have [X] tasks due soon..."
 
-### 4. Inline Micro-Feedback
+**Integration:**
+- `AIAssistantViewModel.swift` - Schedule proactive messages
+- `AppContextService.swift` - Context detection
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+### 7. Memory Confidence Levels
+**File:** `Cloutmate/Services/MemoryBehaviorService.swift`
+- Selective recall: sometimes remember details, sometimes summarize
+- Memory confidence: "I think you mentioned..." vs "You definitely said..."
+- Forgetting gracefully: "I'm drawing a blank on [X], can you remind me?"
+- Memory prioritization: remember emotional moments more than routine tasks
 
-Add shimmer/pulse effects when actions are triggered:
+**Integration:**
+- `AIRecallService.swift` - Add confidence scoring to recall
+- `GeminiService.swift` - Update prompts for memory confidence expression
 
-- 0.5s duration shimmer or icon pulse
-- Use `.symbolEffect(.pulse)` or custom shimmer overlay
-- Trigger on button press, show "Prefilling..." or similar brief feedback
+### 8. Gradual Message Appearance
+**File:** `Cloutmate/Views/AIAssistant/Components/StreamingMessageBubble.swift`
+- Word-by-word streaming animation
+- Chunk-by-chunk for longer messages
+- Smooth transitions between chunks
+- Pause detection for natural breaks
 
-### 5. Smart Toolbar Rearrangement
+**UI Changes:**
+- Replace instant message display with streaming
+- Add animation support
 
-**New File: `Cloutmate/Services/ToolbarUsageTracker.swift`**
+---
 
-Track tool usage frequency:
+## Phase 3: Advanced (Deep Humanization)
 
-- Store usage counts in UserDefaults or SwiftData
-- Reorder toolbar items by frequency (most-used first)
-- Add "Reset Layout" option in Settings or toolbar context menu
-- Update toolbar order dynamically based on usage
+### 9. Personality Quirks System
+**File:** `Cloutmate/Services/PersonalityQuirksService.swift`
+- Signature phrases: recurring expressions that feel "Aurora"
+- Response style: consistent voice that evolves slightly
+- Preferences: subtle likes/dislikes
+- Boundaries: knowing when to be direct vs gentle
 
-### 6. Contextual Hint Bar
+**Integration:**
+- `GeminiService.swift` - Personality injection in prompts
+- `AIAssistantViewModel.swift` - Personality state management
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+### 10. Natural Conversation Flow
+**File:** `Cloutmate/Services/ConversationFlowService.swift`
+- Interruptions: occasionally start responding before user finishes
+- Follow-up questions: ask clarifying questions when uncertain
+- Building on ideas: reference previous messages naturally
+- Topic transitions: smooth shifts between topics
 
-Add subtle hint text below input field:
+**Integration:**
+- `AIAssistantViewModel.swift` - Conversation flow management
+- `GeminiService.swift` - Context-aware follow-ups
 
-- Text: "You can @mention a project or attach a doc"
-- Style: `.caption`, `.secondary` color, subtle opacity
-- Visibility: Only shown when `inputText.isEmpty` and not loading
-- Position: Between input area and quick action tools
+### 11. Selective Memory Recall
+**File:** `Cloutmate/Services/SelectiveMemoryService.swift`
+- Remember emotional moments more than routine tasks
+- Sometimes remember details, sometimes summarize
+- Memory fading simulation for older information
+- Context-dependent memory access
 
-### 7. Overall UI Refinement - Apple Design Language
+**Integration:**
+- `AIRecallService.swift` - Memory prioritization algorithm
+- `GeminiService.swift` - Memory recall strategies
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+### 12. Relationship Building
+**File:** `Cloutmate/Services/RelationshipService.swift`
+- Remembering preferences: "I know you prefer..."
+- Building rapport: reference shared history
+- Personal touches: remember small details
+- Growth acknowledgment: "You've gotten really good at..."
 
-Apply Apple design principles:
+**Integration:**
+- `AIRecallService.swift` - Preference tracking
+- `GeminiService.swift` - Relationship-aware responses
 
-- **Spacing:** Increase padding (16pt → 20pt for main areas)
-- **Typography:** Use SF Pro system fonts, refined hierarchy
-- **Corners:** Subtle corner radius (8pt → 12pt for cards)
-- **Shadows:** Softer, more subtle shadows
-- **Materials:** Use `.ultraThinMaterial` or `.thinMaterial` consistently
-- **Dividers:** Subtle, reduced opacity dividers
-- **Colors:** Leverage ARTE emotional palettes for accents
+---
 
-### 8. Quick Action Tools Redesign
+## Phase 4: Visual & Interaction Enhancements
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (quickActionTools)**
+### 13. Typing Indicators (Enhanced)
+**File:** `Cloutmate/Views/AIAssistant/Components/TypingIndicator.swift`
+- Animated dots with varied timing
+- Speed variations based on thinking complexity
+- Pause detection
+- Cancellation when user starts typing
 
-Replace horizontal scrolling toolbar:
+**UI Changes:**
+- Enhanced thinking indicator component
+- Variable animation speeds
 
-- Move platform selector to input area (dropdown or segmented control)
-- Move content tools to a secondary menu or remove entirely (focus on core capabilities)
-- Keep Cloutmate branding but make it more minimal
-- Use icon-only buttons with tooltips for discoverability
+### 14. Avatar Expressions
+**File:** `Cloutmate/Views/AIAssistant/Components/AuroraAvatar.swift`
+- Subtle facial expressions based on emotional state
+- Micro-animations when "thinking"
+- Presence indicators: subtle breathing/idle animations
+- Emotional state visualization
 
-### 9. Input Area Enhancement
+**UI Changes:**
+- Create Aurora avatar component
+- Integrate with ARTE emotional states
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (inputArea)**
+### 15. Micro-Interactions
+**File:** `Cloutmate/Services/MicroInteractionService.swift`
+- Typing cancellation: stop typing if user starts typing
+- Context switches: acknowledge when user changes topic
+- Multi-tasking: handle multiple requests naturally
+- Priority awareness: address urgent items first
 
-- Remove duplicate placeholder overlay
-- Add platform selector as segmented control or dropdown near input
-- Improve attachment preview styling
-- Better spacing and alignment
+**Integration:**
+- `AIAssistantViewModel.swift` - Interaction handling
+- `AIAssistantView.swift` - UI feedback
 
-## Implementation Details
+---
 
-### Toolbar Button Component
+## Phase 5: Self-Awareness & Error Handling
 
-Create reusable toolbar button component that:
+### 16. Self-Awareness Expressions
+**File:** `Cloutmate/Services/SelfAwarenessService.swift`
+- Acknowledging limitations: "I might be wrong, but..."
+- Confidence expression: "I'm pretty confident about this" vs "I'm guessing..."
+- Learning moments: "Oh interesting, I didn't know that about you"
+- Error recovery: graceful handling of mistakes
 
-- Accepts icon, label (optional), action
-- Supports ARTE state tinting
-- Shows micro-feedback on press
-- Has hover states
+**Integration:**
+- `GeminiService.swift` - Self-awareness prompts
+- `AIAssistantViewModel.swift` - Confidence-based expressions
 
-### Usage Tracking
+### 17. Response Patterns
+**File:** `Cloutmate/Services/ResponsePatternService.swift`
+- Question-first: sometimes ask before answering
+- Statement-first: sometimes answer then elaborate
+- Mixed approaches: vary response structures
+- Natural paragraphs: break up long responses naturally
 
-Store toolbar usage in UserDefaults:
+**Integration:**
+- `GeminiService.swift` - Response pattern variation
+- Message formatting logic
 
-```swift
-@AppStorage("toolbarUsage") private var toolbarUsage: Data = Data()
-```
+### 18. Contextual Adaptations
+**File:** `Cloutmate/Services/ContextualAdaptationService.swift`
+- Time-of-day awareness: morning energy vs evening calm
+- Energy matching: match user's energy level
+- Workload awareness: adjust tone based on user's task load
+- Success celebration: celebrate completions and milestones
 
-### ARTE Integration
+**Integration:**
+- `AppContextService.swift` - Context detection
+- `GeminiService.swift` - Contextual adaptation prompts
 
-Access ARTE state via:
+---
 
-- `GlassColorSystem.active?.emotionalState`
-- `viewModel.currentActivity` for activity-based tinting
-- Map activities to emotional states: `.analyzingDocument` → analyzing → amber
+## Technical Considerations
 
-## Files to Modify
+### Shared Services
+- All services should be `@MainActor` where needed
+- Use `@Observable` for reactive state
+- Integrate with existing ARTE system
+- Maintain compatibility with existing AI pipeline
 
-1. `Cloutmate/Views/AIAssistant/AIAssistantView.swift` - Main UI redesign
-2. `Cloutmate/Services/ToolbarUsageTracker.swift` - New file for usage tracking
-3. `Cloutmate/ViewModels/AIAssistantViewModel.swift` - Add toolbar reordering logic
-4. `Cloutmate/Views/Components/AIToolbarButton.swift` - New reusable component (optional)
+### UI Components
+- Streaming text component
+- Enhanced typing indicator
+- Aurora avatar component
+- Emotional expression visualizations
 
-## Testing Checklist
+### Integration Points
+- `GeminiService.swift` - System prompt updates
+- `AIAssistantViewModel.swift` - State management
+- `AIRecallService.swift` - Memory behaviors
+- `AppContextService.swift` - Context detection
+- `GlassColorSystem.swift` - ARTE integration
 
-- [ ] Toolbar icons display correctly with ARTE tinting
-- [ ] No double placeholder visible
-- [ ] Contextual hint appears/disappears correctly
-- [ ] Toolbar reorders based on usage
-- [ ] Micro-feedback appears on button press
-- [ ] Overall UI feels more Apple-like while maintaining Cloutmate branding
-- [ ] All core capabilities accessible from toolbar
-- [ ] Platform selector accessible in input area
-- [ ] Keyboard shortcuts work (⌘1-⌘6)
-- [ ] ArteTintManager provides consistent tinting across views
-- [ ] ToolbarButtonStyle applies consistent hover/press states
+### Testing Strategy
+- Each feature should be testable independently
+- User preference toggles for each humanization feature
+- Gradual rollout to avoid overwhelming users
+
+---
+
+## Implementation Order
+
+1. **Typing Simulation Engine** (Foundation)
+2. **Natural Response Timing** (Foundation)
+3. **Contractions & Casual Language** (Quick win)
+4. **Typography Emotion** (Quick win)
+5. **Verbal Fillers & Self-Corrections** (Personality)
+6. **Proactive Check-ins** (Personality)
+7. **Memory Confidence Levels** (Personality)
+8. **Gradual Message Appearance** (Visual)
+9. **Personality Quirks System** (Advanced)
+10. **Natural Conversation Flow** (Advanced)
+11. **Selective Memory Recall** (Advanced)
+12. **Relationship Building** (Advanced)
+13. **Typing Indicators (Enhanced)** (Visual)
+14. **Avatar Expressions** (Visual)
+15. **Micro-Interactions** (Interaction)
+16. **Self-Awareness Expressions** (Behavior)
+17. **Response Patterns** (Behavior)
+18. **Contextual Adaptations** (Behavior)
+
+---
+
+## Success Metrics
+
+- User reports feeling like Aurora is "more human"
+- Natural conversation flow without awkward pauses
+- Emotional connection and rapport building
+- Proactive helpfulness without being intrusive
+- Memory behaviors feel organic, not robotic
+
+### To-dos
+
+- [ ] Create TypingSimulationService with variable speed, word-by-word streaming, pauses, and backspace simulation
+- [ ] Create ResponseTimingService with context-aware delays and processing time estimation
+- [ ] Enhance LanguagePersonalityService for natural contractions and casual language matching
+- [ ] Create TypographyEmotionService for subtle emphasis variations and punctuation patterns
+- [ ] Create ConversationalQuirksService with verbal fillers and self-corrections based on confidence
+- [ ] Create ProactiveBehaviorService for check-ins, pattern recognition, and contextual awareness
+- [ ] Enhance MemoryBehaviorService with selective recall, confidence levels, and graceful forgetting
+- [ ] Create StreamingMessageBubble component for word-by-word or chunk-by-chunk message appearance
+- [ ] Create PersonalityQuirksService for signature phrases, response style, and preferences
+- [ ] Create ConversationFlowService for interruptions, follow-ups, and natural topic transitions
+- [ ] Enhance SelectiveMemoryService for emotional memory prioritization and context-dependent recall
+- [ ] Create RelationshipService for preference tracking, rapport building, and growth acknowledgment
+- [ ] Enhance TypingIndicator component with varied timing, speed variations, and pause detection
+- [ ] Create AuroraAvatar component with facial expressions, micro-animations, and presence indicators
+- [ ] Create MicroInteractionService for typing cancellation, context switches, and multi-tasking
+- [ ] Create SelfAwarenessService for acknowledging limitations, confidence expression, and error recovery
+- [ ] Create ResponsePatternService for varied response structures and natural paragraph breaks
+- [ ] Create ContextualAdaptationService for time-of-day awareness, energy matching, and workload awareness

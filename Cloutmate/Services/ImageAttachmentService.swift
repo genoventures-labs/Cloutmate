@@ -2,7 +2,7 @@
 //  ImageAttachmentService.swift
 //  Cloutmate
 //
-//  Handles image attachment loading, validation, and preparation for Gemini.
+//  Handles image attachment loading, validation, and preparation for Ollama.
 //
 
 import AppKit

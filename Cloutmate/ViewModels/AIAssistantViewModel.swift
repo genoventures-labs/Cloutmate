@@ -8,7 +8,6 @@
 import Foundation
 import SwiftUI
 import SwiftData
-import GoogleGenerativeAI
 import CloutmateShared
 
 enum DateFilter: String, CaseIterable {
@@ -23,7 +22,7 @@ enum DateFilter: String, CaseIterable {
 @Observable
 final class AIAssistantViewModel {
     private let aiService = AICreativeService.shared
-    private let geminiService = GeminiService.shared
+    private let coreResponseService = CoreResponseService.shared
     private let aiSettings = AISettings.shared
     private let actionRouter = AIActionRouter.shared
     private let feedbackLogger = AIFeedbackLogger.shared
@@ -61,7 +60,7 @@ final class AIAssistantViewModel {
     var currentActivity: ActivityType = .thinking
     
     // Track current source model for adaptive phrasing
-    var currentSourceModel: GeminiService.SummarySource?
+    var currentSourceModel: SummarySource?
     
     // Micro-delay smoothing: debounced activity to prevent jitter
     private var debouncedActivity: ActivityType = .thinking
@@ -107,8 +106,8 @@ final class AIAssistantViewModel {
     
     // MARK: - Pending Operation Support
     private struct PendingOperation {
-        let operation: GeminiService.ExecutionOperation
-        let intent: GeminiService.ExecutionIntent
+        let operation: ExecutionOperation
+        let intent: ExecutionIntent
         var collectedFields: [ExecutionFieldKey: String]
         var remainingPrompts: [PendingField]
     }
@@ -321,7 +320,7 @@ final class AIAssistantViewModel {
             // Only create items when explicitly requested through conversational flow
             
             // Try preference update intent
-            if let prefUpdate = try? await geminiService.inferPreferenceUpdate(input: text) {
+            if let prefUpdate = try? await coreResponseService.inferPreferenceUpdate(input: text) {
                 await MainActor.run {
                     // Fetch or create preferences
                     let prefs: UserPreferences
@@ -374,7 +373,7 @@ final class AIAssistantViewModel {
     ) async {
         do {
             // Check for REFLECTION intent first (introspective queries about patterns/state)
-            if let reflectionIntent = try? await geminiService.detectReflectionIntent(input: text) {
+            if let reflectionIntent = try? await coreResponseService.detectReflectionIntent(input: text) {
                 updateActivity(.reflecting)
                 await processReflection(
                     reflectionIntent,
@@ -411,7 +410,7 @@ final class AIAssistantViewModel {
             }
             
             // Use resolved linked context for detection
-            if let executionIntent = try? await geminiService.detectExecutionIntent(input: text, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
+            if let executionIntent = try? await coreResponseService.detectExecutionIntent(input: text, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
                 // Set activity based on operation type
                 switch executionIntent.operation {
                 case .createTask:
@@ -444,29 +443,42 @@ final class AIAssistantViewModel {
                 contextAge: contextFreshness
             )
             
-            // Use Gemini with app context for app-smart responses
-            var response = try await geminiService.generateResponseWithAppContext(
+            // Convert conversation messages to ConversationMessage format for CoreResponseService
+            // conversationModelContent is already [ConversationMessage]? from buildAIContext
+            let conversationMessages: [ConversationMessage]? = conversationModelContent
+            
+            // Use CoreResponseService with app context for app-smart responses
+            var response = try await coreResponseService.generateResponseWithAppContext(
                 for: text,
                 appContext: appContext,
                 payloadContext: payloadContext,
-                conversationMessages: conversationModelContent,
+                conversationMessages: conversationMessages,
                 currentMessageStyle: currentStyle,
                 userStyleProfile: styleProfile,
-                confidence: confidenceSnapshot
+                confidence: confidenceSnapshot,
+                modelContext: modelContext
             )
             
+            // Apply typography emotion based on ARTE state
+            if let glassSystem = GlassColorSystem.active {
+                let typographyService = TypographyEmotionService.shared
+                response = typographyService.applyEmotionalTypography(
+                    response,
+                    emotionalState: glassSystem.emotionalState,
+                    intensity: glassSystem.emotionalIntensity
+                )
+            }
+            
             // Check if this was an ambiguous query - if so, append data offer
-            let isAmbiguous = geminiService.isAmbiguousQuery(input: text)
+            let isAmbiguous = await coreResponseService.isAmbiguousQuery(input: text)
             if isAmbiguous {
                 response += "\n\nWant me to show your data? Just say \"show my data\" or \"visualize my patterns\" and I'll pull up the analytics."
             }
             
-            // Convert markdown to attributed string for rich text
-            let attributedResponse = convertMarkdownToAttributedString(response)
-            
+            // Create assistant message with streaming support
             let assistantMessage = AIMessage(
                 role: "assistant",
-                content: attributedResponse,
+                content: response,
                 confidenceScore: confidenceSnapshot.score
             )
             
@@ -486,7 +498,7 @@ final class AIAssistantViewModel {
             if isFirstMessage, let conversation = currentConversation {
                 await generateAndSetTitle(from: text, conversation: conversation, modelContext: modelContext)
             }
-
+            
             let suggestionPreferences: UserPreferences
             if let styleProfile {
                 suggestionPreferences = styleProfile
@@ -495,18 +507,18 @@ final class AIAssistantViewModel {
             }
             await offerLinkingSuggestionIfNeeded(modelContext: modelContext, stylePreferences: suggestionPreferences)
         } catch {
-            // Check if this is a model overload error
+            // Check if this is an Ollama connection error
             let errorDesc = error.localizedDescription.lowercased()
-            let isOverloadError = errorDesc.contains("overloaded") || 
-                                  errorDesc.contains("unavailable") || 
-                                  errorDesc.contains("503") ||
-                                  errorDesc.contains("try again later")
+            let isOllamaError = errorDesc.contains("ollama") || 
+                                errorDesc.contains("connection failed") ||
+                                errorDesc.contains("service unavailable") ||
+                                errorDesc.contains("model not found")
             
             let errorContent: String
-            if isOverloadError {
-                errorContent = "I tried switching to a different model, but all models are currently overloaded. Could you try again in a moment?"
+            if isOllamaError {
+                errorContent = error.localizedDescription
             } else {
-                errorContent = "I'm having trouble connecting to the AI service. Please check your API key and internet connection."
+                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `llama3.1` model is available."
             }
             
             // Handle errors
@@ -535,18 +547,18 @@ final class AIAssistantViewModel {
         modelContext: ModelContext,
         currentStyle: TypingStyle?,
         styleProfile: UserPreferences?
-    ) async throws -> (String, AIPayloadContext, [ModelContent]?) {
+    ) async throws -> (String, AIPayloadContext, [ConversationMessage]?) {
         let appContext = try await AppContextService.shared.buildContextForAI(modelContext: modelContext)
         let compressionResult = await ConversationCompressionService.shared.compress(
             conversationId: currentConversation?.id,
             messages: messages
         )
         let contextMessages = compressionResult.retainedMessages.isEmpty ? messages : compressionResult.retainedMessages
-        var conversationModelContent: [ModelContent]? = await geminiService.convertMessagesToModelContent(contextMessages)
+        var conversationModelContent: [ConversationMessage]? = await coreResponseService.convertMessagesToConversationMessages(contextMessages)
         if let summary = compressionResult.summary {
-            let summaryContent = ModelContent(
+            let summaryContent = ConversationMessage(
                 role: "user",
-                parts: [.text("Conversation so far (summary): \(summary)")]
+                content: "Conversation so far (summary): \(summary)"
             )
             if var existing = conversationModelContent {
                 existing.insert(summaryContent, at: 0)
@@ -686,7 +698,7 @@ final class AIAssistantViewModel {
                 intentSummary: payloadContext.intentClusters,
                 contextAge: contextFreshness
             )
-            let analysis = try await geminiService.analyzeImage(
+            let analysis = try await coreResponseService.analyzeImage(
                 imageData: imageAttachment.data,
                 mimeType: imageAttachment.mimeType,
                 userPrompt: text.isEmpty ? nil : text,
@@ -698,10 +710,11 @@ final class AIAssistantViewModel {
                 confidence: confidenceSnapshot
             )
             await MainActor.run {
-                userMessage.imageAnalysis = analysis
+                let analysisText = analysis.summary
+                userMessage.imageAnalysis = analysisText
                 let assistantMessage = AIMessage(
                     role: "assistant",
-                    content: analysis,
+                    content: analysisText,
                     confidenceScore: confidenceSnapshot.score
                 )
                 modelContext.insert(assistantMessage)
@@ -709,7 +722,7 @@ final class AIAssistantViewModel {
                 currentConversation?.messages?.append(assistantMessage)
                 AIRecallService.shared.indexImageAnalysis(
                     userMessage: userMessage,
-                    analysis: analysis,
+                    analysis: analysisText,
                     modelContext: modelContext
                 )
                 isLoading = false
@@ -719,7 +732,7 @@ final class AIAssistantViewModel {
             }
             if isFirstMessage, let conversation = currentConversation {
                 await generateAndSetTitle(
-                    from: text.isEmpty ? analysis : text,
+                    from: text.isEmpty ? analysis.summary : text,
                     conversation: conversation,
                     modelContext: modelContext
                 )
@@ -769,7 +782,7 @@ final class AIAssistantViewModel {
                 contextAge: contextFreshness
             )
 
-            let descriptor = GeminiService.DocumentDescriptor(
+            let descriptor = DocumentDescriptor(
                 text: documentAttachment.extractedText,
                 preview: documentAttachment.textPreview,
                 fileName: documentAttachment.fileName,
@@ -779,7 +792,7 @@ final class AIAssistantViewModel {
                 sourceURL: documentAttachment.sourceURL?.absoluteString
             )
 
-            let analysis = try await geminiService.analyzeDocument(
+            let analysis = try await coreResponseService.analyzeDocument(
                 descriptor: descriptor,
                 userPrompt: text.isEmpty ? nil : text,
                 appContext: appContext,
@@ -800,22 +813,15 @@ final class AIAssistantViewModel {
                 finalSummary = analysis.summary
             }
             
-            // UX Transparency: Add source model information based on routing tier
+            // UX Transparency: Add source model information
             let sourceMessage: String
             switch analysis.sourceModel {
-            case .gemini:
-                sourceMessage = "" // No message needed for primary path (Tier 1)
             case .appleLLM:
-                // Tier 2: On-device, private, fast - auto-promoted when network is down/degraded or preferred for short docs
-                let networkStatus = await FallbackRoutingService.shared.getNetworkStatus()
-                if networkStatus == .unavailable || networkStatus == .degraded {
-                    sourceMessage = "\n\n💡 _Summary generated locally using Apple Intelligence (network unavailable). Full context restoration will follow when cloud models are available._"
-                } else {
-                    sourceMessage = "\n\n💡 _Summary generated locally using Apple Intelligence for faster processing. Full semantic analysis available via Gemini when needed._"
-                }
+                sourceMessage = "\n\n💡 _Summary generated locally using Apple Intelligence for faster processing._"
             case .offline:
-                // Tier 3: Template-based fallback - final backup
-                sourceMessage = "\n\n💡 _Summary generated offline using template-based extraction. Full semantic analysis will be available when cloud models are back online._"
+                sourceMessage = "\n\n💡 _Summary generated offline using template-based extraction._"
+            default:
+                sourceMessage = "" // Ollama is primary, no message needed
             }
             
             let finalSummaryWithSource = finalSummary + sourceMessage
@@ -846,8 +852,8 @@ final class AIAssistantViewModel {
                 currentActivity = .thinking // Reset activity when done
                 try? modelContext.save()
             }
-            if analysis.sourceModel != .gemini {
-                // Store metadata for reconciliation when Gemini comes back
+            if analysis.sourceModel != SummarySource.appleLLM {
+                // Store metadata for reconciliation if needed
                 await DocumentReconciliationService.shared.recordFallbackSummary(
                     documentId: userMessage.id,
                     fileName: documentAttachment.fileName,
@@ -861,7 +867,7 @@ final class AIAssistantViewModel {
             // Check if user requested execution actions after document analysis
             if !text.isEmpty {
                 // Check for execution intent in the user's prompt
-                if let executionIntent = try? await geminiService.detectExecutionIntent(input: text) {
+                if let executionIntent = try? await coreResponseService.detectExecutionIntent(input: text) {
                     await executeIntent(executionIntent, modelContext: modelContext, isFirstMessage: isFirstMessage)
                     // Don't generate title here since executeIntent might have already handled it
                     return
@@ -902,7 +908,7 @@ final class AIAssistantViewModel {
                     }
                     
                     // Check for execution intent (like creating tasks from the document)
-                    if let executionIntent = try? await geminiService.detectExecutionIntent(input: text, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
+                    if let executionIntent = try? await coreResponseService.detectExecutionIntent(input: text, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
                         await executeIntent(executionIntent, modelContext: modelContext, isFirstMessage: isFirstMessage)
                     } else {
                         // If no explicit execution intent, process as a regular message to handle conversational requests
@@ -964,7 +970,7 @@ final class AIAssistantViewModel {
     }
     
     private func executeIntent(
-        _ intent: GeminiService.ExecutionIntent,
+        _ intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool,
         allowPromptForMissingFields: Bool = true
@@ -1095,7 +1101,7 @@ final class AIAssistantViewModel {
     // MARK: - Compound Operations
     
     private func executeCompoundProjectCreation(
-        intent: GeminiService.ExecutionIntent,
+        intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool
     ) async {
@@ -1144,7 +1150,7 @@ final class AIAssistantViewModel {
                         Make tasks specific and actionable. Base them on the project goal if provided.
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: taskGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: taskGenerationPrompt)
                         let cleaned = response
                             .trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
@@ -1203,7 +1209,7 @@ final class AIAssistantViewModel {
                         Example: ["Note 1 title", "Note 2 title", ...]
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: noteGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: noteGenerationPrompt)
                         let cleaned = response
                             .trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
@@ -1272,7 +1278,7 @@ final class AIAssistantViewModel {
                         Example: ["Caption 1", "Caption 2", ...]
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: postGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: postGenerationPrompt)
                         let cleaned = response
                             .trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
@@ -1409,7 +1415,7 @@ final class AIAssistantViewModel {
     }
     
     private func executeCompoundNoteCreation(
-        intent: GeminiService.ExecutionIntent,
+        intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool
     ) async {
@@ -1449,7 +1455,7 @@ final class AIAssistantViewModel {
                         Return ONLY a JSON array of task titles, no explanation.
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: taskGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: taskGenerationPrompt)
                         let cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
                             .replacingOccurrences(of: "```", with: "")
@@ -1512,7 +1518,7 @@ final class AIAssistantViewModel {
                         Return ONLY a JSON array of captions, no explanation.
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: postGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: postGenerationPrompt)
                         let cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
                             .replacingOccurrences(of: "```", with: "")
@@ -1610,7 +1616,7 @@ final class AIAssistantViewModel {
     }
     
     private func executeCompoundPostCreation(
-        intent: GeminiService.ExecutionIntent,
+        intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool
     ) async {
@@ -1652,7 +1658,7 @@ final class AIAssistantViewModel {
                         Return ONLY a JSON array of task titles, no explanation.
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: taskGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: taskGenerationPrompt)
                         let cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
                             .replacingOccurrences(of: "```", with: "")
@@ -1707,7 +1713,7 @@ final class AIAssistantViewModel {
                         Return ONLY a JSON array of note titles, no explanation.
                         """
                     do {
-                        let response = try await geminiService.generateResponse(for: noteGenerationPrompt)
+                        let response = try await coreResponseService.generateResponse(for: noteGenerationPrompt)
                         let cleaned = response.trimmingCharacters(in: .whitespacesAndNewlines)
                             .replacingOccurrences(of: "```json", with: "")
                             .replacingOccurrences(of: "```", with: "")
@@ -1801,7 +1807,7 @@ final class AIAssistantViewModel {
     // MARK: - Reminder Creation
     
     private func executeReminderCreation(
-        intent: GeminiService.ExecutionIntent,
+        intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool
     ) async {
@@ -1958,7 +1964,7 @@ final class AIAssistantViewModel {
     }
     
     private func processReflection(
-        _ intent: GeminiService.ReflectionIntent,
+        _ intent: ReflectionIntent,
         originalQuery: String,
         modelContext: ModelContext,
         isFirstMessage: Bool,
@@ -2129,7 +2135,7 @@ final class AIAssistantViewModel {
     }
     
     private func handleIncompleteExecutionIntent(
-        _ intent: GeminiService.ExecutionIntent,
+        _ intent: ExecutionIntent,
         modelContext: ModelContext
     ) async -> Bool {
         let prompts = promptsForMissingFields(intent)
@@ -2145,7 +2151,7 @@ final class AIAssistantViewModel {
         return true
     }
     
-    private func promptsForMissingFields(_ intent: GeminiService.ExecutionIntent) -> [PendingField] {
+    private func promptsForMissingFields(_ intent: ExecutionIntent) -> [PendingField] {
         switch intent.operation {
         case .createTask:
             var prompts: [PendingField] = []
@@ -2191,7 +2197,7 @@ final class AIAssistantViewModel {
         }
     }
     
-    private func initialCollectedFields(from intent: GeminiService.ExecutionIntent) -> [ExecutionFieldKey: String] {
+    private func initialCollectedFields(from intent: ExecutionIntent) -> [ExecutionFieldKey: String] {
         var collected: [ExecutionFieldKey: String] = [:]
         if let title = trimmed(intent.taskTitle), !title.isEmpty {
             collected[.taskTitle] = title
@@ -2326,7 +2332,7 @@ final class AIAssistantViewModel {
     
     private func perform(
         action: AIIntentAction,
-        intent: GeminiService.ExecutionIntent,
+        intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool
     ) async {
@@ -2666,7 +2672,7 @@ final class AIAssistantViewModel {
     
     func generateAndSetTitle(from firstMessage: String, conversation: AIConversation, modelContext: ModelContext) async {
         do {
-            let title = try await geminiService.generateConversationTitle(from: firstMessage)
+            let title = try await coreResponseService.generateConversationTitle(from: firstMessage)
             
             await MainActor.run {
                 conversation.title = title
@@ -2723,7 +2729,7 @@ final class AIAssistantViewModel {
         guard let messages = conversation.messages, !messages.isEmpty else { return }
         
         do {
-            let summary = try await geminiService.generateConversationSummary(messages: messages)
+            let summary = try await coreResponseService.generateConversationSummary(messages: messages)
             
             await MainActor.run {
                 conversation.summary = summary
@@ -2748,8 +2754,8 @@ final class AIAssistantViewModel {
         guard let title = conversation.title else { return }
         
         do {
-            let tags = try await geminiService.categorizeConversation(
-                title: title,
+            let tags = try await coreResponseService.categorizeConversation(
+                messages: messages,
                 summary: conversation.summary
             )
             
@@ -2882,7 +2888,10 @@ final class AIAssistantViewModel {
               conversationMessages.count >= 10 else { return }
         
         do {
-            let summary = try await geminiService.summarizeRecentMessages(conversationMessages, count: 15)
+            let summary = try await coreResponseService.summarizeRecentMessages(
+                await coreResponseService.convertMessagesToConversationMessages(conversationMessages),
+                count: 15
+            )
             
             // Insert as system message
             let systemMessage = AIMessage(

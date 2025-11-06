@@ -59,10 +59,12 @@ struct SocialGroup: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            GroupHeader(title: "Social", icon: "chart.bar.fill", accent: KosmicPalette.violet)
+            GroupHeader(title: "Content & Artifacts", icon: "doc.text.fill", accent: KosmicPalette.violet)
             VStack(spacing: 12) {
-                if isVisible(.contentPerformance) { ContentPerformanceCard(size: size(for: .contentPerformance, fallback: defaultSize)) }
-                if isVisible(.platformComparison) { PlatformComparisonCard(size: size(for: .platformComparison, fallback: defaultSize)) }
+                Text("Content insights and artifact analytics are available in the Insights tab.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 8)
             }
         }
         .supportingCard()

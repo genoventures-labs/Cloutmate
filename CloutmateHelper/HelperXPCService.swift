@@ -2,7 +2,7 @@
 //  HelperXPCService.swift
 //  CloutmateHelper
 //
-//  Created by Mike Letts on 10/23/25.
+//  XPC Service for helper app (publishing functionality removed)
 //
 
 import Foundation
@@ -16,21 +16,21 @@ class HelperXPCService: NSObject, NSXPCListenerDelegate, CloutmateHelperProtocol
         return true
     }
     
-    // schedulePost is deprecated - scheduler now reads from SwiftData directly
+    // Deprecated: schedulePost no longer needed - social media publishing removed
     @objc func schedulePost(postID: String, scheduledDate: Date, caption: String, mediaURLs: [String], platforms: [String], pageIDs: [String: String]) {
-        os_log("schedulePost called but no longer needed - scheduler reads from SwiftData", log: .default, type: .default)
-        // Just trigger a check - the post should already be in SwiftData
-        checkScheduledPosts()
+        os_log("schedulePost called but publishing is disabled", log: .default, type: .debug)
+        // No-op
     }
     
+    // Deprecated: fetchInsights no longer needed - social media insights removed
     func fetchInsights(postID: String) {
-        os_log("Received insights fetch request for post: %{public}@", log: .default, type: .info, postID)
-        InsightsPoller.shared.fetchInsights(for: postID)
+        os_log("fetchInsights called but insights polling is disabled", log: .default, type: .debug)
+        // No-op
     }
     
+    // Deprecated: checkScheduledPosts no longer needed - publishing removed
     func checkScheduledPosts() {
-        os_log("Received check scheduled posts request", log: .default, type: .info)
-        BackgroundScheduler.shared.checkScheduledPosts()
+        os_log("checkScheduledPosts called but publishing is disabled", log: .default, type: .debug)
+        // No-op
     }
 }
-

@@ -165,8 +165,7 @@ struct HomeView: View {
                 DashboardCard(cardType: .inboxCount, position: 1, size: .small),
                 DashboardCard(cardType: .activeProjects, position: 2, size: .small),
                 DashboardCard(cardType: .upcomingTasks, position: 3, size: .small),
-                DashboardCard(cardType: .scheduledPosts, position: 4, size: .small),
-                DashboardCard(cardType: .recentNotes, position: 5, size: .small)
+                DashboardCard(cardType: .recentNotes, position: 4, size: .small)
             ]
             
             for card in defaultCards {
@@ -485,13 +484,8 @@ struct DashboardCardContent: View {
                 case .inboxCount: return inboxCountView(waitingInboxCount: waitingInboxCount)
                 case .activeProjects: return activeProjectsView()
                 case .upcomingTasks: return upcomingTasksView()
-                case .scheduledPosts: return scheduledPostsView()
-                case .draftCount: return draftCountView()
                 case .recentNotes: return recentNotesView()
                 case .areasOverview: return textOnlyView("Areas Overview")
-                case .recentInsights: return textOnlyView("Recent Insights")
-                case .postingStreak: return postingStreakView()
-                case .topPerformingPost: return textOnlyView("Top Performing Post")
                 case .quickCapture: return textOnlyView("Quick Capture")
                 case .aiSuggestions: return textOnlyView("AI Suggestions")
                 default: return defaultView()

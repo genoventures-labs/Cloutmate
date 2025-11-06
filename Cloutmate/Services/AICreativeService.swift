@@ -44,7 +44,7 @@ struct AIToolResult {
 
 actor AICreativeService {
     static let shared = AICreativeService()
-    private let geminiService = GeminiService.shared
+    private let coreResponseService = CoreResponseService.shared
     
     private init() {}
     
@@ -52,13 +52,13 @@ actor AICreativeService {
     
     func executeTool(_ tool: AITool, input: String, context: String = "") async -> AIToolResult {
         do {
-            let result = try await geminiService.executeTool(tool, input: input, context: context)
+            let result = try await coreResponseService.executeTool(tool, input: input, context: context)
             return result
         } catch {
-            // Fallback to simple error message if Gemini fails
+            // Fallback to simple error message if Ollama fails
             return AIToolResult(
                 tool: tool,
-                result: "Unable to generate content at this time. Please check your API key and try again.",
+                result: "Unable to generate content at this time. Please check that Ollama is running and the `llama3.1` model is available.",
                 suggestedImprovements: nil
             )
         }

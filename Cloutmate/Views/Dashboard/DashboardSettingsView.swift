@@ -73,33 +73,9 @@ struct DashboardSettingsView: View {
                     }
                 }
                 
-                Section("Social Media") {
-                    ForEach(categorizedCards.social, id: \.self) { cardType in
-                        if cardType == .socialOverview {
-                            HStack {
-                                Image(systemName: cardType.icon)
-                                    .foregroundColor(.kosmicBlue)
-                                    .frame(width: 20)
-                                Text("Social Overview (Always On)")
-                                Spacer()
-                                Image(systemName: "lock.fill").foregroundColor(.secondary)
-                            }
-                        } else {
-                            Toggle(isOn: bindingFor(cardType)) {
-                                HStack {
-                                    Image(systemName: cardType.icon)
-                                        .foregroundColor(.kosmicBlue)
-                                        .frame(width: 20)
-                                    Text(cardType.rawValue)
-                                }
-                            }
-                            .toggleStyle(.switch)
-                        }
-                    }
-                }
-                
-                Section {
-                    ForEach(categorizedCards.facebook, id: \.self) { cardType in
+                // Productivity Insights
+                Section("Productivity Insights") {
+                    ForEach(categorizedCards.productivity, id: \.self) { cardType in
                         Toggle(isOn: bindingFor(cardType)) {
                             HStack {
                                 Image(systemName: cardType.icon)
@@ -110,8 +86,6 @@ struct DashboardSettingsView: View {
                         }
                         .toggleStyle(.switch)
                     }
-                } header: {
-                    Text("Facebook Page Insights")
                 }
                 
                 // Visible Cards with Size Settings
@@ -167,18 +141,15 @@ struct DashboardSettingsView: View {
         )
     }
 
-    private var categorizedCards: (workflow: [DashboardCardType], projects: [DashboardCardType], resources: [DashboardCardType], social: [DashboardCardType], facebook: [DashboardCardType]) {
+    private var categorizedCards: (workflow: [DashboardCardType], projects: [DashboardCardType], resources: [DashboardCardType], productivity: [DashboardCardType]) {
         let workflow: [DashboardCardType] = [.todayOverview, .inboxCount, .upcomingTasks, .upcomingDeadlines]
-        let projects: [DashboardCardType] = [.projectsOverview]
+        let projects: [DashboardCardType] = [.projectsOverview, .tasksOverview]
         let resources: [DashboardCardType] = [.areasHealth, .notesActivity, .recentNotes]
-        let social: [DashboardCardType] = [.scheduledPosts, .draftCount, .recentInsights, .postingStreak, .topPerformingPost, .socialOverview, .contentPerformance, .platformComparison]
-        let facebook: [DashboardCardType] = [.facebookPageInsightsOverview, .facebookPageViews, .facebookPageFans, .facebookPageReach, .facebookPageImpressions, .facebookEngagedUsers, .facebookPostEngagements]
-        return (workflow, projects, resources, social, facebook)
+        let productivity: [DashboardCardType] = [.completionRate, .workloadBalance, .inboxTrend]
+        return (workflow, projects, resources, productivity)
     }
     
     private func toggleCard(_ cardType: DashboardCardType, enabled: Bool) {
-        // Lock Social Overview as mandatory hero card
-        if cardType == .socialOverview { return }
         if enabled {
             // Add card if it doesn't exist
             if !allCards.contains(where: { $0.type == cardType }) {

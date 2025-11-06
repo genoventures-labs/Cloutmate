@@ -2,7 +2,7 @@
 //  DocumentReconciliationService.swift
 //  Cloutmate
 //
-//  Model Reconciliation: When Gemini comes back online, re-run summaries it missed
+//  Model Reconciliation: When Ollama comes back online, re-run summaries it missed
 //  in the background, then merge or overwrite the local ones
 //
 
@@ -40,9 +40,9 @@ actor DocumentReconciliationService {
     func recordFallbackSummary(
         documentId: UUID,
         fileName: String,
-        sourceModel: GeminiService.SummarySource,
+        sourceModel: SummarySource,
         summary: String,
-        descriptor: GeminiService.DocumentDescriptor,
+        descriptor: DocumentDescriptor,
         modelContext: ModelContext
     ) async {
         let pending = PendingReconciliation(
@@ -63,18 +63,18 @@ actor DocumentReconciliationService {
         
         print("📝 Recorded fallback summary for reconciliation: \(fileName) (source: \(sourceModel.rawValue))")
         
-        // Try immediate reconciliation if Gemini is available
+        // Try immediate reconciliation if Ollama is available
         await attemptReconciliation(modelContext: modelContext)
     }
     
-    /// Attempts to reconcile pending summaries when Gemini is available
+    /// Attempts to reconcile pending summaries when Ollama is available
     private func attemptReconciliation(modelContext: ModelContext) async {
         guard !pendingReconciliations.isEmpty else { return }
         
-        // Check if Gemini is available by attempting a simple test
+        // Check if Ollama is available by attempting a simple test
         do {
             // Use a simple test prompt through analyzeDocument with minimal content
-            let testDescriptor = GeminiService.DocumentDescriptor(
+            let testDescriptor = DocumentDescriptor(
                 text: "test",
                 preview: "test",
                 fileName: "test.txt",
@@ -83,20 +83,20 @@ actor DocumentReconciliationService {
                 pageCount: nil,
                 sourceURL: nil
             )
-            let testResult = try await GeminiService.shared.analyzeDocument(
+            let testResult = try await CoreResponseService.shared.analyzeDocument(
                 descriptor: testDescriptor,
-                userPrompt: nil,
+                userPrompt: nil as String?,
                 appContext: "",
-                payloadContext: nil,
-                conversationMessages: nil,
-                currentMessageStyle: nil,
-                userStyleProfile: nil,
-                confidence: nil
+                payloadContext: nil as AIPayloadContext?,
+                conversationMessages: nil as [ConversationMessage]?,
+                currentMessageStyle: nil as TypingStyle?,
+                userStyleProfile: nil as UserPreferences?,
+                confidence: nil as ConfidenceSnapshot?
             )
-            guard testResult.sourceModel == .gemini else { return }
+            guard testResult.sourceModel == SummarySource.ollama else { return }
             
-            // Gemini is available, process pending reconciliations
-            print("🔄 Gemini is back online. Starting reconciliation of \(pendingReconciliations.count) summaries...")
+            // Ollama is available, process pending reconciliations
+            print("🔄 Ollama is back online. Starting reconciliation of \(pendingReconciliations.count) summaries...")
             
             let reconciliationsToProcess = pendingReconciliations
             pendingReconciliations.removeAll()
@@ -105,16 +105,16 @@ actor DocumentReconciliationService {
                 await reconcileSummary(pending: pending, modelContext: modelContext)
             }
         } catch {
-            // Gemini still unavailable, keep pending reconciliations
-            print("⏳ Gemini still unavailable. \(pendingReconciliations.count) summaries pending reconciliation.")
+            // Ollama still unavailable, keep pending reconciliations
+            print("⏳ Ollama still unavailable. \(pendingReconciliations.count) summaries pending reconciliation.")
         }
     }
     
-    /// Reconciles a single summary by re-running with Gemini
+    /// Reconciles a single summary by re-running with Ollama
     private func reconcileSummary(pending: PendingReconciliation, modelContext: ModelContext) async {
         do {
             // Reconstruct descriptor
-            let descriptor = GeminiService.DocumentDescriptor(
+            let descriptor = DocumentDescriptor(
                 text: pending.descriptorText,
                 preview: pending.descriptorPreview,
                 fileName: pending.descriptorFileName,
@@ -124,19 +124,19 @@ actor DocumentReconciliationService {
                 sourceURL: pending.descriptorSourceURL
             )
             
-            // Re-run analysis with Gemini
-            let geminiResult = try await GeminiService.shared.analyzeDocument(
+            // Re-run analysis with Ollama
+            let ollamaResult = try await CoreResponseService.shared.analyzeDocument(
                 descriptor: descriptor,
-                userPrompt: nil,
+                userPrompt: nil as String?,
                 appContext: "", // Minimal context for reconciliation
-                payloadContext: nil,
-                conversationMessages: nil,
-                currentMessageStyle: nil,
-                userStyleProfile: nil,
-                confidence: nil
+                payloadContext: nil as AIPayloadContext?,
+                conversationMessages: nil as [ConversationMessage]?,
+                currentMessageStyle: nil as TypingStyle?,
+                userStyleProfile: nil as UserPreferences?,
+                confidence: nil as ConfidenceSnapshot?
             )
             
-            guard geminiResult.sourceModel == .gemini else {
+            guard ollamaResult.sourceModel == SummarySource.ollama else {
                 // Reconciliation failed, re-add to pending
                 pendingReconciliations.append(pending)
                 return
@@ -150,8 +150,8 @@ actor DocumentReconciliationService {
                 
                 if let messages = try? modelContext.fetch(fetchDescriptor),
                    let message = messages.first {
-                    // Update summary with Gemini's version
-                    let upgradedSummary = geminiResult.summary + "\n\n✨ _Summary upgraded with full Gemini analysis._"
+                    // Update summary with Ollama's version
+                    let upgradedSummary = ollamaResult.summary + "\n\n✨ _Summary upgraded with full Ollama analysis._"
                     message.documentSummary = upgradedSummary
                     
                     // Find and update the assistant message that contains the summary
@@ -160,7 +160,7 @@ actor DocumentReconciliationService {
                        let conversation = conversations.first(where: { $0.messages?.contains(where: { $0.id == pending.documentId }) == true }) {
                         if let assistantMessage = conversation.messages?.first(where: { $0.role == "assistant" && $0.content == pending.summary }) {
                             assistantMessage.content = upgradedSummary
-                            assistantMessage.documentSourceModel = "Gemini" // Update source model after reconciliation
+                            message.documentSourceModel = "Ollama" // Update source model after reconciliation
                         }
                     }
                     

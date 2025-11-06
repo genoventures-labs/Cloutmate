@@ -110,7 +110,7 @@ struct LiveThemesView: View {
                 
                 // Empty State
                 if aliveConcepts.isEmpty && allConcepts.isEmpty {
-                    EmptyStateView()
+                    LiveThemesEmptyStateView()
                         .padding()
                 }
             }
@@ -238,11 +238,11 @@ private struct ConceptCard: View {
         .padding()
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(concept.isAlive ? Color.accentColor.opacity(0.05) : Color.secondary.opacity(0.05))
+                .fill((concept.isAlive ? Color.accentColor : Color.secondary).opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(concept.isAlive ? Color.accentColor.opacity(0.3) : Color.secondary.opacity(0.1), lineWidth: 1)
+                .stroke((concept.isAlive ? Color.accentColor : Color.secondary).opacity(concept.isAlive ? 0.3 : 0.1), lineWidth: 1)
         )
     }
     
@@ -404,7 +404,7 @@ private struct StoryReaderView: View {
 
 // MARK: - Empty State
 
-private struct EmptyStateView: View {
+private struct LiveThemesEmptyStateView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "brain.head.profile")

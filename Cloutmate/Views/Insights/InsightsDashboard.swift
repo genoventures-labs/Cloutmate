@@ -118,10 +118,18 @@ struct InsightsDashboard: View {
             )
             
         case .content:
-            ContentAnalyticsView(
-                snapshot: analyticsSnapshot,
-                timeRange: timeRange
-            )
+            if let snapshot = analyticsSnapshot {
+                ContentAnalyticsView(
+                    snapshot: snapshot,
+                    timeRange: timeRange
+                )
+            } else {
+                ContentUnavailableView(
+                    "No Data",
+                    systemImage: "chart.bar.doc.horizontal",
+                    description: Text("Generating analytics snapshot...")
+                )
+            }
             
         case .automation:
             AutomationDashboardView()

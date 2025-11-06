@@ -9,15 +9,22 @@ import SwiftUI
 
 struct ThinkingIndicator: View {
     let activity: AIAssistantViewModel.ActivityType
-    let sourceModel: GeminiService.SummarySource?
+    let sourceModel: SummarySource?
     
     @State private var displayedActivity: AIAssistantViewModel.ActivityType
     @State private var opacity: Double = 1.0
+    @State private var animationSpeed: Double = 0.6
     
-    init(activity: AIAssistantViewModel.ActivityType, sourceModel: GeminiService.SummarySource? = nil) {
+    private let timingService = ResponseTimingService.shared
+    
+    init(activity: AIAssistantViewModel.ActivityType, sourceModel: SummarySource? = nil) {
         self.activity = activity
         self.sourceModel = sourceModel
         _displayedActivity = State(initialValue: activity)
+        
+        // Adjust animation speed based on activity complexity
+        let isComplex = activity == .analyzingDocument || activity == .analyzingImage || activity == .reflecting
+        _animationSpeed = State(initialValue: isComplex ? 0.4 : 0.6)
     }
     
     var body: some View {
@@ -26,7 +33,7 @@ struct ThinkingIndicator: View {
             Image(systemName: iconName)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundColor(iconColor)
-                .symbolEffect(.pulse, options: .repeating.speed(0.6), isActive: true)
+                .symbolEffect(.pulse, options: .repeating.speed(animationSpeed), isActive: true)
             
             // Dynamic text based on activity (with adaptive phrasing for offline)
             Text(activityText)
@@ -41,6 +48,10 @@ struct ThinkingIndicator: View {
         .onChange(of: activity) { oldValue, newValue in
             // Micro-delay smoothing: fade out, update, fade in
             if oldValue != newValue {
+                // Update animation speed for new activity
+                let isComplex = newValue == .analyzingDocument || newValue == .analyzingImage || newValue == .reflecting
+                animationSpeed = isComplex ? 0.4 : 0.6
+                
                 withAnimation(.easeInOut(duration: 0.15)) {
                     opacity = 0.0
                 }

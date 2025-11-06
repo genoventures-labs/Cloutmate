@@ -222,7 +222,7 @@ final class FocusSessionService {
         duration: TimeInterval = 1800,  // 30 minutes
         daysAhead: Int = 3,
         modelContext: ModelContext
-    ) async throws -> [GeminiService.TimeSlot] {
+    ) async throws -> [TimeSlot] {
         let now = Date()
         let calendar = Calendar.current
         guard let futureDate = calendar.date(byAdding: .day, value: daysAhead, to: now) else {

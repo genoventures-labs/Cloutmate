@@ -123,8 +123,8 @@ extension TaskExtractionService {
         """
         
         do {
-            let geminiService = GeminiService.shared
-            let response = try await geminiService.generateResponse(for: prompt)
+            let coreResponseService = CoreResponseService.shared
+            let response = try await coreResponseService.generateResponse(for: prompt)
             
             // Parse JSON response
             if let jsonData = response.data(using: .utf8),

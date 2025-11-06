@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import CloutmateShared
 import os.log
 
 @MainActor
@@ -367,6 +368,45 @@ This week, you engaged with **\(aliveConcepts.count) active themes** across your
         )
     }
     
+    // MARK: - Artifact Generation
+    
+    /// Generate an Artifact from a narrative/story
+    func generateArtifact(
+        from storyToken: StoryToken,
+        format: OutputFormat = .summary,
+        modelContext: ModelContext
+    ) -> CloutmateShared.Artifact {
+        let artifact = CloutmateShared.Artifact(
+            title: storyToken.title,
+            content: storyToken.markdown,
+            outputFormat: format,
+            state: .final,
+            publishedAt: storyToken.endDate,
+            tags: storyToken.themes
+        )
+        
+        // Copy metrics to custom properties
+        for (key, value) in storyToken.metrics {
+            artifact.customProperties[key] = String(value)
+        }
+        
+        modelContext.insert(artifact)
+        try? modelContext.save()
+        
+        logger.info("Generated artifact from story: \(storyToken.title)")
+        
+        return artifact
+    }
+    
+    /// Generate artifact from weekly summary
+    func generateArtifactFromWeeklySummary(
+        format: OutputFormat = .summary,
+        modelContext: ModelContext
+    ) throws -> CloutmateShared.Artifact {
+        let storyToken = try generateWeeklySummary(modelContext: modelContext)
+        return generateArtifact(from: storyToken, format: format, modelContext: modelContext)
+    }
+    
     // MARK: - Retrieval
     
     func getRecentStories(limit: Int = 10, modelContext: ModelContext) -> [StoryToken] {
@@ -377,6 +417,20 @@ This week, you engaged with **\(aliveConcepts.count) active themes** across your
         descriptor.fetchLimit = limit
         
         return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    /// Get recent artifacts
+    func getRecentArtifacts(limit: Int = 10, modelContext: ModelContext) -> [CloutmateShared.Artifact] {
+        // Fetch all artifacts and filter in memory - SwiftData predicates have issues with enum comparisons
+        var descriptor = FetchDescriptor<CloutmateShared.Artifact>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit * 2 // Fetch more to account for filtering
+        
+        let allArtifacts = (try? modelContext.fetch(descriptor)) ?? []
+        // Filter out archived artifacts in memory
+        let nonArchived = allArtifacts.filter { $0.artifactState != .archived }
+        return Array(nonArchived.prefix(limit))
     }
 }
 

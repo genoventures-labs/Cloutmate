@@ -34,6 +34,8 @@ public final class Note {
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
     public var isArchived: Bool = false
+    public var isPinned: Bool = false
+    public var pinnedAt: Date?
     
     public init(
         title: String,
@@ -55,6 +57,8 @@ public final class Note {
         self.createdAt = Date()
         self.updatedAt = Date()
         self.isArchived = false
+        self.isPinned = false
+        self.pinnedAt = nil
         self.backlinks = []
         self.highlights = []
     }

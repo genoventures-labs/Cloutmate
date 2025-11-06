@@ -281,7 +281,7 @@ struct MorningRitualView: View {
         let prompt = "Break the goal \"\(item.title)\" into 3 focused steps I can take today. Keep it concise."
 
         do {
-            let response = try await GeminiService.shared.generateResponse(for: prompt)
+            let response = try await CoreResponseService.shared.generateResponse(for: prompt)
             await MainActor.run {
                 suggestionText = response
                 isRequestingSuggestion = false

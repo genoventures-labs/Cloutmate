@@ -149,7 +149,7 @@ struct AISelectionSheet: View {
                 if let onGenerate = onGenerate {
                     await onGenerate(prompt)
                 } else {
-                    let result = try await GeminiService.shared.generateResponse(for: prompt, context: platform.rawValue)
+                    let result = try await CoreResponseService.shared.generateResponse(for: prompt, context: platform.rawValue)
                     await MainActor.run {
                         onInsert(result)
                         isGenerating = false

@@ -401,7 +401,7 @@ final class ThemeExtractionPipeline {
     }
     
     private func generateThemeLabel(for content: String) async -> (String, String)? {
-        // Use Gemini to generate a theme label and description
+        // Use Ollama to generate a theme label and description
         let prompt = """
         Based on this collection of related content, generate a concise theme label (2-4 words) and a one-sentence description.
         
@@ -412,7 +412,7 @@ final class ThemeExtractionPipeline {
         """
         
         do {
-            let response = try await GeminiService.shared.generateResponse(for: prompt)
+            let response = try await CoreResponseService.shared.generateResponse(for: prompt)
             
             // Parse JSON response
             if let data = response.data(using: .utf8),

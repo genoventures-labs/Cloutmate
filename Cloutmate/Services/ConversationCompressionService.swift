@@ -61,7 +61,7 @@ final class ConversationCompressionService {
             return ConversationCompressionResult(summary: nil, retainedMessages: messages)
         }
 
-        let summary = try? await GeminiService.shared.summarizeConversation(transcript: transcript)
+        let summary = try? await CoreResponseService.shared.generateConversationSummary(messages: headMessages)
         if let summary = summary {
             cache[conversationId] = CacheEntry(
                 compressedCount: compressCount,

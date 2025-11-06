@@ -2,7 +2,7 @@
 //  OfflineSummarizationService.swift
 //  Cloutmate
 //
-//  Tertiary fallback: Heuristic summarization when both Gemini and Apple LLM fail
+//  Tertiary fallback: Heuristic summarization when both Ollama and Apple LLM fail
 //  Uses text extraction, key phrase clustering, and sentence ranking
 //
 

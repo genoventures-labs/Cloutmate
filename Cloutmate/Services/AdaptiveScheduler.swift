@@ -159,15 +159,15 @@ final class AdaptiveScheduler: ObservableObject {
     // MARK: - Slot Scoring
 
     private func scoreSlots(
-        _ slots: [GeminiService.TimeSlot],
+        _ slots: [TimeSlot],
         energyWindows: [EnergyWindow],
         urgency: Double,
         session: FocusSession
-    ) -> GeminiService.TimeSlot? {
+    ) -> TimeSlot? {
         let now = Date()
         let urgencyWeight = clamp(urgency, min: 0.0, max: 1.0)
 
-        let scored = slots.map { slot -> (GeminiService.TimeSlot, Double) in
+        let scored = slots.map { slot -> (TimeSlot, Double) in
             let energyScore = energyScore(for: slot, energyWindows: energyWindows)
 
             // Recency bias: prefer sooner slots when urgency is high
@@ -191,7 +191,7 @@ final class AdaptiveScheduler: ObservableObject {
             .first
     }
 
-    private func energyScore(for slot: GeminiService.TimeSlot, energyWindows: [EnergyWindow]) -> Double {
+    private func energyScore(for slot: TimeSlot, energyWindows: [EnergyWindow]) -> Double {
         guard !energyWindows.isEmpty else { return 0.5 }
 
         let slotInterval = DateInterval(start: slot.start, end: slot.end)
@@ -243,7 +243,7 @@ final class AdaptiveScheduler: ObservableObject {
         in interval: DateInterval,
         slotMinutes: Int,
         modelContext: ModelContext
-    ) async -> [GeminiService.TimeSlot] {
+    ) async -> [TimeSlot] {
         do {
             return try await CalendarAvailabilityService.shared.availableTimeSlots(
                 modelContext: modelContext,

@@ -18,6 +18,7 @@ struct NotionMappingSheet: View {
     let cloutmateType: String // "Project", "Task", "Note", "Area"
     let notionProperties: [String: Any] // Notion database properties
     @Binding var propertyMappings: [String: String]
+    let onImport: () -> Void
     
     @Environment(\.dismiss) private var dismiss
     @State private var localMappings: [String: String] = [:]
@@ -98,6 +99,7 @@ struct NotionMappingSheet: View {
                     Button("Import") {
                         propertyMappings = localMappings
                         dismiss()
+                        onImport()
                     }
                     .buttonStyle(.borderedProminent)
                 }

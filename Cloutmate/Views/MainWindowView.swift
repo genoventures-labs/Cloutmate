@@ -29,7 +29,7 @@ enum TabIdentifier: String, CaseIterable, Comparable {
     // EXPRESS
     case drafts = "Drafts"
     case calendar = "Calendar"
-    case posts = "Posts"
+    case posts = "Artifacts"
     
     // TOOLS
     case aiAssistant = "AI Assistant"
@@ -55,7 +55,7 @@ enum TabIdentifier: String, CaseIterable, Comparable {
         case .archives: return "archivebox.fill"
         case .drafts: return "doc.text.fill"
         case .calendar: return "calendar"
-        case .posts: return "square.and.pencil"
+        case .posts: return "sparkles"
         case .aiAssistant: return "sparkles"
         case .focusMode: return "timer"
         case .focusGravity: return "gauge.with.dots.needle.67percent"
@@ -79,6 +79,14 @@ struct MainWindowView: View {
     @State private var guardMessage: String = ""
     @State private var showContextualCreateSheet = false
     @State private var contextualCreateTab: TabIdentifier = .home
+    
+    // Child sheet states
+    @State private var showCreateNote = false
+    @State private var showCreateTask = false
+    @State private var showCreateProject = false
+    @State private var showQuickCapture = false
+    @State private var showVoiceMemo = false
+    @State private var showArtifactComposer = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -108,10 +116,40 @@ struct MainWindowView: View {
             }
         }
         .sheet(isPresented: $composerViewModel.isPresented) {
-            ComposerWindow()
+            if selectedTab == .posts {
+                ArtifactComposerView()
+            } else {
+                ComposerWindow()
+            }
         }
         .sheet(isPresented: $showContextualCreateSheet) {
             ContextualCreateSheet(currentTab: contextualCreateTab)
+        }
+        .sheet(isPresented: $showCreateNote) {
+            // Create new note with drawer UI
+            NoteDetailDrawer(
+                note: {
+                    let newNote = Note(title: "", markdown: "")
+                    modelContext.insert(newNote)
+                    return newNote
+                }(),
+                isPresented: $showCreateNote
+            )
+        }
+        .sheet(isPresented: $showCreateTask) {
+            CreateTaskSheet()
+        }
+        .sheet(isPresented: $showCreateProject) {
+            CreateProjectSheet()
+        }
+        .sheet(isPresented: $showQuickCapture) {
+            QuickCaptureView()
+        }
+        .sheet(isPresented: $showVoiceMemo) {
+            VoiceMemoSheet()
+        }
+        .sheet(isPresented: $showArtifactComposer) {
+            ArtifactComposerView()
         }
         .overlay {
             if showCommandPalette {
@@ -119,9 +157,9 @@ struct MainWindowView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openComposer)) { notification in
-            // Check if we're in Posts view - if so, open ComposerWindow directly
+            // Check if we're in Posts view - if so, open ArtifactComposer instead
             if selectedTab == .posts {
-                composerViewModel.present()
+                showArtifactComposer = true
             } else {
                 // Otherwise open contextual create sheet
                 contextualCreateTab = selectedTab
@@ -136,6 +174,24 @@ struct MainWindowView: View {
                 contextualCreateTab = selectedTab
                 showContextualCreateSheet = true
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showCreateNote)) { _ in
+            showCreateNote = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showCreateTask)) { _ in
+            showCreateTask = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showCreateProject)) { _ in
+            showCreateProject = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showQuickCapture)) { _ in
+            showQuickCapture = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showVoiceMemo)) { _ in
+            showVoiceMemo = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showArtifactComposer)) { _ in
+            showArtifactComposer = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchTab)) { notification in
             if let tab = notification.object as? TabIdentifier {
@@ -166,13 +222,13 @@ struct MainWindowView: View {
         case .inbox:
             InboxView()
         case .notes:
-            NotesView()
+            UnifiedNotesView()
         case .journal:
             JournalView()
         case .projects:
-            ProjectsView()
+            UnifiedProjectsView()
         case .tasks:
-            TasksView()
+            UnifiedTasksView()
         case .areas:
             AreasView()
         case .resources:

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import AppKit
 import CloutmateShared
 
 struct ContextualCreateSheet: View {
@@ -15,13 +16,6 @@ struct ContextualCreateSheet: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     let currentTab: TabIdentifier
-    
-    @State private var showCreateNote = false
-    @State private var showCreateTask = false
-    @State private var showCreateProject = false
-    @State private var showComposer = false
-    @State private var showQuickCapture = false
-    @State private var showVoiceMemo = false
     
     @State private var mostUsedActions: [String] = []
     @State private var recentlyCreated: String?
@@ -69,7 +63,6 @@ struct ContextualCreateSheet: View {
             }
             .background(glassColorSystem.backgroundColor())
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -83,24 +76,6 @@ struct ContextualCreateSheet: View {
         .onAppear {
             setupEmotionalTinting()
             loadSmartDefaults()
-        }
-        .sheet(isPresented: $showCreateNote) {
-            CreateNoteSheet()
-        }
-        .sheet(isPresented: $showCreateTask) {
-            CreateTaskSheet()
-        }
-        .sheet(isPresented: $showCreateProject) {
-            CreateProjectSheet()
-        }
-        .sheet(isPresented: $showComposer) {
-            ComposerWindow()
-        }
-        .sheet(isPresented: $showQuickCapture) {
-            QuickCaptureView()
-        }
-        .sheet(isPresented: $showVoiceMemo) {
-            VoiceMemoSheet()
         }
     }
     
@@ -129,11 +104,16 @@ struct ContextualCreateSheet: View {
                 CreateAction(type: "New Project", icon: "folder.fill", color: .kosmicBlue)
             ]
         case .posts:
-            // Should not be shown, but handle gracefully
+            // Now shows artifacts instead of social media posts
             return [
-                CreateAction(type: "Social Post", icon: "square.and.pencil", color: .orange),
-                CreateAction(type: "Content Draft", icon: "doc.text", color: .kosmicBlue),
-                CreateAction(type: "Campaign Template", icon: "slider.horizontal.3", color: .kosmicPurple)
+                CreateAction(type: "New Artifact", icon: "doc.text.fill", color: .kosmicBlue),
+                CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .orange)
+            ]
+        case .calendar:
+            return [
+                CreateAction(type: "New Task", icon: "checkmark.circle.fill", color: .kosmicBlue),
+                CreateAction(type: "Reflection", icon: "brain.head.profile", color: .kosmicPurple),
+                CreateAction(type: "Journal Entry", icon: "book.fill", color: .kosmicGreen)
             ]
         default:
             return [
@@ -152,31 +132,42 @@ struct ContextualCreateSheet: View {
             modelContext: modelContext
         )
         
-        // Show appropriate sheet
-        switch action.type {
-        case "New Note":
-            showCreateNote = true
-        case "Task", "Subtask":
-            showCreateTask = true
-        case "New Project":
-            showCreateProject = true
-        case "Social Post", "Content Draft", "Campaign Template":
-            showComposer = true
-        case "Quick Capture":
-            showQuickCapture = true
-        case "Voice Memo":
-            showVoiceMemo = true
-        case "Routine Builder":
-            // TODO: Implement routine builder
-            showCreateTask = true
-        default:
-            break
-        }
+        // Haptic feedback
+        let generator = NSHapticFeedbackManager.defaultPerformer
+        generator.perform(.generic, performanceTime: .default)
         
-        // Dismiss sheet after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            restoreEmotionalState()
-            dismiss()
+        // Dismiss parent sheet first
+        restoreEmotionalState()
+        dismiss()
+        
+        // Post notification to show child sheet from MainWindowView
+        // Use a slight delay to ensure parent sheet is dismissed first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            switch action.type {
+            case "New Note":
+                NotificationCenter.default.post(name: .showCreateNote, object: nil)
+            case "Task", "Subtask":
+                NotificationCenter.default.post(name: .showCreateTask, object: nil)
+            case "New Project":
+                NotificationCenter.default.post(name: .showCreateProject, object: nil)
+            case "New Artifact":
+                NotificationCenter.default.post(name: .showArtifactComposer, object: nil)
+            case "Quick Capture":
+                NotificationCenter.default.post(name: .showQuickCapture, object: nil)
+            case "Voice Memo":
+                NotificationCenter.default.post(name: .showVoiceMemo, object: nil)
+            case "Routine Builder":
+                // TODO: Implement routine builder
+                NotificationCenter.default.post(name: .showCreateTask, object: nil)
+            case "Reflection":
+                // Create reflection artifact
+                NotificationCenter.default.post(name: .showArtifactComposer, object: nil)
+            case "Journal Entry":
+                // Create journal entry (could be a note or artifact)
+                NotificationCenter.default.post(name: .showCreateNote, object: nil)
+            default:
+                break
+            }
         }
     }
     

@@ -39,7 +39,7 @@ final class AIReflectionService {
     
     /// Main router function to handle all reflection intents
     func reflect(
-        on intent: GeminiService.ReflectionIntent,
+        on intent: ReflectionIntent,
         timeRange: AnalyticsTimeRange,
         modelContext: ModelContext
     ) async -> String {

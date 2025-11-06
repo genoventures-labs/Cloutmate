@@ -512,8 +512,8 @@ struct MessageBubble: View {
     
     private func sourceModelBadgeLabel(for sourceModel: String) -> String {
         switch sourceModel.lowercased() {
-        case "gemini":
-            return "Gemini"
+        case "ollama":
+            return "Ollama"
         case "applellm":
             return "Apple Intelligence"
         case "offline":
@@ -525,7 +525,7 @@ struct MessageBubble: View {
     
     private func sourceModelColor(for sourceModel: String) -> Color {
         switch sourceModel.lowercased() {
-        case "gemini":
+        case "ollama":
             return .kosmicBlue
         case "applellm":
             return .kosmicPurple

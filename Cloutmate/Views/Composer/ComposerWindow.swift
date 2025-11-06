@@ -453,56 +453,10 @@ struct ComposerWindow: View {
     }
     
     private func publishPostDirectly(post: CloutmateShared.Post, context: ModelContext) async {
-        post.postStatus = .publishing
-        try? context.save()
-        
-        var publishedPlatforms: [String] = []
-        
-        for platform in post.postPlatforms {
-            do {
-                if platform == .threads {
-                    let accountKey = "threads_access_token"
-                    let token = try KeychainService.shared.getToken(forAccount: accountKey)
-                    let postID = try await ThreadsService.shared.publishPost(
-                        caption: post.caption,
-                        mediaURLs: post.mediaURLs.isEmpty ? nil : post.mediaURLs,
-                        accessToken: token
-                    )
-                    post.threadsPostID = postID
-                    publishedPlatforms.append(platform.rawValue)
-                    
-                } else if platform == .facebook {
-                    // Get pageID from state or post
-                    let pageID = pageIDs["facebook"] ?? (post.pageIDs["facebook"])
-                    guard let pageID = pageID else {
-                        os_log("No pageID for Facebook", log: .default, type: .error)
-                        continue
-                    }
-                    let accountKey = "facebook_page_\(pageID)_access_token"
-                    let token = try KeychainService.shared.getToken(forAccount: accountKey)
-                    let postID = try await FacebookService.shared.publishPost(
-                        caption: post.caption,
-                        mediaURLs: post.mediaURLs.isEmpty ? nil : post.mediaURLs,
-                        pageID: pageID,
-                        accessToken: token
-                    )
-                    post.facebookPostID = postID
-                    publishedPlatforms.append(platform.rawValue)
-                }
-            } catch {
-                post.lastError = error.localizedDescription
-                let platformName = await MainActor.run { platform.displayName }
-                os_log("Failed to publish to %{public}@: %{public}@", log: .default, type: .error, platformName, error.localizedDescription)
-            }
-        }
-        
-        if !publishedPlatforms.isEmpty {
-            post.postStatus = .published
-            post.publishedDate = Date()
-        } else {
-            post.postStatus = .failed
-        }
-        
+        // Note: Social media posting services were removed
+        // This function is kept for compatibility but does not perform actual publishing
+        post.postStatus = .failed
+        post.lastError = "Social media posting has been removed. Use artifacts instead."
         try? context.save()
     }
     
@@ -531,7 +485,7 @@ struct ComposerWindow: View {
             let cleanedResult = cleanAIResponse(result.result)
             
             // Parse response into list items
-            let items = await GeminiService.shared.parseListResponse(cleanedResult, tool: tool)
+            let items = try await CoreResponseService.shared.parseListResponse(cleanedResult, tool: tool)
             
             // Convert to AIGeneratedItem
             let generatedItems = items.map { AIGeneratedItem(content: $0, type: tool) }

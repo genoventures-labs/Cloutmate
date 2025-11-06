@@ -189,6 +189,8 @@ struct NotionIntegrationSection: View {
                 Logger.notion.error("Notion OAuth failed: \(error.localizedDescription)")
                 await MainActor.run {
                     isConnecting = false
+                    // Show user-friendly error message
+                    // Note: In a production app, you'd want to show this in a user-visible alert
                 }
             }
         }
@@ -198,12 +200,24 @@ struct NotionIntegrationSection: View {
         isConnected = false
         accessToken = nil
         
+        // Delete token from keychain
+        do {
+            try KeychainService.shared.deleteToken(forAccount: "notion_access_token")
+            Logger.notion.info("Notion access token deleted from keychain")
+        } catch {
+            Logger.notion.error("Failed to delete Notion token: \(error.localizedDescription)")
+        }
+        
         // Delete all sync configs
         for config in syncConfigs {
             modelContext.delete(config)
         }
         
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            Logger.notion.error("Failed to save after disconnect: \(error.localizedDescription)")
+        }
     }
     
     private func checkConnectionStatus() {

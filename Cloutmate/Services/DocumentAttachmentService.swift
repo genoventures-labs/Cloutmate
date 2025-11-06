@@ -2,7 +2,7 @@
 //  DocumentAttachmentService.swift
 //  Cloutmate
 //
-//  Handles document loading, validation, and text extraction for Gemini document analysis.
+//  Handles document loading, validation, and text extraction for Ollama document analysis.
 //
 
 import AppKit

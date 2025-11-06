@@ -278,7 +278,7 @@ struct DraftEditor: View {
             let cleanedResult = cleanAIResponse(result.result)
             
             // Parse response into list items
-            let items = await GeminiService.shared.parseListResponse(cleanedResult, tool: tool)
+            let items = try await CoreResponseService.shared.parseListResponse(cleanedResult, tool: tool)
             
             // Convert to AIGeneratedItem
             let generatedItems = items.map { AIGeneratedItem(content: $0, type: tool) }

@@ -14,31 +14,100 @@ import CloutmateShared
 struct ListTableView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Post.createdAt, order: .reverse) private var posts: [Post]
+    @Query(sort: \Artifact.createdAt, order: .reverse) private var artifacts: [Artifact]
     
     @State private var searchText = ""
     @State private var selectedStatus: PostStatus?
+    @State private var selectedFormat: OutputFormat?
     @State private var selectedPlatform: Platform?
     @State private var selectedPosts = Set<UUID>()
+    @State private var selectedArtifacts = Set<UUID>()
     @State private var showComposer = false
+    @State private var showArtifactComposer = false
     @State private var showDeleteAllConfirmation = false
     @State private var refreshID = UUID()
     @State private var selectedViewType: ViewType = .table
     @State private var showPropertyEditor = false
     @State private var postToEdit: Post?
+    @State private var artifactToEdit: Artifact?
     
-    var filteredPosts: [Post] {
-        var filtered = posts
+    enum ListItem: Identifiable {
+        case post(Post)
+        case artifact(Artifact)
+        
+        var id: UUID {
+            switch self {
+            case .post(let post): return post.id
+            case .artifact(let artifact): return artifact.id
+            }
+        }
+        
+        var createdAt: Date {
+            switch self {
+            case .post(let post): return post.createdAt
+            case .artifact(let artifact): return artifact.createdAt
+            }
+        }
+    }
+    
+    var allItems: [ListItem] {
+        var items: [ListItem] = []
+        items.append(contentsOf: posts.map { .post($0) })
+        items.append(contentsOf: artifacts.map { .artifact($0) })
+        // Prioritize artifacts - show them first regardless of date
+        return items.sorted { item1, item2 in
+            switch (item1, item2) {
+            case (.artifact, .post):
+                return true // Artifacts first
+            case (.post, .artifact):
+                return false // Posts after artifacts
+            default:
+                // Within same type, sort by date (newest first)
+                return item1.createdAt > item2.createdAt
+            }
+        }
+    }
+    
+    var filteredItems: [ListItem] {
+        var filtered = allItems
         
         if !searchText.isEmpty {
-            filtered = filtered.filter { $0.caption.localizedCaseInsensitiveContains(searchText) }
+            filtered = filtered.filter { item in
+                switch item {
+                case .post(let post):
+                    return post.caption.localizedCaseInsensitiveContains(searchText)
+                case .artifact(let artifact):
+                    return artifact.title.localizedCaseInsensitiveContains(searchText) ||
+                           artifact.content.localizedCaseInsensitiveContains(searchText)
+                }
+            }
         }
         
         if let status = selectedStatus {
-            filtered = filtered.filter { $0.postStatus == status }
+            filtered = filtered.filter { item in
+                if case .post(let post) = item {
+                    return post.postStatus == status
+                }
+                return false
+            }
+        }
+        
+        if let format = selectedFormat {
+            filtered = filtered.filter { item in
+                if case .artifact(let artifact) = item {
+                    return artifact.format == format
+                }
+                return false
+            }
         }
         
         if let platform = selectedPlatform {
-            filtered = filtered.filter { $0.postPlatforms.contains(platform) }
+            filtered = filtered.filter { item in
+                if case .post(let post) = item {
+                    return post.postPlatforms.contains(platform)
+                }
+                return false
+            }
         }
         
         return filtered
@@ -50,7 +119,7 @@ struct ListTableView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
-                TextField("Search posts...", text: $searchText)
+                TextField("Search posts & artifacts...", text: $searchText)
             }
             .padding(8)
             .background(Color.secondary.opacity(0.1))
@@ -61,18 +130,35 @@ struct ListTableView: View {
                 HStack(spacing: 8) {
                     FilterChip(
                         title: "All",
-                        isSelected: selectedStatus == nil && selectedPlatform == nil,
-                        action: { selectedStatus = nil; selectedPlatform = nil }
+                        isSelected: selectedStatus == nil && selectedFormat == nil && selectedPlatform == nil,
+                        action: { selectedStatus = nil; selectedFormat = nil; selectedPlatform = nil }
                     )
                     
+                    // Post Status filters
                     ForEach(PostStatus.allCases, id: \.self) { status in
                         FilterChip(
                             title: status.displayName,
                             isSelected: selectedStatus == status,
-                            action: { selectedStatus = status }
+                            action: { 
+                                selectedStatus = status
+                                selectedFormat = nil
+                            }
                         )
                     }
                     
+                    // Output Format filters
+                    ForEach(OutputFormat.allCases, id: \.self) { format in
+                        FilterChip(
+                            title: format.displayName,
+                            isSelected: selectedFormat == format,
+                            action: { 
+                                selectedFormat = format
+                                selectedStatus = nil
+                            }
+                        )
+                    }
+                    
+                    // Platform filters (backward compatibility)
                     ForEach(Platform.allCases, id: \.self) { platform in
                         FilterChip(
                             title: platform.displayName,
@@ -87,64 +173,110 @@ struct ListTableView: View {
     }
     
     private var tableSection: some View {
-        Table(filteredPosts, selection: $selectedPosts) {
-            TableColumn("Caption") { post in
-                Text(post.caption)
-                    .lineLimit(2)
-                    .contextMenu {
-                        Button("Edit") {
-                            postToEdit = post
-                        }
-                        Button("Duplicate") {
-                            duplicatePost(post)
-                        }
-                        Divider()
-                        Button("Delete", role: .destructive) {
-                            deleteSinglePost(post)
-                        }
+        Table(filteredItems, selection: Binding(
+            get: { 
+                var ids = Set<UUID>()
+                ids.formUnion(selectedPosts)
+                ids.formUnion(selectedArtifacts)
+                return ids
+            },
+            set: { newSelection in
+                selectedPosts.removeAll()
+                selectedArtifacts.removeAll()
+                for id in newSelection {
+                    if posts.contains(where: { $0.id == id }) {
+                        selectedPosts.insert(id)
+                    } else if artifacts.contains(where: { $0.id == id }) {
+                        selectedArtifacts.insert(id)
                     }
+                }
+            }
+        )) {
+            TableColumn("Content") { listItem in
+                switch listItem {
+                case .post(let post):
+                    Text(post.caption)
+                        .lineLimit(2)
+                        .contextMenu {
+                            Button("Edit") {
+                                postToEdit = post
+                            }
+                            Button("Duplicate") {
+                                duplicatePost(post)
+                            }
+                            Divider()
+                            Button("Delete", role: .destructive) {
+                                deleteSinglePost(post)
+                            }
+                        }
+                case .artifact(let artifact):
+                    Text(artifact.title.isEmpty ? artifact.content.prefix(50).description : artifact.title)
+                        .lineLimit(2)
+                        .contextMenu {
+                            Button("Edit") {
+                                artifactToEdit = artifact
+                            }
+                            Button("Duplicate") {
+                                duplicateArtifact(artifact)
+                            }
+                            Divider()
+                            Button("Delete", role: .destructive) {
+                                deleteSingleArtifact(artifact)
+                            }
+                        }
+                }
             }
             .width(min: 200, ideal: 300)
             
-            TableColumn("Platform") { post in
-                HStack(spacing: 4) {
-                    ForEach(post.postPlatforms, id: \.self) { platform in
-                        Text(platform.displayName)
+            TableColumn("Type") { listItem in
+                switch listItem {
+                case .post:
+                    Text("Post")
+                        .font(.caption)
+                        .foregroundColor(.kosmicBlue)
+                case .artifact(let artifact):
+                    HStack(spacing: 4) {
+                        Image(systemName: formatIcon(for: artifact.format))
+                            .font(.caption2)
+                        Text(artifact.format.displayName)
                             .font(.caption)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(platform == .threads ? Color.kosmicPurple.opacity(0.2) : Color.kosmicBlue.opacity(0.2))
-                            .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
-                            .cornerRadius(4)
                     }
+                    .foregroundColor(formatColor(for: artifact.format))
                 }
             }
             .width(min: 120)
             
-            TableColumn("Status") { post in
-                PostStatusBadge(status: CloutmateShared.PostStatus(rawValue: post.status) ?? .draft)
+            TableColumn("Status") { listItem in
+                switch listItem {
+                case .post(let post):
+                    PostStatusBadge(status: CloutmateShared.PostStatus(rawValue: post.status) ?? .draft)
+                case .artifact(let artifact):
+                    ArtifactStateBadge(state: artifact.artifactState)
+                }
             }
             .width(min: 100)
             
-            TableColumn("Scheduled") { post in
-                if let scheduledDate = post.scheduledDate {
-                    Text(scheduledDate, format: .dateTime.month().day().hour().minute())
-                } else {
-                    Text("—")
-                        .foregroundColor(.secondary)
+            TableColumn("Date") { listItem in
+                switch listItem {
+                case .post(let post):
+                    if let scheduledDate = post.scheduledDate {
+                        Text(scheduledDate, format: .dateTime.month().day().hour().minute())
+                    } else if let publishedDate = post.publishedDate {
+                        Text(publishedDate, format: .dateTime.month().day().hour().minute())
+                    } else {
+                        Text("—")
+                            .foregroundColor(.secondary)
+                    }
+                case .artifact(let artifact):
+                    if let publishedAt = artifact.publishedAt {
+                        Text(publishedAt, format: .dateTime.month().day().hour().minute())
+                    } else {
+                        Text(artifact.createdAt, format: .dateTime.month().day().hour().minute())
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
             .width(min: 150)
-            
-            TableColumn("Engagement") { post in
-                if let engagementRate = post.engagementRate {
-                    Text(String(format: "%.1f%%", engagementRate))
-                } else {
-                    Text("—")
-                        .foregroundColor(.secondary)
-                }
-            }
-            .width(min: 100)
         }
     }
     
@@ -161,14 +293,42 @@ struct ListTableView: View {
             Group {
                 switch selectedViewType {
                 case .table:
-            tableSection
+                    if filteredItems.isEmpty {
+                        VStack(spacing: 16) {
+                            Image(systemName: artifacts.isEmpty ? "sparkles" : "doc.text")
+                                .font(.system(size: 48))
+                                .foregroundColor(.secondary)
+                            Text(artifacts.isEmpty && posts.isEmpty ? "No Artifacts Yet" : "No matches")
+                                .font(.title2)
+                                .fontWeight(.semibold)
+                            Text(artifacts.isEmpty && posts.isEmpty 
+                                ? "Create your first artifact to get started with Aurora's cognitive workspace"
+                                : "Try a different search or filter")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Button("Create Artifact") {
+                                showArtifactComposer = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .padding(.top, 8)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding()
+                    } else {
+                        tableSection
+                    }
                 case .kanban:
-                    KanbanBoardView(posts: filteredPosts)
+                    // Kanban view only supports posts for now (backward compatibility)
+                    KanbanBoardView(posts: filteredItems.compactMap { if case .post(let p) = $0 { return p }; return nil })
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 case .gallery:
-                    PostGalleryView(posts: filteredPosts)
+                    // Gallery view only supports posts for now (backward compatibility)
+                    PostGalleryView(posts: filteredItems.compactMap { if case .post(let p) = $0 { return p }; return nil })
                 case .timeline:
-                    PostTimelineView(posts: filteredPosts)
+                    // Timeline view only supports posts for now (backward compatibility)
+                    PostTimelineView(posts: filteredItems.compactMap { if case .post(let p) = $0 { return p }; return nil })
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 @unknown default:
                     EmptyView()
@@ -185,27 +345,32 @@ struct ListTableView: View {
         .id(refreshID)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                if !selectedPosts.isEmpty {
+                if !selectedPosts.isEmpty || !selectedArtifacts.isEmpty {
                     Menu("Actions") {
                         Button("Export", systemImage: "square.and.arrow.up") {
-                            exportSelectedPosts()
+                            exportSelectedItems()
                         }
                         
                         Button("Delete Selected", systemImage: "trash") {
-                            deleteSelectedPosts()
+                            deleteSelectedItems()
                         }
                         
                         Button("Archive", systemImage: "archivebox") {
-                            archiveSelectedPosts()
+                            archiveSelectedItems()
                         }
                     }
                 }
                 
-                Button("New Post") {
-                    showComposer = true
+                Menu("New") {
+                    Button("New Post") {
+                        showComposer = true
+                    }
+                    Button("New Artifact") {
+                        showArtifactComposer = true
+                    }
                 }
                 
-                if !filteredPosts.isEmpty && selectedPosts.count == filteredPosts.count && filteredPosts.count > 1 {
+                if !filteredItems.isEmpty && (selectedPosts.count + selectedArtifacts.count) == filteredItems.count && filteredItems.count > 1 {
                     Button("Delete All", systemImage: "trash.fill") {
                         showDeleteAllConfirmation = true
                     }
@@ -213,48 +378,56 @@ struct ListTableView: View {
                 }
             }
         }
-        .alert("Delete All Posts?", isPresented: $showDeleteAllConfirmation) {
+        .alert("Delete All Items?", isPresented: $showDeleteAllConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Delete All", role: .destructive) {
-                deleteAllPosts()
+                deleteAllItems()
             }
         } message: {
-            Text("This will permanently delete all \(filteredPosts.count) posts shown in the list. This action cannot be undone.")
+            Text("This will permanently delete all \(filteredItems.count) items shown in the list. This action cannot be undone.")
         }
         .sheet(isPresented: $showComposer) {
             ComposerWindow()
         }
+        .sheet(isPresented: $showArtifactComposer) {
+            ArtifactComposerView()
+        }
         .sheet(item: $postToEdit) { post in
             ComposerWindow(existingPost: post)
+        }
+        .sheet(item: $artifactToEdit) { artifact in
+            ArtifactComposerView(existingArtifact: artifact)
         }
         .sheet(isPresented: $showPropertyEditor) {
             CustomPropertyEditor()
         }
     }
     
-    private func exportSelectedPosts() {
+    private func exportSelectedItems() {
         let selectedPostsList = posts.filter { selectedPosts.contains($0.id) }
+        let selectedArtifactsList = artifacts.filter { selectedArtifacts.contains($0.id) }
         
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.commaSeparatedText]
-        panel.nameFieldStringValue = "cloutmate-posts-\(Date().formatted(date: .numeric, time: .omitted)).csv"
+        panel.nameFieldStringValue = "cloutmate-items-\(Date().formatted(date: .numeric, time: .omitted)).csv"
         
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             
-            var csvString = "Caption,Platform,Status,Scheduled Date,Published Date,Engagement Rate,Likes,Comments,Reach\n"
+            var csvString = "Type,Title/Caption,Format/Platform,Status,Date,Published Date\n"
             
             for post in selectedPostsList {
                 let platforms = post.postPlatforms.map { $0.displayName }.joined(separator: "|")
                 let scheduledDate = post.scheduledDate?.formatted() ?? ""
                 let publishedDate = post.publishedDate?.formatted() ?? ""
-                let engagementRate = post.engagementRate.map { String(format: "%.2f", $0) } ?? ""
-                let likes = post.likes.map { String($0) } ?? ""
-                let comments = post.comments.map { String($0) } ?? ""
-                let reach = post.reach.map { String($0) } ?? ""
-                
                 let escapedCaption = post.caption.replacingOccurrences(of: "\"", with: "\"\"")
-                csvString += "\"\(escapedCaption)\",\(platforms),\(post.postStatus.displayName),\(scheduledDate),\(publishedDate),\(engagementRate),\(likes),\(comments),\(reach)\n"
+                csvString += "Post,\"\(escapedCaption)\",\(platforms),\(post.postStatus.displayName),\(scheduledDate),\(publishedDate)\n"
+            }
+            
+            for artifact in selectedArtifactsList {
+                let title = (artifact.title.isEmpty ? artifact.content.prefix(50).description : artifact.title).replacingOccurrences(of: "\"", with: "\"\"")
+                let publishedDate = artifact.publishedAt?.formatted() ?? ""
+                csvString += "Artifact,\"\(title)\",\(artifact.format.displayName),\(artifact.artifactState.displayName),\(artifact.createdAt.formatted()),\(publishedDate)\n"
             }
             
             do {
@@ -265,45 +438,65 @@ struct ListTableView: View {
         }
     }
     
-    private func deleteSelectedPosts() {
+    private func deleteSelectedItems() {
         let postsToDelete = posts.filter { selectedPosts.contains($0.id) }
+        let artifactsToDelete = artifacts.filter { selectedArtifacts.contains($0.id) }
         withAnimation {
             for post in postsToDelete {
                 modelContext.delete(post)
             }
-            selectedPosts.removeAll()
-        }
-    }
-    
-    private func deleteAllPosts() {
-        withAnimation {
-            for post in filteredPosts {
-                modelContext.delete(post)
+            for artifact in artifactsToDelete {
+                modelContext.delete(artifact)
             }
             selectedPosts.removeAll()
+            selectedArtifacts.removeAll()
         }
     }
     
-    private func archiveSelectedPosts() {
+    private func deleteAllItems() {
+        withAnimation {
+            for item in filteredItems {
+                switch item {
+                case .post(let post):
+                    modelContext.delete(post)
+                case .artifact(let artifact):
+                    modelContext.delete(artifact)
+                }
+            }
+            selectedPosts.removeAll()
+            selectedArtifacts.removeAll()
+        }
+    }
+    
+    private func archiveSelectedItems() {
         let postsToArchive = posts.filter { selectedPosts.contains($0.id) }
+        let artifactsToArchive = artifacts.filter { selectedArtifacts.contains($0.id) }
         withAnimation {
             for post in postsToArchive {
                 post.postStatus = .published
-                // Add tag to indicate archived
                 if !post.tags.contains("archived") {
                     post.tags.append("archived")
                 }
             }
+            for artifact in artifactsToArchive {
+                artifact.artifactState = .archived
+            }
             selectedPosts.removeAll()
+            selectedArtifacts.removeAll()
         }
     }
     
     private func deleteSinglePost(_ post: Post) {
         withAnimation {
             modelContext.delete(post)
-            if selectedPosts.contains(post.id) {
-                selectedPosts.remove(post.id)
-            }
+            selectedPosts.remove(post.id)
+        }
+    }
+    
+    private func deleteSingleArtifact(_ artifact: Artifact) {
+        withAnimation {
+            modelContext.delete(artifact)
+            selectedArtifacts.remove(artifact.id)
         }
     }
     
@@ -316,6 +509,68 @@ struct ListTableView: View {
             status: PostStatus.draft.rawValue
         )
         modelContext.insert(duplicatedPost)
+    }
+    
+    private func duplicateArtifact(_ artifact: Artifact) {
+        let duplicatedArtifact = Artifact(
+            title: artifact.title,
+            content: artifact.content,
+            mediaURLs: artifact.mediaURLs,
+            outputFormat: artifact.format,
+            state: .draft,
+            tags: artifact.tags
+        )
+        modelContext.insert(duplicatedArtifact)
+    }
+    
+    private func formatIcon(for format: OutputFormat) -> String {
+        switch format {
+        case .brief: return "doc.text"
+        case .summary: return "doc.text.below.ecg"
+        case .reflection: return "brain.head.profile"
+        case .report: return "doc.text.magnifyingglass"
+        case .releaseNote: return "megaphone"
+        case .lessonLearned: return "lightbulb"
+        }
+    }
+    
+    private func formatColor(for format: OutputFormat) -> Color {
+        switch format {
+        case .brief: return .kosmicCyan
+        case .summary: return .kosmicBlue
+        case .reflection: return .kosmicPurple
+        case .report: return .kosmicPurple
+        case .releaseNote: return .kosmicGreen
+        case .lessonLearned: return .orange
+        }
+    }
+}
+
+struct PostStatusBadge: View {
+    let status: CloutmateShared.PostStatus
+    
+    var body: some View {
+        Text(status.displayName)
+            .font(.caption)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(status.color.opacity(0.2))
+            .foregroundColor(status.color)
+            .cornerRadius(6)
+    }
+}
+
+extension CloutmateShared.PostStatus {
+    var color: Color {
+        switch self {
+        case .draft: return .gray
+        case .scheduled: return .kosmicBlue
+        case .publishing: return .orange
+        case .published: return .kosmicGreen
+        case .failed: return .red
+        @unknown default: return .gray
+        }
     }
 }
 
@@ -341,6 +596,6 @@ struct FilterChip: View {
 
 #Preview {
     ListTableView()
-        .modelContainer(for: [Post.self])
+        .modelContainer(for: [Post.self, Artifact.self])
 }
 

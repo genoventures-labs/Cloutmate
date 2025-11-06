@@ -19,7 +19,7 @@ final class CalendarAvailabilityService {
         workdayStartHour: Int = 9,
         workdayEndHour: Int = 17,
         slotMinutes: Int = 30
-    ) async throws -> [GeminiService.TimeSlot] {
+    ) async throws -> [TimeSlot] {
         let tasks = try modelContext.fetch(FetchDescriptor<Task>())
         let posts = try modelContext.fetch(FetchDescriptor<Post>())
         let cal = Calendar.current
@@ -41,7 +41,7 @@ final class CalendarAvailabilityService {
         busy.sort { $0.start < $1.start }
         
         // Iterate each day in range within work hours
-        var slots: [GeminiService.TimeSlot] = []
+        var slots: [TimeSlot] = []
         var dayStart = range.start
         while dayStart <= range.end {
             var comps = cal.dateComponents([.year, .month, .day], from: dayStart)
@@ -57,7 +57,7 @@ final class CalendarAvailabilityService {
                 // Check conflict
                 let conflicts = busy.contains { $0.intersects(slotInterval) }
                 if !conflicts && slotEnd <= workEnd && slotEnd <= range.end {
-                    slots.append(GeminiService.TimeSlot(start: slotStart, end: slotEnd))
+                    slots.append(TimeSlot(start: slotStart, end: slotEnd))
                 }
                 slotStart = slotEnd
             }

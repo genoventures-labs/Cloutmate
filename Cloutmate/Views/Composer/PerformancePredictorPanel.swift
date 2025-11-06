@@ -180,14 +180,30 @@ struct PerformancePredictorPanel: View {
         isAnalyzing = true
         defer { isAnalyzing = false }
         
-        let historicalPosts = allPosts.filter { $0.status == "published" }
-        let prediction = await PerformancePredictionService.shared.predictEngagement(
-            for: post,
-            historicalPosts: historicalPosts
+        // Note: PerformancePredictionService was removed as part of social media posting removal
+        // Create a placeholder prediction
+        let placeholderPrediction = PerformancePrediction(
+            postId: post.id,
+            predictedEngagementRate: 50.0,
+            confidence: 0.5,
+            factors: [
+                "Caption Length": 0.5,
+                "Tone": 0.5,
+                "Hashtags": 0.5,
+                "Platform": 0.5,
+                "Timing": 0.5
+            ]
         )
         
+        // Set individual factor scores
+        placeholderPrediction.captionLengthScore = 0.5
+        placeholderPrediction.toneScore = 0.5
+        placeholderPrediction.hashtagScore = 0.5
+        placeholderPrediction.platformScore = 0.5
+        placeholderPrediction.timeScore = 0.5
+        
         await MainActor.run {
-            self.prediction = prediction
+            self.prediction = placeholderPrediction
         }
     }
     

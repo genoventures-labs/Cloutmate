@@ -2,7 +2,7 @@
 //  CloutmateHelperApp.swift
 //  CloutmateHelper
 //
-//  Created by Mike Letts on 10/23/25.
+//  Helper app entry point (publishing functionality removed)
 //
 
 import Foundation
@@ -16,8 +16,7 @@ final class CloutmateHelperApp: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         os_log("CloutmateHelper launching...", log: .default, type: .info)
         setupXPCListener()
-        BackgroundScheduler.shared.start()
-        InsightsPoller.shared.start()
+        // BackgroundScheduler and InsightsPoller removed - no longer publishing to social media
     }
     
     private func setupXPCListener() {
@@ -36,4 +35,3 @@ final class CloutmateHelperApp: NSObject, NSApplicationDelegate {
         os_log("CloutmateHelper terminating...", log: .default, type: .info)
     }
 }
-

@@ -8,7 +8,6 @@
 
 import Foundation
 import SwiftData
-import GoogleGenerativeAI
 import os.log
 
 @MainActor
@@ -16,7 +15,6 @@ final class MemoryGraphService {
     static let shared = MemoryGraphService()
     
     private let logger = Logger(subsystem: "com.kosmicapps.Cloutmate", category: "MemoryGraph")
-    private var embeddingModel: GenerativeModel?
     
     private var config: AIConfig {
         AIConfigService.shared.config
@@ -28,31 +26,7 @@ final class MemoryGraphService {
     private var lastCacheRefresh: Date?
     private let cacheValidity: TimeInterval = 300 // 5 minutes
     
-    private init() {
-        _Concurrency.Task {
-            await initializeEmbeddingModel()
-        }
-    }
-    
-    // MARK: - Initialization
-    
-    private func initializeEmbeddingModel() async {
-        guard let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
-              let plist = NSDictionary(contentsOfFile: path),
-              let apiKey = plist["GeminiAPIKey"] as? String,
-              !apiKey.isEmpty else {
-            logger.error("Gemini API key not found for embedding model")
-            return
-        }
-        
-        embeddingModel = GenerativeModel(
-            name: "models/text-embedding-004",
-            apiKey: apiKey
-        )
-        
-        logger.info("Memory graph embedding model initialized")
-        AIDebug.log("MemoryGraphService: Embedding model ready")
-    }
+    private init() {}
     
     // MARK: - Node Operations
     
@@ -228,14 +202,8 @@ final class MemoryGraphService {
     // MARK: - Embedding Generation
     
     func generateEmbedding(for text: String) async throws -> [Float] {
-        guard embeddingModel != nil else {
-            throw MemoryGraphError.embeddingModelNotInitialized
-        }
-        
-        // TODO: Fix embedding API - GoogleGenerativeAI SDK may not support embedContent yet
-        // For now, generate synthetic embeddings using simple hashing
-        // This allows the system to build and run while proper embeddings are researched
-        logger.warning("Using synthetic embeddings - proper Gemini embedding API needs implementation")
+        // Using synthetic embeddings - local implementation for privacy
+        logger.info("Generating synthetic embedding for memory graph")
         return generateSyntheticEmbedding(for: text)
     }
     

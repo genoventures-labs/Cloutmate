@@ -40,7 +40,7 @@ final class NotionService {
             return envID
         }
         
-        // Load from Config.plist (same way as GeminiService does it)
+        // Load from Config.plist (same way as other services do it)
         if let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
            let plist = NSDictionary(contentsOfFile: path),
            let id = plist["NotionOAuthClientId"] as? String, !id.isEmpty {
@@ -59,7 +59,7 @@ final class NotionService {
             return envSecret
         }
         
-        // Load from Config.plist (same way as GeminiService does it)
+        // Load from Config.plist (same way as other services do it)
         if let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
            let plist = NSDictionary(contentsOfFile: path),
            let secret = plist["NotionOAuthClientSecret"] as? String, !secret.isEmpty {

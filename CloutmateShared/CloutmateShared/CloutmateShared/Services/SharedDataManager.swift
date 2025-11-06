@@ -13,6 +13,7 @@ public final class SharedDataManager {
         let schema = Schema([
             // Shared models
             Post.self,
+            Artifact.self,  // New Artifact model for cognitive workspace
             Template.self,
             PlatformAccount.self,
             PerformancePrediction.self,

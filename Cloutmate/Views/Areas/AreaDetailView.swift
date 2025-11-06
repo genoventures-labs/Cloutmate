@@ -221,22 +221,6 @@ struct AreaTaskRow: View {
     }
 }
 
-// MARK: - Supporting Views
-private struct ProjectStatusBadge: View {
-    let status: ProjectStatus
-    
-    var body: some View {
-        Text(status.displayName)
-            .font(.caption)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(status.color.opacity(0.2))
-            .foregroundColor(status.color)
-            .cornerRadius(6)
-    }
-}
-
 #Preview {
     AreaDetailView(area: Area(title: "Example Area", notes: "This is a sample area"))
         .modelContainer(for: [Area.self, CloutmateShared.Project.self, CloutmateShared.Task.self, CloutmateShared.Note.self])

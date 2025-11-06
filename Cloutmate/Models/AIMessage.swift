@@ -41,7 +41,7 @@ final class AIMessage: Identifiable {
     @Attribute var documentFileName: String?
     @Attribute var documentTextPreview: String?
     @Attribute var documentSourceURL: String?
-    @Attribute var documentSourceModel: String? // "Gemini", "AppleLLM", or "Offline"
+    @Attribute var documentSourceModel: String? // "Ollama", "AppleLLM", or "Offline"
     
     // Inverse relationship
     var conversation: AIConversation?
