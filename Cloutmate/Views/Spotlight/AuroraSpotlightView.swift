@@ -77,6 +77,9 @@ struct AuroraSpotlightView: View {
     
     var body: some View {
         VStack(spacing: 0) {
+            // Drag handle at the top
+            dragHandle
+            
             topInputArea
             messageArea
             bottomInputArea
@@ -86,11 +89,20 @@ struct AuroraSpotlightView: View {
         .shadow(color: .black.opacity(0.3), radius: 20)
         .frame(width: 600)
         .onAppear {
+            // Load existing conversation messages when Spotlight opens
+            Task {
+                await viewModel.loadCurrentConversation(modelContext: modelContext)
+            }
+            
             if viewModel.messages.isEmpty {
                 isInputFocused = true
             } else {
                 isBottomInputFocused = true
             }
+        }
+        .onDisappear {
+            // Stop polling when Spotlight closes
+            viewModel.stopPolling()
         }
         .onChange(of: viewModel.messages.count) { oldCount, newCount in
             // Focus bottom input when Aurora replies
@@ -144,6 +156,13 @@ struct AuroraSpotlightView: View {
     private func setupKeyboardHandlers() {
         // Set up keyboard monitoring for "+" key combo
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Don't intercept if a text field or text editor is focused (unless it's our own input)
+            if let firstResponder = NSApp.keyWindow?.firstResponder,
+               (firstResponder is NSTextView || firstResponder is NSTextField),
+               !(isInputFocused || isBottomInputFocused) {
+                return event
+            }
+            
             // Check for Cmd+N or "+" key when input is focused
             if isInputFocused || isBottomInputFocused {
                 // Cmd+N
@@ -161,6 +180,21 @@ struct AuroraSpotlightView: View {
         }
     }
     
+    private var dragHandle: some View {
+        HStack {
+            Spacer()
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.secondary.opacity(0.4))
+                .frame(width: 40, height: 4)
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Allow dragging from the handle
+        }
+    }
+    
     private var topInputArea: some View {
         HStack(spacing: 12) {
             Image(systemName: "sparkles")
@@ -171,12 +205,43 @@ struct AuroraSpotlightView: View {
                 text: $viewModel.inputText,
                 isFocused: $isInputFocused,
                 placeholder: "Ask Aurora...",
-                onSubmit: handleTopInputSubmit,
+                onSubmit: {
+                    // Only submit if there's actual text (prevent auto-submit)
+                    let trimmed = viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        handleTopInputSubmit()
+                    }
+                },
                 linkedContext: Binding(
                     get: { LinkedContext() },
                     set: { _ in }
                 )
             )
+            
+            // Pop-out button (only show when there are messages)
+            if !viewModel.messages.isEmpty {
+                Button(action: {
+                    // Switch to AI Assistant tab and select current conversation
+                    NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.aiAssistant)
+                    
+                    // Post notification to select the conversation
+                    if let conversation = viewModel.currentConversation {
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("SelectAIConversation"),
+                            object: conversation
+                        )
+                    }
+                    
+                    // Close spotlight
+                    AuroraSpotlightWindowController.shared.close()
+                }) {
+                    Image(systemName: "arrow.up.right.square")
+                        .foregroundColor(.kosmicBlue)
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+                .help("Open in AI Assistant")
+            }
             
             if viewModel.isLoading {
                 ProgressView()

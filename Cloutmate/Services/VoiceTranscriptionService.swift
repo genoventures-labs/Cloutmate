@@ -85,12 +85,80 @@ final class VoiceTranscriptionService: NSObject {
             throw NSError(domain: "VoiceTranscription", code: 13, userInfo: [NSLocalizedDescriptionKey: "Invalid audio format from input node"])
         }
 
+        // Create a compatible format for speech recognition
+        // Speech recognition prefers mono, 16kHz sample rate
+        guard let recordingFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: 16000,
+            channels: 1,
+            interleaved: false
+        ) else {
+            // If we can't create the recording format, use input format directly
+            inputNode.removeTap(onBus: 0)
+            inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+                guard let self else { return }
+                self.recognitionRequest?.append(buffer)
+                self.updateLevel(from: buffer)
+            }
+            audioEngine.prepare()
+            try audioEngine.start()
+            
+            recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+                guard let self else { return }
+                if let result {
+                    let text = result.bestTranscription.formattedString
+                    if result.isFinal {
+                        if !self.accumulatedText.isEmpty {
+                            self.accumulatedText += " "
+                        }
+                        self.accumulatedText += text
+                        self.onFinal?(self.accumulatedText)
+                    } else {
+                        let combined = self.accumulatedText.isEmpty ? text : "\(self.accumulatedText) \(text)"
+                        self.onPartial?(combined)
+                    }
+                }
+                if let error {
+                    self.onError?(error)
+                    self.stopTranscribing()
+                }
+            }
+            return
+        }
+        
+        // Create a converter if needed
+        var converter: AVAudioConverter?
+        if inputFormat != recordingFormat {
+            converter = AVAudioConverter(from: inputFormat, to: recordingFormat)
+        }
+
         inputNode.removeTap(onBus: 0)
-        // Use the input node's native format
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+        // Use the recording format (or input format if converter not needed)
+        let tapFormat = converter != nil ? recordingFormat : inputFormat
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: tapFormat) { [weak self] buffer, _ in
             guard let self else { return }
-            self.recognitionRequest?.append(buffer)
-            self.updateLevel(from: buffer)
+            
+            // Convert buffer if needed
+            if let converter = converter {
+                let capacity = AVAudioFrameCount(Double(buffer.frameLength) * recordingFormat.sampleRate / inputFormat.sampleRate)
+                guard let convertedBuffer = AVAudioPCMBuffer(pcmFormat: recordingFormat, frameCapacity: capacity) else {
+                    return
+                }
+                
+                var error: NSError?
+                converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
+                    outStatus.pointee = .haveData
+                    return buffer
+                }
+                
+                if error == nil {
+                    self.recognitionRequest?.append(convertedBuffer)
+                    self.updateLevel(from: convertedBuffer)
+                }
+            } else {
+                self.recognitionRequest?.append(buffer)
+                self.updateLevel(from: buffer)
+            }
         }
 
         audioEngine.prepare()

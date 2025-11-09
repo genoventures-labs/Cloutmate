@@ -128,6 +128,9 @@ struct JournalView: View {
                         Text(journal.title)
                             .font(.headline)
                             .lineLimit(1)
+                        if journal.author == .aurora {
+                            AuroraAuthorBadge()
+                        }
                     }
                     
                     if !journal.content.isEmpty {
@@ -312,6 +315,7 @@ struct JournalView: View {
         )
         duplicated.aiPrompt = journal.aiPrompt
         duplicated.aiGeneratedContent = journal.aiGeneratedContent
+        duplicated.author = journal.author
         modelContext.insert(duplicated)
         try? modelContext.save()
     }
@@ -654,6 +658,7 @@ struct CreateJournalEntrySheet: View {
             mood: mood,
             tags: tagArray
         )
+        journal.author = .user
         
         modelContext.insert(journal)
         try? modelContext.save()
@@ -839,6 +844,7 @@ struct JournalAIPanel: View {
                 )
                 
                 journal.aiGeneratedContent = content
+                journal.author = .aurora
                 journal.updatedAt = Date()
                 try? modelContext.save()
                 isGenerating = false

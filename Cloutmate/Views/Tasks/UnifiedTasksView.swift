@@ -20,7 +20,6 @@ struct UnifiedTasksView: View {
     
     @State private var selectedFilter: TasksHeaderView.TaskFilter = .all
     @State private var showCreateSheet = false
-    @State private var showEditSheet = false
     @State private var taskToEdit: Task?
     @State private var scrollOffset: CGFloat = 0
     @State private var focusedTaskIndex: Int?
@@ -192,7 +191,6 @@ struct UnifiedTasksView: View {
                                         },
                                         onEdit: { task in
                                             taskToEdit = task
-                                            showEditSheet = true
                                         },
                                         onDuplicate: duplicateTask,
                                         onArchive: { task in
@@ -228,9 +226,21 @@ struct UnifiedTasksView: View {
         .sheet(isPresented: $showCreateSheet) {
             CreateTaskSheetWithPrefill(prefilledDate: Calendar.current.startOfDay(for: Date()))
         }
-        .sheet(isPresented: $showEditSheet) {
-            if let task = taskToEdit {
-                EditTaskSheet(task: task)
+        .sheet(isPresented: Binding(
+            get: { taskToEdit != nil },
+            set: { if !$0 { taskToEdit = nil } }
+        )) {
+            Group {
+                if let task = taskToEdit {
+                    EditTaskSheet(task: task)
+                } else {
+                    // Fallback to prevent white box
+                    Color(.windowBackgroundColor)
+                        .frame(width: 600, height: 520)
+                        .overlay(
+                            ProgressView()
+                        )
+                }
             }
         }
         .onAppear {
@@ -276,6 +286,12 @@ struct UnifiedTasksView: View {
     
     private func setupKeyboardNavigation() {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Don't intercept if a text field or text editor is focused
+            if let firstResponder = NSApp.keyWindow?.firstResponder,
+               (firstResponder is NSTextView || firstResponder is NSTextField) {
+                return event
+            }
+            
             if event.modifierFlags.contains(.command) {
                 switch event.charactersIgnoringModifiers?.lowercased() {
                 case "n":
@@ -541,20 +557,12 @@ struct TasksEmptyStateView: View {
     }
 }
 
-// MARK: - Scroll Offset Preference Key
-
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
 // MARK: - Create Task Sheet with Prefill
 
 struct CreateTaskSheetWithPrefill: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query private var allProjects: [CloutmateShared.Project]
     @Query private var allAreas: [Area]
     
@@ -581,7 +589,16 @@ struct CreateTaskSheetWithPrefill: View {
                 VStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Task Title *", text: $title)
-                        TextField("Notes", text: $notes, axis: .vertical).lineLimit(3...6)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
+                        TextField("Notes", text: $notes, axis: .vertical)
+                            .lineLimit(3...6)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -637,9 +654,10 @@ struct CreateTaskSheetWithPrefill: View {
                 }
                 .padding()
             }
+            .background(Color(.windowBackgroundColor))
             .navigationTitle("New Task")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {

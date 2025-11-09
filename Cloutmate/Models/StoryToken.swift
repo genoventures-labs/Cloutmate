@@ -41,6 +41,12 @@ final class StoryToken {
     var isEdited: Bool = false
     var isArchived: Bool = false
     
+    // Linked resources (for Story Tokens UI)
+    var linkedResourceIds: [UUID] = []
+    
+    // Shareable card image (optional, generated on demand)
+    var shareableCardImage: Data?
+    
     init(
         title: String,
         markdown: String,
@@ -64,6 +70,8 @@ final class StoryToken {
         self.emotionalIntensity = 0.0
         self.createdAt = Date()
         self.metrics = [:]
+        self.linkedResourceIds = []
+        self.shareableCardImage = nil
     }
     
     /// Add a metric to this story

@@ -215,6 +215,7 @@ struct NotesView: View {
             markdown: note.markdown,
             tags: note.tags
         )
+        duplicated.author = note.author
         modelContext.insert(duplicated)
         try? modelContext.save()
     }
@@ -392,6 +393,7 @@ struct CreateNoteSheet: View {
     
     private func createNote() {
         let note = Note(title: title, markdown: content)
+        note.author = .user
         modelContext.insert(note)
         try? modelContext.save()
         dismiss()

@@ -34,6 +34,7 @@ enum CaptureType {
 struct QuickCaptureView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query private var templates: [PARATemplate]
     
     @State private var content = ""
@@ -114,6 +115,7 @@ struct QuickCaptureView: View {
             }
         }
         .padding()
+        .background(glassColorSystem.backgroundColor())
         .frame(width: 600, height: 400)
         .sheet(isPresented: $showTemplatePicker) {
             TemplatePickerSheet(
@@ -161,6 +163,7 @@ struct QuickCaptureView: View {
             modelContext.insert(task)
         case .note:
             let note = Note(title: content.prefix(50).description, markdown: content)
+            note.author = .user
             modelContext.insert(note)
         case .post:
             let post = Post(caption: content)

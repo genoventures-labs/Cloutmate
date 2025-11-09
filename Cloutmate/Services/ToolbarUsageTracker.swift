@@ -21,7 +21,7 @@ enum ToolbarAction: String, Codable, CaseIterable {
         case .createProject: return "folder.fill"
         case .createNote: return "note.text"
         case .createReminder: return "bell.fill"
-        case .analyzeDocument: return "doc.text.magnifyingglass"
+        case .analyzeDocument: return "doc.text.viewfinder"
         case .analyzeImage: return "photo.fill"
         }
     }

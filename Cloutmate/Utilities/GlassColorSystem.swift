@@ -293,6 +293,13 @@ class GlassColorSystem: ObservableObject {
         self.emotionalIntensity = intensity
     }
     
+    // MARK: - Sidebar Tone Gradient (Sidebar V2)
+    
+    /// Get sidebar background gradient based on ARTE emotional state
+    func sidebarToneGradient(for state: EmotionalState) -> LinearGradient {
+        return SidebarToneSyncService.gradientForState(state)
+    }
+    
     // MARK: - Lifecycle
     init() {
         GlassColorSystem.active = self

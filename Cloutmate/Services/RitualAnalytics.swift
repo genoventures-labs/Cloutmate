@@ -53,6 +53,12 @@ final class RitualAnalytics {
         saveContext(modelContext)
         metricsDidChange.send()
     }
+    
+    func recordReflection(_ note: ReflectionNote, modelContext: ModelContext) {
+        saveContext(modelContext)
+        metricsDidChange.send()
+        logger.debug("Recorded reflection note")
+    }
 
     // MARK: - Summary Generation
 

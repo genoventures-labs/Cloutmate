@@ -71,6 +71,7 @@ final class FocusSessionService {
             logger.info("Focus session started: \(session.objective) for \(session.plannedDuration / 60) minutes")
             AIDebug.log("Focus session started: \(session.id.uuidString)")
             NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
+            NotificationCenter.default.post(name: .focusSessionStarted, object: session)
         } catch {
             logger.error("Failed to save focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
@@ -125,8 +126,14 @@ final class FocusSessionService {
             
             // Log to feedback system
             _ = AIFeedbackLogger.shared.recordFocusSession(session: session, modelContext: modelContext)
+            
+            // Link to memory graph
+            Task {
+                try? await MemoryGraphService.shared.linkFocusSession(session: session, modelContext: modelContext)
+            }
 
             NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
+            NotificationCenter.default.post(name: .focusSessionEnded, object: session)
         } catch {
             logger.error("Failed to commit focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
@@ -165,12 +172,39 @@ final class FocusSessionService {
             _ = AIFeedbackLogger.shared.recordFocusSession(session: session, modelContext: modelContext)
 
             NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
+            NotificationCenter.default.post(name: .focusSessionEnded, object: session)
         } catch {
             logger.error("Failed to abandon focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
         }
         
         return session
+    }
+    
+    // MARK: - Streak & Analytics
+    
+    /// Get current focus streak count (consecutive days with completed sessions)
+    func getStreakCount(modelContext: ModelContext) -> Int {
+        let calendar = Calendar.current
+        var streak = 0
+        var checkDate = calendar.startOfDay(for: Date())
+        
+        while streak < 365 { // Max 365 day streak
+            let dayEnd = calendar.date(byAdding: .day, value: 1, to: checkDate) ?? checkDate
+            let dayRange = DateInterval(start: checkDate, end: dayEnd)
+            let daySessions = getSessions(in: dayRange, modelContext: modelContext)
+            let completed = daySessions.filter { $0.status == .completed }
+            
+            if completed.isEmpty {
+                break
+            }
+            
+            streak += 1
+            guard let prevDate = calendar.date(byAdding: .day, value: -1, to: checkDate) else { break }
+            checkDate = prevDate
+        }
+        
+        return streak
     }
     
     // MARK: - Session History & Stats

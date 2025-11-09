@@ -11,27 +11,28 @@ import CloutmateShared
 
 struct NoteCardV2: View {
     @Bindable var note: Note
+    let selectionMode: Bool
+    let isSelected: Bool
+    let onSelectionToggle: () -> Void
     let onTap: () -> Void
     let onEdit: () -> Void
     let onPin: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
+    let onSendToTasks: () -> Void
     
     @State private var isHovered = false
     @State private var showHoverActions = false
     
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     private var previewText: String {
         let lines = note.markdown.components(separatedBy: .newlines)
         let firstThreeLines = Array(lines.prefix(3)).joined(separator: "\n")
         return firstThreeLines.isEmpty ? "No content" : firstThreeLines
-    }
-    
-    private var isSelected: Bool {
-        false // Can be bound from parent if needed
     }
     
     var body: some View {
@@ -55,7 +56,7 @@ struct NoteCardV2: View {
                     // Content
                     VStack(alignment: .leading, spacing: 8) {
                         // Title with pin indicator
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        HStack(alignment: .center, spacing: 6) {
                             if note.isPinned {
                                 Image(systemName: "pin.fill")
                                     .font(.caption2)
@@ -82,6 +83,10 @@ struct NoteCardV2: View {
                                         )
                                     )
                                 }
+                            
+                            if note.author == .aurora {
+                                AuroraAuthorBadge()
+                            }
                         }
                         
                         // Preview text with fade-out
@@ -174,10 +179,39 @@ struct NoteCardV2: View {
             }
         }
         .floatLift()
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: isSelected ? [.kosmicBlue, .kosmicPurple] : [.clear, .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: isSelected ? 2 : 0
+                )
+        )
+        .overlay(alignment: .topTrailing) {
+            if selectionMode {
+                SelectionIndicator(isSelected: isSelected)
+                    .padding(10)
+                    .onTapGesture {
+                        onSelectionToggle()
+                    }
+            }
+        }
         .onTapGesture {
-            onTap()
+            if selectionMode {
+                onSelectionToggle()
+            } else {
+                onTap()
+            }
         }
         .onHover { hovering in
+            guard !selectionMode else {
+                isHovered = hovering
+                showHoverActions = false
+                return
+            }
             if reduceMotion {
                 isHovered = hovering
                 showHoverActions = hovering
@@ -189,24 +223,34 @@ struct NoteCardV2: View {
             }
         }
         .contextMenu {
-            Button("Edit") {
-                onEdit()
-            }
-            Button(note.isPinned ? "Unpin" : "Pin") {
-                onPin()
-            }
-            Divider()
-            Button("Archive") {
-                onArchive()
-            }
-            Button("Delete", role: .destructive) {
-                onDelete()
+            if !selectionMode {
+                Button("Edit") {
+                    onEdit()
+                }
+                Button("Send to Tasks", systemImage: "checkmark.circle") {
+                    onSendToTasks()
+                }
+                Button(note.isPinned ? "Unpin" : "Pin") {
+                    onPin()
+                }
+                Divider()
+                Button("Archive") {
+                    onArchive()
+                }
+                Button("Delete", role: .destructive) {
+                    onDelete()
+                }
             }
         }
         .accessibilityLabel("Note: \(note.title)")
         .accessibilityHint("Double tap to open")
         .accessibilityValue(note.isPinned ? "Pinned" : "")
         .accessibilityAddTraits(note.isPinned ? .isSelected : [])
+        .onChange(of: selectionMode) { _, newValue in
+            if newValue {
+                showHoverActions = false
+            }
+        }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
@@ -228,26 +272,32 @@ extension View {
     VStack(spacing: 12) {
         NoteCardV2(
             note: Note(title: "Sample Note", markdown: "This is a sample note with some content that spans multiple lines.\n\nHere's another paragraph to show how the preview works."),
+            selectionMode: false,
+            isSelected: false,
+            onSelectionToggle: {},
             onTap: {},
             onEdit: {},
             onPin: {},
             onArchive: {},
-            onDelete: {}
+            onDelete: {},
+            onSendToTasks: {}
         )
         
         NoteCardV2(
             note: {
                 let note = Note(title: "Pinned Note", markdown: "This note is pinned and should show a gradient title.")
                 note.isPinned = true
-                note.pinnedAt = Date()
-                note.tags = ["important", "ideas", "work"]
                 return note
             }(),
+            selectionMode: true,
+            isSelected: true,
+            onSelectionToggle: {},
             onTap: {},
             onEdit: {},
             onPin: {},
             onArchive: {},
-            onDelete: {}
+            onDelete: {},
+            onSendToTasks: {}
         )
     }
     .padding()

@@ -25,6 +25,7 @@ struct FocusModeView: View {
     @State private var sessionCompleted = true
     
     @State private var currentTime = Date()
+    @State private var pendingSessionParams: PendingFocusSessionParams?
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -125,12 +126,56 @@ struct FocusModeView: View {
                 onComplete: completeSession
             )
         }
+        .onReceive(NotificationCenter.default.publisher(for: .startPendingFocusSession)) { notification in
+            // Store the pending session parameters
+            if let params = notification.object as? PendingFocusSessionParams {
+                pendingSessionParams = params
+                // Try to start immediately if no active session
+                tryStartPendingSession()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .currentTabUpdated)) { notification in
+            // When tab switches to Focus Mode, try to start pending session
+            if let tab = notification.object as? TabIdentifier,
+               tab == .focusMode {
+                tryStartPendingSession()
+            }
+        }
+        .onAppear {
+            // Also try when view appears (in case notification arrived before view loaded)
+            tryStartPendingSession()
+        }
     }
     
     private func refreshData() {
         activeSession = FocusSessionService.shared.getActiveSession(modelContext: modelContext)
         recentSessions = FocusSessionService.shared.getRecentSessions(limit: 10, modelContext: modelContext)
         suggestedTargets = FocusSessionService.shared.suggestFocusTargets(limit: 5, modelContext: modelContext)
+    }
+    
+    private func tryStartPendingSession() {
+        // Only start if we have pending params, no active session, and we're on Focus Mode tab
+        guard let params = pendingSessionParams,
+              activeSession == nil else {
+            return
+        }
+        
+        // Start the session with the provided parameters
+        do {
+            let session = try FocusSessionService.shared.startSession(
+                objective: params.objective,
+                plannedDuration: params.plannedDuration,
+                targetObjectId: params.targetObjectId,
+                targetObjectType: params.targetObjectType,
+                modelContext: modelContext
+            )
+            activeSession = session
+            pendingSessionParams = nil // Clear pending params after starting
+            refreshData() // Refresh to show the new session
+        } catch {
+            print("Failed to start pending focus session: \(error)")
+            pendingSessionParams = nil // Clear on error too
+        }
     }
     
     private func startSession() {

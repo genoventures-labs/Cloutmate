@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import CloutmateShared
 import os.log
 
 @MainActor
@@ -228,6 +229,54 @@ final class MemoryGraphService {
         return embedding
     }
     
+    // MARK: - Focus Session Linking
+    
+    /// Link a FocusSession to MemoryNode for later recall
+    func linkFocusSession(
+        session: FocusSession,
+        modelContext: ModelContext
+    ) async throws {
+        guard config.featureFlags.memoryGraphEnabled else {
+            logger.debug("Memory graph disabled - skipping session link")
+            return
+        }
+        
+        // Create a concept node for the session objective
+        let content = """
+        Focus Session: \(session.objective)
+        Duration: \(session.durationFormatted)
+        Status: \(session.status.rawValue)
+        Completed: \(session.completed)
+        """
+        
+        let sessionNode = try await createConceptNode(
+            concept: "Focus Session: \(session.objective)",
+            content: content,
+            modelContext: modelContext
+        )
+        
+        // If session is linked to a workspace object, create edge
+        if let targetId = session.targetObjectId {
+            let targetDescriptor = FetchDescriptor<MemoryNode>(
+                predicate: #Predicate { $0.objectId == targetId }
+            )
+            
+            if let targetNode = try? modelContext.fetch(targetDescriptor).first {
+                _ = try createEdge(
+                    from: sessionNode.id,
+                    to: targetNode.id,
+                    type: .relatedTo,
+                    weight: 0.7,
+                    reason: "Focus session linked to \(session.targetObjectType ?? "object")",
+                    modelContext: modelContext
+                )
+                logger.info("Linked focus session to memory node: \(targetId.uuidString)")
+            }
+        }
+        
+        logger.info("Created memory graph link for focus session: \(session.id.uuidString)")
+    }
+    
     // MARK: - Helper Methods
     
     private func buildContent(for object: any RecallTrackable) -> String {
@@ -311,6 +360,66 @@ final class MemoryGraphService {
             sortBy: [SortDescriptor(\.salience, order: .reverse)]
         )
         return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    /// Get linked projects for an area
+    func linkedProjects(for areaId: UUID, modelContext: ModelContext) -> [CloutmateShared.Project] {
+        let descriptor = FetchDescriptor<CloutmateShared.Project>()
+        guard let allProjects = try? modelContext.fetch(descriptor) else {
+            return []
+        }
+        return allProjects.filter { $0.areaId == areaId }
+    }
+    
+    // MARK: - Archive Integration
+    
+    /// Retrieve archived relationships for an object
+    func retrieveArchivedRelationships(
+        for objectId: UUID,
+        modelContext: ModelContext
+    ) -> [MemoryEdge] {
+        guard config.featureFlags.memoryGraphEnabled else { return [] }
+        
+        // Query edges where sourceNodeId or targetNodeId matches
+        let edgeDescriptor = FetchDescriptor<MemoryEdge>(
+            predicate: #Predicate { edge in
+                edge.sourceNodeId == objectId || edge.targetNodeId == objectId
+            }
+        )
+        
+        guard let edges = try? modelContext.fetch(edgeDescriptor) else {
+            return []
+        }
+        
+        // Filter to active (non-archived) relationships
+        // For now, return all edges - can be enhanced to check archived status of linked nodes
+        return edges
+    }
+    
+    /// Update archived status for a memory node
+    func updateArchivedStatus(
+        for objectId: UUID,
+        isArchived: Bool,
+        modelContext: ModelContext
+    ) throws {
+        guard config.featureFlags.memoryGraphEnabled else { return }
+        
+        // Find node for this object
+        let descriptor = FetchDescriptor<MemoryNode>(
+            predicate: #Predicate { $0.objectId == objectId }
+        )
+        
+        if let node = try? modelContext.fetch(descriptor).first {
+            // Update node tags to reflect archived status
+            if isArchived {
+                if !node.tags.contains("archived") {
+                    node.tags.append("archived")
+                }
+            } else {
+                node.tags.removeAll { $0 == "archived" }
+            }
+            try modelContext.save()
+        }
     }
 }
 

@@ -20,5 +20,26 @@ extension Notification.Name {
     static let showVoiceMemo = Notification.Name("showVoiceMemo")
     static let showArtifactComposer = Notification.Name("showArtifactComposer")
     static let openNoteDetail = Notification.Name("openNoteDetail")
+    static let openJournalEntry = Notification.Name("openJournalEntry")
+    static let openDraftEditor = Notification.Name("openDraftEditor")
+    static let draftPublished = Notification.Name("draftPublished")
+    static let openInboxCapture = Notification.Name("openInboxCapture")
+    static let openResourceDetail = Notification.Name("openResourceDetail")
+    static let showResourceImport = Notification.Name("showResourceImport")
+    static let openAIAssistantThread = Notification.Name("openAIAssistantThread")
+    static let openEntity = Notification.Name("openEntity")
+    static let openAreaDetail = Notification.Name("openAreaDetail")
+    static let startPendingFocusSession = Notification.Name("startPendingFocusSession")
+    static let focusSessionStarted = Notification.Name("focusSessionStarted")
+    static let focusSessionEnded = Notification.Name("focusSessionEnded")
+}
+
+// MARK: - Focus Session Parameters
+
+struct PendingFocusSessionParams {
+    let objective: String
+    let plannedDuration: TimeInterval
+    let targetObjectId: UUID?
+    let targetObjectType: String?
 }
 

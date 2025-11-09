@@ -1076,6 +1076,34 @@ extension Note: RecallTrackable {
     }
 }
 
+extension Journal: RecallTrackable {
+    var recallObjectId: UUID { id }
+    var recallObjectType: RecallObjectType { .document }
+    var recallTitle: String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Journal Entry" : trimmed
+    }
+    var recallDetail: String {
+        if !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return content
+        }
+        if let summary = aiGeneratedContent, !summary.isEmpty {
+            return summary
+        }
+        return "Journal entry (\(journalEntryType.rawValue))"
+    }
+    var recallUpdatedAt: Date { updatedAt }
+    var recallImportance: Double {
+        journalMood == .none ? 0.4 : 0.7
+    }
+    var recallKeywords: [String] {
+        var values = tags.map { $0.lowercased() }
+        values.append(journalMood.rawValue.lowercased())
+        values.append(journalEntryType.rawValue.lowercased())
+        return values
+    }
+}
+
 extension Draft: RecallTrackable {
     var recallObjectId: UUID { id }
     var recallObjectType: RecallObjectType { .draft }
@@ -1224,5 +1252,167 @@ private extension AIRecallService {
             AIDebug.log("Failed to prune stale recall entries: \(error.localizedDescription)")
         }
         lastPruneRun = referenceDate
+    }
+    
+    // MARK: - Conversation Memory Layer
+    
+    /// Generate a context snapshot for a conversation
+    /// Auto-summarizes after 5+ messages and stores sentiment, tags, and ARTE tone
+    internal func generateContextSnapshot(conversationId: UUID, modelContext: ModelContext) async -> ConversationContextSnapshot? {
+        guard config.featureFlags.recallEnabled else { return nil }
+        
+        // Fetch conversation
+        var descriptor = FetchDescriptor<AIConversation>(
+            predicate: #Predicate { $0.id == conversationId }
+        )
+        guard let conversation = try? modelContext.fetch(descriptor).first,
+              let messages = conversation.messages,
+              messages.count >= 5 else {
+            return nil
+        }
+        
+        // Generate summary using OllamaBridgeService
+        do {
+            let summary = try await OllamaBridgeService.shared.generateConversationSummary(messages: messages)
+            
+            // Analyze emotional tone from messages
+            let emotionalTone = analyzeConversationTone(messages: messages)
+            
+            // Extract tags from conversation content using AI
+            let tags = await extractConversationTags(messages: messages)
+            
+            // Get ARTE emotional state
+            let arteState = ReactiveThemeManager.shared.currentState.rawValue
+            
+            // Update conversation with summary
+            conversation.summary = summary
+            if conversation.tags.isEmpty {
+                conversation.tags = tags
+            }
+            
+            try modelContext.save()
+            
+            return ConversationContextSnapshot(
+                conversationId: conversationId,
+                summary: summary,
+                emotionalTone: emotionalTone,
+                tags: tags,
+                arteState: arteState,
+                messageCount: messages.count
+            )
+        } catch {
+            AIDebug.log("Failed to generate context snapshot: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    private func analyzeConversationTone(messages: [AIMessage]) -> String {
+        let allContent = messages.compactMap { $0.content }.joined(separator: " ")
+        let emotion = EmotionAnalyzer.analyzeTone(text: allContent)
+        
+        if emotion.valence > 0.3 {
+            return "positive"
+        } else if emotion.valence < -0.3 {
+            return "challenging"
+        } else {
+            return "neutral"
+        }
+    }
+    
+    internal func extractConversationTags(messages: [AIMessage]) async -> [String] {
+        // Use AI to generate relevant tags based on conversation content
+        // This replaces simple keyword matching with intelligent analysis
+        let allContent = messages.compactMap { $0.content }.joined(separator: "\n")
+        
+        // If conversation is too short, return empty tags
+        guard allContent.count > 50 else {
+            return []
+        }
+        
+        // Use Aurora to analyze and tag the conversation
+        return await generateTagsWithAI(messages: messages, content: allContent)
+    }
+    
+    private func generateTagsWithAI(messages: [AIMessage], content: String) async -> [String] {
+        do {
+            // Create a prompt for Aurora to analyze and tag the conversation
+            let conversationText = messages.prefix(10).compactMap { message -> String? in
+                guard let content = message.content else { return nil }
+                let role = message.role == "user" ? "User" : "Aurora"
+                return "\(role): \(content)"
+            }.joined(separator: "\n\n")
+            
+            let prompt = """
+            Analyze this conversation and suggest 1-3 relevant tags that accurately categorize its main topics and purpose.
+            
+            Conversation:
+            \(conversationText)
+            
+            Return ONLY a comma-separated list of tags (e.g., "Web Search, OpenAI, Information"). Each tag should be:
+            - Specific and relevant to the conversation content
+            - Capitalized (e.g., "Task Management" not "task management")
+            - No more than 2-3 words
+            - Focused on the main topics discussed
+            
+            Tags:
+            """
+            
+            // Use CoreResponseService to generate tags
+            let response = try await CoreResponseService.shared.generateResponse(
+                for: prompt,
+                context: "",
+                modelContext: nil
+            )
+            
+            // Parse tags from response
+            let tags = response
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .components(separatedBy: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .prefix(3) // Limit to 3 tags
+            
+            return Array(tags)
+        } catch {
+            AIDebug.log("Failed to generate tags with AI: \(error.localizedDescription)")
+            // Fallback to empty tags if AI fails
+            return []
+        }
+    }
+}
+
+struct ConversationContextSnapshot: Sendable {
+    let conversationId: UUID
+    let summary: String
+    let emotionalTone: String
+    let tags: [String]
+    let arteState: String
+    let messageCount: Int
+}
+
+extension Area: RecallTrackable {
+    var recallObjectId: UUID { id }
+    var recallObjectType: RecallObjectType { .project } // Using project type as closest match
+    var recallTitle: String { title }
+    var recallDetail: String {
+        if let notes = notes, !notes.isEmpty {
+            return notes
+        }
+        return "Area with \(tags.count) tag\(tags.count == 1 ? "" : "s")"
+    }
+    var recallUpdatedAt: Date { updatedAt }
+    var recallImportance: Double {
+        switch status {
+        case .active: return 0.7
+        case .reviewNeeded: return 0.8
+        case .archived: return 0.2
+        }
+    }
+    var recallKeywords: [String] {
+        var values = tags.map { $0.lowercased() }
+        if let categoryIcon = categoryIcon {
+            values.append(categoryIcon.lowercased())
+        }
+        return values
     }
 }

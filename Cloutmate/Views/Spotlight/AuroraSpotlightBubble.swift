@@ -49,6 +49,18 @@ struct AuroraSpotlightBubble: View {
                         )
                         .cornerRadius(12)
                 }
+                
+                // Thinking view (collapsible) for assistant messages
+                if !isUser, let thinking = message.thinkingContent, !thinking.isEmpty {
+                    ThinkingView(thinkingContent: thinking)
+                        .padding(.top, 4)
+                }
+                
+                // Model badge at bottom
+                if !isUser, let modelUsed = message.modelUsed, !modelUsed.isEmpty {
+                    ModelBadge(modelName: modelUsed)
+                        .padding(.top, 4)
+                }
             }
             
             if isUser {

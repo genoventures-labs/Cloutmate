@@ -16,8 +16,10 @@ struct MentionMatch {
 struct MentionParser {
     /// Parse @ mentions from text input
     static func parseMentions(from text: String) -> [MentionMatch] {
-        let pattern = "@([\\w\\s-]+)"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+        // Pattern matches @word or @web followed by optional text
+        // First, find all @mentions (simple pattern)
+        let simplePattern = "@([\\w]+)"
+        guard let regex = try? NSRegularExpression(pattern: simplePattern, options: []) else {
             return []
         }
         
@@ -44,6 +46,41 @@ struct MentionParser {
                 range: fullRange
             )
         }
+    }
+    
+    /// Check if a mention is a web search mention
+    static func isWebSearchMention(_ mention: MentionMatch) -> Bool {
+        return mention.mentionText.lowercased() == "web"
+    }
+    
+    /// Extract search query from @web mention in text
+    static func extractWebSearchQuery(from text: String, mention: MentionMatch) -> String? {
+        guard isWebSearchMention(mention) else { return nil }
+        
+        // Find text after "@web " - look for the next word boundary or end of string
+        let mentionEnd = mention.range.location + mention.range.length
+        
+        // Check if there's text immediately after "@web"
+        if mentionEnd < text.count {
+            let remainingText = String(text[text.index(text.startIndex, offsetBy: mentionEnd)...])
+            let trimmed = remainingText.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // If there's text, extract until next @ or end of line/string
+            if !trimmed.isEmpty {
+                // Find the end of the query (next @, newline, or end of string)
+                var queryEnd = trimmed.count
+                if let nextAt = trimmed.firstIndex(of: "@") {
+                    queryEnd = trimmed.distance(from: trimmed.startIndex, to: nextAt)
+                } else if let newline = trimmed.firstIndex(of: "\n") {
+                    queryEnd = trimmed.distance(from: trimmed.startIndex, to: newline)
+                }
+                
+                let query = String(trimmed.prefix(queryEnd)).trimmingCharacters(in: .whitespacesAndNewlines)
+                return query.isEmpty ? nil : query
+            }
+        }
+        
+        return nil
     }
     
     /// Check if cursor is currently inside a mention (e.g., typing "@proj")

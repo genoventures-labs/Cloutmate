@@ -43,6 +43,15 @@ final class AIMessage: Identifiable {
     @Attribute var documentSourceURL: String?
     @Attribute var documentSourceModel: String? // "Ollama", "AppleLLM", or "Offline"
     
+    // Web search results support
+    @Attribute var webSearchResultsData: Data? // Encoded WebSearchResults
+    @Attribute var webSearchConfidence: Double? // Confidence score for web search results
+    
+    // Thinking and model tracking
+    @Attribute var thinkingContent: String? // Thinking/reasoning content from model
+    @Attribute var modelUsed: String? // Display name of model used (e.g., "Qwen3", "DeepSeek")
+    @Attribute var wasThinking: Bool = false // Whether model was in thinking mode
+    
     // Inverse relationship
     var conversation: AIConversation?
     
@@ -66,7 +75,12 @@ final class AIMessage: Identifiable {
         documentFileName: String? = nil,
         documentTextPreview: String? = nil,
         documentSourceURL: String? = nil,
-        documentSourceModel: String? = nil
+        documentSourceModel: String? = nil,
+        webSearchResults: WebSearchResults? = nil,
+        webSearchConfidence: Double? = nil,
+        thinkingContent: String? = nil,
+        modelUsed: String? = nil,
+        wasThinking: Bool = false
     ) {
         self.id = UUID()
         self.role = role
@@ -89,10 +103,30 @@ final class AIMessage: Identifiable {
         self.documentTextPreview = documentTextPreview
         self.documentSourceURL = documentSourceURL
         self.documentSourceModel = documentSourceModel
+        self.webSearchConfidence = webSearchConfidence
+        self.thinkingContent = thinkingContent
+        self.modelUsed = modelUsed
+        self.wasThinking = wasThinking
+        
+        // Encode web search results if provided
+        if let webSearchResults = webSearchResults {
+            self.webSearchResultsData = try? JSONEncoder().encode(webSearchResults)
+        }
         
         // Encode chart data if provided
         if let chartData = chartData {
             self.chartDataEncoded = try? JSONEncoder().encode(chartData)
+        }
+    }
+    
+    // Helper for web search results access
+    var webSearchResults: WebSearchResults? {
+        get {
+            guard let data = webSearchResultsData else { return nil }
+            return try? JSONDecoder().decode(WebSearchResults.self, from: data)
+        }
+        set {
+            webSearchResultsData = newValue.flatMap { try? JSONEncoder().encode($0) }
         }
     }
     

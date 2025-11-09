@@ -217,6 +217,12 @@ final class AIAssistantViewModel {
         // Initialize conversation if needed
         if currentConversation == nil {
             initializeConversation(modelContext: modelContext)
+            // Ensure conversation is saved before proceeding
+            do {
+                try modelContext.save()
+            } catch {
+                print("Failed to save conversation after initialization: \(error)")
+            }
         }
         
         // Track if this is the first message in the conversation
@@ -263,6 +269,13 @@ final class AIAssistantViewModel {
         modelContext.insert(userMessage)
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
+        
+        // Ensure conversation and user message are saved immediately so it appears in the list
+        do {
+            try modelContext.save()
+        } catch {
+            print("Failed to save conversation with user message: \(error)")
+        }
         
         let typingStyle: TypingStyle
         if !trimmedText.isEmpty {
@@ -391,8 +404,75 @@ final class AIAssistantViewModel {
             let mentions = MentionParser.parseMentions(from: text)
             var resolvedLinkedContext = LinkedContext()
             
-            // Resolve mentions to actual objects
+            // Check for @web mentions and perform web search
+            var webSearchQuery: String? = nil
             for mention in mentions {
+                if MentionParser.isWebSearchMention(mention) {
+                    if let query = MentionParser.extractWebSearchQuery(from: text, mention: mention) {
+                        webSearchQuery = query
+                    } else {
+                        // If no query provided, use the rest of the message as query
+                        let remainingText = text.replacingOccurrences(of: mention.fullText, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                        webSearchQuery = remainingText.isEmpty ? nil : remainingText
+                    }
+                    break // Only handle first @web mention
+                }
+            }
+            
+            // If web search is requested, perform it and include results in context
+            var webSearchResults: String? = nil
+            var webSearchFailed = false
+            var webSearchResult: WebSearchResult? = nil
+            if let query = webSearchQuery {
+                updateActivity(.searching)
+                do {
+                    let searchResult = try await WebSearchService.shared.searchWeb(query: query)
+                    webSearchResult = searchResult
+                    
+                    // Format search results naturally for Aurora to incorporate
+                    var resultsText = ""
+                    
+                    if let summary = searchResult.summary, !summary.isEmpty {
+                        resultsText += summary
+                        if !searchResult.results.isEmpty {
+                            resultsText += "\n\n"
+                        }
+                    }
+                    
+                    if !searchResult.results.isEmpty {
+                        for (index, result) in searchResult.results.prefix(3).enumerated() {
+                            if index > 0 { resultsText += "\n" }
+                            resultsText += "• \(result.title)"
+                            if let snippet = result.snippet, !snippet.isEmpty {
+                                resultsText += " — \(snippet)"
+                            }
+                            resultsText += " (\(result.url))"
+                        }
+                    }
+                    
+                    webSearchResults = resultsText.isEmpty ? nil : resultsText
+                } catch {
+                    // If web search fails, mark it as failed so we can handle it appropriately
+                    webSearchFailed = true
+                    print("Web search error: \(error.localizedDescription)")
+                    
+                    // Ensure conversation is saved even if web search fails
+                    await MainActor.run {
+                        do {
+                            try modelContext.save()
+                        } catch {
+                            print("Failed to save conversation after web search error: \(error)")
+                        }
+                    }
+                }
+            }
+            
+            // Resolve other mentions to actual objects (skip @web)
+            for mention in mentions {
+                if MentionParser.isWebSearchMention(mention) {
+                    continue // Skip @web mentions
+                }
+                
                 let results = WorkspaceObjectSearchService.shared.search(
                     query: mention.mentionText,
                     modelContext: modelContext,
@@ -448,8 +528,64 @@ final class AIAssistantViewModel {
             let conversationMessages: [ConversationMessage]? = conversationModelContent
             
             // Use CoreResponseService with app context for app-smart responses
-            var response = try await coreResponseService.generateResponseWithAppContext(
-                for: text,
+            // Include web search results in the user input if available, so Aurora can naturally incorporate them
+            // CRITICAL: Completely remove all @web mentions so Aurora never sees or references them in her response
+            let userInputWithWebSearch: String
+            if let webResults = webSearchResults, !webResults.isEmpty, let query = webSearchQuery {
+                // Remove @web mention and query completely - use regex to catch all variations
+                // Pattern: @web followed by optional space and then the query text (handles "@web query" and "@webquery")
+                var cleanText = text
+                // First, try to match @web followed by the query (with or without space)
+                let escapedQuery = NSRegularExpression.escapedPattern(for: query)
+                if let regex = try? NSRegularExpression(pattern: "@web\\s*\(escapedQuery)", options: .caseInsensitive) {
+                    let range = NSRange(cleanText.startIndex..<cleanText.endIndex, in: cleanText)
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: range, withTemplate: "")
+                }
+                // Also remove any remaining @web mentions (standalone or with other text)
+                // Pattern: @web followed by any non-whitespace characters
+                if let regex = try? NSRegularExpression(pattern: "@web\\S*", options: .caseInsensitive) {
+                    let range = NSRange(cleanText.startIndex..<cleanText.endIndex, in: cleanText)
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: range, withTemplate: "")
+                }
+                cleanText = cleanText.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Format as a natural question with search results as context
+                // Don't mention "web search" or "@web" - just provide the information naturally
+                let queryText = cleanText.isEmpty ? query : cleanText
+                userInputWithWebSearch = "\(queryText)\n\n\(webResults)"
+            } else if webSearchFailed, let query = webSearchQuery {
+                // Web search failed - remove @web mention completely
+                var cleanText = text
+                // Remove @web followed by query (with or without space)
+                let escapedQuery = NSRegularExpression.escapedPattern(for: query)
+                if let regex = try? NSRegularExpression(pattern: "@web\\s*\(escapedQuery)", options: .caseInsensitive) {
+                    let range = NSRange(cleanText.startIndex..<cleanText.endIndex, in: cleanText)
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: range, withTemplate: "")
+                }
+                // Remove any remaining @web mentions
+                if let regex = try? NSRegularExpression(pattern: "@web\\S*", options: .caseInsensitive) {
+                    let range = NSRange(cleanText.startIndex..<cleanText.endIndex, in: cleanText)
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: range, withTemplate: "")
+                }
+                cleanText = cleanText.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Format as a normal question
+                let queryText = cleanText.isEmpty ? query : cleanText
+                userInputWithWebSearch = queryText
+            } else {
+                // No web search requested or no results - remove @web if present
+                var cleanText = text
+                // Remove @web and everything after it until whitespace/newline
+                if let regex = try? NSRegularExpression(pattern: "@web\\S*", options: .caseInsensitive) {
+                    let range = NSRange(cleanText.startIndex..<cleanText.endIndex, in: cleanText)
+                    cleanText = regex.stringByReplacingMatches(in: cleanText, options: [], range: range, withTemplate: "")
+                }
+                cleanText = cleanText.trimmingCharacters(in: .whitespacesAndNewlines)
+                userInputWithWebSearch = cleanText.isEmpty ? text : cleanText
+            }
+            
+            var result = try await coreResponseService.generateResponseWithAppContext(
+                for: userInputWithWebSearch,
                 appContext: appContext,
                 payloadContext: payloadContext,
                 conversationMessages: conversationMessages,
@@ -458,6 +594,11 @@ final class AIAssistantViewModel {
                 confidence: confidenceSnapshot,
                 modelContext: modelContext
             )
+            
+            var response = result.response
+            
+            // Don't prepend web search results - they're already in the context
+            // Aurora will naturally incorporate them into the response
             
             // Apply typography emotion based on ARTE state
             if let glassSystem = GlassColorSystem.active {
@@ -476,10 +617,19 @@ final class AIAssistantViewModel {
             }
             
             // Create assistant message with streaming support
+            // Include web search results if available
+            let webSearchResultsForMessage: WebSearchResults? = webSearchResult.map { WebSearchResults(from: $0) }
+            let webSearchConfidenceScore: Double? = webSearchResult?.confidence
+            
             let assistantMessage = AIMessage(
                 role: "assistant",
                 content: response,
-                confidenceScore: confidenceSnapshot.score
+                confidenceScore: confidenceSnapshot.score,
+                webSearchResults: webSearchResultsForMessage,
+                webSearchConfidence: webSearchConfidenceScore,
+                thinkingContent: result.thinking,
+                modelUsed: result.modelUsed,
+                wasThinking: result.thinking != nil && !result.thinking!.isEmpty
             )
             
             await MainActor.run {
@@ -518,7 +668,7 @@ final class AIAssistantViewModel {
             if isOllamaError {
                 errorContent = error.localizedDescription
             } else {
-                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `llama3.1` model is available."
+                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `granite3.2:2b` model is available."
             }
             
             // Handle errors
@@ -741,14 +891,35 @@ final class AIAssistantViewModel {
             await offerLinkingSuggestionIfNeeded(modelContext: modelContext, stylePreferences: stylePreferences)
         } catch {
             await MainActor.run {
+                // Provide helpful error messages based on error type
+                let errorContent: String
+                let errorDescription = error.localizedDescription
+                
+                // Check error type by description or type name
+                if errorDescription.contains("authentication") || errorDescription.contains("API key") || errorDescription.contains("Google API key") {
+                    errorContent = "I need your Google API key to analyze images. Please add it to Config.plist (GoogleAPIKey)."
+                } else if errorDescription.contains("airplane mode") || errorDescription.contains("cloud access") {
+                    errorContent = "Image analysis requires cloud access. \(errorDescription)"
+                } else if errorDescription.contains("timeout") || errorDescription.contains("timed out") {
+                    errorContent = "Image analysis timed out. The image might be too large or the service is slow. Please try again."
+                } else if errorDescription.contains("HTTP 401") || errorDescription.contains("401") {
+                    errorContent = "Authentication failed. Please check your Google API key in Config.plist (GoogleAPIKey)."
+                } else if errorDescription.contains("HTTP") {
+                    errorContent = "Gemini API error: \(errorDescription). Please check your API key and try again."
+                } else if errorDescription.contains("Image analysis requires") {
+                    errorContent = errorDescription
+                } else {
+                    errorContent = "I'm having trouble processing that image: \(errorDescription). Please check your Google API key configuration in Config.plist (GoogleAPIKey)."
+                }
+                
                 let errorMessage = AIMessage(
                     role: "assistant",
-                    content: "I'm having trouble processing that image right now. Mind trying again in a minute?"
+                    content: errorContent
                 )
                 modelContext.insert(errorMessage)
                 messages.append(errorMessage)
                 currentConversation?.messages?.append(errorMessage)
-                self.errorMessage = error.localizedDescription
+                self.errorMessage = errorDescription
                 isLoading = false
                 currentActivity = .thinking // Reset activity on error
                 currentSourceModel = nil // Clear source model
@@ -975,6 +1146,9 @@ final class AIAssistantViewModel {
         isFirstMessage: Bool,
         allowPromptForMissingFields: Bool = true
     ) async {
+        // Make intent mutable so we can reassign if needed
+        var intent = intent
+        
         // Handle compound operations: create project with tasks/notes/posts
         if intent.operation == .createProject && (
             intent.createTasksWithProject == true || intent.createNotesWithProject == true || intent.createPostsWithProject == true ||
@@ -1012,7 +1186,77 @@ final class AIAssistantViewModel {
             return
         }
         
-            if let action = AIIntentAction(from: intent) {
+        // For updateTask, try to find task ID from conversation if missing
+        if intent.operation == .updateTask && intent.taskId == nil {
+            // Try to find the most recently created task from conversation messages
+            if let lastTask = findLastCreatedTask(from: messages, modelContext: modelContext) {
+                // Create a new intent with the task ID (ExecutionIntent has let properties, so we need to create a new instance)
+                intent = ExecutionIntent(
+                    operation: intent.operation,
+                    criteria: intent.criteria,
+                    daysAgo: intent.daysAgo,
+                    postFilter: intent.postFilter,
+                    filterValue: intent.filterValue,
+                    reportType: intent.reportType,
+                    daysAhead: intent.daysAhead,
+                    caption: intent.caption,
+                    platforms: intent.platforms,
+                    scheduledDate: intent.scheduledDate,
+                    tags: intent.tags,
+                    notes: intent.notes,
+                    createDraft: intent.createDraft,
+                    draftId: intent.draftId,
+                    taskId: lastTask.id.uuidString,
+                    taskTitle: intent.taskTitle,
+                    taskTitles: intent.taskTitles,
+                    taskNotes: intent.taskNotes,
+                    taskDueDate: intent.taskDueDate,
+                    taskStatus: intent.taskStatus,
+                    taskPriority: intent.taskPriority,
+                    taskProjectId: intent.taskProjectId,
+                    taskAreaId: intent.taskAreaId,
+                    noteId: intent.noteId,
+                    noteTitle: intent.noteTitle,
+                    noteTitles: intent.noteTitles,
+                    noteBody: intent.noteBody,
+                    noteTags: intent.noteTags,
+                    inboxItemId: intent.inboxItemId,
+                    inboxContent: intent.inboxContent,
+                    inboxType: intent.inboxType,
+                    conversionTarget: intent.conversionTarget,
+                    projectId: intent.projectId,
+                    projectTitle: intent.projectTitle,
+                    projectGoal: intent.projectGoal,
+                    projectStatus: intent.projectStatus,
+                    projectDueDate: intent.projectDueDate,
+                    projectAreaId: intent.projectAreaId,
+                    postId: intent.postId,
+                    postCaptions: intent.postCaptions,
+                    publishNotes: intent.publishNotes,
+                    conversationId: intent.conversationId,
+                    searchQuery: intent.searchQuery,
+                    createTasksWithProject: intent.createTasksWithProject,
+                    createNotesWithProject: intent.createNotesWithProject,
+                    createPostsWithProject: intent.createPostsWithProject,
+                    createTasksWithNote: intent.createTasksWithNote,
+                    createPostsWithNote: intent.createPostsWithNote,
+                    createTasksWithPost: intent.createTasksWithPost,
+                    createNotesWithPost: intent.createNotesWithPost,
+                    taskCount: intent.taskCount,
+                    noteCount: intent.noteCount,
+                    postCount: intent.postCount,
+                    reminderTitle: intent.reminderTitle,
+                    reminderNotes: intent.reminderNotes,
+                    reminderDate: intent.reminderDate,
+                    reminderTime: intent.reminderTime,
+                    reminderTaskId: intent.reminderTaskId,
+                    reminderProjectId: intent.reminderProjectId,
+                    linkedContext: intent.linkedContext
+                )
+            }
+        }
+        
+        if let action = AIIntentAction(from: intent) {
             await perform(action: action, intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
             return
         }
@@ -1432,6 +1676,7 @@ final class AIAssistantViewModel {
                 markdown: intent.noteBody ?? "",
                 tags: intent.noteTags ?? []
             )
+            note.author = .aurora
             modelContext.insert(note)
             do {
                 try modelContext.save()
@@ -1737,6 +1982,7 @@ final class AIAssistantViewModel {
                         markdown: "Related to post: \(caption)",
                         tags: noteTags
                     )
+                    note.author = .aurora
                     modelContext.insert(note)
                     do {
                         try modelContext.save()
@@ -2338,8 +2584,12 @@ final class AIAssistantViewModel {
     ) async {
         do {
             let actionResult = try await actionRouter.route(action, modelContext: modelContext)
-            let attributedResult = convertMarkdownToAttributedString(actionResult.markdown)
+            
+            // Convert structured markdown to conversational format
+            let conversationalResponse = await convertExecutionResultToConversational(actionResult, modelContext: modelContext)
+            let attributedResult = convertMarkdownToAttributedString(conversationalResponse)
             let assistantMessage = AIMessage(role: "assistant", content: attributedResult)
+            
             await MainActor.run {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
@@ -2365,6 +2615,64 @@ final class AIAssistantViewModel {
                 try? modelContext.save()
             }
         }
+    }
+    
+    /// Converts structured execution results to conversational format
+    private func convertExecutionResultToConversational(_ result: AIActionResult, modelContext: ModelContext) async -> String {
+        // Extract key information from the structured result
+        var conversational = result.message
+        
+        // Convert details to natural language
+        if !result.details.isEmpty {
+            let detailsText = result.details.joined(separator: ", ")
+            conversational += " \(detailsText)."
+        }
+        
+        // Add items affected naturally if relevant
+        if result.itemsAffected > 0 {
+            conversational = conversational.replacingOccurrences(of: "Affected: \(result.itemsAffected) items", with: "")
+            conversational = conversational.replacingOccurrences(of: "✅ **", with: "")
+            conversational = conversational.replacingOccurrences(of: "**", with: "")
+            
+            // Make it conversational
+            if result.itemsAffected == 1 {
+                conversational += " That's 1 item updated."
+            } else {
+                conversational += " That's \(result.itemsAffected) items updated."
+            }
+        }
+        
+        // Remove any remaining structured formatting
+        conversational = conversational.replacingOccurrences(of: "Total posts:", with: "")
+        conversational = conversational.replacingOccurrences(of: "Published:", with: "")
+        conversational = conversational.replacingOccurrences(of: "Scheduled:", with: "")
+        conversational = conversational.replacingOccurrences(of: "•", with: "")
+        conversational = conversational.replacingOccurrences(of: "\n\n", with: " ")
+        conversational = conversational.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // If we have structured markdown, ask Aurora to convert it conversationally
+        if result.markdown.contains("Total posts:") || result.markdown.contains("Published:") || result.markdown.contains("Affected:") {
+            let conversionPrompt = """
+            Convert this structured information into a natural, conversational response:
+            
+            \(result.markdown)
+            
+            Respond as Aurora would - naturally and conversationally, weaving the information into flowing sentences. No lists, no labels, just natural conversation.
+            """
+            
+            do {
+                let converted = try await coreResponseService.generateResponse(
+                    for: conversionPrompt,
+                    modelContext: modelContext
+                )
+                return converted
+            } catch {
+                // Fallback to cleaned up version if conversion fails
+                return conversational
+            }
+        }
+        
+        return conversational
     }
     
     private func checkAndShowPendingSuggestions(modelContext: ModelContext) async {
@@ -2452,6 +2760,41 @@ final class AIAssistantViewModel {
         try? modelContext.save()
     }
  
+    private func findLastCreatedTask(from messages: [AIMessage], modelContext: ModelContext) -> CloutmateShared.Task? {
+        // Look through recent messages for task creation confirmations
+        // Messages often contain "Task created Title: X" or similar patterns
+        for message in messages.reversed() {
+            guard let content = message.content else { continue }
+            
+            // Check if message mentions a task creation
+            if content.lowercased().contains("task created") || content.lowercased().contains("created task") {
+                // Try to extract task title from the message
+                if let titleMatch = content.range(of: #"Title:\s*([^|]+)"#, options: .regularExpression) {
+                    let title = String(content[titleMatch]).replacingOccurrences(of: "Title:", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    // Find the task by title (most recent match)
+                    var descriptor = FetchDescriptor<CloutmateShared.Task>(
+                        predicate: #Predicate { $0.title == title },
+                        sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+                    )
+                    descriptor.fetchLimit = 1
+                    
+                    if let task = try? modelContext.fetch(descriptor).first {
+                        return task
+                    }
+                }
+            }
+        }
+        
+        // Fallback: find the most recently created task overall
+        var descriptor = FetchDescriptor<CloutmateShared.Task>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        
+        return try? modelContext.fetch(descriptor).first
+    }
+    
      private func sendAssistantPrompt(_ prompt: String, modelContext: ModelContext) async {
         await MainActor.run {
             let assistantMessage = AIMessage(role: "assistant", content: prompt)
@@ -2751,15 +3094,14 @@ final class AIAssistantViewModel {
     }
     
     func autoTag(_ conversation: AIConversation, modelContext: ModelContext) async {
-        guard let title = conversation.title else { return }
+        guard let messages = conversation.messages, !messages.isEmpty else { return }
         
-        do {
-            let tags = try await coreResponseService.categorizeConversation(
-                messages: messages,
-                summary: conversation.summary
-            )
-            
-            await MainActor.run {
+        // Use AIRecallService to generate tags using AI
+        let tags = await AIRecallService.shared.extractConversationTags(messages: messages)
+        
+        await MainActor.run {
+            // Only update tags if they're empty or if new tags are better
+            if conversation.tags.isEmpty || !tags.isEmpty {
                 conversation.tags = tags
                 
                 do {
@@ -2768,8 +3110,6 @@ final class AIAssistantViewModel {
                     print("Failed to save tags: \(error)")
                 }
             }
-        } catch {
-            print("Failed to generate tags: \(error)")
         }
     }
     
@@ -2780,10 +3120,17 @@ final class AIAssistantViewModel {
         
         // Create draft with conversation title as notes
         let draft = Draft(
+            title: conversation.title ?? "Aurora Conversation",
             caption: content,
             tags: conversation.tags,
             notes: "From AI Conversation: \(conversation.title ?? "Untitled")"
         )
+        draft.source = "AI Assistant"
+        draft.applyAutoTaggingForAIExport(conversationTitle: conversation.title)
+        draft.refreshContentSignals()
+        draft.refreshWordMetrics()
+        draft.isPublished = false
+        draft.lastEditedAt = Date()
         
         modelContext.insert(draft)
         
@@ -3069,5 +3416,126 @@ final class AIAssistantViewModel {
         }
         
         return content.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    // MARK: - Smart Recap & Export
+    
+    /// Generate a smart recap (auto-summary) for the current conversation
+    func generateSmartRecap(modelContext: ModelContext) async {
+        guard let conversation = currentConversation else { return }
+        
+        // Use AIRecallService to generate context snapshot
+        if let snapshot = await AIRecallService.shared.generateContextSnapshot(
+            conversationId: conversation.id,
+            modelContext: modelContext
+        ) {
+            // Update conversation with snapshot data
+            conversation.summary = snapshot.summary
+            if conversation.tags.isEmpty {
+                conversation.tags = snapshot.tags
+            }
+            try? modelContext.save()
+        }
+    }
+    
+    /// Generate chat summary (legacy method name)
+    func generateChatSummary(modelContext: ModelContext? = nil) async {
+        guard let conversation = currentConversation else { return }
+        // Use provided modelContext or fallback to shared container
+        let context = modelContext ?? CloutmateApp.sharedModelContainer.mainContext
+        await generateSmartRecap(modelContext: context)
+    }
+    
+    /// Export conversation to Drafts (rich text with metadata)
+    func exportToDraft(messages: [AIMessage], conversation: AIConversation, modelContext: ModelContext) -> Bool {
+        guard !messages.isEmpty else { return false }
+        
+        let content = messages.map { message -> String in
+            let role = message.role == "user" ? "You" : "Aurora"
+            return "\(role): \(message.content ?? "")"
+        }.joined(separator: "\n\n")
+        
+        let draft = Draft(
+            caption: content,
+            mediaURLs: [],
+            tags: conversation.tags,
+            notes: conversation.summary
+        )
+        
+        modelContext.insert(draft)
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            AIDebug.log("Failed to export to draft: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    /// Export conversation to Notes (Markdown summary)
+    func exportToNote(messages: [AIMessage], conversation: AIConversation, modelContext: ModelContext) -> Bool {
+        guard !messages.isEmpty else { return false }
+        
+        let summary = conversation.summary ?? "Conversation summary"
+        let markdown = """
+        # \(conversation.title ?? "Conversation")
+        
+        \(summary)
+        
+        ## Messages
+        
+        \(messages.map { message -> String in
+            let role = message.role == "user" ? "You" : "Aurora"
+            return "### \(role)\n\n\(message.content ?? "")"
+        }.joined(separator: "\n\n"))
+        """
+        
+        let note = Note(
+            title: conversation.title ?? "AI Conversation",
+            markdown: markdown
+        )
+        
+        modelContext.insert(note)
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            AIDebug.log("Failed to export to note: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    /// Export conversation to Journal (emotional reflection only)
+    func exportToJournal(messages: [AIMessage], conversation: AIConversation, modelContext: ModelContext) -> Bool {
+        guard !messages.isEmpty else { return false }
+        
+        // Extract emotional reflection from conversation
+        let emotionalTone = conversation.tags.contains("Reflection") ? "Reflective" : "Neutral"
+        let reflection = """
+        ## \(conversation.title ?? "Conversation Reflection")
+        
+        **Emotional Tone:** \(emotionalTone)
+        
+        **Summary:** \(conversation.summary ?? "No summary available")
+        
+        **Key Insights:**
+        \(messages.filter { $0.role == "assistant" }.prefix(3).map { "- \($0.content ?? "")" }.joined(separator: "\n"))
+        """
+        
+        // Create journal entry (assuming JournalEntry model exists)
+        // For now, create a Note with journal-specific content
+        let note = Note(
+            title: "Reflection: \(conversation.title ?? "Conversation")",
+            markdown: reflection
+        )
+        
+        modelContext.insert(note)
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            AIDebug.log("Failed to export to journal: \(error.localizedDescription)")
+            return false
+        }
     }
 }

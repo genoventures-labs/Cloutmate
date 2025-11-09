@@ -13,7 +13,13 @@ struct ProjectListView: View {
     let projects: [Project]
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let selectedProjectIDs: Set<UUID>
+    let onSelectionToggle: (Project) -> Void
     let onProjectSelected: (Project) -> Void
+    let onDuplicateProject: (Project) -> Void
+    let onArchiveProject: (Project) -> Void
+    let onDeleteProject: (Project) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -28,9 +34,13 @@ struct ProjectListView: View {
                         project: project,
                         tasks: tasks.filter { $0.projectId == project.id },
                         areas: areas,
-                        onTap: {
-                            onProjectSelected(project)
-                        }
+                        selectionMode: selectionMode,
+                        isSelected: selectedProjectIDs.contains(project.id),
+                        onSelectionToggle: { onSelectionToggle(project) },
+                        onTap: { onProjectSelected(project) },
+                        onDuplicate: { onDuplicateProject(project) },
+                        onArchive: { onArchiveProject(project) },
+                        onDelete: { onDeleteProject(project) }
                     )
                     .accessibilityLabel("Project: \(project.title)")
                     .accessibilityHint("Double tap to open. Press Enter to view details.")
@@ -60,10 +70,16 @@ struct ProjectListView: View {
 // MARK: - Project List Card
 
 struct ProjectListCard: View {
-    let project: Project
+    @Bindable var project: Project
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let isSelected: Bool
+    let onSelectionToggle: () -> Void
     let onTap: () -> Void
+    let onDuplicate: () -> Void
+    let onArchive: () -> Void
+    let onDelete: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -72,6 +88,8 @@ struct ProjectListCard: View {
     @State private var isHovered = false
     @State private var isExpanded = false
     @State private var focusMetrics: ProjectFocusMetrics?
+    @State private var showFocusDurationSheet = false
+    @State private var focusDuration: TimeInterval = 1800 // Default 30 min
     
     var completedTasksCount: Int {
         tasks.filter { $0.status == .done }.count
@@ -106,22 +124,76 @@ struct ProjectListCard: View {
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3), value: isHovered)
         .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3), value: isExpanded)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: isSelected ? [.kosmicBlue, .kosmicPurple] : [.clear, .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: isSelected ? 2 : 0
+                )
+        )
+        .overlay(alignment: .topTrailing) {
+            if selectionMode {
+                SelectionIndicator(isSelected: isSelected)
+                    .padding(12)
+                    .onTapGesture {
+                        onSelectionToggle()
+                    }
+            }
+        }
         .onHover { hovering in
+            guard !selectionMode else {
+                isHovered = hovering
+                return
+            }
             isHovered = hovering
         }
         .onTapGesture {
-            withAnimation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3)) {
-                isExpanded.toggle()
+            if selectionMode {
+                onSelectionToggle()
+            } else {
+                withAnimation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3)) {
+                    isExpanded.toggle()
+                }
             }
         }
         .onTapGesture(count: 2) {
-            onTap()
+            if selectionMode {
+                onSelectionToggle()
+            } else {
+                onTap()
+            }
         }
         .contextMenu {
-            contextMenuContent
+            if !selectionMode {
+                Button("Start Focus Session") {
+                    showFocusDurationSheet = true
+                }
+                Divider()
+                contextMenuContent
+            }
+        }
+        .sheet(isPresented: $showFocusDurationSheet) {
+            FocusDurationSheet(
+                selectedDuration: $focusDuration,
+                itemTitle: project.title,
+                itemType: "Project",
+                onStart: startFocusSession
+            )
         }
         .task {
             focusMetrics = ProjectFocusGravityService.shared.focusMetrics(for: project, modelContext: modelContext)
+        }
+        .onChange(of: selectionMode) { _, newValue in
+            if newValue {
+                isHovered = false
+                withAnimation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3)) {
+                    isExpanded = false
+                }
+            }
         }
     }
     
@@ -162,27 +234,22 @@ struct ProjectListCard: View {
                     .foregroundColor(glassColorSystem.textPrimary())
                 
                 HStack(spacing: 8) {
-                    ProjectStatusBadge(status: project.status)
+                    // Interactive status badge
+                    InteractiveProjectStatusBadge(project: project)
                     
-                    if let dueDate = project.dueDate {
-                        ProjectDueDateBadge(dueDate: dueDate)
-                    }
+                    // Interactive due date badge
+                    InteractiveProjectDueDateBadge(project: project)
                     
+                    // Area badge (could be made interactive too)
                     if let area = area {
-                        Text(area.title)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.1))
-                            .cornerRadius(4)
+                        InteractiveAreaBadge(project: project, area: area, areas: areas)
                     }
                 }
             }
             
             Spacer()
             
-            if isHovered {
+            if isHovered && !selectionMode {
                 quickActionsView
             }
         }
@@ -243,6 +310,13 @@ struct ProjectListCard: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .lineLimit(3)
+            }
+            
+            // Interactive fields row
+            HStack(spacing: 12) {
+                InteractiveProjectStatusPicker(project: project)
+                InteractiveProjectDueDatePicker(project: project)
+                Spacer()
             }
             
             if !tasks.isEmpty {
@@ -308,18 +382,15 @@ struct ProjectListCard: View {
             Button("Open") {
                 onTap()
             }
-            Button("Edit") {
-                // Edit action
-            }
             Button("Duplicate") {
-                // Duplicate action
+                onDuplicate()
             }
             Divider()
             Button("Archive") {
-                // Archive action
+                onArchive()
             }
             Button("Delete", role: .destructive) {
-                // Delete action
+                onDelete()
             }
         }
     }
@@ -334,6 +405,342 @@ struct ProjectListCard: View {
     
     private var cardHeight: CGFloat {
         isExpanded ? 200 : 80
+    }
+    
+    private func startFocusSession() {
+        showFocusDurationSheet = false
+        
+        // Post notification with session parameters instead of starting immediately
+        let params = PendingFocusSessionParams(
+            objective: project.title,
+            plannedDuration: focusDuration,
+            targetObjectId: project.id,
+            targetObjectType: "project"
+        )
+        
+        // Post session parameters first (will be stored as pending)
+        NotificationCenter.default.post(
+            name: .startPendingFocusSession,
+            object: params
+        )
+        
+        // Switch to focus mode tab (session will start after switch completes)
+        NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
+    }
+}
+
+// MARK: - Interactive Project Status Badge
+
+struct InteractiveProjectStatusBadge: View {
+    @Bindable var project: Project
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            ForEach(ProjectStatus.allCases, id: \.self) { status in
+                Button(action: {
+                    withAnimation(GlassMotion.Easing.spring) {
+                        project.status = status
+                        project.updatedAt = Date()
+                    }
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Text(status.displayName)
+                        if project.status == status {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            ProjectStatusBadge(status: project.status)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Interactive Project Due Date Badge
+
+struct InteractiveProjectDueDateBadge: View {
+    @Bindable var project: Project
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDatePicker = false
+    
+    var color: Color {
+        guard let dueDate = project.dueDate else { return .gray }
+        let daysUntilDue = Calendar.current.dateComponents([.day], from: Date(), to: dueDate).day ?? 0
+        if daysUntilDue < 0 {
+            return .red
+        } else if daysUntilDue == 0 {
+            return .kosmicBlue
+        } else if daysUntilDue <= 3 {
+            return .kosmicPurple
+        }
+        return .gray
+    }
+    
+    var body: some View {
+        Menu {
+            Button("Set Due Date") {
+                if project.dueDate == nil {
+                    project.dueDate = Date()
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+                showDatePicker = true
+            }
+            
+            if project.dueDate != nil {
+                Button("Remove Due Date", role: .destructive) {
+                    project.dueDate = nil
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+            
+            Divider()
+            
+            Button("Today") {
+                project.dueDate = Calendar.current.startOfDay(for: Date())
+                project.updatedAt = Date()
+                try? modelContext.save()
+            }
+            
+            Button("Tomorrow") {
+                if let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+                    project.dueDate = Calendar.current.startOfDay(for: tomorrow)
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+            
+            Button("Next Week") {
+                if let nextWeek = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: Date()) {
+                    project.dueDate = Calendar.current.startOfDay(for: nextWeek)
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+        } label: {
+            if let dueDate = project.dueDate {
+                ProjectDueDateBadge(dueDate: dueDate)
+            } else {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(6)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(4)
+            }
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showDatePicker) {
+            DatePicker(
+                "Due Date",
+                selection: Binding(
+                    get: { project.dueDate ?? Date() },
+                    set: {
+                        project.dueDate = $0
+                        project.updatedAt = Date()
+                        try? modelContext.save()
+                        showDatePicker = false
+                    }
+                ),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .padding()
+        }
+    }
+}
+
+// MARK: - Interactive Area Badge
+
+struct InteractiveAreaBadge: View {
+    @Bindable var project: Project
+    let area: Area
+    let areas: [Area]
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            Button("None") {
+                project.areaId = nil
+                project.updatedAt = Date()
+                try? modelContext.save()
+            }
+            
+            if !areas.isEmpty {
+                Divider()
+                ForEach(areas) { areaOption in
+                    Button(action: {
+                        project.areaId = areaOption.id
+                        project.updatedAt = Date()
+                        try? modelContext.save()
+                    }) {
+                        HStack {
+                            Text(areaOption.title)
+                            if project.areaId == areaOption.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Text(area.title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(4)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Interactive Status Picker (for expanded view)
+
+struct InteractiveProjectStatusPicker: View {
+    @Bindable var project: Project
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            ForEach(ProjectStatus.allCases, id: \.self) { status in
+                Button(action: {
+                    withAnimation(GlassMotion.Easing.spring) {
+                        project.status = status
+                        project.updatedAt = Date()
+                    }
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Circle()
+                            .fill(status.color.opacity(0.2))
+                            .frame(width: 12, height: 12)
+                            .overlay(
+                                Circle()
+                                    .fill(status.color)
+                                    .frame(width: 6, height: 6)
+                            )
+                        Text(status.displayName)
+                        if project.status == status {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(project.status.color.opacity(0.2))
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .fill(project.status.color)
+                            .frame(width: 6, height: 6)
+                    )
+                Text(project.status.displayName)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Interactive Due Date Picker (for expanded view)
+
+struct InteractiveProjectDueDatePicker: View {
+    @Bindable var project: Project
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDatePicker = false
+    
+    var body: some View {
+        Menu {
+            Button("Set Due Date") {
+                if project.dueDate == nil {
+                    project.dueDate = Date()
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+                showDatePicker = true
+            }
+            
+            if project.dueDate != nil {
+                Button("Remove Due Date", role: .destructive) {
+                    project.dueDate = nil
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+            
+            Divider()
+            
+            Button("Today") {
+                project.dueDate = Calendar.current.startOfDay(for: Date())
+                project.updatedAt = Date()
+                try? modelContext.save()
+            }
+            
+            Button("Tomorrow") {
+                if let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+                    project.dueDate = Calendar.current.startOfDay(for: tomorrow)
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+            
+            Button("Next Week") {
+                if let nextWeek = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: Date()) {
+                    project.dueDate = Calendar.current.startOfDay(for: nextWeek)
+                    project.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.caption2)
+                if let dueDate = project.dueDate {
+                    Text(dueDate, format: .dateTime.month(.abbreviated).day())
+                        .font(.caption)
+                } else {
+                    Text("No due date")
+                        .font(.caption)
+                }
+            }
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showDatePicker) {
+            DatePicker(
+                "Due Date",
+                selection: Binding(
+                    get: { project.dueDate ?? Date() },
+                    set: {
+                        project.dueDate = $0
+                        project.updatedAt = Date()
+                        try? modelContext.save()
+                        showDatePicker = false
+                    }
+                ),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .padding()
+        }
     }
 }
 

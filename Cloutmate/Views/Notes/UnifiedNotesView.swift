@@ -28,6 +28,9 @@ struct UnifiedNotesView: View {
     @State private var showDrawer = false
     @State private var expandedGroups: Set<String> = []
     @State private var focusedNoteIndex: Int?
+    @State private var isSelectionMode = false
+    @State private var selectedNoteIDs: Set<UUID> = []
+    @State private var createSheetNote: Note?
     
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFocused: Bool
@@ -110,11 +113,12 @@ struct UnifiedNotesView: View {
             let groups = Dictionary(grouping: notesToGroup) { note in
                 formatter.string(from: note.createdAt)
             }
-            return groups.sorted { lhs, rhs in
-                guard let lhsDate = formatter.date(from: lhs.key),
-                      let rhsDate = formatter.date(from: rhs.key) else { return false }
-                return lhsDate > rhsDate
-            }
+            return groups.map { (key: $0.key, notes: $0.value) }
+                .sorted { lhs, rhs in
+                    guard let lhsDate = formatter.date(from: lhs.key),
+                          let rhsDate = formatter.date(from: rhs.key) else { return false }
+                    return lhsDate > rhsDate
+                }
         }
     }
     
@@ -126,143 +130,50 @@ struct UnifiedNotesView: View {
         allNotes.filter { !$0.isArchived && !$0.tags.isEmpty }.count
     }
     
+    private var visibleSelectedNoteCount: Int {
+        selectedNotes.count
+    }
+    
+    private var isSelectionActive: Bool {
+        isSelectionMode || !selectedNoteIDs.isEmpty
+    }
+    
+    private var selectedNotes: [Note] {
+        filteredNotes.filter { selectedNoteIDs.contains($0.id) }
+    }
+    
     var body: some View {
         ZStack(alignment: .top) {
             Color(.windowBackgroundColor)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
-                NotesHeaderView(
-                    searchText: $searchText,
-                    selectedFilter: $selectedFilter,
-                    showCreateSheet: $showCreateSheet,
-                    totalNotes: totalActiveNotes,
-                    taggedNotes: taggedNotesCount
-                )
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
-                
-                // Content
-                if sortedNotes.isEmpty {
-                    emptyState
-                } else {
-                    ScrollView {
-                        ScrollViewReader { proxy in
-                            LazyVStack(spacing: 24) {
-                                // Pinned notes section
-                                if !pinnedNotes.isEmpty {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        HStack {
-                                            Text("Pinned")
-                                                .font(.system(.headline, design: .rounded))
-                                                .fontWeight(.semibold)
-                                                .foregroundStyle(
-                                                    LinearGradient(
-                                                        colors: [.kosmicBlue, .kosmicPurple],
-                                                        startPoint: .leading,
-                                                        endPoint: .trailing
-                                                    )
-                                                )
-                                            
-                                            Spacer()
-                                            
-                                            Text("\(pinnedNotes.count)")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        .padding(.horizontal, 4)
-                                        
-                                        // Gradient divider
-                                        Rectangle()
-                                            .fill(
-                                                LinearGradient(
-                                                    colors: [.kosmicBlue.opacity(0.3), .kosmicPurple.opacity(0.3)],
-                                                    startPoint: .leading,
-                                                    endPoint: .trailing
-                                                )
-                                            )
-                                            .frame(height: 1)
-                                        
-                                        // Pinned cards
-                                        ForEach(pinnedNotes) { note in
-                                            NoteCardV2(
-                                                note: note,
-                                                onTap: {
-                                                    selectedNote = note
-                                                    showDrawer = true
-                                                },
-                                                onEdit: {
-                                                    selectedNote = note
-                                                    showDrawer = true
-                                                },
-                                                onPin: {
-                                                    togglePin(note)
-                                                },
-                                                onArchive: {
-                                                    archiveNote(note)
-                                                },
-                                                onDelete: {
-                                                    deleteNote(note)
-                                                }
-                                            )
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
-                                }
-                                
-                                // Grouped notes
-                                ForEach(groupedNotes, id: \.key) { group in
-                                    NoteGroupSection(
-                                        title: group.key,
-                                        notes: group.notes,
-                                        isCollapsed: !expandedGroups.contains(group.key),
-                                        onToggleCollapse: {
-                                            withAnimation(GlassMotion.Easing.spring(duration: 0.35)) {
-                                                if expandedGroups.contains(group.key) {
-                                                    expandedGroups.remove(group.key)
-                                                } else {
-                                                    expandedGroups.insert(group.key)
-                                                }
-                                            }
-                                        },
-                                        onNoteTap: { note in
-                                            selectedNote = note
-                                            showDrawer = true
-                                        },
-                                        onNoteEdit: { note in
-                                            selectedNote = note
-                                            showDrawer = true
-                                        },
-                                        onNotePin: { note in
-                                            togglePin(note)
-                                        },
-                                        onNoteArchive: { note in
-                                            archiveNote(note)
-                                        },
-                                        onNoteDelete: { note in
-                                            deleteNote(note)
-                                        }
-                                    )
-                                }
-                            }
-                            .padding(.vertical, 20)
-                        }
-                    }
-                }
+                headerView
+                contentView
             }
         }
         .sheet(isPresented: $showCreateSheet) {
-            // Create new note - will use drawer UI
-            NoteDetailDrawer(
-                note: {
-                    let newNote = Note(title: "", markdown: "")
-                    modelContext.insert(newNote)
-                    return newNote
-                }(),
-                isPresented: $showCreateSheet
-            )
+            // Create new note
+            if let note = createSheetNote {
+                NavigationStack {
+                    NoteDetailDrawer(
+                        note: note,
+                        isPresented: $showCreateSheet
+                    )
+                }
+            }
+        }
+        .onChange(of: showCreateSheet) { _, isShowing in
+            if isShowing && createSheetNote == nil {
+                // Only create note once when sheet opens
+                let newNote = Note(title: "", markdown: "")
+                newNote.author = .user
+                modelContext.insert(newNote)
+                createSheetNote = newNote
+            } else if !isShowing {
+                // Clean up when sheet closes
+                createSheetNote = nil
+            }
         }
         .overlay {
             if showDrawer, let note = selectedNote {
@@ -273,6 +184,20 @@ struct UnifiedNotesView: View {
                 .transition(.move(edge: .trailing))
             }
         }
+        .overlay(alignment: .bottom) {
+            if isSelectionActive {
+                SelectionActionBar(
+                    count: visibleSelectedNoteCount,
+                    itemLabel: "note",
+                    actions: noteSelectionActions(),
+                    onCancel: clearSelection,
+                    onSelectAll: toggleSelectAll,
+                    totalItems: filteredNotes.count
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+            }
+        }
         .onChange(of: selectedNote) { _, newValue in
             showDrawer = newValue != nil
         }
@@ -281,6 +206,165 @@ struct UnifiedNotesView: View {
         }
         .onAppear {
             setupKeyboardNavigation()
+        }
+        .onChange(of: searchText) { _, _ in
+            pruneSelection()
+        }
+        .onChange(of: selectedFilter) { _, _ in
+            pruneSelection()
+        }
+        .onChange(of: groupingMode) { _, _ in
+            pruneSelection()
+        }
+    }
+    
+    private var headerView: some View {
+        NotesHeaderView(
+            searchText: $searchText,
+            selectedFilter: $selectedFilter,
+            showCreateSheet: $showCreateSheet,
+            isSelectionMode: $isSelectionMode,
+            totalNotes: totalActiveNotes,
+            taggedNotes: taggedNotesCount,
+            selectionCount: visibleSelectedNoteCount,
+            onToggleSelection: toggleSelectionMode
+        )
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+        .padding(.bottom, 12)
+    }
+    
+    @ViewBuilder
+    private var contentView: some View {
+        if sortedNotes.isEmpty {
+            emptyState
+        } else {
+            notesScrollView
+        }
+    }
+    
+    private var notesScrollView: some View {
+        ScrollView {
+            ScrollViewReader { proxy in
+                LazyVStack(spacing: 24) {
+                    pinnedNotesSection
+                    
+                    // Grouped notes
+                    ForEach(groupedNotes, id: \.key) { group in
+                        NoteGroupSection(
+                            title: group.key,
+                            notes: group.notes,
+                            isCollapsed: !expandedGroups.contains(group.key),
+                            onToggleCollapse: {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                    if expandedGroups.contains(group.key) {
+                                        expandedGroups.remove(group.key)
+                                    } else {
+                                        expandedGroups.insert(group.key)
+                                    }
+                                }
+                            },
+                            onNoteTap: { note in
+                                selectedNote = note
+                                showDrawer = true
+                            },
+                            onNoteEdit: { note in
+                                selectedNote = note
+                                showDrawer = true
+                            },
+                            onNotePin: { note in
+                                togglePin(note)
+                            },
+                            onNoteArchive: { note in
+                                archiveNote(note)
+                            },
+                            onNoteDelete: { note in
+                                deleteNote(note)
+                            },
+                            onNoteSendToTasks: { note in
+                                sendNoteToTask(note)
+                            },
+                            selectionMode: isSelectionActive,
+                            selectedNoteIDs: selectedNoteIDs,
+                            onSelectionToggle: { note in
+                                toggleNoteSelection(note)
+                            }
+                        )
+                    }
+                }
+                .padding(.vertical, 20)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var pinnedNotesSection: some View {
+        if !pinnedNotes.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Pinned")
+                        .font(.system(.headline, design: .rounded))
+                        .fontWeight(.semibold)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.kosmicBlue, .kosmicPurple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                    
+                    Spacer()
+                    
+                    Text("\(pinnedNotes.count)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 4)
+                
+                // Gradient divider
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.kosmicBlue.opacity(0.3), .kosmicPurple.opacity(0.3)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(height: 1)
+                
+                // Pinned cards
+                ForEach(pinnedNotes) { note in
+                    NoteCardV2(
+                        note: note,
+                        selectionMode: isSelectionActive,
+                        isSelected: selectedNoteIDs.contains(note.id),
+                        onSelectionToggle: {
+                            toggleNoteSelection(note)
+                        },
+                        onTap: {
+                            selectedNote = note
+                            showDrawer = true
+                        },
+                        onEdit: {
+                            selectedNote = note
+                            showDrawer = true
+                        },
+                        onPin: {
+                            togglePin(note)
+                        },
+                        onArchive: {
+                            archiveNote(note)
+                        },
+                        onDelete: {
+                            deleteNote(note)
+                        },
+                        onSendToTasks: {
+                            sendNoteToTask(note)
+                        }
+                    )
+                }
+            }
+            .padding(.horizontal, 20)
         }
     }
     
@@ -308,6 +392,189 @@ struct UnifiedNotesView: View {
         .padding()
     }
     
+    private func toggleSelectionMode() {
+        if isSelectionMode || !selectedNoteIDs.isEmpty {
+            clearSelection()
+        } else if !filteredNotes.isEmpty {
+            isSelectionMode = true
+        }
+    }
+    
+    private func toggleNoteSelection(_ note: Note) {
+        if selectedNoteIDs.contains(note.id) {
+            selectedNoteIDs.remove(note.id)
+            if selectedNoteIDs.isEmpty {
+                isSelectionMode = false
+            }
+        } else {
+            if !isSelectionMode {
+                isSelectionMode = true
+            }
+            selectedNoteIDs.insert(note.id)
+        }
+        // Prevent drawer from staying open when selecting
+        if isSelectionActive {
+            selectedNote = nil
+            showDrawer = false
+        }
+    }
+    
+    private func clearSelection() {
+        selectedNoteIDs.removeAll()
+        isSelectionMode = false
+    }
+    
+    private func pruneSelection() {
+        let visibleIDs = Set(filteredNotes.map(\.id))
+        selectedNoteIDs = selectedNoteIDs.intersection(visibleIDs)
+        if selectedNoteIDs.isEmpty {
+            isSelectionMode = false
+        }
+    }
+    
+    private func noteSelectionActions() -> [SelectionActionBar.Action] {
+        let notes = selectedNotes
+        guard !notes.isEmpty else { return [] }
+        
+        var actions: [SelectionActionBar.Action] = []
+        
+        // Send to Tasks
+        actions.append(
+            .init(title: "Send to Tasks", icon: "checkmark.circle") {
+                sendSelectedNotesToTasks()
+            }
+        )
+        
+        if notes.contains(where: { !$0.isPinned }) {
+            actions.append(
+                .init(title: "Pin", icon: "pin.fill") {
+                    pinSelectedNotes()
+                }
+            )
+        }
+        
+        if notes.contains(where: { $0.isPinned }) {
+            actions.append(
+                .init(title: "Unpin", icon: "pin.slash") {
+                    unpinSelectedNotes()
+                }
+            )
+        }
+        
+        actions.append(
+            .init(title: "Archive", icon: "archivebox", role: .surface) {
+                archiveSelectedNotes()
+            }
+        )
+        
+        actions.append(
+            .init(title: "Delete", icon: "trash", role: .danger) {
+                deleteSelectedNotes()
+            }
+        )
+        
+        return actions
+    }
+    
+    private func pinSelectedNotes() {
+        let timestamp = Date()
+        let notesToPin = selectedNotes.filter { !$0.isPinned }
+        for note in notesToPin {
+            note.isPinned = true
+            note.pinnedAt = timestamp
+            note.updatedAt = timestamp
+        }
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func unpinSelectedNotes() {
+        let notesToUnpin = selectedNotes.filter { $0.isPinned }
+        for note in notesToUnpin {
+            note.isPinned = false
+            note.pinnedAt = nil
+            note.updatedAt = Date()
+        }
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func archiveSelectedNotes() {
+        let notesToArchive = selectedNotes
+        guard !notesToArchive.isEmpty else { return }
+        for note in notesToArchive {
+            note.isArchived = true
+            if note.isPinned {
+                note.isPinned = false
+                note.pinnedAt = nil
+            }
+            note.updatedAt = Date()
+        }
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func deleteSelectedNotes() {
+        let notesToDelete = selectedNotes
+        guard !notesToDelete.isEmpty else { return }
+        for note in notesToDelete {
+            modelContext.delete(note)
+        }
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func toggleSelectAll() {
+        let allVisibleIDs = Set(filteredNotes.map(\.id))
+        if selectedNoteIDs == allVisibleIDs {
+            // All selected, deselect all
+            clearSelection()
+        } else {
+            // Not all selected, select all visible
+            selectedNoteIDs = allVisibleIDs
+            if !isSelectionMode {
+                isSelectionMode = true
+            }
+        }
+    }
+    
+    private func sendSelectedNotesToTasks() {
+        let notesToConvert = selectedNotes
+        guard !notesToConvert.isEmpty else { return }
+        
+        for note in notesToConvert {
+            let task = CloutmateShared.Task(
+                title: note.title.isEmpty ? "Untitled Task" : note.title,
+                notes: note.markdown,
+                status: .todo,
+                priority: .medium
+            )
+            // Preserve project link if it exists
+            if let projectId = note.projectId {
+                task.projectId = projectId
+            }
+            modelContext.insert(task)
+        }
+        
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func sendNoteToTask(_ note: Note) {
+        let task = CloutmateShared.Task(
+            title: note.title.isEmpty ? "Untitled Task" : note.title,
+            notes: note.markdown,
+            status: .todo,
+            priority: .medium
+        )
+        // Preserve project link if it exists
+        if let projectId = note.projectId {
+            task.projectId = projectId
+        }
+        modelContext.insert(task)
+        try? modelContext.save()
+    }
+    
     private func togglePin(_ note: Note) {
         note.isPinned.toggle()
         if note.isPinned {
@@ -325,12 +592,16 @@ struct UnifiedNotesView: View {
             note.isPinned = false
             note.pinnedAt = nil
         }
+        selectedNoteIDs.remove(note.id)
         try? modelContext.save()
+        pruneSelection()
     }
     
     private func deleteNote(_ note: Note) {
         modelContext.delete(note)
+        selectedNoteIDs.remove(note.id)
         try? modelContext.save()
+        pruneSelection()
     }
     
     private func setupKeyboardNavigation() {
@@ -346,6 +617,9 @@ struct UnifiedNotesView: View {
                 if showDrawer {
                     showDrawer = false
                     selectedNote = nil
+                    return nil
+                } else if isSelectionActive {
+                    clearSelection()
                     return nil
                 }
             }
@@ -399,6 +673,10 @@ struct NoteGroupSection: View {
     let onNotePin: (Note) -> Void
     let onNoteArchive: (Note) -> Void
     let onNoteDelete: (Note) -> Void
+    let onNoteSendToTasks: (Note) -> Void
+    let selectionMode: Bool
+    let selectedNoteIDs: Set<UUID>
+    let onSelectionToggle: (Note) -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -443,11 +721,15 @@ struct NoteGroupSection: View {
                     ForEach(notes) { note in
                         NoteCardV2(
                             note: note,
+                            selectionMode: selectionMode,
+                            isSelected: selectedNoteIDs.contains(note.id),
+                            onSelectionToggle: { onSelectionToggle(note) },
                             onTap: { onNoteTap(note) },
                             onEdit: { onNoteEdit(note) },
                             onPin: { onNotePin(note) },
                             onArchive: { onNoteArchive(note) },
-                            onDelete: { onNoteDelete(note) }
+                            onDelete: { onNoteDelete(note) },
+                            onSendToTasks: { onNoteSendToTasks(note) }
                         )
                     }
                 }

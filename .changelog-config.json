@@ -1,0 +1,61 @@
+{
+  "monitorPaths": [
+    "Cloutmate/Services/",
+    "Cloutmate/Models/",
+    "Cloutmate/Views/"
+  ],
+  "patternDetection": {
+    "newService": {
+      "pattern": "*Service.swift",
+      "changeType": "added",
+      "tags": ["service", "backend"]
+    },
+    "newModel": {
+      "pattern": "*Model.swift",
+      "changeType": "added",
+      "tags": ["model", "data"]
+    },
+    "newView": {
+      "pattern": "*View.swift",
+      "changeType": "added",
+      "tags": ["ui", "frontend"]
+    },
+    "systemPrompt": {
+      "pattern": "buildSystemPrompt",
+      "changeType": "modified",
+      "tags": ["system-prompt"]
+    },
+    "capabilityComment": {
+      "pattern": "// (NEW|Capability|Feature):",
+      "changeType": "added",
+      "tags": []
+    }
+  },
+  "featureNameExtraction": {
+    "removeSuffixes": ["Service", "Model", "View", "Manager", "Controller"],
+    "camelCaseToTitle": true
+  },
+  "defaultTags": {
+    "Services": ["service", "backend"],
+    "Models": ["model", "data"],
+    "Views": ["ui", "frontend"]
+  },
+  "userFacingDetection": {
+    "alwaysUserFacing": [
+      "*Service.swift",
+      "*View.swift",
+      "buildSystemPrompt"
+    ],
+    "publicApiIndicators": [
+      "public func",
+      "public struct",
+      "public class",
+      "public actor"
+    ]
+  },
+  "versionDetection": {
+    "fromGitTags": true,
+    "defaultVersion": "9.0"
+  }
+}
+

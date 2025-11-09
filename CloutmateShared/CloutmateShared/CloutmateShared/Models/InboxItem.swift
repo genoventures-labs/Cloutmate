@@ -12,12 +12,15 @@ import SwiftData
 public final class InboxItem {
     public var id: UUID = UUID()
     public var content: String = ""
-    public var itemType: String = "text" // text, image, file, url
+    public var itemType: String = "text" // text, image, file, url, voice
     public var fileURL: String?
     public var createdAt: Date = Date()
-    public var convertedToType: String? // task, note, post, project
+    public var convertedToType: String? // task, note, post, project, draft
     public var convertedToId: UUID?
     public var convertedAt: Date?
+    public var isFlagged: Bool = false
+    public var isArchived: Bool = false
+    public var aiImported: Bool = false
     
     public init(
         content: String,

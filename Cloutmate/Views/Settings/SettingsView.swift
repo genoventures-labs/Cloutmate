@@ -396,6 +396,20 @@ struct SettingsView: View {
                 }) {
                     AboutSection()
                 }
+                
+                // Flow Companion Settings
+                GlassCard(showHeader: true, headerContent: {
+                    AnyView(
+                        HStack {
+                            Image(systemName: "sparkles")
+                                .foregroundColor(.purple)
+                            Text("Flow Companion")
+                                .font(.headline)
+                        }
+                    )
+                }) {
+                    FlowCompanionSettingsSection()
+                }
             }
             .padding(28)
         }

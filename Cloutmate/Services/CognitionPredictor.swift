@@ -565,7 +565,7 @@ final class CognitionPredictor: ObservableObject {
         }
     }
 
-    private func fetchLatestForecast(modelContext: ModelContext) -> FocusForecast? {
+    func fetchLatestForecast(modelContext: ModelContext) -> FocusForecast? {
         var descriptor = FetchDescriptor<FocusForecast>(
             sortBy: [SortDescriptor(\.generatedAt, order: .reverse)]
         )

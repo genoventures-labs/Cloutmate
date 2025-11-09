@@ -19,6 +19,7 @@ final class PerformanceMemory {
     var timeoutCount: Int
     var lastUsed: Date
     var createdAt: Date
+    var cachedPerformanceScore: Double? // Cache computed score for sorting
     
     init(
         intentCluster: String,
@@ -40,6 +41,7 @@ final class PerformanceMemory {
         self.timeoutCount = timeoutCount
         self.lastUsed = lastUsed
         self.createdAt = createdAt
+        self.cachedPerformanceScore = nil
     }
     
     /// Success rate (0.0 to 1.0)
@@ -62,6 +64,11 @@ final class PerformanceMemory {
     
     /// Overall performance score (higher is better, 0.0 to 1.0)
     var performanceScore: Double {
+        // Return cached value if available and still valid
+        if let cached = cachedPerformanceScore {
+            return cached
+        }
+        
         let successWeight = 0.5
         let latencyWeight = 0.3
         let timeoutPenalty = 0.2
@@ -71,7 +78,12 @@ final class PerformanceMemory {
         
         // Calculate score
         let score = (successRate * successWeight) + (normalizedLatency * latencyWeight) - (timeoutRate * timeoutPenalty)
-        return max(0.0, min(1.0, score))
+        let finalScore = max(0.0, min(1.0, score))
+        
+        // Cache the score for sorting
+        cachedPerformanceScore = finalScore
+        
+        return finalScore
     }
     
     /// Record a successful request
@@ -80,6 +92,8 @@ final class PerformanceMemory {
         requestCount += 1
         totalLatency += latency
         lastUsed = Date()
+        // Invalidate cached score
+        cachedPerformanceScore = nil
     }
     
     /// Record a failed request
@@ -90,11 +104,14 @@ final class PerformanceMemory {
             timeoutCount += 1
         }
         lastUsed = Date()
+        // Invalidate cached score
+        cachedPerformanceScore = nil
     }
 }
 
 /// Service for managing performance memory
-actor PerformanceMemoryService {
+@MainActor
+final class PerformanceMemoryService {
     static let shared = PerformanceMemoryService()
     
     private var modelContext: ModelContext?
@@ -144,6 +161,9 @@ actor PerformanceMemoryService {
         )
         memory.recordSuccess(latency: latency)
         
+        // Save context to persist changes
+        try? modelContext.save()
+        
         // Cleanup old records (7-day window or top-100 cap)
         cleanupOldRecords(intentCluster: intentCluster, modelContext: modelContext)
     }
@@ -161,6 +181,9 @@ actor PerformanceMemoryService {
             modelContext: modelContext
         )
         memory.recordFailure(isTimeout: isTimeout)
+        
+        // Save context to persist changes
+        try? modelContext.save()
     }
     
     /// Get best performing model for an intent cluster
@@ -168,16 +191,30 @@ actor PerformanceMemoryService {
         for intentCluster: String,
         modelContext: ModelContext
     ) -> String? {
+        // Update cached scores before sorting
         let descriptor = FetchDescriptor<PerformanceMemory>(
             predicate: #Predicate<PerformanceMemory> { memory in
                 memory.intentCluster == intentCluster && memory.requestCount >= 3
-            },
-            sortBy: [SortDescriptor(\.performanceScore, order: .reverse)]
+            }
         )
         
-        guard let memories = try? modelContext.fetch(descriptor),
-              let best = memories.first,
-              best.performanceScore > 0.5 else {
+        guard var memories = try? modelContext.fetch(descriptor) else {
+            return nil
+        }
+        
+        // Update cached scores for all memories
+        for memory in memories {
+            _ = memory.performanceScore // This will cache the score
+        }
+        
+        // Save the context to persist cached scores
+        try? modelContext.save()
+        
+        // Now sort by cached score
+        memories.sort { ($0.cachedPerformanceScore ?? 0.0) > ($1.cachedPerformanceScore ?? 0.0) }
+        
+        guard let best = memories.first,
+              (best.cachedPerformanceScore ?? 0.0) > 0.5 else {
             return nil
         }
         
@@ -186,6 +223,7 @@ actor PerformanceMemoryService {
     
     /// Cleanup old records (7-day window or top-100 cap per intent cluster)
     private func cleanupOldRecords(intentCluster: String, modelContext: ModelContext) {
+        // This must be called from MainActor context
         let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
         
         // Delete records older than 7 days
@@ -201,7 +239,7 @@ actor PerformanceMemoryService {
             }
         }
         
-        // Keep only top 100 records per intent cluster
+        // Keep only top 100 records per intent cluster (sorted by lastUsed)
         let allDescriptor = FetchDescriptor<PerformanceMemory>(
             predicate: #Predicate<PerformanceMemory> { memory in
                 memory.intentCluster == intentCluster

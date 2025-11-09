@@ -66,20 +66,25 @@ actor CoreResponseService {
         userStyleProfile: UserPreferences? = nil,
         confidence: ConfidenceSnapshot? = nil,
         modelContext: ModelContext? = nil
-    ) async throws -> String {
-        // Hybrid bridge is the core implementation - always use it when modelContext is available
+    ) async throws -> (response: String, thinking: String?, modelUsed: String) {
+        // Use local Ollama routing with ModelRoutingEngine
         if let modelContext = modelContext {
-            let apiKey = await MainActor.run {
-                AISettings.shared.ollamaCloudAPIKey
-            }
-            let latencyThreshold = await MainActor.run {
-                AISettings.shared.latencyThreshold
-            }
-            let preferredModel = await MainActor.run {
-                AISettings.shared.preferredCloudModel
-            }
+            // Get routing decision from ModelRoutingEngine
+            let intentCluster = payloadContext?.intentClusters?.primaryCluster
+            let confidenceScore = payloadContext?.intentClusters?.confidence ?? confidence?.score ?? 0.7
+            let messageLength = input.count
             
-            return try await hybridBridge.generateResponseWithAppContext(
+            let routingDecision = await ModelRoutingEngine.shared.selectModel(
+                input: input,
+                intentCluster: intentCluster,
+                confidence: confidenceScore,
+                messageLength: messageLength,
+                userStyle: currentMessageStyle,
+                conversationId: nil
+            )
+            
+            // Use OllamaBridgeService with the selected model and thinking setting
+            let result = try await ollamaBridge.generateResponseWithAppContext(
                 for: input,
                 appContext: appContext,
                 payloadContext: payloadContext,
@@ -87,22 +92,28 @@ actor CoreResponseService {
                 currentMessageStyle: currentMessageStyle,
                 userStyleProfile: userStyleProfile,
                 confidence: confidence,
-                apiKey: apiKey,
-                useHybridBridge: true, // Always enabled as core
-                latencyThreshold: latencyThreshold,
-                modelContext: modelContext
+                useThinking: routingDecision.useThinking,
+                model: routingDecision.model
             )
+            
+            // Record model usage for cooldown/stickiness
+            await ModelRoutingEngine.shared.recordModelUsage(routingDecision.model)
+            
+            return result
         } else {
             // Fallback to local Ollama if no modelContext (legacy compatibility)
-            return try await ollamaBridge.generateResponseWithAppContext(
+            let response = try await ollamaBridge.generateResponseWithAppContext(
                 for: input,
                 appContext: appContext,
                 payloadContext: payloadContext,
                 conversationMessages: conversationMessages,
                 currentMessageStyle: currentMessageStyle,
                 userStyleProfile: userStyleProfile,
-                confidence: confidence
+                confidence: confidence,
+                useThinking: false,
+                model: nil
             )
+            return response
         }
     }
     
@@ -151,7 +162,22 @@ actor CoreResponseService {
         userStyleProfile: UserPreferences? = nil,
         confidence: ConfidenceSnapshot? = nil
     ) async throws -> DocumentAnalysisResult {
-        return try await ollamaBridge.analyzeImage(
+        // Use Gemini 2.5 Flash for image analysis - STRICTLY GEMINI, NO FALLBACK
+        let apiKey = await MainActor.run {
+            AISettings.shared.googleAPIKey
+        }
+        
+        print("[CoreResponseService] Image analysis requested - Google API Key present: \(apiKey != nil && !apiKey!.isEmpty)")
+        
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            let errorMsg = "Image analysis requires Google API key. Please configure it in Config.plist (GoogleAPIKey)."
+            print("[CoreResponseService] Image analysis failed: \(errorMsg)")
+            throw CoreResponseError.notImplemented(errorMsg)
+        }
+        
+        // Use Gemini 2.5 Flash via GeminiService - NO FALLBACK
+        print("[CoreResponseService] Routing image analysis to GeminiService (gemini-2.5-flash)")
+        return try await GeminiService.shared.analyzeImage(
             imageData: imageData,
             mimeType: mimeType,
             userPrompt: userPrompt,
@@ -160,7 +186,8 @@ actor CoreResponseService {
             conversationMessages: conversationMessages,
             currentMessageStyle: currentMessageStyle,
             userStyleProfile: userStyleProfile,
-            confidence: confidence
+            confidence: confidence,
+            apiKey: apiKey
         )
     }
     

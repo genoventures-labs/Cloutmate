@@ -21,9 +21,12 @@ struct NotesHeaderView: View {
     @Binding var searchText: String
     @Binding var selectedFilter: NotesFilter
     @Binding var showCreateSheet: Bool
+    @Binding var isSelectionMode: Bool
     
     let totalNotes: Int
     let taggedNotes: Int
+    let selectionCount: Int
+    let onToggleSelection: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
@@ -51,13 +54,26 @@ struct NotesHeaderView: View {
                     
                     Spacer()
                     
-                    // Quick Add button
-                    GlassButton(
-                        icon: "plus",
-                        style: .iconOnly,
-                        role: .primary
-                    ) {
-                        showCreateSheet = true
+                    HStack(spacing: 8) {
+                        GlassButton(
+                            icon: isSelectionMode || selectionCount > 0 ? "checkmark.circle.fill" : "checkmark.circle",
+                            style: .iconOnly,
+                            role: .surface
+                        ) {
+                            onToggleSelection()
+                        }
+                        .accessibilityLabel(isSelectionMode ? "Exit selection mode" : "Enter selection mode")
+                        .help(isSelectionMode ? "Done Selecting" : "Select Notes")
+                        
+                        // Quick Add button
+                        GlassButton(
+                            icon: "plus",
+                            style: .iconOnly,
+                            role: .primary
+                        ) {
+                            showCreateSheet = true
+                        }
+                        .accessibilityLabel("Create new note")
                     }
                 }
                 
@@ -104,8 +120,11 @@ struct NotesHeaderView: View {
         searchText: .constant(""),
         selectedFilter: .constant(.all),
         showCreateSheet: .constant(false),
+        isSelectionMode: .constant(false),
         totalNotes: 128,
-        taggedNotes: 14
+        taggedNotes: 14,
+        selectionCount: 0,
+        onToggleSelection: {}
     )
     .padding()
     .environmentObject(GlassColorSystem())

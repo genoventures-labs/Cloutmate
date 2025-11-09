@@ -91,6 +91,27 @@ nonisolated enum SchemaIntrospector {
             "highlights: [String]",
             "source: String?",
             "type: enum ResourceType { note, article, video, book, podcast, link, idea, reference }",
+            "authorRaw: String (NoteAuthor)",
+            "createdAt: Date",
+            "updatedAt: Date",
+            "isArchived: Bool"
+        ])
+        doc += section("Journal", fields: [
+            "id: UUID",
+            "title: String",
+            "content: String",
+            "entryDate: Date",
+            "entryType: String (JournalEntryType)",
+            "mood: String (JournalMood)",
+            "tags: [String]",
+            "projectId: UUID?",
+            "areaId: UUID?",
+            "linkedNoteIds: [UUID]",
+            "linkedAreaIds: [UUID]",
+            "linkedProjectIds: [UUID]",
+            "aiPrompt: String?",
+            "aiGeneratedContent: String?",
+            "authorRaw: String (JournalAuthor)",
             "createdAt: Date",
             "updatedAt: Date",
             "isArchived: Bool"

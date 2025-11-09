@@ -47,6 +47,8 @@ struct CloutmateApp: App {
                         checkAndRunMigration()
                         registerGlobalHotkey()
                         startRitualSystemsIfNeeded()
+                        startAIFlowCompanion()
+                        startFlowCompanionEngine()
                         // Start ARTE after other systems
                         _Concurrency.Task { @MainActor in
                             try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds to ensure SwiftData is ready
@@ -210,6 +212,18 @@ struct CloutmateApp: App {
                     os_log("Migration failed: %{public}@", log: .default, type: .error, error.localizedDescription)
                 }
             }
+            
+            if !UserDefaults.standard.bool(forKey: "note_author_migrated") {
+                do {
+                    try await MigrationService.shared.applyAuthorMetadataAndCleanup(
+                        context: CloutmateApp.sharedModelContainer.mainContext
+                    )
+                    UserDefaults.standard.set(true, forKey: "note_author_migrated")
+                    os_log("Author metadata migration completed successfully", log: .default, type: .info)
+                } catch {
+                    os_log("Author metadata migration failed: %{public}@", log: .default, type: .error, error.localizedDescription)
+                }
+            }
         }
     }
     
@@ -344,6 +358,24 @@ struct CloutmateApp: App {
             os_log("ARTE: Integration complete - reactive theme system active", log: .default, type: .info)
         }
     }
+    
+    // MARK: - AI Flow Companion Integration
+    
+    private func startAIFlowCompanion() {
+        _Concurrency.Task { @MainActor in
+            let context = CloutmateApp.sharedModelContainer.mainContext
+            AIFlowCompanion.shared.start(modelContext: context)
+            os_log("AI Flow Companion started", log: .default, type: .info)
+        }
+    }
+    
+    private func startFlowCompanionEngine() {
+        _Concurrency.Task { @MainActor in
+            let context = CloutmateApp.sharedModelContainer.mainContext
+            FlowCompanionEngine.shared.start(modelContext: context)
+            os_log("Flow Companion Engine started", log: .default, type: .info)
+        }
+    }
 }
 
 extension CloutmateApp {
@@ -352,6 +384,7 @@ extension CloutmateApp {
             // Shared models used in the app (publicly accessible)
             CloutmateShared.Post.self,
             CloutmateShared.Artifact.self,  // New Artifact model for cognitive workspace
+            CloutmateShared.ArtifactMention.self,  // Artifact mentions tracking
             Draft.self,  // Draft is app-local, not in CloutmateShared
             CloutmateShared.Template.self,
             CloutmateShared.PlatformAccount.self,
@@ -411,10 +444,19 @@ extension CloutmateApp {
             FocusForecast.self,
             DriftEvent.self,
             EnergyWindow.self,
+            // Archives V2 models
+            ArchiveReflection.self,
             // Context-aware create sheet models
             CreateActionUsage.self,
             // Hybrid Bridge models
-            PerformanceMemory.self
+            PerformanceMemory.self,
+            // Missing Integrations models
+            FlowCompanionState.self,
+            StoryArc.self,
+            StoryChapter.self,
+            StoryScene.self,
+            MoodEntry.self,
+            ReflectionNote.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"

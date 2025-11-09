@@ -350,6 +350,7 @@ struct ProjectHubSheet: View {
 struct CreateProjectSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query private var allAreas: [Area]
     
     @State private var title = ""
@@ -370,9 +371,17 @@ struct CreateProjectSheet: View {
                             .font(.headline)
                         
                         TextField("Project Title *", text: $title)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
                         
                         TextField("Goal", text: $goal)
                             .lineLimit(3...5)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
                         
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Status")
@@ -424,11 +433,16 @@ struct CreateProjectSheet: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             TextField("e.g., work, priority", text: $tags)
+                                .textFieldStyle(.plain)
+                                .padding(12)
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(8)
                         }
                     }
                 }
                 .padding()
             }
+            .background(glassColorSystem.backgroundColor())
             .navigationTitle("New Project")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -467,6 +481,7 @@ struct CreateProjectSheet: View {
 
 struct BulkStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     let projects: [Project]
     let onUpdate: (ProjectStatus) -> Void
     
@@ -491,7 +506,7 @@ struct BulkStatusSheet: View {
                                 Spacer()
                             }
                             .padding(12)
-                            .background(Color(.controlBackgroundColor))
+                            .background(.ultraThinMaterial)
                             .cornerRadius(8)
                         }
                         .buttonStyle(.plain)
@@ -499,7 +514,8 @@ struct BulkStatusSheet: View {
                 }
             }
             .padding()
-            .frame(width: 400, height: 250)
+            .background(glassColorSystem.backgroundColor())
+            .frame(width: 400, height: 300)
             .navigationTitle("Change Status")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {

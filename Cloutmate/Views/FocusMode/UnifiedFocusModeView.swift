@@ -1,0 +1,224 @@
+//
+//  UnifiedFocusModeView.swift
+//  Cloutmate
+//
+//  Focus Mode V2 - Unified Main View
+//
+
+import SwiftUI
+import SwiftData
+import AppKit
+import Combine
+import CloutmateShared
+
+struct UnifiedFocusModeView: View {
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
+    @State private var activeSession: FocusSession?
+    @State private var selectedFilter: FocusFilter = .session
+    @State private var durationMode: DurationMode = .pomodoro
+    @State private var showObjectiveDrawer = false
+    @State private var showAnalyticsDrawer = false
+    @State private var showAuroraInsights = false
+    @State private var streakCount: Int = 0
+    @State private var cpsScore: Double?
+    @State private var currentTime = Date()
+    @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    // Objective drawer state
+    @State private var objective: String = ""
+    @State private var selectedDuration: TimeInterval = 1800
+    @State private var reflectAfterSession: Bool = true
+    
+    // Calm Mode
+    @State private var isCalmModeEnabled: Bool = UserDefaults.standard.bool(forKey: "focusCalmModeEnabled")
+    @State private var breathingPhase: CGFloat = 0
+    
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(.windowBackgroundColor)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header
+                FocusHeaderView(
+                    activeSession: activeSession,
+                    selectedFilter: selectedFilter,
+                    onFilterChange: { selectedFilter = $0 },
+                    onStartSession: {
+                        showObjectiveDrawer = true
+                    },
+                    onPauseSession: pauseSession,
+                    onEndSession: endSession,
+                    onSetObjective: {
+                        showObjectiveDrawer = true
+                    },
+                    onOpenAuroraInsights: {
+                        showAuroraInsights = true
+                    }
+                )
+                .padding(.horizontal)
+                .padding(.top)
+                .padding(.bottom, 8)
+                
+                // Main Content
+                HStack(spacing: 20) {
+                    // Session Panel (Left)
+                    VStack {
+                        FocusSessionPanel(
+                            session: activeSession,
+                            streakCount: streakCount,
+                            cpsScore: cpsScore,
+                            durationMode: durationMode,
+                            onDurationModeChange: { durationMode = $0 }
+                        )
+                        .frame(maxWidth: .infinity)
+                        
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
+                    
+                    // Sidebar (Right)
+                    FocusSidebar(
+                        session: activeSession,
+                        onLogTone: logTone
+                    )
+                    .frame(width: 320)
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+        }
+        .coordinateSpace(name: "scroll")
+        .onReceive(timer) { _ in
+            currentTime = Date()
+        }
+        .task {
+            refreshData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .focusSessionStatusChanged)) { _ in
+            refreshData()
+        }
+        .sheet(isPresented: $showObjectiveDrawer) {
+            FocusObjectiveDrawer(
+                objective: $objective,
+                selectedDuration: $selectedDuration,
+                reflectAfterSession: $reflectAfterSession,
+                onSave: startSession
+            )
+        }
+        .sheet(isPresented: $showAnalyticsDrawer) {
+            FocusAnalyticsDrawer()
+        }
+        .sheet(isPresented: $showAuroraInsights) {
+            FocusAnalyticsDrawer()
+        }
+    }
+    
+    // MARK: - Actions
+    
+    private func startSession(
+        objective: String,
+        duration: TimeInterval,
+        targetObjectId: UUID?,
+        targetObjectType: String?,
+        reflectAfterSession: Bool
+    ) {
+        do {
+            let session = try FocusSessionService.shared.startSession(
+                objective: objective,
+                plannedDuration: duration,
+                targetObjectId: targetObjectId,
+                targetObjectType: targetObjectType,
+                modelContext: modelContext
+            )
+            activeSession = session
+            refreshData()
+            
+            // Haptic feedback
+            let generator = NSHapticFeedbackManager.defaultPerformer
+            generator.perform(.generic, performanceTime: .default)
+        } catch {
+            print("Failed to start session: \(error)")
+        }
+    }
+    
+    private func pauseSession() {
+        // Note: FocusSessionService doesn't have a pause method yet
+        // For now, we'll just update the UI state
+        // In a full implementation, we'd add pause/resume to the service
+    }
+    
+    private func endSession() {
+        guard let session = activeSession else { return }
+        
+        // Show completion sheet or directly end
+        do {
+            _ = try FocusSessionService.shared.commitSession(
+                completed: true,
+                notes: nil,
+                modelContext: modelContext
+            )
+            activeSession = nil
+            refreshData()
+            
+            // Haptic feedback
+            let generator = NSHapticFeedbackManager.defaultPerformer
+            generator.perform(.generic, performanceTime: .default)
+        } catch {
+            print("Failed to end session: \(error)")
+        }
+    }
+    
+    private func logTone(_ tone: EmotionalState) {
+        // Log tone to journal/insights
+        // For now, we'll create a simple journal entry
+        // In a full implementation, we'd use AdaptiveJournalService
+        
+        // Haptic feedback
+        let generator = NSHapticFeedbackManager.defaultPerformer
+        generator.perform(.generic, performanceTime: .default)
+    }
+    
+    private func refreshData() {
+        activeSession = FocusSessionService.shared.getActiveSession(modelContext: modelContext)
+        streakCount = FocusSessionService.shared.getStreakCount(modelContext: modelContext)
+        
+        if let session = activeSession,
+           let targetId = session.targetObjectId {
+            cpsScore = PriorityEngine.shared.getScoreValue(for: targetId, modelContext: modelContext)
+        } else {
+            cpsScore = nil
+        }
+    }
+    
+    // MARK: - Calm Mode
+    
+    @ViewBuilder
+    private var breathingDotIndicator: some View {
+        Circle()
+            .fill(Color.kosmicBlue.opacity(0.6))
+            .frame(width: 12 + breathingPhase * 4, height: 12 + breathingPhase * 4)
+            .opacity(0.7 + breathingPhase * 0.3)
+    }
+    
+    private func startBreathingAnimation() {
+        guard !reduceMotion else { return }
+        withAnimation(
+            Animation.easeInOut(duration: 3.0)
+                .repeatForever(autoreverses: true)
+        ) {
+            breathingPhase = 1.0
+        }
+    }
+}
+
+#Preview {
+    UnifiedFocusModeView()
+        .environmentObject(GlassColorSystem())
+        .modelContainer(for: [FocusSession.self])
+}
+

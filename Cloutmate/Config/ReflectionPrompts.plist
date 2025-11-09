@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>calm</key>
+	<array>
+		<string>What felt most meaningful today?</string>
+		<string>What are you noticing about your work?</string>
+		<string>What's bringing you clarity right now?</string>
+	</array>
+	<key>fatigued</key>
+	<array>
+		<string>Where did your attention leak?</string>
+		<string>What's draining your energy?</string>
+		<string>What would help you reset?</string>
+	</array>
+	<key>energized</key>
+	<array>
+		<string>What momentum are you riding right now?</string>
+		<string>What's working well?</string>
+		<string>What's fueling your energy?</string>
+	</array>
+	<key>reflective</key>
+	<array>
+		<string>What surprised you about today?</string>
+		<string>What patterns are you seeing?</string>
+		<string>What insights are emerging?</string>
+	</array>
+	<key>focused</key>
+	<array>
+		<string>What's holding your focus?</string>
+		<string>What needs your attention?</string>
+		<string>What's driving your deep work?</string>
+	</array>
+</dict>
+</plist>
+

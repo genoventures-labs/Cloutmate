@@ -57,7 +57,7 @@ struct Sidebar: View {
                         label: "TOOLS",
                         icon: "wand.and.stars.inverse",
                         isExpanded: $toolsExpanded,
-                        tabs: [.aiAssistant, .focusMode, .focusGravity, .insights, .settings]
+                        tabs: [.aiAssistant, .focusMode, .focusGravity, .rituals, .insights, .settings]
                     )
                 }
                 .padding(.horizontal, 12)

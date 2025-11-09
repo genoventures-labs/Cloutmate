@@ -32,6 +32,16 @@ extension Color {
         return Color(red: 124/255, green: 77/255, blue: 255/255)
     }
     
+    /// System yellow color (Kosmic yellow) - for external articles and links
+    static var kosmicYellow: Color {
+        return Color(red: 255/255, green: 193/255, blue: 7/255)
+    }
+    
+    /// System violet color (Kosmic violet) - for reflective states
+    static var kosmicViolet: Color {
+        return Color(red: 0.44, green: 0.31, blue: 0.92)
+    }
+    
     // Legacy compatibility - map system colors to explicit values
     // These avoid asset catalog lookups while maintaining compatibility
     static var safeBlue: Color {

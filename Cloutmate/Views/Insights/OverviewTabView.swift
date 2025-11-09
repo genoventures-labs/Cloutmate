@@ -11,6 +11,7 @@ struct OverviewTabView: View {
     @Environment(\.modelContext) private var modelContext
     let snapshot: AnalyticsSnapshot?
     let ritualTrend: [(Date, Double)]
+    @Query(sort: \ReflectionNote.timestamp, order: .reverse) private var reflections: [ReflectionNote]
 
     var body: some View {
         if !hasMeaningfulOverviewData {
@@ -26,6 +27,7 @@ struct OverviewTabView: View {
                 statsGrid
                 EmotionalStateIndicator()
                 focusRitualsCard
+                recentReflectionsCard
                 if let snapshot, snapshot.feedbackEventsCount > 0 { experimentCard(snapshot) }
             }
         }
@@ -165,6 +167,78 @@ struct OverviewTabView: View {
                 Text(getAuroraExperiment(from: snapshot)).font(.system(size: 14)).foregroundColor(.secondary)
             }
             .padding(16)
+        }
+    }
+    
+    private var recentReflectionsCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 16) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "sparkles.rectangle.stack").foregroundColor(KosmicPalette.violet)
+                    Text("Recent Reflections").font(.system(size: 18, weight: .bold))
+                    Spacer()
+                }
+                
+                if reflections.isEmpty {
+                    Text("No reflections yet. Aurora will prompt you when helpful.")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(reflections.prefix(3)) { reflection in
+                            Button(action: {
+                                // Open reflection panel
+                                FlowCompanionEngine.shared.shouldShowPanel = true
+                            }) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(reflection.prompt)
+                                            .font(.system(size: 13, weight: .medium))
+                                            .lineLimit(1)
+                                        Spacer()
+                                        Circle()
+                                            .fill(sentimentColor(reflection.sentimentScore))
+                                            .frame(width: 8, height: 8)
+                                    }
+                                    Text(reflection.response)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if reflection.id != reflections.prefix(3).last?.id {
+                                Divider()
+                            }
+                        }
+                    }
+                    
+                    // Sentiment trend
+                    HStack(spacing: 8) {
+                        ForEach(reflections.prefix(5), id: \.id) { reflection in
+                            Circle()
+                                .fill(sentimentColor(reflection.sentimentScore))
+                                .frame(width: 12, height: 12)
+                        }
+                        Text("Sentiment trend")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            .padding(18)
+        }
+    }
+    
+    private func sentimentColor(_ score: Double) -> Color {
+        if score > 0.3 {
+            return .green
+        } else if score < -0.3 {
+            return .red
+        } else {
+            return .gray
         }
     }
 

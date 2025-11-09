@@ -153,6 +153,24 @@ class WorkspaceObjectSearchService {
             }
         }
         
+        // Search Focus Sessions
+        let focusSessionDescriptor = FetchDescriptor<FocusSession>()
+        if let sessions = try? modelContext.fetch(focusSessionDescriptor) {
+            for session in sessions {
+                let score = calculateMatchScore(text: session.objective.lowercased(), query: lowerQuery)
+                if score > 0 {
+                    let subtitle = session.status.rawValue.capitalized + " · \(session.durationFormatted)"
+                    results.append(WorkspaceObjectResult(
+                        id: session.id,
+                        type: .focusSession,
+                        title: session.objective,
+                        subtitle: subtitle,
+                        matchScore: score
+                    ))
+                }
+            }
+        }
+        
         // Sort by match score (highest first) and limit results
         return results
             .sorted { $0.matchScore > $1.matchScore }
@@ -247,6 +265,14 @@ class WorkspaceObjectSearchService {
             if let item = try? modelContext.fetch(descriptor).first {
                 let subtitle = item.convertedAt == nil ? "Unconverted" : "Converted"
                 return (title: String(item.content.prefix(50)), subtitle: subtitle)
+            }
+        case .focusSession:
+            let descriptor = FetchDescriptor<FocusSession>(
+                predicate: #Predicate { $0.id == id }
+            )
+            if let session = try? modelContext.fetch(descriptor).first {
+                let subtitle = session.status.rawValue.capitalized + " · \(session.durationFormatted)"
+                return (title: session.objective, subtitle: subtitle)
             }
         }
         

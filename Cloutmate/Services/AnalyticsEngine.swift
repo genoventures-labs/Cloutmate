@@ -283,38 +283,231 @@ final class AnalyticsEngine {
         end: Date,
         modelContext: ModelContext
     ) -> (snapshot: EmotionalSnapshot, trend: EmotionalTrend, dominant: EmotionType) {
-        // Simplified - emotion tracking can be enhanced with ConversationDigest
-        let conversationDescriptor = FetchDescriptor<AIConversation>()
+        // Collect emotional data from multiple sources
+        var emotionalDataPoints: [(timestamp: Date, valence: Double, intensity: Double, emotion: EmotionType)] = []
+        var emotionCounts: [EmotionType: Int] = [:]
         
-        guard let conversations = try? modelContext.fetch(conversationDescriptor),
-              !conversations.isEmpty else {
+        // 1. Fetch user messages in the date range
+        let messageDescriptor = FetchDescriptor<AIMessage>(
+            predicate: #Predicate { message in
+                message.role == "user" &&
+                message.timestamp != nil &&
+                message.timestamp! >= start &&
+                message.timestamp! <= end &&
+                message.content != nil &&
+                !message.content!.isEmpty
+            },
+            sortBy: [SortDescriptor(\.timestamp, order: .forward)]
+        )
+        
+        if let messages = try? modelContext.fetch(messageDescriptor) {
+            for message in messages {
+                var emotionStr: String?
+                var emotionScore: Double = 0.0
+                var emotionIntensity: Double = 0.0
+                
+                // Use existing emotional data if available, otherwise analyze on-the-fly
+                if let existingEmotion = message.emotion, !existingEmotion.isEmpty, message.emotionIntensity > 0.1 {
+                    emotionStr = existingEmotion
+                    emotionScore = message.emotionScore
+                    emotionIntensity = message.emotionIntensity
+                } else if let content = message.content, !content.isEmpty {
+                    // Analyze message content if no emotional data exists
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: content)
+                    emotionStr = snapshot.primaryEmotion.rawValue
+                    emotionScore = snapshot.valence
+                    emotionIntensity = snapshot.intensity
+                    
+                    // Update message with analyzed data for future use
+                    message.emotion = emotionStr
+                    message.emotionScore = emotionScore
+                    message.emotionIntensity = emotionIntensity
+                }
+                
+                if let emotion = emotionStr, emotionIntensity > 0.05 { // Lower threshold
+                    let emotionType = mapEmotionStringToType(emotion)
+                    emotionCounts[emotionType, default: 0] += 1
+                    if let timestamp = message.timestamp {
+                        emotionalDataPoints.append((timestamp: timestamp, valence: emotionScore, intensity: emotionIntensity, emotion: emotionType))
+                    }
+                }
+            }
+        }
+        
+        // 2. Include Journal entries
+        let journalDescriptor = FetchDescriptor<Journal>(
+            predicate: #Predicate { journal in
+                journal.createdAt >= start && journal.createdAt <= end &&
+                (!journal.content.isEmpty || !journal.title.isEmpty)
+            },
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        
+        if let journals = try? modelContext.fetch(journalDescriptor) {
+            for journal in journals {
+                let content = "\(journal.title) \(journal.content)".trimmingCharacters(in: .whitespacesAndNewlines)
+                if !content.isEmpty {
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: content)
+                    if snapshot.intensity > 0.05 {
+                        let emotionType = mapEmotionStringToType(snapshot.primaryEmotion.rawValue)
+                        emotionCounts[emotionType, default: 0] += 1
+                        emotionalDataPoints.append((timestamp: journal.createdAt, valence: snapshot.valence, intensity: snapshot.intensity, emotion: emotionType))
+                    }
+                }
+            }
+        }
+        
+        // 3. Include ReflectionNotes
+        let reflectionDescriptor = FetchDescriptor<ReflectionNote>(
+            predicate: #Predicate { note in
+                note.timestamp >= start && note.timestamp <= end &&
+                !note.response.isEmpty
+            },
+            sortBy: [SortDescriptor(\.timestamp, order: .forward)]
+        )
+        
+        if let reflections = try? modelContext.fetch(reflectionDescriptor) {
+            for reflection in reflections {
+                var valence = reflection.sentimentScore
+                var emotionStr = reflection.emotionTone
+                
+                // Analyze if not already done
+                if valence == 0.0 || emotionStr.isEmpty {
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: reflection.response)
+                    valence = snapshot.valence
+                    emotionStr = snapshot.primaryEmotion.rawValue
+                    reflection.sentimentScore = valence
+                    reflection.emotionTone = emotionStr
+                }
+                
+                if abs(valence) > 0.05 {
+                    let emotionType = mapEmotionStringToType(emotionStr)
+                    emotionCounts[emotionType, default: 0] += 1
+                    emotionalDataPoints.append((timestamp: reflection.timestamp, valence: valence, intensity: abs(valence), emotion: emotionType))
+                }
+            }
+        }
+        
+        // 4. Include Notes (from CloutmateShared)
+        let noteDescriptor = FetchDescriptor<CloutmateShared.Note>(
+            predicate: #Predicate { note in
+                note.createdAt >= start && note.createdAt <= end &&
+                (!note.markdown.isEmpty || !note.title.isEmpty)
+            },
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        
+        if let notes = try? modelContext.fetch(noteDescriptor) {
+            for note in notes {
+                let content = "\(note.title) \(note.markdown)".trimmingCharacters(in: .whitespacesAndNewlines)
+                if !content.isEmpty {
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: content)
+                    if snapshot.intensity > 0.05 {
+                        let emotionType = mapEmotionStringToType(snapshot.primaryEmotion.rawValue)
+                        emotionCounts[emotionType, default: 0] += 1
+                        emotionalDataPoints.append((timestamp: note.createdAt, valence: snapshot.valence, intensity: snapshot.intensity, emotion: emotionType))
+                    }
+                }
+            }
+        }
+        
+        // If no data found, return neutral
+        guard !emotionalDataPoints.isEmpty else {
             return (EmotionalSnapshot.neutral, .stable, .neutral)
         }
         
-        // Simplified - no emotional tracking on AIConversation directly yet
-        // Can be enhanced with ConversationDigest emotional data
-        var emotionCounts: [EmotionType: Int] = [.neutral: conversations.count]
-        var valences: [Double] = [0.0]
-        
+        // Determine dominant emotion
         let dominantEmotion = emotionCounts.max(by: { $0.value < $1.value })?.key ?? .neutral
-        let avgValence = valences.reduce(0, +) / Double(valences.count)
         
-        // Determine trend - simplified without direct emotional data
-        let midpoint = conversations.count / 2
+        // Calculate averages
+        let allValences = emotionalDataPoints.map { $0.valence }
+        let allIntensities = emotionalDataPoints.map { $0.intensity }
+        let avgValence = allValences.reduce(0, +) / Double(allValences.count)
+        let avgIntensity = allIntensities.reduce(0, +) / Double(allIntensities.count)
         
-        // Default to stable trend
-        let trend: EmotionalTrend = .stable
+        // Determine trend by comparing first half vs second half (sorted by timestamp)
+        let sortedDataPoints = emotionalDataPoints.sorted { $0.timestamp < $1.timestamp }
+        let sortedValences = sortedDataPoints.map { $0.valence }
         
-        // Simplified emotion snapshot for now
+        let midpoint = sortedValences.count / 2
+        let firstHalfValences = Array(sortedValences.prefix(midpoint))
+        let secondHalfValences = Array(sortedValences.suffix(sortedValences.count - midpoint))
+        
+        let firstHalfAvg = firstHalfValences.isEmpty ? 0.0 : firstHalfValences.reduce(0, +) / Double(firstHalfValences.count)
+        let secondHalfAvg = secondHalfValences.isEmpty ? 0.0 : secondHalfValences.reduce(0, +) / Double(secondHalfValences.count)
+        
+        let trend: EmotionalTrend
+        let delta = secondHalfAvg - firstHalfAvg
+        if abs(delta) < 0.1 {
+            trend = .stable
+        } else if delta > 0.2 {
+            trend = .improving
+        } else if delta < -0.2 {
+            trend = .declining
+        } else {
+            // Check for volatility
+            let variance = allValences.map { pow($0 - avgValence, 2) }.reduce(0, +) / Double(allValences.count)
+            trend = variance > 0.3 ? .volatile : .stable
+        }
+        
+        // Map EmotionType to EmotionTone for snapshot
+        let primaryTone = mapEmotionTypeToTone(dominantEmotion)
+        
         let snapshot = EmotionalSnapshot(
-            primaryEmotion: .neutral,  // Convert EmotionType to EmotionTone as needed
+            primaryEmotion: primaryTone,
             secondaryEmotion: nil,
             valence: avgValence,
-            intensity: abs(avgValence),
+            intensity: avgIntensity,
             keywords: []
         )
         
-        return (snapshot, trend, .neutral)
+        // Save updated messages and reflections
+        try? modelContext.save()
+        
+        return (snapshot, trend, dominantEmotion)
+    }
+    
+    private func mapEmotionStringToType(_ emotion: String) -> EmotionType {
+        let lowercased = emotion.lowercased()
+        switch lowercased {
+        case "joyful", "happy", "glad":
+            return .joyful
+        case "excited", "enthusiastic", "energized":
+            return .excited
+        case "calm", "peaceful", "relaxed":
+            return .calm
+        case "frustrated", "annoyed", "irritated":
+            return .frustrated
+        case "anxious", "worried", "nervous", "stressed":
+            return .anxious
+        case "motivated", "determined", "focused":
+            return .motivated
+        case "overwhelmed", "burdened":
+            return .overwhelmed
+        default:
+            return .neutral
+        }
+    }
+    
+    private func mapEmotionTypeToTone(_ emotion: EmotionType) -> EmotionTone {
+        switch emotion {
+        case .joyful:
+            return .joyful
+        case .excited:
+            return .excited
+        case .calm:
+            return .calm
+        case .frustrated:
+            return .frustrated
+        case .anxious:
+            return .overwhelmed // Closest match
+        case .motivated:
+            return .determined
+        case .overwhelmed:
+            return .overwhelmed
+        case .neutral:
+            return .neutral
+        }
     }
     
     // MARK: - Content Metrics
@@ -460,6 +653,74 @@ final class AnalyticsEngine {
         }
         
         return trends.reversed()
+    }
+    
+    /// Backfill emotional data for all existing content
+    func backfillEmotionalData(modelContext: ModelContext) async {
+        let logger = Logger(subsystem: "com.kosmicapps.Cloutmate", category: "AnalyticsEngine")
+        logger.info("Starting emotional data backfill...")
+        
+        var processedCount = 0
+        
+        // Backfill AIMessages
+        let messageDescriptor = FetchDescriptor<AIMessage>(
+            predicate: #Predicate { message in
+                message.role == "user" &&
+                message.content != nil &&
+                !message.content!.isEmpty
+            }
+        )
+        
+        if let messages = try? modelContext.fetch(messageDescriptor) {
+            for message in messages {
+                // Only process if missing or low-quality emotional data
+                let needsBackfill = message.emotion == nil || 
+                                   message.emotion!.isEmpty || 
+                                   message.emotionIntensity <= 0.1
+                
+                if needsBackfill, let content = message.content, !content.isEmpty {
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: content)
+                    message.emotion = snapshot.primaryEmotion.rawValue
+                    message.emotionScore = snapshot.valence
+                    message.emotionIntensity = snapshot.intensity
+                    processedCount += 1
+                }
+            }
+        }
+        
+        // Backfill Journals
+        let journalDescriptor = FetchDescriptor<Journal>()
+        if let journals = try? modelContext.fetch(journalDescriptor) {
+            for journal in journals {
+                let content = "\(journal.title) \(journal.content)"
+                if !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: content)
+                    // Journals don't have emotion fields, but we can use them in trend calculation
+                    processedCount += 1
+                }
+            }
+        }
+        
+        // Backfill ReflectionNotes
+        let reflectionDescriptor = FetchDescriptor<ReflectionNote>()
+        if let reflections = try? modelContext.fetch(reflectionDescriptor) {
+            for reflection in reflections {
+                if reflection.sentimentScore == 0.0 && !reflection.response.isEmpty {
+                    let snapshot = EmotionAnalyzer.analyzeTone(text: reflection.response)
+                    reflection.sentimentScore = snapshot.valence
+                    reflection.emotionTone = snapshot.primaryEmotion.rawValue
+                    processedCount += 1
+                }
+            }
+        }
+        
+        // Save all changes
+        do {
+            try modelContext.save()
+            logger.info("Backfilled emotional data for \(processedCount) items")
+        } catch {
+            logger.error("Failed to save backfilled emotional data: \(error.localizedDescription)")
+        }
     }
     
     /// Get focus time trend over time

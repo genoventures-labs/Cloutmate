@@ -634,6 +634,7 @@ final class AIActionRouter {
                 markdown: request.body,
                 tags: request.tags
             )
+            note.author = .aurora
             modelContext.insert(note)
             try? modelContext.save()
             AIRecallService.shared.registerCreated(note, modelContext: modelContext)
@@ -740,6 +741,7 @@ final class AIActionRouter {
                     markdown: noteRequest.body,
                     tags: noteRequest.tags
                 )
+                note.author = .user
                 modelContext.insert(note)
                 affected.append(note.id)
                 details.append("Converted to note \(note.title)")
@@ -1192,6 +1194,28 @@ extension AIIntentAction {
             self = .createReminder(request)
         }
     }
+    
+    // MARK: - Entity Resolution
+    
+    /// Resolve a mention text to an entity (type, ID, display name)
+    /// Used for @mention linking and deep linking
+    func resolveEntity(mentionText: String, modelContext: ModelContext) -> (type: ObjectType, id: UUID, displayName: String)? {
+        let searchResults = WorkspaceObjectSearchService.shared.search(
+            query: mentionText,
+            modelContext: modelContext,
+            limit: 1
+        )
+        
+        guard let firstResult = searchResults.first else {
+            return nil
+        }
+        
+        return (
+            type: firstResult.type,
+            id: firstResult.id,
+            displayName: firstResult.title
+        )
+    }
 }
 
 // MARK: - Helpers
@@ -1309,11 +1333,22 @@ private func mapTaskStatus(_ raw: String?) -> CloutmateShared.TaskStatus? {
 }
 
 private func mapTaskPriority(_ raw: String?) -> CloutmateShared.TaskPriority? {
-    guard let raw = raw?.lowercased() else { return nil }
-    switch raw {
+    guard let raw = raw?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+    
+    // Handle variations like "high priority", "set to high", "with a high priority"
+    let cleaned = raw
+        .replacingOccurrences(of: "priority", with: "")
+        .replacingOccurrences(of: "priroty", with: "") // Handle typo
+        .replacingOccurrences(of: "set to", with: "")
+        .replacingOccurrences(of: "to", with: "")
+        .replacingOccurrences(of: "with a", with: "")
+        .replacingOccurrences(of: "with", with: "")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    
+    switch cleaned {
     case "low": return .low
-    case "medium", "normal": return .medium
-    case "high": return .high
+    case "medium", "normal", "med": return .medium
+    case "high", "hi": return .high
     default: return nil
     }
 }

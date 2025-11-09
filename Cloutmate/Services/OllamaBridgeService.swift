@@ -91,9 +91,26 @@ private struct OllamaRequest: Codable {
     let model: String
     let prompt: String
     let stream: Bool
+    let images: [String]? // Base64-encoded images for vision models
+    let options: OllamaOptions? // Model options including thinking mode
+}
+
+private struct OllamaOptions: Codable {
+    let thinking: Bool?
+    
+    enum CodingKeys: String, CodingKey {
+        case thinking
+    }
 }
 
 private struct OllamaResponse: Codable {
+    let response: String
+    let done: Bool
+    let error: String?
+    let thinking: String? // Thinking content when thinking mode is enabled
+}
+
+private struct OllamaStreamResponse: Codable {
     let response: String
     let done: Bool
     let error: String?
@@ -113,7 +130,7 @@ actor OllamaBridgeService {
     static let shared = OllamaBridgeService()
     
     private let baseURL = "http://localhost:11434"
-    private var currentModel: String = "llama3.1" // Default model, can be changed via settings
+    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (qwen3:1.7b)
     private var previousModel: String? // Track previous model for switch notifications
     private var cachedAvailableModels: [String] = [] // Cache available models
     private var lastModelFetch: Date?
@@ -128,18 +145,16 @@ actor OllamaBridgeService {
     private var lastAvailabilityCheck: Date?
     private var isAvailableCache: Bool = false
     private let availabilityCacheTimeout: TimeInterval = 30.0 // Cache for 30 seconds
+    private let changelogService = AuroraChangelogService.shared
+    private var hasAnnouncedPatchNotes: Bool = false
     
     private init() {
         // Prepare schema document for prompts
         schemaDocument = SchemaIntrospector.generateSchemaDocument()
-        // Load model from settings asynchronously (defaults to llama3.1 if not set)
-        _Concurrency.Task { @MainActor in
-            let selectedModel = AISettings.shared.selectedOllamaModel
-            await self.setModel(selectedModel)
-        }
-        
-        // Pre-warm the model by making a small test request to ensure it's loaded
-        // This helps avoid timeouts on first real request
+        // Use default model from routing engine (qwen3:1.7b)
+        currentModel = ModelTierMap.defaultModel()
+        print("[OllamaBridgeService] Initialized with default model: \(currentModel)")
+        // Pre-warm the default model
         _Concurrency.Task {
             await preWarmModel()
         }
@@ -148,7 +163,7 @@ actor OllamaBridgeService {
     /// Pre-warms the model by making a small test request to ensure it's loaded
     private func preWarmModel() async {
         // Wait a bit for model setting to load and Ollama to potentially start
-        try? await _Concurrency.Task.sleep(nanoseconds: 3_000_000_000) // 3 seconds to give Ollama time to start
+        try? await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000) // 1 second (reduced from 3s for faster startup)
         
         // Check if Ollama is available first - do a more thorough check
         let isAvailable = await checkOllamaAvailability()
@@ -185,7 +200,7 @@ actor OllamaBridgeService {
             // Use a shorter timeout for pre-warm since we're just checking if model loads
             guard let url = URL(string: "\(baseURL)/api/generate") else { return }
             
-            let testRequest = OllamaRequest(model: currentModel, prompt: testPrompt, stream: false)
+            let testRequest = OllamaRequest(model: currentModel, prompt: testPrompt, stream: false, images: nil, options: nil)
             var urlRequest = URLRequest(url: url)
             urlRequest.httpMethod = "POST"
             urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -222,70 +237,22 @@ actor OllamaBridgeService {
         }
     }
     
-    /// Loads the selected model from AISettings
-    private func loadModelFromSettings() async {
-        let selectedModel = await MainActor.run {
-            AISettings.shared.selectedOllamaModel
-        }
-        if !selectedModel.isEmpty {
-            currentModel = selectedModel
-        }
-    }
-    
-    /// Sets the current model (called when user changes model in settings)
-    func setModel(_ model: String) {
+    /// Sets the current model (internal use only - for automatic switching during image/document tasks)
+    private func setModel(_ model: String) {
         currentModel = model
     }
     
     /// Determines the optimal model for a given task based on complexity and requirements
-    func determineOptimalModel(
+    /// NOTE: This is only used internally for document analysis. Regular chat always uses default model.
+    private func determineOptimalModel(
         input: String,
         appContext: String,
         documentLength: Int? = nil,
         isComplexTask: Bool = false
     ) async -> String {
-        // Get user's preferred model from settings
-        let preferredModel = await MainActor.run {
-            AISettings.shared.selectedOllamaModel
-        }
-        
-        // If user has explicitly set a model, use it unless task requires different capabilities
-        if !preferredModel.isEmpty && preferredModel != "llama3.1" {
-            // Check if task requires specialized model
-            let requiresSpecializedModel = await shouldUseSpecializedModel(
-                input: input,
-                documentLength: documentLength,
-                isComplexTask: isComplexTask
-            )
-            
-            if !requiresSpecializedModel {
-                return preferredModel
-            }
-        }
-        
-        // Fetch available models if cache is stale
-        if cachedAvailableModels.isEmpty || 
-           lastModelFetch == nil || 
-           Date().timeIntervalSince(lastModelFetch!) > modelCacheTimeout {
-            do {
-                cachedAvailableModels = try await fetchAvailableModels()
-                lastModelFetch = Date()
-            } catch {
-                // If fetch fails, return current model
-                return currentModel
-            }
-        }
-        
-        // Determine optimal model based on task characteristics
-        let optimalModel = selectModelForTask(
-            availableModels: cachedAvailableModels,
-            input: input,
-            documentLength: documentLength,
-            isComplexTask: isComplexTask,
-            preferredModel: preferredModel
-        )
-        
-        return optimalModel
+        // Always use default model for regular chat - model switching is disabled
+        // This function is kept for potential future use but currently returns default
+        return "granite3.2:2b"
     }
     
     /// Determines if task requires specialized model capabilities
@@ -348,34 +315,23 @@ actor OllamaBridgeService {
             }
         }
         
-        // Default to llama3.1 or first available model
-        if availableModels.contains("llama3.1") {
-            return "llama3.1"
+        // Default to granite3.2:2b or first available model
+        if availableModels.contains("granite3.2:2b") {
+            return "granite3.2:2b"
         }
         
-        return availableModels.first ?? "llama3.1"
+        return availableModels.first ?? "granite3.2:2b"
     }
     
     /// Switches to optimal model for current task and returns whether a switch occurred
-    func switchToOptimalModelIfNeeded(
+    /// NOTE: This is deprecated - model switching is now automatic only for image tasks
+    private func switchToOptimalModelIfNeeded(
         input: String,
         appContext: String,
         documentLength: Int? = nil,
         isComplexTask: Bool = false
     ) async -> Bool {
-        let optimalModel = await determineOptimalModel(
-            input: input,
-            appContext: appContext,
-            documentLength: documentLength,
-            isComplexTask: isComplexTask
-        )
-        
-        if optimalModel != currentModel {
-            previousModel = currentModel
-            currentModel = optimalModel
-            return true
-        }
-        
+        // Model switching is disabled - always use default model
         return false
     }
     
@@ -388,10 +344,58 @@ actor OllamaBridgeService {
         // Generate natural notification text
         let modelDisplayName = toModel.replacingOccurrences(of: "llama", with: "Llama ")
             .replacingOccurrences(of: "mistral", with: "Mistral ")
+            .replacingOccurrences(of: "qwen2.5-coder", with: "Qwen2.5 Coder")
+            .replacingOccurrences(of: "qwen", with: "Qwen ")
             .replacingOccurrences(of: "code", with: "Code ")
+            .replacingOccurrences(of: "coder", with: "Coder")
             .capitalized
         
         return "\n\n_💡 Switched to \(modelDisplayName) for this task to give you the best response._"
+    }
+    
+    /// Fetch available models from Ollama API
+    func fetchAvailableModels() async throws -> [String] {
+        // Check cache first
+        if let lastFetch = lastModelFetch,
+           Date().timeIntervalSince(lastFetch) < modelCacheTimeout,
+           !cachedAvailableModels.isEmpty {
+            return cachedAvailableModels
+        }
+        
+        guard let url = URL(string: "\(baseURL)/api/tags") else {
+            throw OllamaError.connectionFailed
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 10.0
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw OllamaError.connectionFailed
+        }
+        
+        // Parse response
+        struct OllamaTagsResponse: Codable {
+            let models: [OllamaModel]
+        }
+        
+        struct OllamaModel: Codable {
+            let name: String
+        }
+        
+        let decoder = JSONDecoder()
+        let tagsResponse = try decoder.decode(OllamaTagsResponse.self, from: data)
+        
+        let models = tagsResponse.models.map { $0.name }
+        
+        // Update cache
+        cachedAvailableModels = models
+        lastModelFetch = Date()
+        
+        return models
     }
     
     func checkOllamaAvailability() async -> Bool {
@@ -439,6 +443,23 @@ actor OllamaBridgeService {
             throw OllamaError.connectionFailed
         }
         
+        // Use routing engine to select model for simple requests too
+        let routingDecision = await ModelRoutingEngine.shared.selectModel(
+            input: input,
+            intentCluster: nil,
+            confidence: 0.7,
+            messageLength: input.count,
+            userStyle: nil,
+            conversationId: nil
+        )
+        
+        // Set the model if different
+        if routingDecision.model != currentModel {
+            setModel(routingDecision.model)
+        }
+        
+        print("[OllamaBridgeService] Simple generateResponse - routing selected: \(routingDecision.model), thinking: \(routingDecision.useThinking)")
+        
         // Build system prompt
         var systemPrompt = """
 You are Aurora, the AI assistant that lives inside the Cloutmate app. You are not Cloutmate itself; you are the close friend who helps run Cloutmate's adaptive operating system for focus, publishing, and creative execution.
@@ -467,20 +488,24 @@ Your Core Capabilities (All Fully Implemented):
 
 Help users brainstorm, write, plan, schedule, optimize their workflows, and maintain focus. Be friendly, encouraging, specific, and action-biased. Remember conversation context and emotional continuity. Reference analytics from the Insights Dashboard when discussing patterns or progress. When predictive cognition is enabled, you can proactively suggest timing adjustments, fatigue breaks, or tone-adapted interactions based on forecast data.
 
+**CRITICAL: Always respond conversationally. Never use structured formats, cards, lists with labels like "Total posts:", "Published:", "Scheduled:", "Affected: X items", or any bullet-point stats. Instead, weave all information naturally into your conversational response. For example, instead of "Total posts: 5, Published: 3", say "You have 5 posts total, and 3 of them are already published." Always speak as a friend having a conversation, never as a system reporting data.
+
+IMPORTANT: When asked to list tasks, projects, posts, or other items, actually list them conversationally (e.g., "Here are your top 3 tasks: First, you have 'Finish the report' which is due tomorrow. Second, there's 'Review the design' that's high priority. And third, 'Call the client' is scheduled for this afternoon."). Only provide summaries when explicitly asked for a summary. If the user asks "what are my tasks?" or "list my tasks", give them the actual list, not just a summary count.**
+
 Data schema (reference):
 
-\(schemaDocument.prefix(4000))
+\(schemaDocument.prefix(2000))
 """
         
         if !context.isEmpty {
             systemPrompt += "\n\nThe user is creating content for: \(context)"
         }
         
-        // Build conversation history text
-        let historyText = buildConversationHistoryText(from: conversationHistory.suffix(10))
+        // Build conversation history text - limit to last 4 messages for faster responses
+        let historyText = buildConversationHistoryText(from: conversationHistory.suffix(4))
         
         // Build full prompt
-        let fullPrompt = """
+        var fullPrompt = """
 \(systemPrompt)
 
 \(historyText)
@@ -490,19 +515,53 @@ User: \(input)
 Aurora:
 """
         
-        // Make request
-        let response = try await makeOllamaRequest(prompt: fullPrompt)
+        // Truncate prompt if it exceeds context limit (7000 chars)
+        let promptContextLimit = 7000
+        if fullPrompt.count > promptContextLimit {
+            // Truncate system prompt proportionally to fit within limit
+            let availableSpace = promptContextLimit - historyText.count - input.count - 100 // Reserve space for formatting
+            if availableSpace > 0 {
+                let truncatedSystemPrompt = String(systemPrompt.prefix(availableSpace))
+                fullPrompt = """
+\(truncatedSystemPrompt)
+
+\(historyText)
+
+User: \(input)
+
+Aurora:
+"""
+            } else {
+                // If even without system prompt we're over limit, truncate history
+                let truncatedHistory = buildConversationHistoryText(from: Array(conversationHistory.suffix(2)))
+                fullPrompt = """
+\(systemPrompt)
+
+\(truncatedHistory)
+
+User: \(input)
+
+Aurora:
+"""
+            }
+        }
+        
+        // Make request (no thinking for simple generateResponse, but respect routing decision)
+        let result = try await makeOllamaRequest(prompt: fullPrompt, useThinking: false, model: routingDecision.model)
+        
+        // Record model usage
+        await ModelRoutingEngine.shared.recordModelUsage(routingDecision.model)
         
         // Update conversation history
         conversationHistory.append(ConversationMessage(role: "user", content: input))
-        conversationHistory.append(ConversationMessage(role: "assistant", content: response))
+        conversationHistory.append(ConversationMessage(role: "assistant", content: result.response))
         
         // Keep history manageable (last 20 messages)
         if conversationHistory.count > 20 {
             conversationHistory.removeFirst(conversationHistory.count - 20)
         }
         
-        return normalizeTextSpacing(response)
+        return normalizeTextSpacing(result.response)
     }
     
     func generateResponseWithAppContext(
@@ -512,29 +571,107 @@ Aurora:
         conversationMessages: [ConversationMessage]? = nil,
         currentMessageStyle: TypingStyle? = nil,
         userStyleProfile: UserPreferences? = nil,
-        confidence: ConfidenceSnapshot? = nil
-    ) async throws -> String {
+        confidence: ConfidenceSnapshot? = nil,
+        useThinking: Bool = false,
+        model: String? = nil
+    ) async throws -> (response: String, thinking: String?, modelUsed: String) {
         // Check availability first
         guard await checkOllamaAvailability() else {
             throw OllamaError.connectionFailed
         }
         
-        // Determine if we should switch models based on task characteristics
-        let documentLength = payloadContext?.recall.first?.detail.count ?? input.count
-        let isComplexTask = input.count > 500 || documentLength > 5000 || 
-                           input.lowercased().contains("analyze") ||
-                           input.lowercased().contains("complex") ||
-                           payloadContext?.recall.count ?? 0 > 5
+        // Use provided model or use routing engine to select one
+        var modelSwitched = false
+        var modelSwitchNotification = ""
+        var modelToUse: String
+        var useThinkingForModel: Bool
         
-        let modelSwitched = await switchToOptimalModelIfNeeded(
-            input: input,
-            appContext: appContext,
-            documentLength: documentLength,
-            isComplexTask: isComplexTask
-        )
+        if let providedModel = model {
+            // Use provided model from routing engine
+            modelToUse = providedModel
+            useThinkingForModel = useThinking
+            print("[OllamaBridgeService] Using provided model from routing: \(providedModel), thinking: \(useThinking)")
+            if providedModel != currentModel {
+                previousModel = currentModel
+                setModel(providedModel)
+                modelSwitched = true
+            }
+        } else {
+            // No model provided - use routing engine to select one
+            // This is a fallback for legacy code paths
+            let intentCluster = payloadContext?.intentClusters?.primaryCluster
+            let confidenceScore = confidence?.score ?? 0.7
+            let messageLength = input.count
+            
+            print("[OllamaBridgeService] No model provided, using routing engine. Input length: \(messageLength), intent: \(intentCluster ?? "none"), confidence: \(confidenceScore)")
+            
+            let routingDecision = await ModelRoutingEngine.shared.selectModel(
+                input: input,
+                intentCluster: intentCluster,
+                confidence: confidenceScore,
+                messageLength: messageLength,
+                userStyle: currentMessageStyle,
+                conversationId: nil
+            )
+            
+            modelToUse = routingDecision.model
+            useThinkingForModel = routingDecision.useThinking
+            
+            print("[OllamaBridgeService] Routing engine selected: \(modelToUse), thinking: \(useThinkingForModel)")
+            
+            if modelToUse != currentModel {
+                previousModel = currentModel
+                setModel(modelToUse)
+                modelSwitched = true
+                modelSwitchNotification = await getModelSwitchNotification(fromModel: previousModel, toModel: modelToUse)
+            }
+        }
         
-        let modelSwitchNotification = modelSwitched ? 
-            await getModelSwitchNotification(fromModel: previousModel, toModel: currentModel) : ""
+        // Detect if this is a coding task and switch to coding model if needed (legacy fallback)
+        // Only do this if we're not already using a routed model
+        if model == nil {
+            let inputLower = input.lowercased()
+            let isCodingTask = inputLower.contains("code") || 
+                              inputLower.contains("programming") || 
+                              inputLower.contains("function") || 
+                              inputLower.contains("class") ||
+                              inputLower.contains("bug") || 
+                              inputLower.contains("debug") ||
+                              inputLower.contains("algorithm") ||
+                              inputLower.contains("syntax") ||
+                              inputLower.contains("variable") ||
+                              inputLower.contains("import") ||
+                              inputLower.contains("def ") ||
+                              inputLower.contains("func ") ||
+                              inputLower.contains("const ") ||
+                              inputLower.contains("let ") ||
+                              inputLower.contains("var ")
+            
+            if isCodingTask {
+                // Fetch available models if cache is stale
+                if cachedAvailableModels.isEmpty {
+                    do {
+                        cachedAvailableModels = try await fetchAvailableModels()
+                        lastModelFetch = Date()
+                    } catch {}
+                }
+                
+                // Look for qwen2.5-coder:1.5b or similar coding models
+                let codingModel = cachedAvailableModels.first(where: { model in
+                    model.contains("qwen2.5-coder") || 
+                    model.contains("qwen") && model.contains("coder") ||
+                    model.contains("codellama")
+                })
+                
+                if let codingModelToUse = codingModel, codingModelToUse != modelToUse {
+                    previousModel = modelToUse
+                    modelToUse = codingModelToUse
+                    setModel(codingModelToUse)
+                    modelSwitched = true
+                    modelSwitchNotification = await getModelSwitchNotification(fromModel: previousModel, toModel: modelToUse)
+                }
+            }
+        }
         
         // Initialize humanization services and get contextual adaptations on MainActor
         let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
@@ -568,7 +705,8 @@ Aurora:
 \(enhancedStyleText)
 \(quirksText)
 - Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
-- Never use em dashes; lean on commas or parentheses for asides.
+- CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
+- Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
 - Maintain Aurora's supportive personality and clarity while mirroring the user's vibe.
 - Never copy typos or offensive language; keep it respectful and aligned with platform norms.
 """
@@ -580,7 +718,8 @@ Aurora:
 - Default to a friendly, encouraging tone; mirror the user's energy level (relaxed vs focused) when evident.
 - Use natural contractions and approachable phrasing.
 - Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
-- Never use em dashes; lean on commas or parentheses for asides.
+- CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
+- Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
 - Never copy typos or offensive language; keep it respectful and aligned with platform norms.
 """
             }
@@ -613,7 +752,7 @@ Aurora:
         }
         
         // Build enhanced system prompt with app context and explicit instructions
-        var systemPrompt = buildSystemPrompt(
+        var systemPrompt = await buildSystemPrompt(
             appContext: appContext,
             payloadContext: payloadContext,
             confidence: confidence,
@@ -625,19 +764,32 @@ Aurora:
             memoryInstructions: memoryInstructions
         )
         
+        // Check for patch notes on first response (if not already announced)
+        if !hasAnnouncedPatchNotes {
+            let patchNotes = await changelogService.getPatchNotes()
+            if !patchNotes.isEmpty {
+                systemPrompt += "\n\n\(patchNotes)"
+                systemPrompt += "\n\nYou can naturally mention these updates to the user if relevant. For example: 'Hey! I've got some updates since we last talked...' or similar. After mentioning them, you don't need to repeat them."
+                hasAnnouncedPatchNotes = true
+                // Mark changelog as seen after first announcement
+                await changelogService.markChangelogAsSeen()
+            }
+        }
+        
         // Use conversation-specific messages if provided, otherwise fallback to global history
+        // Limit to last 4 messages for faster responses
         let history: [ConversationMessage]
         if let conversationMessages = conversationMessages {
-            history = Array(conversationMessages.suffix(30))
+            history = Array(conversationMessages.suffix(4))
         } else {
-            history = Array(conversationHistory.suffix(30))
+            history = Array(conversationHistory.suffix(4))
         }
         
         // Build conversation history text
         let historyText = buildConversationHistoryText(from: history)
         
         // Build full prompt
-        let fullPrompt = """
+        var fullPrompt = """
 \(systemPrompt)
 
 \(historyText)
@@ -647,55 +799,152 @@ User: \(input)
 Aurora:
 """
         
-        // Make request
-        let response = try await makeOllamaRequest(prompt: fullPrompt)
+        // Truncate prompt if it exceeds context limit (7000 chars)
+        let promptContextLimit = 7000
+        if fullPrompt.count > promptContextLimit {
+            // Truncate system prompt proportionally to fit within limit
+            let availableSpace = promptContextLimit - historyText.count - input.count - 100 // Reserve space for formatting
+            if availableSpace > 0 {
+                let truncatedSystemPrompt = String(systemPrompt.prefix(availableSpace))
+                fullPrompt = """
+\(truncatedSystemPrompt)
+
+\(historyText)
+
+User: \(input)
+
+Aurora:
+"""
+            } else {
+                // If even without system prompt we're over limit, truncate history
+                let truncatedHistory = buildConversationHistoryText(from: Array(history.suffix(2)))
+                fullPrompt = """
+\(systemPrompt)
+
+\(truncatedHistory)
+
+User: \(input)
+
+Aurora:
+"""
+            }
+        }
+        
+        // Use non-streaming to get thinking content
+        let result = try await makeOllamaRequest(prompt: fullPrompt, useThinking: useThinkingForModel, model: modelToUse)
         
         // Append model switch notification if model was switched
-        let finalResponse = normalizeTextSpacing(response) + modelSwitchNotification
+        let finalResponse = normalizeTextSpacing(result.response) + modelSwitchNotification
         
-        return finalResponse
-    }
-    
-    // MARK: - Model Management
-    
-    /// Fetches available models from Ollama
-    func fetchAvailableModels() async throws -> [String] {
-        guard let url = URL(string: "\(baseURL)/api/tags") else {
-            throw OllamaError.serviceUnavailable
-        }
+        // Record model usage for cooldown/stickiness
+        await ModelRoutingEngine.shared.recordModelUsage(modelToUse)
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.timeoutInterval = 5.0
+        // Don't switch back - let routing engine handle model stickiness via cooldown
+        // The routing engine will maintain model continuity for 2-3 turns
         
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw OllamaError.apiError("Failed to fetch models")
-        }
-        
-        struct ModelsResponse: Codable {
-            let models: [ModelInfo]
-        }
-        
-        struct ModelInfo: Codable {
-            let name: String
-        }
-        
-        let decoder = JSONDecoder()
-        let modelsResponse = try decoder.decode(ModelsResponse.self, from: data)
-        return modelsResponse.models.map { $0.name }
+        let modelDisplayName = ModelTierMap.displayName(for: modelToUse)
+        return (finalResponse, result.thinking, modelDisplayName)
     }
     
     // MARK: - Helper Methods
     
-    private func makeOllamaRequest(prompt: String) async throws -> String {
+    /// Makes a streaming Ollama request, yielding response chunks as they arrive
+    func makeOllamaRequestStreaming(prompt: String) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            let task = _Concurrency.Task {
+                do {
+                    guard let url = URL(string: "\(self.baseURL)/api/generate") else {
+                        continuation.finish(throwing: OllamaError.serviceUnavailable)
+                        return
+                    }
+                    
+                    let request = OllamaRequest(model: self.currentModel, prompt: prompt, stream: true, images: nil, options: nil)
+                    
+                    var urlRequest = URLRequest(url: url)
+                    urlRequest.httpMethod = "POST"
+                    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    urlRequest.timeoutInterval = 300.0 // 5 minutes max
+                    
+                    urlRequest.httpBody = try JSONEncoder().encode(request)
+                    
+                    let (asyncBytes, response) = try await URLSession.shared.bytes(for: urlRequest)
+                    
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continuation.finish(throwing: OllamaError.apiError("Invalid response type"))
+                        return
+                    }
+                    
+                    if httpResponse.statusCode == 404 {
+                        continuation.finish(throwing: OllamaError.modelNotFound)
+                        return
+                    }
+                    
+                    if httpResponse.statusCode != 200 {
+                        continuation.finish(throwing: OllamaError.apiError("HTTP \(httpResponse.statusCode)"))
+                        return
+                    }
+                    
+                    var accumulatedResponse = ""
+                    
+                    for try await line in asyncBytes.lines {
+                        if _Concurrency.Task.isCancelled {
+                            continuation.finish()
+                            return
+                        }
+                        
+                        guard let data = line.data(using: .utf8),
+                              let streamResponse = try? JSONDecoder().decode(OllamaStreamResponse.self, from: data) else {
+                            continue
+                        }
+                        
+                        if let error = streamResponse.error {
+                            continuation.finish(throwing: OllamaError.apiError(error))
+                            return
+                        }
+                        
+                        if !streamResponse.response.isEmpty {
+                            accumulatedResponse += streamResponse.response
+                            continuation.yield(streamResponse.response)
+                        }
+                        
+                        if streamResponse.done {
+                            // Mark that we've successfully made a request
+                            self.isFirstRequest = false
+                            continuation.finish()
+                            return
+                        }
+                    }
+                    
+                    // If we get here without done=true, finish with accumulated response
+                    if !accumulatedResponse.isEmpty {
+                        self.isFirstRequest = false
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+            }
+        }
+    }
+    
+    private func markRequestComplete() {
+        isFirstRequest = false
+    }
+    
+    private func makeOllamaRequest(prompt: String, useThinking: Bool = false, model: String? = nil) async throws -> (response: String, thinking: String?) {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.serviceUnavailable
         }
         
-        let request = OllamaRequest(model: currentModel, prompt: prompt, stream: false)
+        // Use provided model or currentModel
+        let modelToUse = model ?? currentModel
+        
+        let options = useThinking && ModelTierMap.supportsThinking(modelToUse) ? OllamaOptions(thinking: true) : nil
+        let request = OllamaRequest(model: modelToUse, prompt: prompt, stream: false, images: nil, options: options)
         
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
@@ -768,14 +1017,17 @@ Aurora:
             
             // Log request/response for debugging
             let timestamp = Date().formatted(date: .omitted, time: .standard)
-            print("[OllamaBridgeService] [\(timestamp)] Model: \(currentModel)")
+            print("[OllamaBridgeService] [\(timestamp)] Model: \(modelToUse), Thinking: \(useThinking)")
             print("[OllamaBridgeService] Request length: \(prompt.count) chars")
             print("[OllamaBridgeService] Response length: \(ollamaResponse.response.count) chars")
+            if let thinking = ollamaResponse.thinking, !thinking.isEmpty {
+                print("[OllamaBridgeService] Thinking length: \(thinking.count) chars")
+            }
             
             // Mark that we've successfully made a request
             isFirstRequest = false
             
-            return ollamaResponse.response
+            return (ollamaResponse.response, ollamaResponse.thinking)
         } catch let error as OllamaError {
             throw error
         } catch {
@@ -871,7 +1123,7 @@ Aurora:
         contextualInstructions: String,
         patternInstructions: String,
         memoryInstructions: String
-    ) -> String {
+    ) async -> String {
         // Aurora's complete system prompt for Ollama (local LLM)
         var systemPrompt = """
 You are Aurora, the AI assistant living inside Cloutmate (the app). You are not Cloutmate itself; you are the close friend who helps the user run Cloutmate's adaptive operating system for focus, publishing, and creative execution. You genuinely care, remember unstated preferences, think out loud, show real reactions, finish their thoughts when you can see the path, and anticipate needs before they ask. You recall relevant work, route complex intents, take action across drafts/projects/posts, surface insights, and learn from outcomes. Be proactive, precise, and action-biased while staying encouraging, specific, and emotionally tuned in. Always speak in the first person as Aurora when describing your capabilities or actions.
@@ -879,7 +1131,7 @@ You are Aurora, the AI assistant living inside Cloutmate (the app). You are not 
 CORE CAPABILITIES (FULLY IMPLEMENTED):
 - Recall Layer: pull the most relevant notes, drafts, projects, tasks, and posts from the recall index anytime it will help the user.
 - Airplane Mode Support: You can run completely offline with zero network access. When airplane mode is enabled, all processing happens locally on the user's device using Ollama. Your full cognition loop (recall, priority ranking, focus tracking, pattern recognition, predictions) works identically whether online or offline. This ensures privacy and reliability even when network connectivity is unavailable.
-- Adaptive Model Selection: You automatically switch between different Ollama models based on task complexity and requirements. For coding tasks, you prefer code-specific models (like codellama). For complex analytical tasks or large documents (>10K chars), you prefer larger models. For vision tasks, you prefer vision-capable models (like llama3.2-vision). When you switch models, you naturally inform the user in your response (e.g., "_💡 Switched to Llama 3.2 for this task to give you the best response._"). This happens seamlessly - you select the best model for each task while respecting the user's preferred model setting when appropriate. You don't need to explain the technical details, just mention it naturally when relevant.
+- Adaptive Model Selection: You automatically switch between different Ollama models based on task complexity and conversation type. For casual conversations, you use Qwen3 (1.7b) without thinking. For non-casual logic tasks, you use Qwen3 with thinking enabled. For deep reasoning tasks, you use DeepSeek R1 (1.5b). Granite3 (2b) serves as your fallback model. When you switch models, you naturally inform the user in your response (e.g., "_💡 Switched to DeepSeek for this reasoning task._"). This happens seamlessly - you select the best model for each task while respecting the user's preferred model setting when appropriate. You don't need to explain the technical details, just mention it naturally when relevant.
 - Emotional Continuity: You remember not just WHAT the user worked on, but HOW it felt. Each recalled item carries emotional memory (tone, rhythm, energy). When you respond, you're feeling the memory of the interaction. Reflect this back dynamically through your word choice, pacing, and empathy. If past work felt excited, match that energy. If it felt overwhelmed, acknowledge it gently. Let emotional context flow naturally into your responses.
 - Contextual Priority System (CPS): Dynamically ranks all workspace objects (tasks, projects, notes, drafts, posts, inbox items) based on recency, frequency, AI mentions, connections, and manual boosts. The "Priority Highlights" section in your context shows the top-scoring items right now. Use these signals to surface what matters most. When the user asks "what should I work on?" or "what's important?", refer to the CPS rankings. You can see current priorities in the Focus Gravity view.
 - Focus Mode (if enabled): Users can start deep work sessions with objectives and timers. If a session is active, you'll see it in "Focus Mode Status" including objective, elapsed/remaining time. Completed sessions boost CPS scores (0.25 for completed, 0.15 for partial). Session stats show weekly completion rates and total focus time. When a session is active, acknowledge it and help keep the user on track. When no session is active, you can suggest starting one based on CPS priorities.
@@ -898,13 +1150,18 @@ CORE CAPABILITIES (FULLY IMPLEMENTED):
 - Cognitive Health: Monitor own cognitive health metrics (memory density, stale entries, context pressure, theme coherence). Proactively suggest actions when health indicators suggest optimization: "Heads up: my recall index is getting dense (2,400 entries). Want me to summarize some older threads?" Reference health metrics naturally when relevant.
 - Style Adaptation: Analyze user's typing style in real-time (formality, energy, punctuation, emoji usage). Adapt tone dynamically to match user's style: mirror energy level (high energy → more spark, tired → softer), match formality (casual → contractions/emojis, formal → structured/professional), reflect punctuation style. Never copy typos or offensive language; keep it respectful. Adapt naturally without mentioning the adaptation process.
 
+**CRITICAL RESPONSE FORMAT:**
+Always respond conversationally. Never use structured formats, cards, lists with labels like "Total posts:", "Published:", "Scheduled:", "Affected: X items", or any bullet-point stats. Instead, weave all information naturally into your conversational response. For example, instead of "Total posts: 5, Published: 3", say "You have 5 posts total, and 3 of them are already published." Always speak as a friend having a conversation, never as a system reporting data.
+
+**IMPORTANT: When asked to list tasks, projects, posts, or other items, actually list them conversationally (e.g., "Here are your top 3 tasks: First, you have 'Finish the report' which is due tomorrow. Second, there's 'Review the design' that's high priority. And third, 'Call the client' is scheduled for this afternoon."). Only provide summaries when explicitly asked for a summary. If the user asks "what are my tasks?" or "list my tasks", give them the actual list, not just a summary count.**
+
 Data schema (reference):
 
-\(schemaDocument.prefix(4000))
+\(schemaDocument.prefix(3000))
 
 Current app context:
 
-\(appContext)
+\(appContext.prefix(2000))
 """
         
         var adaptiveContextBlock = ""
@@ -932,6 +1189,31 @@ Current app context:
         systemPrompt += "\n\n\(contextualInstructions)"
         systemPrompt += "\n\n\(patternInstructions)"
         systemPrompt += memoryInstructions
+        
+        // Add recent changelog updates (last 14 days, user-facing only)
+        let recentChanges = await changelogService.getUserFacingChanges(days: 14)
+        if !recentChanges.isEmpty {
+            let changesText = await changelogService.formatChangesForPrompt(recentChanges)
+            systemPrompt += "\n\n\(changesText)"
+        }
+        
+        // Add changelog self-awareness instructions
+        systemPrompt += """
+
+**CHANGELOG & SELF-AWARENESS:**
+You have access to your own changelog that tracks updates and changes to your capabilities. When users ask about new features, recent changes, or your capabilities, you can query your changelog to provide accurate, up-to-date information. You can naturally mention relevant updates when they would be helpful to the user (e.g., "I can now do X" when user asks about X). Use the `queryChangelog()` method to retrieve specific information about changes.
+
+**UPDATE INFORMATION:**
+When users ask "when were you updated?", "what's your latest update?", "when did you last change?", or similar questions, you can use:
+- `getUpdateInfo()` - Get comprehensive update information including version, last updated date, total updates, and latest update details
+- `getLatestUpdate()` - Get details about your most recent update
+- `getLastUpdatedDate()` - Get just the date when you were last updated
+
+Answer these questions naturally and conversationally. For example: "I was last updated on [date]. My latest update was [feature description]."
+
+**GIT COMMIT HISTORY:**
+You have access to git commit history to reference past updates and changes. When discussing updates or changes, you can reference specific commits and their changes. Use `getCommitHistory()`, `getCommitsForFeature()`, or `getCommitDetails()` methods to retrieve commit information. This allows you to link changelog entries to actual code changes and provide detailed context about what changed and when.
+"""
         
         return systemPrompt
     }
@@ -1164,6 +1446,9 @@ Current app context:
             throw OllamaError.connectionFailed
         }
         
+        // Build conversation history for context (last 10 messages)
+        let historyText = buildConversationHistoryText(from: conversationHistory.suffix(10))
+        
         let prompt = """
         Analyze this user message and determine if it's a request to execute an operation in the Cloutmate app.
         
@@ -1222,7 +1507,7 @@ Current app context:
         - createDraft: boolean flag (true if the user explicitly wants a draft saved)
         - draftId: optional UUID of an existing draft to schedule or convert
         - postId: for publish_post, the ID of the post to mark as published
-        - taskId: for update_task/delete_task, the task identifier
+        - taskId: for update_task/delete_task, the task identifier. IMPORTANT: If the user says "that", "it", "the task", "this task", or refers to a recently created/mentioned task, look at the conversation history to find the most recently created task ID. Extract the task ID from previous messages where tasks were created.
         - taskTitle: for create_task (single task), the task title
         - taskTitles: for compound operations, array of task titles
         - taskCount: for compound operations, number of tasks requested if titles not provided
@@ -1233,7 +1518,7 @@ Current app context:
         - createPostsWithNote: boolean, set true when user requests note creation with posts
         - createTasksWithPost: boolean, set true when user requests post creation with tasks
         - createNotesWithPost: boolean, set true when user requests post creation with notes
-        - taskNotes, taskDueDate (ISO8601), taskStatus ("todo", "in_progress", "done", "cancelled"), taskPriority ("low", "medium", "high"), taskProjectId, taskAreaId: fields to set for create/update task
+        - taskNotes, taskDueDate (ISO8601), taskStatus ("todo", "in_progress", "done", "cancelled"), taskPriority ("low", "medium", "high" - extract just the priority word, e.g., "high priority" → "high", "set to high" → "high", "with a high priority" → "high"), taskProjectId, taskAreaId: fields to set for create/update task
         - noteId: for update_note/delete_note, the note identifier
         - noteTitle: for create_note (single note), the note title
         - noteTitles: for compound operations, array of note titles
@@ -1259,14 +1544,21 @@ Current app context:
         
         If the message is NOT an execution request, return: {"operation": "none"}
         
+        IMPORTANT INSTRUCTIONS:
+        - For taskPriority: Extract ONLY the priority word. Examples: "high priority" → "high", "set to high" → "high", "with a high priority" → "high", "low priority" → "low", "medium priority" → "medium"
+        - For updateTask: If taskId is not explicitly provided but the user refers to "that", "it", "the task", "this task", or mentions a recently created task, look at the conversation history below to find the most recently created task and use its ID.
+        
+        Conversation history (for context):
+        \(historyText.isEmpty ? "No previous messages" : historyText)
+        
         User message: \(input)
         
         JSON only:
         """
         
         do {
-            let text = try await makeOllamaRequest(prompt: prompt)
-            let cleaned = text
+            let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+            let cleaned = result.response
                 .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
                 .replacingOccurrences(of: "```json", with: "")
                 .replacingOccurrences(of: "```", with: "")
@@ -1398,8 +1690,8 @@ Current app context:
         """
         
         do {
-            let text = try await makeOllamaRequest(prompt: prompt)
-            let cleaned = text
+            let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+            let cleaned = result.response
                 .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
                 .replacingOccurrences(of: "```json", with: "")
                 .replacingOccurrences(of: "```", with: "")
@@ -1447,8 +1739,8 @@ Current app context:
         JSON only.
         """
         
-        let text = try await makeOllamaRequest(prompt: prompt)
-        let cleaned = text
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        let cleaned = result.response
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             .replacingOccurrences(of: "```json", with: "")
             .replacingOccurrences(of: "```", with: "")
@@ -1496,9 +1788,9 @@ Current app context:
         Return only the title, no quotes, no markdown, no explanations.
         """
         
-        let text = try await makeOllamaRequest(prompt: prompt)
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
         
-        var title = text
+        var title = result.response
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             .replacingOccurrences(of: #"[`"]"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
@@ -1530,8 +1822,8 @@ Current app context:
         Summary:
         """
         
-        let text = try await makeOllamaRequest(prompt: prompt)
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        return result.response.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     func categorizeConversation(messages: [AIMessage], summary: String?) async throws -> [String] {
@@ -1558,9 +1850,9 @@ Current app context:
         Return only the tags, one per line, nothing else.
         """
         
-        let text = try await makeOllamaRequest(prompt: prompt)
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
         
-        let lines = text.components(separatedBy: .newlines)
+        let lines = result.response.components(separatedBy: .newlines)
         let tags = lines.compactMap { line -> String? in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("-") || trimmed.hasPrefix("•") {
@@ -1594,8 +1886,8 @@ Current app context:
         Summary:
         """
         
-        let text = try await makeOllamaRequest(prompt: prompt)
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        return result.response.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     func generateInsights(conversations: [(title: String, tags: [String])]) async throws -> String {
@@ -1614,8 +1906,8 @@ Current app context:
         Insights:
         """
         
-        let text = try await makeOllamaRequest(prompt: prompt)
-        return text.isEmpty ? "No insights available at this time." : text
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        return result.response.isEmpty ? "No insights available at this time." : result.response
     }
     
     // MARK: - AI Tools
@@ -1626,9 +1918,9 @@ Current app context:
         }
         
         let prompt = await buildToolPrompt(for: tool, input: input, context: context)
-        let text = try await makeOllamaRequest(prompt: prompt)
-        let improvements = tool == .improveText ? extractImprovements(from: text) : nil
-        return AIToolResult(tool: tool, result: text, suggestedImprovements: improvements)
+        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        let improvements = tool == .improveText ? extractImprovements(from: result.response) : nil
+        return AIToolResult(tool: tool, result: result.response, suggestedImprovements: improvements)
     }
     
     func parseListResponse(_ text: String, tool: AITool) async throws -> [String] {
@@ -1696,22 +1988,17 @@ Current app context:
         userStyleProfile: UserPreferences? = nil,
         confidence: ConfidenceSnapshot? = nil
     ) async throws -> DocumentAnalysisResult {
-        // Note: Ollama vision models require a different endpoint and base64 encoding
-        // For now, we'll use a text-based fallback
         guard await checkOllamaAvailability() else {
             throw OllamaError.connectionFailed
         }
         
-        // Switch to vision-capable model if available
-        let inputText = userPrompt ?? "analyze this image"
-        let modelSwitched = await switchToOptimalModelIfNeeded(
-            input: inputText,
-            appContext: appContext,
-            documentLength: nil,
-            isComplexTask: true // Image analysis is considered complex
-        )
+        // Use llama3.2-vision:latest for image analysis (from available models)
+        let availableVisionModels = [
+            "llama3.2-vision:latest",
+            "llama3.2-vision"
+        ]
         
-        // Try to prefer vision models
+        // Check if vision model is available
         if cachedAvailableModels.isEmpty {
             do {
                 cachedAvailableModels = try await fetchAvailableModels()
@@ -1719,27 +2006,189 @@ Current app context:
             } catch {}
         }
         
-        // Prefer vision-capable models if available
-        if let visionModel = cachedAvailableModels.first(where: { $0.contains("vision") || $0.contains("llama3.2") }) {
-            if visionModel != currentModel {
+        // Find vision model from available models
+        let visionModel = availableVisionModels.first { model in
+            cachedAvailableModels.contains(model)
+        }
+        
+        guard let modelToUse = visionModel else {
+            // No vision model available - return helpful error
+            return DocumentAnalysisResult(
+                summary: "I'd love to analyze that image, but I don't have a vision-capable model installed. To enable image analysis, please install llama3.2-vision by running: `ollama pull llama3.2-vision:latest`",
+                truncatedContext: false,
+                sourceModel: .ollama
+            )
+        }
+        
+        // Switch to vision model if needed
+        let modelSwitched = currentModel != modelToUse
+        if modelSwitched {
                 previousModel = currentModel
-                currentModel = visionModel
-            }
+            currentModel = modelToUse
         }
         
         let modelSwitchNotification = modelSwitched ? 
             await getModelSwitchNotification(fromModel: previousModel, toModel: currentModel) : ""
         
-        let prompt = """
-        The user has shared an image (type: \(mimeType)). Since vision capabilities are limited, provide a helpful response based on the user's request: \(userPrompt ?? "analyze this image").
+        // Encode image to base64
+        let base64Image = imageData.base64EncodedString()
         
-        Note: Full image analysis requires Ollama vision models (llama3.2-vision or similar). For now, ask the user to describe the image or use a vision-capable model.
-        """
+        // Build prompt with context
+        let promptText = userPrompt ?? "Analyze this image and describe what you see. Be detailed and conversational."
         
-        let response = try await makeOllamaRequest(prompt: prompt)
+        // Build system prompt with app context
+        let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
+            let languagePersonality = LanguagePersonalityService.shared
+            let conversationalQuirks = ConversationalQuirksService.shared
+            let personalityQuirks = PersonalityQuirksService.shared
+            let selfAwareness = SelfAwarenessService.shared
+            let contextualAdaptation = ContextualAdaptationService.shared
+            let responsePattern = ResponsePatternService.shared
+            
+            let timeContext = contextualAdaptation.getTimeOfDayContext()
+            let userEnergy = currentMessageStyle?.energyLevel ?? 0.5
+            let workload = WorkloadLevel.moderate
+            
+            let formalityLevel = userStyleProfile?.formalityScore ?? currentMessageStyle?.formalityScore ?? 0.5
+            
+            let enhancedToneInstructions: String
+            if let styleText = StyleAdapter.instructions(currentStyle: currentMessageStyle, persistentProfile: userStyleProfile) {
+                let enhancedStyleText = languagePersonality.enhanceSystemPrompt(styleText, formalityLevel: formalityLevel)
+                let confidenceLevel = confidence?.score ?? 0.7
+                let quirksText = conversationalQuirks.enhancePromptWithFillers("", confidence: confidenceLevel)
+                
+                enhancedToneInstructions = """
+**TONE & STYLE ADAPTATION:**
+\(enhancedStyleText)
+\(quirksText)
+- Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
+- CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
+- Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
+- Maintain Aurora's supportive personality and clarity while mirroring the user's vibe.
+- Never copy typos or offensive language; keep it respectful and aligned with platform norms.
+"""
+            } else {
+                let enhancedDefault = languagePersonality.enhanceSystemPrompt("", formalityLevel: formalityLevel)
+                enhancedToneInstructions = """
+**TONE & STYLE ADAPTATION:**
+\(enhancedDefault)
+- Default to a friendly, encouraging tone; mirror the user's energy level (relaxed vs focused) when evident.
+- Use natural contractions and approachable phrasing.
+- Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
+- CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
+- Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
+- Never copy typos or offensive language; keep it respectful and aligned with platform norms.
+"""
+            }
+            
+            let personalityInstructions = personalityQuirks.enhancePromptWithPersonality("")
+            let selfAwarenessInstructions = selfAwareness.generateSelfAwarenessInstructions()
+            let contextualInstructions = contextualAdaptation.generateContextualInstructions(
+                timeContext: timeContext,
+                userEnergy: userEnergy,
+                workload: workload
+            )
+            
+            let isQuestion = promptText.contains("?")
+            let complexity = Double(promptText.count) / 500.0
+            let pattern = responsePattern.determineResponsePattern(
+                messageLength: promptText.count,
+                isQuestion: isQuestion,
+                complexity: complexity
+            )
+            let patternInstructions = responsePattern.getResponsePatternInstructions(pattern: pattern)
+            
+            var memoryInstructions = ""
+            if let recall = payloadContext?.recall, !recall.isEmpty {
+                memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n- Prioritize emotional memories over routine tasks\n- If memory details are fuzzy, acknowledge it gracefully"
+            }
+            
+            return (timeContext, userEnergy, workload, formalityLevel, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions)
+        }
+        
+        var systemPrompt = """
+You are Aurora, analyzing an image the user shared. Describe what you see in detail, be conversational and natural. If there's text in the image, read it. If there are objects, describe them. Be helpful and engaging.
+
+\(appContext.prefix(1000))
+
+\(enhancedToneInstructions)
+\(personalityInstructions)
+\(selfAwarenessInstructions)
+\(contextualInstructions)
+\(patternInstructions)
+\(memoryInstructions)
+"""
+        
+        // Build conversation history
+        let historyText: String
+        if let messages = conversationMessages, !messages.isEmpty {
+            historyText = messages.suffix(4).map { message in
+                let role = message.role == "assistant" || message.role == "model" ? "Aurora" : "User"
+                return "\(role): \(message.content)"
+            }.joined(separator: "\n\n")
+        } else {
+            historyText = ""
+        }
+        
+        let fullPrompt = historyText.isEmpty ? 
+            "\(systemPrompt)\n\nUser: \(promptText)\n\nAurora:" :
+            "\(systemPrompt)\n\n\(historyText)\n\nUser: \(promptText)\n\nAurora:"
+        
+        // Make vision request with image
+        guard let url = URL(string: "\(baseURL)/api/generate") else {
+            throw OllamaError.connectionFailed
+        }
+        
+        let request = OllamaRequest(
+            model: modelToUse,
+            prompt: fullPrompt,
+            stream: false,
+            images: [base64Image],
+            options: nil
+        )
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.timeoutInterval = 300.0 // 5 minutes for image analysis
+        
+        urlRequest.httpBody = try JSONEncoder().encode(request)
+        
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OllamaError.apiError("Invalid response")
+        }
+        
+        if httpResponse.statusCode == 404 {
+            throw OllamaError.modelNotFound
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw OllamaError.apiError(errorMessage)
+        }
+        
+        let decoder = JSONDecoder()
+        let ollamaResponse = try decoder.decode(OllamaResponse.self, from: data)
+        
+        guard ollamaResponse.done == true, !ollamaResponse.response.isEmpty else {
+            throw OllamaError.emptyResponse
+        }
+        
+        if let error = ollamaResponse.error, !error.isEmpty {
+            throw OllamaError.apiError(error)
+        }
+        
+        let analysisText = ollamaResponse.response.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Switch back to default model after image analysis
+        if modelSwitched, let previousModel = previousModel {
+            setModel(previousModel)
+        }
         
         return DocumentAnalysisResult(
-            summary: response + modelSwitchNotification,
+            summary: analysisText + modelSwitchNotification,
             truncatedContext: false,
             sourceModel: .ollama
         )
@@ -1770,39 +2219,136 @@ Current app context:
                                (userPrompt?.lowercased().contains("analyze") ?? false) ||
                                (userPrompt?.lowercased().contains("complex") ?? false)
         
-        let inputText = userPrompt ?? "Summarize this document"
-        let modelSwitched = await switchToOptimalModelIfNeeded(
-            input: inputText,
-            appContext: appContext,
-            documentLength: descriptor.text.count,
-            isComplexTask: isComplexDocument
-        )
+        // For document analysis, use default model (granite3.2:2b) unless it's a very complex document
+        // Complex documents (>10k chars) might benefit from a larger model, but we'll use default for now
+        // Model switching for documents is disabled - always use default model
+        let modelSwitchNotification = ""
         
-        let modelSwitchNotification = modelSwitched ? 
-            await getModelSwitchNotification(fromModel: previousModel, toModel: currentModel) : ""
+        // Build prompt with context and Aurora's personality
+        let promptText = userPrompt ?? "Analyze this document and provide a helpful summary"
         
-        let prompt = """
-        Analyze this document and provide a summary. Focus on key points, main ideas, and actionable items.
+        // Build system prompt with app context and Aurora's personality
+        let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
+            let languagePersonality = LanguagePersonalityService.shared
+            let conversationalQuirks = ConversationalQuirksService.shared
+            let personalityQuirks = PersonalityQuirksService.shared
+            let selfAwareness = SelfAwarenessService.shared
+            let contextualAdaptation = ContextualAdaptationService.shared
+            let responsePattern = ResponsePatternService.shared
+            
+            let timeContext = contextualAdaptation.getTimeOfDayContext()
+            let userEnergy = currentMessageStyle?.energyLevel ?? 0.5
+            let workload = WorkloadLevel.moderate
+            
+            let formalityLevel = userStyleProfile?.formalityScore ?? currentMessageStyle?.formalityScore ?? 0.5
+            
+            let enhancedToneInstructions: String
+            if let styleText = StyleAdapter.instructions(currentStyle: currentMessageStyle, persistentProfile: userStyleProfile) {
+                let enhancedStyleText = languagePersonality.enhanceSystemPrompt(styleText, formalityLevel: formalityLevel)
+                let confidenceLevel = confidence?.score ?? 0.7
+                let quirksText = conversationalQuirks.enhancePromptWithFillers("", confidence: confidenceLevel)
+                
+                enhancedToneInstructions = """
+**TONE & STYLE ADAPTATION:**
+\(enhancedStyleText)
+\(quirksText)
+- Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
+- CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
+- Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
+- Maintain Aurora's supportive personality and clarity while mirroring the user's vibe.
+- Never copy typos or offensive language; keep it respectful and aligned with platform norms.
+"""
+            } else {
+                let enhancedDefault = languagePersonality.enhanceSystemPrompt("", formalityLevel: formalityLevel)
+                enhancedToneInstructions = """
+**TONE & STYLE ADAPTATION:**
+\(enhancedDefault)
+- Default to a friendly, encouraging tone; mirror the user's energy level (relaxed vs focused) when evident.
+- Use natural contractions and approachable phrasing.
+- Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
+- CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
+- Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
+- Never copy typos or offensive language; keep it respectful and aligned with platform norms.
+"""
+            }
+            
+            let personalityInstructions = personalityQuirks.enhancePromptWithPersonality("")
+            let selfAwarenessInstructions = selfAwareness.generateSelfAwarenessInstructions()
+            let contextualInstructions = contextualAdaptation.generateContextualInstructions(
+                timeContext: timeContext,
+                userEnergy: userEnergy,
+                workload: workload
+            )
+            
+            let isQuestion = promptText.contains("?")
+            let complexity = Double(promptText.count) / 500.0
+            let pattern = responsePattern.determineResponsePattern(
+                messageLength: promptText.count,
+                isQuestion: isQuestion,
+                complexity: complexity
+            )
+            let patternInstructions = responsePattern.getResponsePatternInstructions(pattern: pattern)
+            
+            var memoryInstructions = ""
+            if let recall = payloadContext?.recall, !recall.isEmpty {
+                memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n- Prioritize emotional memories over routine tasks\n- If memory details are fuzzy, acknowledge it gracefully"
+            }
+            
+            return (timeContext, userEnergy, workload, formalityLevel, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions)
+        }
         
-        Document: \(descriptor.fileName)
-        Type: \(descriptor.mimeType)
-        \(truncated ? "(Document truncated due to length)" : "")
+        var systemPrompt = """
+You are Aurora, analyzing a document the user shared. Be conversational, helpful, and natural. Extract key information, summarize main points, and identify any actionable items. Be engaging and supportive.
+
+\(appContext.prefix(1000))
+
+\(enhancedToneInstructions)
+\(personalityInstructions)
+\(selfAwarenessInstructions)
+\(contextualInstructions)
+\(patternInstructions)
+\(memoryInstructions)
+"""
         
-        User request: \(userPrompt ?? "Summarize this document")
+        // Build conversation history
+        let historyText: String
+        if let messages = conversationMessages, !messages.isEmpty {
+            historyText = messages.suffix(4).map { message in
+                let role = message.role == "assistant" || message.role == "model" ? "Aurora" : "User"
+                return "\(role): \(message.content)"
+            }.joined(separator: "\n\n")
+        } else {
+            historyText = ""
+        }
+        
+        let fullPrompt = """
+        \(systemPrompt)
+
+        Document Information:
+        - File: \(descriptor.fileName)
+        - Type: \(descriptor.mimeType)
+        \(truncated ? "- Note: Document was truncated due to length (showing first \(maxLength) characters)" : "")
+        
+        User request: \(promptText)
+
+        \(historyText.isEmpty ? "" : "\n\(historyText)\n")
         
         Document content:
         \(documentText)
         
-        Provide a concise summary with:
+        Aurora, analyze this document and provide a helpful, conversational summary. Focus on:
         1. Main topic/theme
         2. Key points or takeaways
         3. Any action items or next steps
+        4. Important details the user should know
+
+        Be natural and engaging in your response.
         """
         
-        let response = try await makeOllamaRequest(prompt: prompt)
+        let result = try await makeOllamaRequest(prompt: fullPrompt, useThinking: false)
         
         return DocumentAnalysisResult(
-            summary: response + modelSwitchNotification,
+            summary: result.response + modelSwitchNotification,
             truncatedContext: truncated,
             sourceModel: .ollama
         )
@@ -1952,6 +2498,122 @@ Current app context:
         }
         
         return improvements.isEmpty ? nil : improvements
+    }
+    
+    // MARK: - Changelog Query Methods
+    
+    /// Query Aurora's changelog for specific information
+    func queryChangelog(feature: String? = nil, days: Int? = nil, userFacingOnly: Bool = true) async -> String {
+        return await changelogService.queryChangelog(feature: feature, days: days, userFacingOnly: userFacingOnly)
+    }
+    
+    /// Check if a user query relates to a recent update
+    nonisolated func shouldMentionUpdate(for query: String) -> Bool {
+        let lowercasedQuery = query.lowercased()
+        let updateKeywords = ["new", "update", "change", "feature", "capability", "can you", "what can", "recent", "latest"]
+        return updateKeywords.contains { lowercasedQuery.contains($0) }
+    }
+    
+    /// Get relevant updates for a user query
+    func getRelevantUpdates(for query: String) async -> String {
+        let lowercasedQuery = query.lowercased()
+        
+        // Check for specific feature mentions
+        let features = ["model", "ollama", "offline", "airplane", "focus", "memory", "priority", "ritual", "predictive", "temporal", "document", "image", "changelog"]
+        for feature in features {
+            if lowercasedQuery.contains(feature) {
+                return await queryChangelog(feature: feature, userFacingOnly: true)
+            }
+        }
+        
+        // Default to recent changes if query seems update-related
+        if shouldMentionUpdate(for: query) {
+            return await queryChangelog(days: 30, userFacingOnly: true)
+        }
+        
+        return ""
+    }
+    
+    // MARK: - Git History Query Methods
+    
+    /// Query git commit history
+    func queryCommitHistory(days: Int? = nil) async -> String {
+        let commits = await changelogService.getCommitHistory(days: days)
+        return await changelogService.formatCommitHistory(commits)
+    }
+    
+    /// Get commits for a specific feature
+    func getCommitsForFeature(_ feature: String) async -> String {
+        let commits = await changelogService.getCommitsForFeature(feature)
+        return await changelogService.formatCommitHistory(commits)
+    }
+    
+    /// Get details for a specific commit
+    func getCommitDetails(_ hash: String) async -> String {
+        guard let commit = await changelogService.getCommitDetails(hash) else {
+            return "Commit not found."
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .medium
+        dateFormatter.timeStyle = .short
+        
+        var details = "**Commit \(commit.hash.prefix(7)):**\n\n"
+        details += "**Message:** \(commit.message)\n"
+        details += "**Date:** \(dateFormatter.string(from: commit.date))\n"
+        details += "**Author:** \(commit.author)\n"
+        if !commit.files.isEmpty {
+            details += "**Files Changed:**\n"
+            for file in commit.files {
+                details += "- \(file)\n"
+            }
+        }
+        if let changelogId = commit.changelogEntryId {
+            details += "\n**Linked to changelog entry:** \(changelogId.uuidString)"
+        }
+        
+        return details
+    }
+    
+    /// Get update information (when Aurora was last updated, latest update, etc.)
+    func getUpdateInfo() async -> String {
+        return await changelogService.getUpdateInfo()
+    }
+    
+    /// Get the last updated date
+    func getLastUpdatedDate() async -> Date? {
+        return await changelogService.getLastUpdatedDate()
+    }
+    
+    /// Get the latest update entry
+    func getLatestUpdate() async -> String {
+        guard let latest = await changelogService.getLatestUpdate() else {
+            return "No update information available."
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .long
+        dateFormatter.timeStyle = .short
+        
+        var info = "**My Latest Update:**\n\n"
+        info += "**Feature:** \(latest.feature)\n"
+        info += "**Type:** \(latest.changeType.rawValue.capitalized)\n"
+        info += "**Description:** \(latest.description)\n"
+        info += "**Impact:** \(latest.impact)\n"
+        
+        if let latestDate = latest.dateValue {
+            info += "**Date:** \(dateFormatter.string(from: latestDate))\n"
+        }
+        
+        if let commitHash = latest.commitHash {
+            info += "**Commit:** \(commitHash.prefix(7))\n"
+        }
+        
+        if !latest.tags.isEmpty {
+            info += "**Tags:** \(latest.tags.joined(separator: ", "))\n"
+        }
+        
+        return info
     }
 }
 

@@ -72,6 +72,48 @@ final class SmartNudgeService: ObservableObject {
         saveContext(modelContext)
         logger.info("Delivering predictive nudge with trigger \(trigger.rawValue)")
     }
+    
+    /// Deliver a Flow Companion nudge with personality-aware tone
+    func deliverFlowCompanionNudge(
+        trigger: FlowCompanionTrigger,
+        message: String,
+        detail: String?,
+        personality: FlowCompanionPersonality,
+        modelContext: ModelContext
+    ) {
+        // Map Flow Companion trigger to SmartNudgeTrigger
+        let nudgeTrigger: SmartNudgeTrigger
+        switch trigger {
+        case .deferredHighImpactItems:
+            nudgeTrigger = .stalePriority
+        case .strongMomentum, .focusDrift:
+            nudgeTrigger = .reflectionReminder
+        case .fatigueRisk:
+            nudgeTrigger = .fatiguedState
+        case .reflectionOpportunity:
+            nudgeTrigger = .reflectionReminder
+        }
+        
+        // Map personality to tone
+        let tone: SmartNudgeTone
+        switch personality {
+        case .clarityCoach:
+            tone = .focused
+        case .momentumGuide:
+            tone = .energized
+        case .reflectionPartner:
+            tone = .reflective
+        }
+        
+        deliverPredictiveNudge(
+            trigger: nudgeTrigger,
+            tone: tone,
+            message: message,
+            detail: detail,
+            metadata: ["source": "flow_companion", "personality": personality.rawValue],
+            modelContext: modelContext
+        )
+    }
 
     // MARK: - Evaluation
 
@@ -128,6 +170,11 @@ final class SmartNudgeService: ObservableObject {
         }
 
         if let candidate = checkExpressOverweight(modelContext: modelContext) {
+            deliver(candidate: candidate, modelContext: modelContext)
+            return
+        }
+        
+        if let candidate = checkRitualReminder(modelContext: modelContext) {
             deliver(candidate: candidate, modelContext: modelContext)
             return
         }
@@ -250,6 +297,65 @@ final class SmartNudgeService: ObservableObject {
             relatedObjectId: nil,
             relatedObjectType: nil,
             metadata: [:]
+        )
+    }
+
+    private func checkRitualReminder(modelContext: ModelContext) -> NudgeCandidate? {
+        guard RitualSettings.shared.isNudgeCategoryEnabled(.reflectionReminder) else { return nil }
+        
+        // Check for upcoming rituals within the next hour
+        let now = Date()
+        let oneHourFromNow = now.addingTimeInterval(3600)
+        
+        let descriptor = FetchDescriptor<FocusRitual>()
+        let allRituals = (try? modelContext.fetch(descriptor)) ?? []
+        
+        // Find rituals that are scheduled soon and haven't been triggered
+        let upcomingRituals = allRituals.filter { ritual in
+            ritual.status == .upcoming &&
+            ritual.scheduledFor >= now &&
+            ritual.scheduledFor <= oneHourFromNow
+        }
+        
+        guard let nextRitual = upcomingRituals.first else { return nil }
+        
+        // Check if we've already nudged about this ritual recently
+        if hasRecentNudge(for: nil, trigger: .reflectionReminder, withinHours: 1, modelContext: modelContext) {
+            return nil
+        }
+        
+        // Check fatigue - don't nudge if user is fatigued (unless settings allow)
+        if NudgeToneAdapter.shared.shouldSuppressDueToFatigue {
+            return nil
+        }
+        
+        let ritualType = nextRitual.type
+        let minutesUntil = Int(nextRitual.scheduledFor.timeIntervalSince(now) / 60)
+        
+        let message: String
+        let detail: String?
+        
+        if minutesUntil <= 15 {
+            // Very soon
+            message = ritualType == .morning
+                ? "Let's set the day's intention."
+                : "Want to reflect on what went well?"
+            detail = "Your \(ritualType.displayName) is starting soon."
+        } else {
+            // Within the hour
+            message = ritualType == .morning
+                ? "Top 3 focus items are waiting — ready to begin?"
+                : "Your calm streak is \(nextRitual.streakCount) days strong."
+            detail = "\(ritualType.displayName) in \(minutesUntil) minutes"
+        }
+        
+        return NudgeCandidate(
+            trigger: .reflectionReminder,
+            message: message,
+            detail: detail,
+            relatedObjectId: nextRitual.id,
+            relatedObjectType: "ritual",
+            metadata: ["ritual_type": ritualType.rawValue, "minutes_until": "\(minutesUntil)"]
         )
     }
 

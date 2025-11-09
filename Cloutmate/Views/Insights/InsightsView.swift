@@ -12,6 +12,7 @@ import Charts
 import os.log
 import CloutmateShared
 import UniformTypeIdentifiers
+import AppKit
 
 struct InsightsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -19,7 +20,8 @@ struct InsightsView: View {
     @State private var selectedTimeRange: AnalyticsTimeRange = .thisWeek
     @State private var currentSnapshot: AnalyticsSnapshot?
     @State private var isLoading = false
-    @State private var selectedTab: InsightTab = .overview
+    @State private var selectedViewType: InsightsViewType = .focus
+    @State private var searchText: String = ""
     @State private var autoRefreshTimer: Timer?
     @State private var ritualTrend: [(Date, Double)] = []
     @State private var topConcepts: [(name: String, salience: Double, count: Int)] = []
@@ -33,86 +35,23 @@ struct InsightsView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header with time range selector
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Intelligence Dashboard")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.primary)
-                    
-                    Text("Your cognitive patterns and personal growth")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
+            // Unified Header
+            InsightsHeaderView(
+                selectedTimeRange: $selectedTimeRange,
+                selectedViewType: $selectedViewType,
+                searchText: $searchText,
+                onExport: {
+                    exportWeeklyReflection()
                 }
-                
-                Spacer()
-                
-                timeRangePicker
-            }
-            .padding(.horizontal, 28)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+            )
             
-            // Tab picker (segmented) and on-demand rendering
-            Picker("Tab", selection: $selectedTab) {
-                ForEach(InsightTab.allCases, id: \.self) { tab in
-                    Text(tab.title).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 28)
-            .padding(.bottom, 8)
-
-            Group {
-                switch selectedTab {
-                case .overview:
-                    ScrollView {
-                        OverviewTabView(snapshot: currentSnapshot, ritualTrend: ritualTrend)
-                    .padding(28)
-                }
-                .background(Color(.windowBackgroundColor))
-                
-                case .memoryGraph:
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 32) {
-                        memoryGraphSection
-                    }
-                    .padding(28)
-                }
-                .background(Color(.windowBackgroundColor))
-                .task {
-                    await checkMemoryGraphData()
-                }
-                
-                case .focus:
-                ScrollView {
-                        FocusTabView(snapshot: currentSnapshot, timeRange: selectedTimeRange)
-                    .padding(28)
-                }
-                .background(Color(.windowBackgroundColor))
-                
-                case .emotional:
-                ScrollView {
-                        EmotionalTabView(snapshot: currentSnapshot, timeRange: selectedTimeRange)
-                    .padding(28)
-                }
-                .background(Color(.windowBackgroundColor))
-                
-                case .learning:
-                ScrollView {
-                        LearningTabView(snapshot: currentSnapshot, timeRange: selectedTimeRange)
-                    .padding(28)
-                }
-                .background(Color(.windowBackgroundColor))
-                
-                case .connections:
-                ScrollView {
-                        ConnectionsTabView(snapshot: currentSnapshot, topConcepts: topConcepts, timeRange: selectedTimeRange)
-                    .padding(28)
-                }
-                .background(Color(.windowBackgroundColor))
-                }
-            }
+            // Unified Dashboard
+            UnifiedInsightsView(
+                snapshot: currentSnapshot,
+                timeRange: selectedTimeRange,
+                searchText: searchText,
+                selectedViewType: selectedViewType
+            )
         }
         .task {
             await loadAnalytics()
@@ -121,55 +60,13 @@ struct InsightsView: View {
                 startAutoRefresh()
             }
         }
-        .onChange(of: selectedTab) { _, _ in
-            if selectedTab == .memoryGraph {
-                _Concurrency.Task { @MainActor in
-                    await checkMemoryGraphData()
-                }
+        .onChange(of: selectedTimeRange) { _, _ in
+            _Concurrency.Task {
+                await loadAnalytics()
             }
         }
-        .sheet(isPresented: $showingMemoryGraphInfo) {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack {
-                    Image(systemName: memoryGraphError != nil ? "exclamationmark.triangle.fill" : "network")
-                        .foregroundColor(memoryGraphError != nil ? .orange : KosmicPalette.cyan)
-                    Text(memoryGraphError != nil ? "Memory Graph Error" : "About Memory Graph")
-                        .font(.system(size: 20, weight: .bold))
-                    Spacer()
-                }
-                
-                if let error = memoryGraphError {
-                    Text(error)
-                        .font(.system(size: 13))
-                        .foregroundColor(.orange)
-                        .padding(.vertical, 8)
-                        .padding(.horizontal, 12)
-                        .background(Color.orange.opacity(0.1))
-                        .cornerRadius(8)
-                } else {
-                    Text("The Memory Graph connects your tasks, notes, drafts, and posts into a knowledge map. Aurora uses it to surface recurring themes and relationships. You can build it from your existing data at any time; it updates over time as you work.")
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
-                
-                HStack {
-                    if memoryGraphError != nil {
-                        Button("Dismiss") {
-                            memoryGraphError = nil
-                            showingMemoryGraphInfo = false
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    Spacer()
-                    Button("Close") {
-                        memoryGraphError = nil
-                        showingMemoryGraphInfo = false
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-            .padding(24)
-            .frame(width: 520)
+        .onDisappear {
+            stopAutoRefresh()
         }
         .overlay(alignment: .center) {
             if isBuildingGraph {
@@ -184,14 +81,6 @@ struct InsightsView: View {
                     .background(.ultraThinMaterial)
                     .cornerRadius(12)
                 }
-            }
-        }
-        .onDisappear {
-            stopAutoRefresh()
-        }
-        .onChange(of: selectedTimeRange) { _, _ in
-            _Concurrency.Task {
-                await loadAnalytics()
             }
         }
     }
@@ -787,23 +676,78 @@ struct InsightsView: View {
     }
     
     private func exportWeeklyReflection() {
-        // Future: Generate PDF report
+        guard let snapshot = currentSnapshot else { return }
+        
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.pdf]
+        panel.allowedContentTypes = [.pdf, .plainText]
         panel.nameFieldStringValue = "Weekly_Reflection_\(Date().ISO8601Format()).pdf"
         panel.message = "Export your weekly reflection"
+        panel.allowsOtherFileTypes = false
         
         panel.begin { response in
             if response == .OK, let url = panel.url {
-                // TODO: Generate PDF with:
-                // - Cognitive overview
-                // - Focus session summary
-                // - Emotional heatmap
-                // - Top themes and concepts
-                // - Aurora's insights
-                Logger.insights.info("Exporting weekly reflection to \(url.path)")
+                // Generate summary content
+                let summary = generateWeeklySummary(snapshot: snapshot)
+                
+                // Export as Markdown (simplified - full PDF generation would require PDFKit)
+                if url.pathExtension == "txt" || url.pathExtension == "md" {
+                    do {
+                        try summary.write(to: url, atomically: true, encoding: .utf8)
+                        Logger.insights.info("Exported weekly reflection to \(url.path)")
+                    } catch {
+                        Logger.insights.error("Failed to export reflection: \(error.localizedDescription)")
+                    }
+                } else {
+                    // For PDF, we'd need to use PDFKit - for now, save as text
+                    let textURL = url.deletingPathExtension().appendingPathExtension("txt")
+                    do {
+                        try summary.write(to: textURL, atomically: true, encoding: .utf8)
+                        Logger.insights.info("Exported weekly reflection to \(textURL.path)")
+                    } catch {
+                        Logger.insights.error("Failed to export reflection: \(error.localizedDescription)")
+                    }
+                }
             }
         }
+    }
+    
+    private func generateWeeklySummary(snapshot: AnalyticsSnapshot) -> String {
+        var summary = "# Weekly Reflection\n\n"
+        summary += "Generated: \(Date().formatted(date: .long, time: .shortened))\n\n"
+        
+        summary += "## Focus Metrics\n"
+        summary += "- Sessions: \(snapshot.focusSessionsCount)\n"
+        summary += "- Completion Rate: \(Int(snapshot.focusCompletionRate * 100))%\n"
+        summary += "- Total Focus Time: \(snapshot.totalFocusMinutes) minutes\n\n"
+        
+        summary += "## Emotional Patterns\n"
+        summary += "- Dominant Emotion: \(snapshot.dominantEmotion.rawValue)\n"
+        summary += "- Trend: \(snapshot.emotionalTrend.rawValue)\n"
+        summary += "- Valence: \(String(format: "%.2f", snapshot.emotionalSnapshot.valence))\n\n"
+        
+        summary += "## Habits & Rituals\n"
+        summary += "- Ritual Completion: \(Int(snapshot.ritualCompletionRate * 100))%\n"
+        summary += "- Morning Streak: \(snapshot.morningRitualStreak) days\n"
+        summary += "- Evening Streak: \(snapshot.eveningRitualStreak) days\n\n"
+        
+        summary += "## Task Completion\n"
+        summary += "- Tasks Completed: \(snapshot.tasksCompleted)\n"
+        summary += "- Completion Rate: \(Int(snapshot.completionRate * 100))%\n\n"
+        
+        if let forecast = snapshot.latestForecast {
+            summary += "## Cognitive Forecast\n"
+            summary += "- Fatigue Risk: \(Int(forecast.fatigueRisk * 100))%\n"
+            summary += "- Focus Stability: \(Int(forecast.focusStability * 100))%\n"
+            if let nextWindow = forecast.nextFocusWindowStart {
+                summary += "- Next Focus Peak: \(nextWindow.formatted(date: .abbreviated, time: .shortened))\n"
+            }
+            summary += "\n"
+        }
+        
+        summary += "---\n"
+        summary += "*Generated by Aurora's Intelligence Layer*\n"
+        
+        return summary
     }
     
     private func startAutoRefresh() {

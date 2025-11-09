@@ -24,6 +24,11 @@ struct UnifiedProjectsView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var showCreateSheet = false
     @State private var projectToShow: Project?
+    @State private var isSelectionMode = false
+    @State private var selectedProjectIDs: Set<UUID> = []
+    @State private var showFocusDurationSheet = false
+    @State private var focusDuration: TimeInterval = 1800 // Default 30 min
+    @State private var projectForFocus: Project?
     
     var filteredProjects: [Project] {
         var filtered = allProjects
@@ -46,9 +51,188 @@ struct UnifiedProjectsView: View {
         filteredProjects.filter { $0.status == .active }.count
     }
     
+    var selectedProjects: [Project] {
+        filteredProjects.filter { selectedProjectIDs.contains($0.id) }
+    }
+    
+    var visibleSelectedProjectCount: Int {
+        selectedProjects.count
+    }
+    
+    var isSelectionActive: Bool {
+        isSelectionMode || !selectedProjectIDs.isEmpty
+    }
+    
     var headerOpacity: Double {
         let threshold: CGFloat = 50
         return scrollOffset > threshold ? 1.0 : max(0.3, Double(scrollOffset / threshold))
+    }
+    
+    private func projectSelectionActions() -> [SelectionActionBar.Action] {
+        var actions: [SelectionActionBar.Action] = []
+        
+        // Start Focus Session action (only if single project selected)
+        if selectedProjects.count == 1, let project = selectedProjects.first {
+            actions.append(.init(title: "Start Focus Session", icon: "timer") {
+                startFocusSessionForProject(project)
+            })
+        }
+        
+        if selectedProjects.contains(where: { $0.status != .active }) {
+            actions.append(.init(title: "Mark Active", icon: "play.fill") {
+                updateSelectedProjectsStatus(.active)
+            })
+        }
+        if selectedProjects.contains(where: { $0.status != .paused }) {
+            actions.append(.init(title: "Pause", icon: "pause.fill") {
+                updateSelectedProjectsStatus(.paused)
+            })
+        }
+        if selectedProjects.contains(where: { $0.status != .completed }) {
+            actions.append(.init(title: "Complete", icon: "checkmark.seal.fill") {
+                updateSelectedProjectsStatus(.completed)
+            })
+        }
+        actions.append(.init(title: "Delete", icon: "trash", role: .danger) {
+            deleteSelectedProjects()
+        })
+        return actions
+    }
+    
+    private func toggleSelectionMode() {
+        guard selectedViewMode != .timeline else { return }
+        if isSelectionMode || !selectedProjectIDs.isEmpty {
+            clearSelection()
+        } else if !filteredProjects.isEmpty {
+            isSelectionMode = true
+        }
+    }
+    
+    private func toggleProjectSelection(_ project: Project) {
+        if selectedProjectIDs.contains(project.id) {
+            selectedProjectIDs.remove(project.id)
+            if selectedProjectIDs.isEmpty {
+                isSelectionMode = false
+            }
+        } else {
+            if !isSelectionMode {
+                isSelectionMode = true
+            }
+            selectedProjectIDs.insert(project.id)
+        }
+        if isSelectionActive {
+            projectToShow = nil
+        }
+    }
+    
+    private func clearSelection() {
+        selectedProjectIDs.removeAll()
+        isSelectionMode = false
+    }
+    
+    private func pruneSelection() {
+        let visibleIDs = Set(filteredProjects.map(\.id))
+        selectedProjectIDs = selectedProjectIDs.intersection(visibleIDs)
+        if selectedProjectIDs.isEmpty {
+            isSelectionMode = false
+        }
+    }
+    
+    private func updateSelectedProjectsStatus(_ status: ProjectStatus) {
+        for project in selectedProjects {
+            project.status = status
+            project.updatedAt = Date()
+        }
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func deleteSelectedProjects() {
+        for project in selectedProjects {
+            modelContext.delete(project)
+        }
+        try? modelContext.save()
+        clearSelection()
+    }
+    
+    private func duplicateProject(_ project: Project) {
+        let duplicated = Project(
+            title: "\(project.title) (Copy)",
+            goal: project.goal,
+            status: project.status,
+            dueDate: project.dueDate,
+            areaId: project.areaId,
+            tags: project.tags
+        )
+        modelContext.insert(duplicated)
+        try? modelContext.save()
+    }
+    
+    private func archiveProject(_ project: Project) {
+        project.status = .completed
+        project.updatedAt = Date()
+        try? modelContext.save()
+        if selectedProjectIDs.contains(project.id) {
+            selectedProjectIDs.remove(project.id)
+            if selectedProjectIDs.isEmpty {
+                isSelectionMode = false
+            }
+        }
+    }
+    
+    private func deleteProject(_ project: Project) {
+        modelContext.delete(project)
+        try? modelContext.save()
+        if selectedProjectIDs.contains(project.id) {
+            selectedProjectIDs.remove(project.id)
+            if selectedProjectIDs.isEmpty {
+                isSelectionMode = false
+            }
+        }
+    }
+    
+    private func startFocusSessionForProject(_ project: Project) {
+        projectForFocus = project
+        showFocusDurationSheet = true
+    }
+    
+    private func startFocusSession() {
+        guard let project = projectForFocus else { return }
+        showFocusDurationSheet = false
+        
+        // Post notification with session parameters instead of starting immediately
+        let params = PendingFocusSessionParams(
+            objective: project.title,
+            plannedDuration: focusDuration,
+            targetObjectId: project.id,
+            targetObjectType: "project"
+        )
+        
+        projectForFocus = nil
+        clearSelection()
+        
+        // Post session parameters first (will be stored as pending)
+        NotificationCenter.default.post(
+            name: .startPendingFocusSession,
+            object: params
+        )
+        
+        // Switch to focus mode tab (session will start after switch completes)
+        NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
+    }
+    
+    private func toggleSelectAll() {
+        let allVisibleIDs = Set(filteredProjects.map(\.id))
+        if selectedProjectIDs == allVisibleIDs {
+            // All selected, deselect all
+            clearSelection()
+        } else {
+            // Not all selected, select all visible
+            selectedProjectIDs = allVisibleIDs
+            if !isSelectionMode {
+                isSelectionMode = true
+            }
+        }
     }
     
     var body: some View {
@@ -69,6 +253,32 @@ struct UnifiedProjectsView: View {
         }
         .sheet(item: $projectToShow) { project in
             ProjectDetailSheet(project: project)
+        }
+        .sheet(isPresented: $showFocusDurationSheet) {
+            if let project = projectForFocus {
+                FocusDurationSheet(
+                    selectedDuration: $focusDuration,
+                    itemTitle: project.title,
+                    itemType: "Project",
+                    onStart: {
+                        startFocusSession()
+                    }
+                )
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if isSelectionActive {
+                SelectionActionBar(
+                    count: visibleSelectedProjectCount,
+                    itemLabel: "project",
+                    actions: projectSelectionActions(),
+                    onCancel: clearSelection,
+                    onSelectAll: toggleSelectAll,
+                    totalItems: filteredProjects.count
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+            }
         }
         .background(
             Button("New Project") {
@@ -95,6 +305,19 @@ struct UnifiedProjectsView: View {
         }
         .accessibilityLabel("Projects view")
         .accessibilityHint("Use arrow keys to switch between views. Press Command+N to create a new project.")
+        .onChange(of: searchText) { _, _ in
+            pruneSelection()
+        }
+        .onChange(of: selectedFilter) { _, _ in
+            pruneSelection()
+        }
+        .onChange(of: selectedViewMode) { _, newValue in
+            if newValue == .timeline {
+                clearSelection()
+            } else {
+                pruneSelection()
+            }
+        }
     }
     
     // MARK: - Header Zone
@@ -173,6 +396,18 @@ struct UnifiedProjectsView: View {
                 }
             }
             
+            GlassButton(
+                icon: isSelectionActive ? "checkmark.circle.fill" : "checkmark.circle",
+                style: .iconOnly,
+                role: .surface
+            ) {
+                toggleSelectionMode()
+            }
+            .accessibilityLabel(isSelectionActive ? "Exit selection mode" : "Enter selection mode")
+            .help(isSelectionActive ? "Done Selecting" : "Select Projects")
+            .opacity(selectedViewMode == .timeline ? 0.5 : 1.0)
+            .disabled(selectedViewMode == .timeline)
+            
             // Quick Create Button
             Button(action: {
                 showCreateSheet = true
@@ -219,18 +454,30 @@ struct UnifiedProjectsView: View {
                                 projects: filteredProjects,
                                 tasks: allTasks,
                                 areas: allAreas,
+                                selectionMode: isSelectionActive,
+                                selectedProjectIDs: selectedProjectIDs,
+                                onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
                                     projectToShow = project
-                                }
+                                },
+                                onDuplicateProject: { project in duplicateProject(project) },
+                                onArchiveProject: { project in archiveProject(project) },
+                                onDeleteProject: { project in deleteProject(project) }
                             )
                         case .board:
                             ProjectBoardView(
                                 projects: filteredProjects,
                                 tasks: allTasks,
                                 areas: allAreas,
+                                selectionMode: isSelectionActive,
+                                selectedProjectIDs: selectedProjectIDs,
+                                onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
                                     projectToShow = project
-                                }
+                                },
+                                onDuplicateProject: { project in duplicateProject(project) },
+                                onArchiveProject: { project in archiveProject(project) },
+                                onDeleteProject: { project in deleteProject(project) }
                             )
                         case .timeline:
                             ProjectTimelineView(
@@ -246,6 +493,9 @@ struct UnifiedProjectsView: View {
                                 projects: filteredProjects,
                                 tasks: allTasks,
                                 areas: allAreas,
+                                selectionMode: isSelectionActive,
+                                selectedProjectIDs: selectedProjectIDs,
+                                onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
                                     projectToShow = project
                                 }

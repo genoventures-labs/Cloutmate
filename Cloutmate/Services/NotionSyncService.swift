@@ -202,6 +202,7 @@ final class NotionSyncService {
         context: ModelContext
     ) throws -> PARANote {
         let note = PARANote(title: "")
+        note.author = .user
         
         // Apply property mappings
         applyMappingsToNote(note: note, page: page, propertyMappings: propertyMappings)

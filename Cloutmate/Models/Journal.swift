@@ -48,6 +48,12 @@ enum JournalMood: String, Codable, CaseIterable {
     }
 }
 
+enum JournalAuthor: String, Codable, CaseIterable {
+    case user
+    case aurora
+    case unknown
+}
+
 @Model
 final class Journal {
     var id: UUID = UUID()
@@ -68,6 +74,7 @@ final class Journal {
     // AI-related fields
     var aiPrompt: String?
     var aiGeneratedContent: String?
+    var authorRaw: String = JournalAuthor.user.rawValue
     
     // Metadata
     var createdAt: Date = Date()
@@ -102,6 +109,7 @@ final class Journal {
         self.createdAt = Date()
         self.updatedAt = Date()
         self.isArchived = false
+        self.authorRaw = JournalAuthor.user.rawValue
     }
     
     // Computed properties for type safety
@@ -113,6 +121,11 @@ final class Journal {
     var journalMood: JournalMood {
         get { JournalMood(rawValue: mood) ?? .none }
         set { mood = newValue.rawValue }
+    }
+    
+    var author: JournalAuthor {
+        get { JournalAuthor(rawValue: authorRaw) ?? .user }
+        set { authorRaw = newValue.rawValue }
     }
 }
 

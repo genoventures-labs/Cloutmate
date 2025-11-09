@@ -13,6 +13,9 @@ struct ProjectGalleryView: View {
     let projects: [Project]
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let selectedProjectIDs: Set<UUID>
+    let onSelectionToggle: (Project) -> Void
     let onProjectSelected: (Project) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -35,6 +38,9 @@ struct ProjectGalleryView: View {
                         project: project,
                         tasks: tasks.filter { $0.projectId == project.id },
                         areas: areas,
+                        selectionMode: selectionMode,
+                        isSelected: selectedProjectIDs.contains(project.id),
+                        onSelectionToggle: { onSelectionToggle(project) },
                         onTap: {
                             onProjectSelected(project)
                         }
@@ -64,9 +70,12 @@ struct ProjectGalleryView: View {
 // MARK: - Project Gallery Card
 
 struct ProjectGalleryCard: View {
-    let project: Project
+    @Bindable var project: Project
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let isSelected: Bool
+    let onSelectionToggle: () -> Void
     let onTap: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -122,13 +131,9 @@ struct ProjectGalleryCard: View {
                     .foregroundColor(glassColorSystem.textPrimary())
                 
                 HStack {
-                    ProjectStatusBadge(status: project.status)
+                    InteractiveProjectStatusBadge(project: project)
                     
-                    if let dueDate = project.dueDate {
-                        Text(dueDate, format: .dateTime.month().day())
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    InteractiveProjectDueDateBadge(project: project)
                 }
                 
                 if !tasks.isEmpty {
@@ -148,22 +153,53 @@ struct ProjectGalleryCard: View {
         .shadow(color: .black.opacity(isHovered ? 0.15 : 0.05), radius: isHovered ? 8 : 4, y: isHovered ? 4 : 2)
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3), value: isHovered)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: isSelected ? [.kosmicBlue, .kosmicPurple] : [.clear, .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: isSelected ? 2 : 0
+                )
+        )
+        .overlay(alignment: .topTrailing) {
+            if selectionMode {
+                SelectionIndicator(isSelected: isSelected)
+                    .padding(10)
+                    .onTapGesture {
+                        onSelectionToggle()
+                    }
+            }
+        }
         .onHover { hovering in
-            isHovered = hovering
+            isHovered = selectionMode ? false : hovering
         }
         .onTapGesture {
-            onTap()
-        }
-        .contextMenu {
-            Button("Open") {
+            if selectionMode {
+                onSelectionToggle()
+            } else {
                 onTap()
             }
-            Button("Edit") {
-                // Edit action
+        }
+        .contextMenu {
+            if !selectionMode {
+                Button("Open") {
+                    onTap()
+                }
+                Button("Edit") {
+                    // Edit action
+                }
+                Divider()
+                Button("Archive") {
+                    // Archive action
+                }
             }
-            Divider()
-            Button("Archive") {
-                // Archive action
+        }
+        .onChange(of: selectionMode) { _, newValue in
+            if newValue {
+                isHovered = false
             }
         }
         .task {

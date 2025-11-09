@@ -83,8 +83,8 @@ struct ContextualCreateSheet: View {
         switch effectiveTab {
         case .inbox:
             return [
-                CreateAction(type: "New Note", icon: "note.text", color: .kosmicPurple),
                 CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .kosmicBlue),
+                CreateAction(type: "New Note", icon: "note.text", color: .kosmicPurple),
                 CreateAction(type: "Voice Memo", icon: "mic.fill", color: .orange)
             ]
         case .notes:
@@ -99,6 +99,12 @@ struct ContextualCreateSheet: View {
                 CreateAction(type: "Subtask", icon: "list.bullet", color: .kosmicGreen),
                 CreateAction(type: "Routine Builder", icon: "arrow.triangle.2.circlepath", color: .kosmicPurple)
             ]
+        case .drafts:
+            return [
+                CreateAction(type: "New Draft", icon: "doc.text", color: .kosmicPurple),
+                CreateAction(type: "Draft From AI", icon: "sparkles", color: .kosmicBlue),
+                CreateAction(type: "Draft From Note", icon: "note.text", color: .kosmicGreen)
+            ]
         case .projects:
             return [
                 CreateAction(type: "New Project", icon: "folder.fill", color: .kosmicBlue)
@@ -109,11 +115,23 @@ struct ContextualCreateSheet: View {
                 CreateAction(type: "New Artifact", icon: "doc.text.fill", color: .kosmicBlue),
                 CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .orange)
             ]
+        case .resources:
+            return [
+                CreateAction(type: "Import Resource", icon: "square.and.arrow.down", color: .kosmicBlue),
+                CreateAction(type: "Save Link", icon: "link", color: .kosmicPurple),
+                CreateAction(type: "Capture Text", icon: "text.cursor", color: .kosmicGreen)
+            ]
         case .calendar:
             return [
                 CreateAction(type: "New Task", icon: "checkmark.circle.fill", color: .kosmicBlue),
                 CreateAction(type: "Reflection", icon: "brain.head.profile", color: .kosmicPurple),
                 CreateAction(type: "Journal Entry", icon: "book.fill", color: .kosmicGreen)
+            ]
+        case .journal:
+            return [
+                CreateAction(type: "Morning Reflection", icon: "sunrise.fill", color: .kosmicBlue),
+                CreateAction(type: "Evening Reflection", icon: "moon.fill", color: .kosmicPurple),
+                CreateAction(type: "Free Write", icon: "pencil", color: .kosmicGreen)
             ]
         default:
             return [
@@ -150,12 +168,22 @@ struct ContextualCreateSheet: View {
                 NotificationCenter.default.post(name: .showCreateTask, object: nil)
             case "New Project":
                 NotificationCenter.default.post(name: .showCreateProject, object: nil)
+            case "New Draft":
+                NotificationCenter.default.post(name: .openDraftEditor, object: nil)
+            case "Draft From AI":
+                NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.aiAssistant)
+                NotificationCenter.default.post(name: .openDraftEditor, object: "ai-assistant")
+            case "Draft From Note":
+                NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.notes)
+                NotificationCenter.default.post(name: .openDraftEditor, object: "note-reference")
             case "New Artifact":
                 NotificationCenter.default.post(name: .showArtifactComposer, object: nil)
             case "Quick Capture":
-                NotificationCenter.default.post(name: .showQuickCapture, object: nil)
+                NotificationCenter.default.post(name: .openInboxCapture, object: nil)
             case "Voice Memo":
                 NotificationCenter.default.post(name: .showVoiceMemo, object: nil)
+            case "Import Resource", "Save Link", "Capture Text":
+                NotificationCenter.default.post(name: .showResourceImport, object: nil)
             case "Routine Builder":
                 // TODO: Implement routine builder
                 NotificationCenter.default.post(name: .showCreateTask, object: nil)
@@ -165,6 +193,12 @@ struct ContextualCreateSheet: View {
             case "Journal Entry":
                 // Create journal entry (could be a note or artifact)
                 NotificationCenter.default.post(name: .showCreateNote, object: nil)
+            case "Morning Reflection":
+                NotificationCenter.default.post(name: .openJournalEntry, object: JournalTemplate.morning)
+            case "Evening Reflection":
+                NotificationCenter.default.post(name: .openJournalEntry, object: JournalTemplate.evening)
+            case "Free Write":
+                NotificationCenter.default.post(name: .openJournalEntry, object: JournalTemplate.freeWrite)
             default:
                 break
             }
@@ -193,6 +227,8 @@ struct ContextualCreateSheet: View {
             return .focused
         case .projects, .posts:
             return .energized
+        case .journal:
+            return .reflective
         default:
             return .calm
         }
@@ -326,6 +362,7 @@ struct VoiceMemoSheet: View {
     private func createNoteFromVoiceMemo() {
         let title = content.prefix(50).description
         let note = Note(title: title, markdown: content)
+        note.author = .user
         modelContext.insert(note)
         try? modelContext.save()
         dismiss()

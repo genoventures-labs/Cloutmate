@@ -37,8 +37,17 @@ struct AIAssistantView: View {
     @State private var voiceInputText = ""
     @FocusState private var isInputFocused: Bool
     @State private var showMicroFeedback: ToolbarAction? = nil
-    @State private var showCreateSheet = false
+    @State private var showContextualCreateSheet = false
     @State private var contextualCreateTab: TabIdentifier = .home
+    @State private var scrollOffset: CGFloat = 0
+    @State private var headerOpacity: Double = 1.0
+    @State private var showAuroraPreferences = false
+    @State private var showSpotlight = false
+    @State private var showAuroraCreateSheet = false
+    @State private var createSheetAction: ToolbarAction?
+    
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     private let voiceService = VoiceTranscriptionService.shared
     private let tintManager = ArteTintManager.shared
@@ -56,67 +65,29 @@ struct AIAssistantView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.windowBackgroundColor))
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                // Voice Input
-                Button(action: toggleVoiceInput) {
-                    Image(systemName: isRecording ? "mic.fill" : "mic.circle")
-                        .foregroundColor(isRecording ? .red : .primary)
-                }
-                .help(isRecording ? "Stop recording" : "Voice input")
-                .disabled(viewModel.isLoading)
-                
-                // Save to Draft
-                Button(action: saveCurrentToDraft) {
-                    Image(systemName: "square.and.arrow.down")
-                }
-                .help("Save to Draft")
-                .disabled(viewModel.messages.isEmpty)
-                
-                // New Conversation
-                Button(action: {
-                    if !viewModel.messages.isEmpty {
-                        showUnsavedAlert = true
-                    } else {
-                        viewModel.clearMessages()
-                    }
-                }) {
-                    Image(systemName: "plus.circle")
-                }
-                .help("New Conversation")
-            }
-        }
         .onAppear {
             setupVoiceService()
             setupKeyboardHandlers()
-            // Listen for keyboard shortcuts
-            NotificationCenter.default.addObserver(
-                forName: NSNotification.Name("AuroraToolbarAction"),
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let action = notification.object as? ToolbarAction {
-                    handleToolbarAction(action)
-                }
-            }
-            // Listen for current tab updates
-            NotificationCenter.default.addObserver(
-                forName: NSNotification.Name("CurrentTabUpdated"),
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let tab = notification.object as? TabIdentifier {
-                    contextualCreateTab = tab
-                }
-            }
+            setupNotifications()
         }
-        .sheet(isPresented: $showCreateSheet) {
+        .sheet(isPresented: $showContextualCreateSheet) {
             ContextualCreateSheet(currentTab: contextualCreateTab)
         }
-        .alert("AI Assistant", isPresented: $showAIInfo) {
-            Button("OK") { }
-        } message: {
-            Text("Powered by Ollama (local LLM), Aurora is context-aware of your tasks, projects, posts, and notes. She can help extract tasks, suggest projects, and answer questions about your work. Requires Ollama running locally with the llama3.1 model.")
+        .sheet(isPresented: $showAuroraPreferences) {
+            AIAssistantPreferencesSheet()
+                }
+        .sheet(isPresented: $showSpotlight) {
+            AuroraSpotlightView()
+                .frame(width: 600, height: 500)
+        }
+        .sheet(isPresented: $showAuroraCreateSheet) {
+            if let action = createSheetAction {
+                AuroraCreateSheet(action: action) { prompt in
+                    // Send formatted prompt to Aurora
+                    viewModel.inputText = prompt
+                    sendCurrentMessage(modelContext: modelContext)
+                }
+            }
         }
         .alert("Unsaved Changes", isPresented: $showUnsavedAlert) {
             Button("Cancel", role: .cancel) {}
@@ -124,9 +95,9 @@ struct AIAssistantView: View {
                 if let conversationToLoad = conversationToLoad {
                     let _ = viewModel.loadConversation(conversationToLoad, modelContext: modelContext)
                     self.conversationToLoad = nil
-                } else {
-                    viewModel.clearMessages()
-                }
+                    } else {
+                        viewModel.clearMessages()
+                    }
             }
         } message: {
             Text("You have unsaved messages. Discard and continue?")
@@ -154,6 +125,53 @@ struct AIAssistantView: View {
             Text("Are you sure you want to delete this conversation? This action cannot be undone.")
         }
         .toast(message: $toastMessage, systemImage: "checkmark.circle.fill")
+    }
+    
+    private func setupNotifications() {
+            // Listen for keyboard shortcuts
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("AuroraToolbarAction"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let action = notification.object as? ToolbarAction {
+                    handleToolbarAction(action)
+                }
+            }
+            // Listen for current tab updates
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("CurrentTabUpdated"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let tab = notification.object as? TabIdentifier {
+                    contextualCreateTab = tab
+                }
+            }
+            // Listen for image paste from MentionInputField
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("MentionInputImagePaste"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let image = notification.object as? NSImage {
+                    handleImagePaste(image)
+                }
+            }
+            // Listen for conversation selection from Spotlight
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("SelectAIConversation"),
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let conversation = notification.object as? AIConversation {
+                    let loaded = viewModel.loadConversation(conversation, modelContext: modelContext)
+                    if !loaded {
+                        conversationToLoad = conversation
+                        showUnsavedAlert = true
+                    }
+                }
+            }
     }
     
     // MARK: - Conversations Sidebar
@@ -228,7 +246,10 @@ struct AIAssistantView: View {
                                 },
                                 onExportToDraft: {
                                     if let messages = conversation.messages, !messages.isEmpty {
-                                        _ = viewModel.exportToDraft(messages: messages, conversation: conversation, modelContext: modelContext)
+                                        let messagesArray: [AIMessage] = Array(messages)
+                                        let conversationRef: AIConversation = conversation
+                                        let result: Bool = viewModel.exportToDraft(messages: messagesArray, conversation: conversationRef, modelContext: modelContext)
+                                        _ = result
                                         toastMessage = "Exported to Drafts!"
                                     }
                                 }
@@ -252,13 +273,34 @@ struct AIAssistantView: View {
         }
     }
     
-    // MARK: - Main Chat Area
-    
     private var mainChatArea: some View {
         VStack(spacing: 0) {
-            // Chat Messages
+            // Header with scroll fade
+            AIAssistantHeaderView(
+                onSearch: {
+                    showSpotlight = true
+                },
+                onNewChat: {
+                    if !viewModel.messages.isEmpty {
+                        showUnsavedAlert = true
+                    } else {
+                        viewModel.clearMessages()
+                    }
+                },
+                onSettings: {
+                    showAuroraPreferences = true
+                },
+                selectedFilter: $viewModel.selectedDateFilter
+            )
+            .opacity(headerOpacity)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            
+            Divider()
+            
+            // Chat Messages with scroll tracking
             ZStack(alignment: .bottomTrailing) {
                 ScrollViewReader { proxy in
+                    GeometryReader { geometry in
                     ScrollView {
                         VStack(spacing: 8) {
                             if viewModel.messages.isEmpty {
@@ -270,11 +312,10 @@ struct AIAssistantView: View {
                                         onEdit: { editedMessage, newContent in
                                             viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
                                         },
-                                        onCopy: { copiedContent in
-                                            // Optional: Can show a toast or perform additional actions
-                                        }
+                                            onCopy: { _ in }
                                     )
                                     .id(message.id)
+                                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                                 }
                             }
                             
@@ -285,24 +326,40 @@ struct AIAssistantView: View {
                                 )
                                 .padding()
                             } else if !viewModel.messages.isEmpty {
-                                // Idle intelligence: subtle presence when waiting for input
                                 IdleIndicator()
                                     .padding(.top, 8)
                             }
                         }
                         .padding(.vertical, 16)
-                        .padding(.bottom, 60) // Space for floating button
+                            .padding(.bottom, 60)
+                            .background(
+                                GeometryReader { scrollGeometry in
+                                    Color.clear.preference(
+                                        key: ScrollOffsetPreferenceKey.self,
+                                        value: scrollGeometry.frame(in: .named("scroll")).minY
+                                    )
+                                }
+                            )
+                        }
+                        .coordinateSpace(name: "scroll")
+                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                            let offset = -value
+                            scrollOffset = offset
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                                headerOpacity = max(0.0, min(1.0, 1.0 - offset / 100.0))
+                            }
                     }
                     .onChange(of: viewModel.messages.count) { _, _ in
                         if let lastMessage = viewModel.messages.last {
-                            withAnimation {
+                                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
                                 proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                                }
                             }
                         }
                     }
                 }
                 
-                // Floating Summarize Chat Button (only show when 10+ messages)
+                // Floating Summarize Chat Button
                 if viewModel.messages.count >= 10 {
                     Button(action: {
  		_Concurrency.Task {
@@ -328,31 +385,65 @@ struct AIAssistantView: View {
             }
             
             Divider()
-                .overlay(Color.white.opacity(0.1))
             
-            // Core Capabilities Toolbar
-            coreCapabilitiesToolbar
+            // Toolbar
+            AIAssistantToolbar(
+                viewModel: viewModel,
+                isRecording: $isRecording,
+                onSmartRecap: {
+                    _Concurrency.Task {
+                        await viewModel.generateSmartRecap(modelContext: modelContext)
+                    }
+                },
+                onExportToDraft: {
+                    saveCurrentToDraft()
+                },
+                onVoiceInput: {
+                    toggleVoiceInput()
+                },
+                onToolbarAction: { action in
+                    handleToolbarAction(action)
+                },
+                onWebSearch: {
+                    // Insert "@web " into input field and focus it
+                    if viewModel.inputText.isEmpty {
+                        viewModel.inputText = "@web "
+                    } else {
+                        viewModel.inputText += " @web "
+                    }
+                    isInputFocused = true
+                }
+            )
             
             Divider()
-                .overlay(Color.white.opacity(0.1))
             
-            // Status Banner
-            if let status = viewModel.currentStatus {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text(status)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
+            // Message Composer
+            AIMessageComposer(
+                text: $viewModel.inputText,
+                linkedContext: $viewModel.linkedContext,
+                isFocused: $isInputFocused,
+                isRecording: $isRecording,
+                voiceInputText: $voiceInputText,
+                isLoading: viewModel.isLoading,
+                pendingImageAttachment: viewModel.pendingImageAttachment,
+                pendingDocumentAttachment: viewModel.pendingDocumentAttachment,
+                lastConfidenceScore: viewModel.messages.last(where: { $0.role == "assistant" })?.confidenceScore,
+                onSend: {
+                    sendCurrentMessage(modelContext: modelContext)
+                },
+                onAttachImage: {
+                    attachImageFromPicker()
+                },
+                onAttachDocument: {
+                    presentDocumentSourceChooser()
+                },
+                onClearImage: {
+                    viewModel.clearPendingImage()
+                },
+                onClearDocument: {
+                    viewModel.clearPendingDocument()
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-            }
-            
-            // Input Area
-            inputArea
+            )
             
             // Contextual Hint Bar
             if viewModel.inputText.isEmpty && !viewModel.isLoading {
@@ -368,6 +459,15 @@ struct AIAssistantView: View {
                 .padding(.bottom, 8)
                 .transition(.opacity)
             }
+        }
+    }
+    
+    // MARK: - Scroll Offset Preference Key
+    
+    struct ScrollOffsetPreferenceKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+            value = nextValue()
         }
     }
     
@@ -405,46 +505,23 @@ struct AIAssistantView: View {
         .padding()
     }
     
-    // MARK: - Core Capabilities Toolbar
-    
-    private var coreCapabilitiesToolbar: some View {
-        let orderedActions = usageTracker.orderedActions()
-        let tintColor = tintManager.combinedTintColor(activity: viewModel.currentActivity)
-        
-        return HStack(spacing: 12) {
-            ForEach(orderedActions, id: \.self) { action in
-                toolbarButton(for: action, tintColor: tintColor)
-            }
-            
-            Spacer()
+    // MARK: - Voice Input & Actions
+
+    private func sendCurrentMessage(modelContext: ModelContext) {
+        let currentText = viewModel.inputText
+        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let attachment = viewModel.pendingImageAttachment
+        let documentAttachment = viewModel.pendingDocumentAttachment
+        guard !trimmed.isEmpty || attachment != nil || documentAttachment != nil else {
+            viewModel.inputText = ""
+            return
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
-    }
-    
-    private func toolbarButton(for action: ToolbarAction, tintColor: Color) -> some View {
-        Button(action: {
-            handleToolbarAction(action)
-        }) {
-            Image(systemName: action.icon)
-                .font(.title3)
-                .symbolEffect(.pulse, isActive: showMicroFeedback == action)
-        }
-        .buttonStyle(ToolbarButtonStyle(tintColor: tintColor, isDisabled: viewModel.isLoading))
-        .help(action.rawValue)
-        .keyboardShortcut(keyboardShortcut(for: action), modifiers: [.command, .shift])
-    }
-    
-    private func keyboardShortcut(for action: ToolbarAction) -> KeyEquivalent {
-        switch action {
-        case .createTask: return "1"
-        case .createProject: return "2"
-        case .createNote: return "3"
-        case .createReminder: return "4"
-        case .analyzeDocument: return "5"
-        case .analyzeImage: return "6"
-        }
+        viewModel.sendMessage(
+            currentText,
+            modelContext: modelContext,
+            image: attachment,
+            document: documentAttachment
+        )
     }
     
     private func handleToolbarAction(_ action: ToolbarAction) {
@@ -464,21 +541,10 @@ struct AIAssistantView: View {
         
         // Handle action
         switch action {
-        case .createTask:
-            viewModel.inputText = "Create a task"
-            sendCurrentMessage(modelContext: modelContext)
-            
-        case .createProject:
-            viewModel.inputText = "Create a project"
-            sendCurrentMessage(modelContext: modelContext)
-            
-        case .createNote:
-            viewModel.inputText = "Create a note"
-            sendCurrentMessage(modelContext: modelContext)
-            
-        case .createReminder:
-            viewModel.inputText = "Create a reminder"
-            sendCurrentMessage(modelContext: modelContext)
+        case .createTask, .createProject, .createNote, .createReminder:
+            // Show create sheet for these actions
+            createSheetAction = action
+            showAuroraCreateSheet = true
             
         case .analyzeDocument:
             presentDocumentSourceChooser()
@@ -486,228 +552,6 @@ struct AIAssistantView: View {
         case .analyzeImage:
             attachImageFromPicker()
         }
-        
-        // Clear input after sending
-        if action != .analyzeDocument && action != .analyzeImage {
-            viewModel.inputText = ""
-        }
-    }
-    
-    // MARK: - Input Area
-    
-    private var inputArea: some View {
-        VStack(spacing: 12) {
-            // Platform selector (moved from toolbar)
-            HStack(spacing: 8) {
-                Text("Platform:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                Picker("Platform", selection: $viewModel.selectedPlatform) {
-                    ForEach(Platform.allCases, id: \.self) { platform in
-                        Text(platform.displayName).tag(platform)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .controlSize(.small)
-                .frame(maxWidth: 200)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            // Voice recording indicator
-            if isRecording {
-                VStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "waveform")
-                            .foregroundColor(.red)
-                            .symbolEffect(.variableColor.iterative, isActive: true)
-                        Text("Listening...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        
-                        // Done button to complete recording
-                        Button(action: completeVoiceInput) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Done")
-                            }
-                            .font(.caption)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.kosmicBlue)
-                            .foregroundColor(.white)
-                            .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
-                        
-                        // Cancel button
-                        Button("Cancel") {
-                            voiceService.stopTranscribing()
-                            isRecording = false
-                            voiceInputText = ""
-                            viewModel.inputText = ""
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundColor(.red)
-                    }
-                    
-                    // Show current transcription
-                    if !voiceInputText.isEmpty {
-                        Text(voiceInputText)
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.white.opacity(0.5))
-                            .cornerRadius(4)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.red.opacity(0.1))
-                .cornerRadius(8)
-            }
-            
-            if let document = viewModel.pendingDocumentAttachment {
-                HStack(spacing: 12) {
-                    Image(systemName: "doc.text.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.kosmicBlue)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(document.fileName)
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                        Text(documentDetailText(for: document))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Button(action: viewModel.clearPendingDocument) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Remove document")
-                }
-                .padding(8)
-                .background(Color.gray.opacity(0.08))
-                .cornerRadius(8)
-            } else if let attachment = viewModel.pendingImageAttachment {
-                HStack(spacing: 12) {
-                    Image(nsImage: attachment.preview)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 96, height: 72)
-                        .cornerRadius(8)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-                        )
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(attachment.fileName ?? "Attached Image")
-                            .font(.caption)
-                            .foregroundColor(.primary)
-                        Text(attachment.mimeType)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Button(action: viewModel.clearPendingImage) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .help("Remove image")
-                }
-                .padding(8)
-                .background(Color.gray.opacity(0.08))
-                .cornerRadius(8)
-            }
-
-            // Text input area
-            HStack(spacing: 12) {
-                let attachmentIconName: String = {
-                    if viewModel.pendingDocumentAttachment != nil {
-                        return "paperclip.circle.fill"
-                    }
-                    if viewModel.pendingImageAttachment != nil {
-                        return "photo.fill"
-                    }
-                    return "paperclip.circle"
-                }()
-                Menu {
-                    Button("Document (filters only documents)", action: presentDocumentSourceChooser)
-                        .disabled(viewModel.pendingDocumentAttachment != nil || viewModel.isLoading)
-                    Divider()
-                    Button("Image From Computer", action: attachImageFromPicker)
-                    Button("Image From Photos", action: attachImageFromPhotos)
-                } label: {
-                    Image(systemName: attachmentIconName)
-                        .font(.title3)
-                        .foregroundColor(.kosmicBlue)
-                }
-                .menuStyle(BorderlessButtonMenuStyle())
-                .help("Attach file")
-                .disabled(isRecording || viewModel.isLoading)
-                ZStack(alignment: .topLeading) {
-                    MentionInputField(
-                        text: $viewModel.inputText,
-                        isFocused: $isInputFocused,
-                        placeholder: "Ask me anything...",
-                        onSubmit: {
-                            sendCurrentMessage(modelContext: modelContext)
-                        },
-                        linkedContext: $viewModel.linkedContext
-                    )
-                    .frame(minHeight: 38, maxHeight: 120)
-                    .disabled(isRecording)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.gray.opacity(0.15), lineWidth: 1)
-                    )
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(nsColor: .textBackgroundColor))
-                    )
-                }
-                let hasAttachment = viewModel.pendingImageAttachment != nil || viewModel.pendingDocumentAttachment != nil
-                let canSend = !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasAttachment
-                Button(action: {
-                    sendCurrentMessage(modelContext: modelContext)
-                }) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(canSend ? .kosmicBlue : .secondary)
-                }
-                .buttonStyle(.plain)
-                .disabled(!canSend || isRecording)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-    }
-
-    // MARK: - Voice Input & Actions
-
-    private func sendCurrentMessage(modelContext: ModelContext) {
-        let currentText = viewModel.inputText
-        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let attachment = viewModel.pendingImageAttachment
-        let documentAttachment = viewModel.pendingDocumentAttachment
-        guard !trimmed.isEmpty || attachment != nil || documentAttachment != nil else {
-            viewModel.inputText = ""
-            return
-        }
-        viewModel.sendMessage(
-            currentText,
-            modelContext: modelContext,
-            image: attachment,
-            document: documentAttachment
-        )
     }
 
     private func presentDocumentSourceChooser() {
@@ -893,16 +737,23 @@ struct AIAssistantView: View {
     private func setupKeyboardHandlers() {
         // Set up keyboard monitoring for "+" key combo
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Don't intercept if a text field or text editor is focused (unless it's our own input)
+            if let firstResponder = NSApp.keyWindow?.firstResponder,
+               (firstResponder is NSTextView || firstResponder is NSTextField),
+               !isInputFocused {
+                return event
+            }
+            
             // Check for Cmd+N or "+" key when input is focused
             if isInputFocused {
                 // Cmd+N
                 if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "n" {
-                    showCreateSheet = true
+                    showContextualCreateSheet = true
                     return nil
                 }
                 // "+" key (equality key on most keyboards)
                 if event.charactersIgnoringModifiers == "+" || event.charactersIgnoringModifiers == "=" {
-                    showCreateSheet = true
+                    showContextualCreateSheet = true
                     return nil
                 }
             }
@@ -958,7 +809,10 @@ struct AIAssistantView: View {
             return
         }
         
-        _ = viewModel.exportToDraft(messages: messages, conversation: conversation, modelContext: modelContext)
+        let messagesArray: [AIMessage] = Array(messages)
+        let conversationRef: AIConversation = conversation
+        let result: Bool = viewModel.exportToDraft(messages: messagesArray, conversation: conversationRef, modelContext: modelContext)
+        _ = result
         toastMessage = "Saved to Drafts!"
     }
 }

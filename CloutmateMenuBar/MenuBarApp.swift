@@ -11,6 +11,7 @@ import CloutmateShared
 @main
 struct CloutmateMenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @StateObject private var glassColorSystem = GlassColorSystem()
     
     var sharedModelContainer: ModelContainer = {
         SharedDataManager.createSharedModelContainer()
@@ -20,6 +21,7 @@ struct CloutmateMenuBarApp: App {
         Settings {
             MenuBarPopoverView()
                 .modelContainer(sharedModelContainer)
+                .environmentObject(glassColorSystem)
         }
     }
 }
@@ -27,22 +29,8 @@ struct CloutmateMenuBarApp: App {
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarItem: NSStatusItem!
     private var popover: NSPopover!
-    private var currentIconState: IconState = .idle
     private var menu: NSMenu!
-    
-    enum IconState {
-        case idle
-        case posting
-        case error
-        
-        var symbolName: String {
-            switch self {
-            case .idle: return "message.fill"
-            case .posting: return "arrow.up.circle.fill"
-            case .error: return "exclamationmark.triangle.fill"
-            }
-        }
-    }
+    private let glassColorSystem = GlassColorSystem()
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create right-click menu
@@ -50,7 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create status bar item
         statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        updateIcon(.idle)
+        updateIcon()
         
         if let button = statusBarItem.button {
             // Left click shows popover
@@ -68,54 +56,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let sharedModelContainer = SharedDataManager.createSharedModelContainer()
         let contentView = MenuBarPopoverView()
             .modelContainer(sharedModelContainer)
+            .environmentObject(glassColorSystem)
         
-        popover.contentViewController = NSHostingController(rootView: contentView)
-        
-        // Listen for notifications
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handlePostingStatus(_:)),
-            name: NSNotification.Name("PostStatusChanged"),
-            object: nil
-        )
+        let hostingController = NSHostingController(rootView: contentView)
+        popover.contentViewController = hostingController
         
         NSApp.setActivationPolicy(.accessory)
         
         // Request notification permissions
-        Task {
+        _Concurrency.Task {
             _ = await NotificationService.shared.requestPermission()
         }
     }
     
-    func updateIcon(_ state: IconState) {
-        currentIconState = state
-        statusBarItem.button?.image = NSImage(systemSymbolName: state.symbolName, accessibilityDescription: "Cloutmate")
-        
-        // Add visual feedback for posting state
-        if case .posting = state {
-            // Animate the posting icon
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.updateIcon(.posting)
-            }
-        }
-    }
-    
-    @objc func handlePostingStatus(_ notification: Notification) {
-        guard let status = notification.userInfo?["status"] as? String else { return }
-        
-        switch status {
-        case "publishing":
-            updateIcon(.posting)
-        case "published":
-            updateIcon(.idle)
-        case "failed":
-            updateIcon(.error)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.updateIcon(.idle)
-            }
-        default:
-            updateIcon(.idle)
-        }
+    func updateIcon() {
+        statusBarItem.button?.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "Cloutmate")
     }
     
     @objc func togglePopover() {

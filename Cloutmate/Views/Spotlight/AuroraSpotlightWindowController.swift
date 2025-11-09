@@ -19,6 +19,7 @@ class AuroraSpotlightPanel: NSPanel {
     override var canBecomeMain: Bool {
         return false
     }
+    
 }
 
 class AuroraSpotlightWindowController: ObservableObject {
@@ -44,9 +45,16 @@ class AuroraSpotlightWindowController: ObservableObject {
             defer: false
         )
         
+        // Keep it on top - use floating level which keeps it above normal windows
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = false
+        
+        // Ensure it stays on top even when other windows are activated
+        panel.hidesOnDeactivate = false
+        
+        // Make it draggable
+        panel.isMovableByWindowBackground = true
+        
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.isOpaque = false
@@ -62,7 +70,18 @@ class AuroraSpotlightWindowController: ObservableObject {
         hostingView.autoresizingMask = [.width, .height]
         panel.contentView = hostingView
         panel.contentView?.wantsLayer = true
-        panel.center()
+        
+        // Center relative to the main window instead of screen
+        if let mainWindow = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isMainWindow }) {
+            let mainFrame = mainWindow.frame
+            let panelSize = panel.frame.size
+            let centerX = mainFrame.midX - panelSize.width / 2
+            let centerY = mainFrame.midY - panelSize.height / 2
+            panel.setFrameOrigin(NSPoint(x: centerX, y: centerY))
+        } else {
+            // Fallback to screen center if no main window
+            panel.center()
+        }
         
         self.window = panel
         isPresented = true

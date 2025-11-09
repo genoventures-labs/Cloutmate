@@ -202,6 +202,8 @@ struct EmotionalHeatmapView: View {
             .padding(.vertical)
         }
         .task {
+            // Backfill emotional data on first load
+            await AnalyticsEngine.shared.backfillEmotionalData(modelContext: modelContext)
             loadData()
         }
         .onChange(of: timeRange) { _ in
@@ -273,14 +275,12 @@ struct EmotionalHeatmapView: View {
     }
 
     private var hasMeaningfulTrend: Bool {
-        emotionalTrend.contains { abs($0.valence) > 0.05 || $0.emotion != .neutral }
+        !emotionalTrend.isEmpty // Show data if we have any data points
     }
 
     private func hasMeaningfulSnapshot(_ snapshot: AnalyticsSnapshot) -> Bool {
-        abs(snapshot.emotionalSnapshot.valence) > 0.05 ||
-        snapshot.emotionalSnapshot.intensity > 0.05 ||
-        snapshot.dominantEmotion != .neutral ||
-        snapshot.emotionalTrend != .stable
+        // Show snapshot if we have any emotional data, even if neutral
+        true // Always show if snapshot exists
     }
 }
 

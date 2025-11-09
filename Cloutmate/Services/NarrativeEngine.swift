@@ -432,6 +432,39 @@ This week, you engaged with **\(aliveConcepts.count) active themes** across your
         let nonArchived = allArtifacts.filter { $0.artifactState != .archived }
         return Array(nonArchived.prefix(limit))
     }
+    
+    // MARK: - Arc Detection
+    
+    /// Detect story arcs from activity patterns
+    func detectArcs(
+        in dateRange: DateInterval? = nil,
+        modelContext: ModelContext
+    ) async -> [StoryArc] {
+        let range = dateRange ?? DateInterval(
+            start: Calendar.current.date(byAdding: .month, value: -3, to: Date()) ?? Date(),
+            end: Date()
+        )
+        
+        return await ArcDetectionService.shared.detectArcs(
+            in: range,
+            modelContext: modelContext
+        )
+    }
+    
+    // MARK: - Memory Weaving
+    
+    /// Weave connections to past insights
+    func weaveMemory(
+        currentText: String,
+        currentContext: String? = nil,
+        modelContext: ModelContext
+    ) async -> [MemoryConnection] {
+        return await MemoryWeavingService.shared.findConnections(
+            currentText: currentText,
+            currentContext: currentContext,
+            modelContext: modelContext
+        )
+    }
 }
 
 // MARK: - Supporting Types

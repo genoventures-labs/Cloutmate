@@ -15,7 +15,7 @@ actor HybridBridgeService {
     static let shared = HybridBridgeService()
     
     private let localBaseURL = "http://localhost:11434"
-    private let cloudBaseURL = "https://ollama.com"
+    private let cloudBaseURL = "https://api.ollama.cloud/v1"
     
     private var consecutiveTimeouts: [String: Int] = [:] // Track timeouts per model
     private var healthCheckStatus: HealthCheckStatus = .unknown
@@ -29,6 +29,50 @@ actor HybridBridgeService {
     }
     
     private init() {}
+    
+    // MARK: - Model Listing
+    
+    /// Fetch available models from Ollama Cloud API
+    func fetchAvailableCloudModels(apiKey: String) async throws -> [String] {
+        guard let url = URL(string: "\(cloudBaseURL)/models") else {
+            throw HybridBridgeError.invalidURL
+        }
+        
+        struct ModelsResponse: Codable {
+            let data: [ModelInfo]?
+            let models: [ModelInfo]?
+        }
+        
+        struct ModelInfo: Codable {
+            let id: String
+            let name: String?
+        }
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "GET"
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw HybridBridgeError.invalidResponse
+        }
+        
+        if httpResponse.statusCode == 401 {
+            throw HybridBridgeError.authenticationFailed
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            let responseBody = String(data: data, encoding: .utf8) ?? "Unable to decode response"
+            throw HybridBridgeError.apiError("HTTP \(httpResponse.statusCode): \(responseBody)")
+        }
+        
+        let decoder = JSONDecoder()
+        let modelsResponse = try decoder.decode(ModelsResponse.self, from: data)
+        
+        let modelList = modelsResponse.data ?? modelsResponse.models ?? []
+        return modelList.compactMap { $0.name ?? $0.id }
+    }
     
     // MARK: - Health Check
     
@@ -155,76 +199,38 @@ actor HybridBridgeService {
         useHybridBridge: Bool = true,
         latencyThreshold: TimeInterval = 6.0,
         modelContext: ModelContext
-    ) async throws -> String {
-        // If hybrid bridge disabled, fallback to local Ollama
-        if !useHybridBridge {
-            return try await OllamaBridgeService.shared.generateResponseWithAppContext(
-                for: input,
-                appContext: appContext,
-                payloadContext: payloadContext,
-                conversationMessages: conversationMessages,
-                currentMessageStyle: currentMessageStyle,
-                userStyleProfile: userStyleProfile,
-                confidence: confidence
-            )
-        }
-        
-        // Extract intent cluster from payload context
+    ) async throws -> (response: String, thinking: String?, modelUsed: String) {
+        // Use local Ollama routing with ModelRoutingEngine (all models are local now)
         let intentCluster = payloadContext?.intentClusters?.primaryCluster
-        let confidenceScore = confidence?.score ?? 0.7
+        let confidenceScore = payloadContext?.intentClusters?.confidence ?? confidence?.score ?? 0.7
+        let messageLength = input.count
         
-        // Check if we should use cloud or local
-        let shouldUseCloud = await shouldUseCloud(
-            apiKey: apiKey,
-            intentCluster: intentCluster
+        let routingDecision = await ModelRoutingEngine.shared.selectModel(
+            input: input,
+            intentCluster: intentCluster,
+            confidence: confidenceScore,
+            messageLength: messageLength,
+            userStyle: currentMessageStyle,
+            conversationId: nil
         )
         
-        if shouldUseCloud, let apiKey = apiKey, !apiKey.isEmpty {
-            // Try cloud first
-            do {
-                let preferredModel = await MainActor.run {
-                    AISettings.shared.preferredCloudModel
-                }
-                
-                return try await generateCloudResponseWithAppContext(
-                    for: input,
-                    appContext: appContext,
-                    payloadContext: payloadContext,
-                    conversationMessages: conversationMessages,
-                    currentMessageStyle: currentMessageStyle,
-                    userStyleProfile: userStyleProfile,
-                    confidence: confidence,
-                    intentCluster: intentCluster,
-                    confidenceScore: confidenceScore,
-                    preferredModel: preferredModel,
-                    apiKey: apiKey,
-                    latencyThreshold: latencyThreshold,
-                    modelContext: modelContext
-                )
-            } catch {
-                // Fallback to local on cloud failure
-                return try await OllamaBridgeService.shared.generateResponseWithAppContext(
-                    for: input,
-                    appContext: appContext,
-                    payloadContext: payloadContext,
-                    conversationMessages: conversationMessages,
-                    currentMessageStyle: currentMessageStyle,
-                    userStyleProfile: userStyleProfile,
-                    confidence: confidence
-                )
-            }
-        } else {
-            // Use local Ollama
-            return try await OllamaBridgeService.shared.generateResponseWithAppContext(
-                for: input,
-                appContext: appContext,
-                payloadContext: payloadContext,
-                conversationMessages: conversationMessages,
-                currentMessageStyle: currentMessageStyle,
-                userStyleProfile: userStyleProfile,
-                confidence: confidence
-            )
-        }
+        // Use OllamaBridgeService with the selected model and thinking setting
+        let result = try await OllamaBridgeService.shared.generateResponseWithAppContext(
+            for: input,
+            appContext: appContext,
+            payloadContext: payloadContext,
+            conversationMessages: conversationMessages,
+            currentMessageStyle: currentMessageStyle,
+            userStyleProfile: userStyleProfile,
+            confidence: confidence,
+            useThinking: routingDecision.useThinking,
+            model: routingDecision.model
+        )
+        
+        // Record model usage for cooldown/stickiness
+        await ModelRoutingEngine.shared.recordModelUsage(routingDecision.model)
+        
+        return result
     }
     
     // MARK: - Private Methods
@@ -262,13 +268,15 @@ actor HybridBridgeService {
         modelContext: ModelContext
     ) async throws -> String {
         // Select model using routing engine
-        let selectedModel = await ModelRoutingEngine.shared.selectModel(
+        let routingDecision = await ModelRoutingEngine.shared.selectModel(
+            input: input,
             intentCluster: intentCluster,
             confidence: confidence,
-            preferredModel: preferredModel,
-            modelContext: modelContext,
-            latencyThreshold: latencyThreshold
+            messageLength: input.count,
+            userStyle: nil,
+            conversationId: nil
         )
+        let selectedModel = routingDecision.model
         
         let startTime = Date()
         
@@ -316,15 +324,13 @@ actor HybridBridgeService {
             if isTimeout {
                 consecutiveTimeouts[selectedModel, default: 0] += 1
                 
-                // If 2 consecutive timeouts, escalate
+                // If 2 consecutive timeouts, try fallback model
                 if consecutiveTimeouts[selectedModel] ?? 0 >= 2 {
-                    if let escalatedModel = await ModelRoutingEngine.shared.escalateModel(
-                        selectedModel,
-                        intentCluster: intentCluster
-                    ) {
-                        // Try escalated model
+                    let fallbackModel = ModelTierMap.fallbackModel()
+                    if fallbackModel != selectedModel {
+                        // Try fallback model
                         return try await makeCloudRequest(
-                            model: escalatedModel,
+                            model: fallbackModel,
                             prompt: buildPrompt(input: input, context: context),
                             apiKey: apiKey,
                             timeout: latencyThreshold * 3
@@ -353,13 +359,15 @@ actor HybridBridgeService {
         modelContext: ModelContext
     ) async throws -> String {
         // Select model using routing engine
-        let selectedModel = await ModelRoutingEngine.shared.selectModel(
+        let routingDecision = await ModelRoutingEngine.shared.selectModel(
+            input: input,
             intentCluster: intentCluster,
             confidence: confidenceScore,
-            preferredModel: preferredModel,
-            modelContext: modelContext,
-            latencyThreshold: latencyThreshold
+            messageLength: input.count,
+            userStyle: currentMessageStyle,
+            conversationId: nil
         )
+        let selectedModel = routingDecision.model
         
         // Build system prompt using OllamaBridgeService's method (we'll reuse the logic)
         // For now, we'll use a simplified version and delegate to OllamaBridgeService for prompt building
@@ -426,12 +434,11 @@ actor HybridBridgeService {
                 consecutiveTimeouts[selectedModel, default: 0] += 1
                 
                 if consecutiveTimeouts[selectedModel] ?? 0 >= 2 {
-                    if let escalatedModel = await ModelRoutingEngine.shared.escalateModel(
-                        selectedModel,
-                        intentCluster: intentCluster
-                    ) {
+                    let fallbackModel = ModelTierMap.fallbackModel()
+                    if fallbackModel != selectedModel {
+                        // Try fallback model
                         return try await makeCloudRequest(
-                            model: escalatedModel,
+                            model: fallbackModel,
                             prompt: fullPrompt,
                             apiKey: apiKey,
                             timeout: latencyThreshold * 3
@@ -448,12 +455,147 @@ actor HybridBridgeService {
         model: String,
         prompt: String,
         apiKey: String,
-        timeout: TimeInterval
+        timeout: TimeInterval,
+        images: [String]? = nil // Base64-encoded images for vision models
     ) async throws -> String {
-        guard let url = URL(string: "\(cloudBaseURL)/api/generate") else {
+        // Ollama Cloud API uses /chat/completions endpoint for vision models (OpenAI-compatible)
+        // Fallback to /chat if /chat/completions doesn't work
+        let endpoint = images != nil ? "/chat/completions" : "/generate"
+        guard let url = URL(string: "\(cloudBaseURL)\(endpoint)") else {
             throw HybridBridgeError.invalidURL
         }
         
+        // For vision models, use chat API format
+        if let images = images, !images.isEmpty {
+            struct ChatMessage: Codable {
+                let role: String
+                let content: String
+                let images: [String]?
+            }
+            
+            struct ChatRequest: Codable {
+                let model: String
+                let messages: [ChatMessage]
+                let stream: Bool
+            }
+            
+            struct ChatResponse: Codable {
+                let message: ChatMessage?
+                let response: String?
+                let done: Bool
+                let error: String?
+                // OpenAI-compatible format
+                let choices: [ChatChoice]?
+            }
+            
+            struct ChatChoice: Codable {
+                let message: ChatMessage?
+                let delta: ChatMessage?
+            }
+            
+            // Parse prompt to extract system prompt and user message
+            // Format: "SYSTEM_PROMPT\n\nUser: USER_MESSAGE\n\nAurora:"
+            var systemPromptText = ""
+            var userMessageText = prompt
+            
+            if let systemEndRange = prompt.range(of: "\n\nUser:") {
+                systemPromptText = String(prompt[..<systemEndRange.lowerBound])
+                let userStartIndex = systemEndRange.upperBound
+                if let auroraRange = prompt.range(of: "\n\nAurora:", range: userStartIndex..<prompt.endIndex) {
+                    userMessageText = String(prompt[userStartIndex..<auroraRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                } else {
+                    userMessageText = String(prompt[userStartIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            
+            var messages: [ChatMessage] = []
+            if !systemPromptText.isEmpty {
+                messages.append(ChatMessage(role: "system", content: systemPromptText, images: nil))
+            }
+            messages.append(ChatMessage(role: "user", content: userMessageText, images: images))
+            
+            let request = ChatRequest(model: model, messages: messages, stream: false)
+            
+            // Log request details for debugging
+            if let requestData = try? JSONEncoder().encode(request),
+               let requestJSON = String(data: requestData, encoding: .utf8) {
+                print("[HybridBridgeService] Request body (truncated): \(String(requestJSON.prefix(500)))...")
+            }
+            
+            var urlRequest = URLRequest(url: url)
+            urlRequest.httpMethod = "POST"
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            urlRequest.timeoutInterval = timeout
+            
+            do {
+                urlRequest.httpBody = try JSONEncoder().encode(request)
+            } catch {
+                throw HybridBridgeError.encodingError(error.localizedDescription)
+            }
+            
+            let startTime = Date()
+            print("[HybridBridgeService] Starting cloud request at \(startTime)")
+            
+            do {
+                let (data, response) = try await URLSession.shared.data(for: urlRequest)
+                let duration = Date().timeIntervalSince(startTime)
+                print("[HybridBridgeService] Cloud request completed in \(String(format: "%.2f", duration)) seconds")
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw HybridBridgeError.invalidResponse
+                }
+                
+                if httpResponse.statusCode == 401 {
+                    throw HybridBridgeError.authenticationFailed
+                }
+                
+                if httpResponse.statusCode != 200 {
+                    // Try to decode error response
+                    let responseBody = String(data: data, encoding: .utf8) ?? "Unable to decode response"
+                    print("[HybridBridgeService] Cloud API error response (HTTP \(httpResponse.statusCode)): \(responseBody)")
+                    
+                    if let errorData = try? JSONDecoder().decode(ChatResponse.self, from: data),
+                       let errorMsg = errorData.error {
+                        throw HybridBridgeError.apiError("HTTP \(httpResponse.statusCode): \(errorMsg)")
+                    }
+                    throw HybridBridgeError.apiError("HTTP \(httpResponse.statusCode): \(responseBody)")
+                }
+                
+                let decoder = JSONDecoder()
+                let chatResponse = try decoder.decode(ChatResponse.self, from: data)
+                
+                if let error = chatResponse.error {
+                    throw HybridBridgeError.apiError(error)
+                }
+                
+                // Extract response - try OpenAI-compatible format first, then Ollama format
+                var responseText = ""
+                if let choices = chatResponse.choices, let firstChoice = choices.first {
+                    responseText = firstChoice.message?.content ?? firstChoice.delta?.content ?? ""
+                }
+                if responseText.isEmpty {
+                    responseText = chatResponse.message?.content ?? chatResponse.response ?? ""
+                }
+                guard !responseText.isEmpty else {
+                    throw HybridBridgeError.emptyResponse
+                }
+                
+                return responseText
+            } catch let error as HybridBridgeError {
+                throw error
+            } catch let urlError as URLError {
+                if urlError.code == .timedOut {
+                    let duration = Date().timeIntervalSince(startTime)
+                    print("[HybridBridgeService] Request timed out after \(String(format: "%.2f", duration)) seconds (timeout was \(timeout)s)")
+                    throw HybridBridgeError.timeout
+                }
+                throw HybridBridgeError.networkError(urlError.localizedDescription)
+            } catch {
+                throw HybridBridgeError.unknown(error.localizedDescription)
+            }
+        } else {
+            // Non-vision requests use /generate endpoint
         struct CloudRequest: Codable {
             let model: String
             let prompt: String
@@ -516,6 +658,7 @@ actor HybridBridgeService {
             throw HybridBridgeError.networkError(urlError.localizedDescription)
         } catch {
             throw HybridBridgeError.unknown(error.localizedDescription)
+            }
         }
     }
     
@@ -743,6 +886,83 @@ actor HybridBridgeService {
             let role = message.role == "assistant" || message.role == "model" ? "Aurora" : "User"
             return "\(role): \(message.content)"
         }.joined(separator: "\n\n")
+    }
+    
+    // MARK: - Image Analysis
+    
+    func analyzeImage(
+        imageData: Data,
+        mimeType: String,
+        userPrompt: String?,
+        appContext: String,
+        payloadContext: AIPayloadContext? = nil,
+        conversationMessages: [ConversationMessage]? = nil,
+        currentMessageStyle: TypingStyle? = nil,
+        userStyleProfile: UserPreferences? = nil,
+        confidence: ConfidenceSnapshot? = nil,
+        apiKey: String?
+    ) async throws -> DocumentAnalysisResult {
+        // Use cloud model gemma3:latest for image analysis - NO FALLBACK
+        guard let apiKey = apiKey, !apiKey.isEmpty else {
+            print("[HybridBridgeService] Image analysis failed: No API key configured")
+            throw HybridBridgeError.authenticationFailed
+        }
+        
+        // Check airplane mode
+        let airplaneMode = UserDefaults.standard.bool(forKey: "com.kosmicapps.cloutmate.airplaneMode")
+        if airplaneMode {
+            print("[HybridBridgeService] Image analysis failed: Airplane mode is enabled")
+            throw HybridBridgeError.networkError("Image analysis requires cloud access. Please disable airplane mode.")
+        }
+        
+        print("[HybridBridgeService] Starting image analysis with gemma3:latest cloud model")
+        
+        // Encode image to base64
+        let base64Image = imageData.base64EncodedString()
+        print("[HybridBridgeService] Image encoded to base64 (\(base64Image.count) chars)")
+        
+        // Build prompt with context (reuse OllamaBridgeService's prompt building logic)
+        let promptText = userPrompt ?? "Analyze this image and describe what you see. Be detailed and conversational."
+        
+        // Build system prompt with app context
+        let systemPrompt = buildSystemPromptWithAppContext(
+            appContext: appContext,
+            payloadContext: payloadContext,
+            confidence: confidence,
+            currentMessageStyle: currentMessageStyle,
+            userStyleProfile: userStyleProfile
+        )
+        
+        // Build conversation history
+        let historyText = buildConversationHistoryText(from: conversationMessages ?? [])
+        
+        let fullPrompt = historyText.isEmpty ?
+            "\(systemPrompt)\n\nUser: \(promptText)\n\nAurora:" :
+            "\(systemPrompt)\n\n\(historyText)\n\nUser: \(promptText)\n\nAurora:"
+        
+        // Use gemma3:latest cloud model for vision tasks - NO FALLBACK
+        do {
+            print("[HybridBridgeService] Making cloud request to gemma3:latest with image")
+            print("[HybridBridgeService] Request URL: \(cloudBaseURL)/chat/completions")
+            
+            let response = try await makeCloudRequest(
+                model: "gemma3:latest",
+                prompt: fullPrompt,
+                apiKey: apiKey,
+                timeout: 600.0, // 10 minutes for image analysis (vision models can be slow)
+                images: [base64Image]
+            )
+            
+            print("[HybridBridgeService] Image analysis successful")
+            return DocumentAnalysisResult(
+                summary: response.trimmingCharacters(in: .whitespacesAndNewlines),
+                truncatedContext: false,
+                sourceModel: .ollama // Using .ollama for cloud Ollama API
+            )
+        } catch {
+            print("[HybridBridgeService] Image analysis failed: \(error.localizedDescription)")
+            throw error
+        }
     }
 }
 

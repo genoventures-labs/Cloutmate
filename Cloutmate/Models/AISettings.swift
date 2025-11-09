@@ -44,16 +44,12 @@ final class AISettings {
         }
     }
     
+    // Model selection is now automatic - users cannot change models manually
+    // Models are automatically selected based on task type (image/document vs regular chat)
     var selectedOllamaModel: String {
         get {
-            userDefaults.string(forKey: selectedOllamaModelKey) ?? "llama3.1"
-        }
-        set {
-            userDefaults.set(newValue, forKey: selectedOllamaModelKey)
-            // Notify OllamaBridgeService when model changes
-            Task {
-                await OllamaBridgeService.shared.setModel(newValue)
-            }
+            // Always return default model - actual model selection happens automatically in OllamaBridgeService
+            return "granite3.2:2b"
         }
     }
     
@@ -72,14 +68,15 @@ final class AISettings {
     
     var ollamaCloudAPIKey: String? {
         get {
-            userDefaults.string(forKey: ollamaCloudAPIKeyKey)
-        }
-        set {
-            if let key = newValue {
-                userDefaults.set(key, forKey: ollamaCloudAPIKeyKey)
-            } else {
-                userDefaults.removeObject(forKey: ollamaCloudAPIKeyKey)
+            // Load from Info.plist or environment variable (like Meta API keys)
+            if let envKey = ProcessInfo.processInfo.environment["OllamaCloudAPIKey"], !envKey.isEmpty {
+                return envKey
             }
+            if let bundle = Bundle.main.object(forInfoDictionaryKey: "OllamaCloudAPIKey") as? String, !bundle.isEmpty {
+                return bundle
+            }
+            // Fallback to UserDefaults for backward compatibility
+            return userDefaults.string(forKey: ollamaCloudAPIKeyKey)
         }
     }
     
@@ -103,6 +100,22 @@ final class AISettings {
         }
         set {
             userDefaults.set(newValue, forKey: latencyThresholdKey)
+        }
+    }
+    
+    var googleAPIKey: String? {
+        get {
+            // Load from Config.plist (same way as other services do it)
+            if let path = Bundle.main.path(forResource: "Config", ofType: "plist"),
+               let plist = NSDictionary(contentsOfFile: path),
+               let key = plist["GoogleAPIKey"] as? String, !key.isEmpty {
+                return key
+            }
+            // Fallback to environment variable
+            if let envKey = ProcessInfo.processInfo.environment["GoogleAPIKey"], !envKey.isEmpty {
+                return envKey
+            }
+            return nil
         }
     }
     

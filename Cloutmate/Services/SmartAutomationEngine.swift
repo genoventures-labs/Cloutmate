@@ -54,8 +54,41 @@ final class SmartAutomationEngine {
         await detectTimeBlockPatterns(modelContext: modelContext)
         await detectContentSchedulePatterns(modelContext: modelContext)
         await detectEmotionalCyclePatterns(modelContext: modelContext)
+        await detectArtifactPatterns(modelContext: modelContext)
         
         logger.info("Pattern detection complete")
+    }
+    
+    /// Detect artifacts that user creates repeatedly
+    private func detectArtifactPatterns(modelContext: ModelContext) async {
+        let descriptor = FetchDescriptor<Artifact>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        guard let artifacts = try? modelContext.fetch(descriptor), artifacts.count >= 3 else { return }
+        
+        // Group by format and day of week
+        let calendar = Calendar.current
+        var formatDayCounts: [String: [Int: Int]] = [:]
+        
+        for artifact in artifacts.prefix(50) {
+            let format = artifact.format.rawValue
+            let dayOfWeek = calendar.component(.weekday, from: artifact.createdAt)
+            
+            if formatDayCounts[format] == nil {
+                formatDayCounts[format] = [:]
+            }
+            formatDayCounts[format]?[dayOfWeek, default: 0] += 1
+        }
+        
+        // Detect patterns (same format on same day of week 3+ times)
+        for (format, dayCounts) in formatDayCounts {
+            for (day, count) in dayCounts where count >= 3 {
+                // Create pattern suggestion
+                let dayName = calendar.weekdaySymbols[day - 1]
+                logger.info("Detected artifact pattern: \(format) on \(dayName)")
+                // TODO: Create WorkflowPattern suggestion for template automation
+            }
+        }
     }
     
     /// Detect tasks that user creates repeatedly
@@ -337,6 +370,7 @@ final class SmartAutomationEngine {
         case .createNote:
             guard let title = action.parameters["title"] else { return }
             let note = CloutmateShared.Note(title: title)
+            note.author = .aurora
             modelContext.insert(note)
             
         case .startFocus:

@@ -24,6 +24,8 @@ struct TaskCardV2: View {
     @State private var isHovered = false
     @State private var showCompletionAnimation = false
     @State private var previousStatus: TaskStatus?
+    @State private var showFocusDurationSheet = false
+    @State private var focusDuration: TimeInterval = 1800 // Default 30 min
     
     private var isDueToday: Bool {
         guard let dueDate = task.dueDate else { return false }
@@ -53,8 +55,8 @@ struct TaskCardV2: View {
         VStack(spacing: 0) {
             // Main card content
             HStack(spacing: 12) {
-                // Progress pill indicator
-                ProgressPill(status: task.status)
+                // Progress pill indicator (interactive)
+                InteractiveProgressPill(task: task)
                 
                 // Task content
                 VStack(alignment: .leading, spacing: 6) {
@@ -68,10 +70,8 @@ struct TaskCardV2: View {
                         
                         Spacer()
                         
-                        // Due date badge
-                        if let dueDate = task.dueDate {
-                            DueDateBadge(date: dueDate, color: dueDateColor)
-                        }
+                        // Due date badge (interactive)
+                        InteractiveDueDateBadge(task: task, color: dueDateColor)
                     }
                     
                     // Expanded content
@@ -83,6 +83,17 @@ struct TaskCardV2: View {
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .lineLimit(nil)
+                            }
+                            
+                            // Interactive fields row
+                            HStack(spacing: 12) {
+                                // Status picker
+                                InteractiveStatusPicker(task: task)
+                                
+                                // Priority picker
+                                InteractivePriorityPicker(task: task)
+                                
+                                Spacer()
                             }
                             
                             // Project/Area
@@ -115,8 +126,8 @@ struct TaskCardV2: View {
                     }
                 }
                 
-                // Priority indicator
-                PriorityIndicator(priority: task.priority)
+                // Priority indicator (interactive)
+                InteractivePriorityIndicator(task: task)
             }
             .padding(16)
             .frame(minHeight: 56)
@@ -125,6 +136,9 @@ struct TaskCardV2: View {
                 withAnimation(GlassMotion.Easing.spring) {
                     isExpanded.toggle()
                 }
+            }
+            .onTapGesture(count: 2) {
+                onEdit()
             }
             .onHover { hovering in
                 withAnimation(GlassMotion.Easing.spring) {
@@ -173,6 +187,10 @@ struct TaskCardV2: View {
         .scaleEffect(isHovered ? 1.01 : 1.0)
         .animation(GlassMotion.Easing.spring, value: isHovered)
         .contextMenu {
+            Button("Start Focus Session") {
+                showFocusDurationSheet = true
+            }
+            Divider()
             Button("Edit") {
                 onEdit()
             }
@@ -187,6 +205,14 @@ struct TaskCardV2: View {
                 onDelete()
             }
         }
+        .sheet(isPresented: $showFocusDurationSheet) {
+            FocusDurationSheet(
+                selectedDuration: $focusDuration,
+                itemTitle: task.title,
+                itemType: "Task",
+                onStart: startFocusSession
+            )
+        }
         .onChange(of: task.status) { oldValue, newValue in
             if newValue == .done && oldValue != .done {
                 triggerCompletionAnimation()
@@ -198,6 +224,7 @@ struct TaskCardV2: View {
             Group {
                 if showCompletionAnimation {
                     CompletionAnimationOverlay()
+                        .allowsHitTesting(false)
                 }
             }
         )
@@ -230,38 +257,81 @@ struct TaskCardV2: View {
     private func triggerCompletionAnimation() {
         showCompletionAnimation = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            showCompletionAnimation = false
+            withAnimation {
+                showCompletionAnimation = false
+            }
         }
+    }
+    
+    private func startFocusSession() {
+        showFocusDurationSheet = false
+        
+        // Post notification with session parameters instead of starting immediately
+        let params = PendingFocusSessionParams(
+            objective: task.title,
+            plannedDuration: focusDuration,
+            targetObjectId: task.id,
+            targetObjectType: "task"
+        )
+        
+        // Post session parameters first (will be stored as pending)
+        NotificationCenter.default.post(
+            name: .startPendingFocusSession,
+            object: params
+        )
+        
+        // Switch to focus mode tab (session will start after switch completes)
+        NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
     }
 }
 
-// MARK: - Progress Pill
+// MARK: - Interactive Progress Pill
 
-struct ProgressPill: View {
-    let status: TaskStatus
+struct InteractiveProgressPill: View {
+    @Bindable var task: Task
+    @Environment(\.modelContext) private var modelContext
     
     @State private var pulsePhase: CGFloat = 0
     
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(pillColor.opacity(0.2))
-                .frame(width: 24, height: 24)
-            
-            Image(systemName: iconName)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(pillColor)
-            
-            if status == .inProgress {
+        Menu {
+            ForEach(TaskStatus.allCases, id: \.self) { status in
+                Button(action: {
+                    withAnimation(GlassMotion.Easing.spring) {
+                        task.status = status
+                    }
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Text(status.displayName)
+                        if task.status == status {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            ZStack {
                 Circle()
-                    .stroke(pillColor.opacity(0.4), lineWidth: 2)
-                    .frame(width: 28, height: 28)
-                    .scaleEffect(1.0 + pulsePhase * 0.3)
-                    .opacity(1.0 - pulsePhase)
+                    .fill(pillColor.opacity(0.2))
+                    .frame(width: 24, height: 24)
+                
+                Image(systemName: iconName)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(pillColor)
+                
+                if task.status == .inProgress {
+                    Circle()
+                        .stroke(pillColor.opacity(0.4), lineWidth: 2)
+                        .frame(width: 28, height: 28)
+                        .scaleEffect(1.0 + pulsePhase * 0.3)
+                        .opacity(1.0 - pulsePhase)
+                }
             }
         }
+        .buttonStyle(.plain)
         .onAppear {
-            if status == .inProgress {
+            if task.status == .inProgress {
                 withAnimation(
                     Animation.linear(duration: 1.5)
                         .repeatForever(autoreverses: false)
@@ -273,7 +343,7 @@ struct ProgressPill: View {
     }
     
     private var pillColor: Color {
-        switch status {
+        switch task.status {
         case .done:
             return .kosmicGreen
         case .inProgress:
@@ -286,7 +356,7 @@ struct ProgressPill: View {
     }
     
     private var iconName: String {
-        switch status {
+        switch task.status {
         case .done:
             return "checkmark"
         case .inProgress:
@@ -299,38 +369,235 @@ struct ProgressPill: View {
     }
 }
 
-// MARK: - Due Date Badge
+// MARK: - Interactive Due Date Badge
 
-struct DueDateBadge: View {
-    let date: Date
+struct InteractiveDueDateBadge: View {
+    @Bindable var task: Task
     let color: Color
+    @Environment(\.modelContext) private var modelContext
+    @State private var showDatePicker = false
     
     var body: some View {
-        Text(date, format: .dateTime.month(.abbreviated).day())
-            .font(.caption2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(color.opacity(0.15))
-            .foregroundColor(color)
-            .cornerRadius(6)
+        Menu {
+            Button("Set Due Date") {
+                if task.dueDate == nil {
+                    task.dueDate = Date()
+                    try? modelContext.save()
+                }
+                showDatePicker = true
+            }
+            
+            if task.dueDate != nil {
+                Button("Remove Due Date", role: .destructive) {
+                    task.dueDate = nil
+                    try? modelContext.save()
+                }
+            }
+            
+            Divider()
+            
+            Button("Today") {
+                task.dueDate = Calendar.current.startOfDay(for: Date())
+                try? modelContext.save()
+            }
+            
+            Button("Tomorrow") {
+                if let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) {
+                    task.dueDate = Calendar.current.startOfDay(for: tomorrow)
+                    try? modelContext.save()
+                }
+            }
+            
+            Button("Next Week") {
+                if let nextWeek = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: Date()) {
+                    task.dueDate = Calendar.current.startOfDay(for: nextWeek)
+                    try? modelContext.save()
+                }
+            }
+        } label: {
+            if let dueDate = task.dueDate {
+                Text(dueDate, format: .dateTime.month(.abbreviated).day())
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(color.opacity(0.15))
+                    .foregroundColor(color)
+                    .cornerRadius(6)
+            } else {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .padding(6)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(6)
+            }
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showDatePicker) {
+            DatePicker(
+                "Due Date",
+                selection: Binding(
+                    get: { task.dueDate ?? Date() },
+                    set: {
+                        task.dueDate = $0
+                        try? modelContext.save()
+                        showDatePicker = false
+                    }
+                ),
+                displayedComponents: .date
+            )
+            .datePickerStyle(.graphical)
+            .padding()
+        }
     }
 }
 
-// MARK: - Priority Indicator
+// MARK: - Interactive Priority Indicator
 
-struct PriorityIndicator: View {
-    let priority: TaskPriority
+struct InteractivePriorityIndicator: View {
+    @Bindable var task: Task
+    @Environment(\.modelContext) private var modelContext
     
     var body: some View {
-        Circle()
-            .fill(priority.color.opacity(0.2))
-            .frame(width: 8, height: 8)
-            .overlay(
+        Menu {
+            ForEach(TaskPriority.allCases, id: \.self) { priority in
+                Button(action: {
+                    withAnimation(GlassMotion.Easing.spring) {
+                        task.priority = priority
+                    }
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Circle()
+                            .fill(priority.color)
+                            .frame(width: 8, height: 8)
+                        Text(priority.displayName)
+                        if task.priority == priority {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            Circle()
+                .fill(task.priority.color.opacity(0.2))
+                .frame(width: 8, height: 8)
+                .overlay(
+                    Circle()
+                        .fill(task.priority.color)
+                        .frame(width: 4, height: 4)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Interactive Status Picker (for expanded view)
+
+struct InteractiveStatusPicker: View {
+    @Bindable var task: Task
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            ForEach(TaskStatus.allCases, id: \.self) { status in
+                Button(action: {
+                    withAnimation(GlassMotion.Easing.spring) {
+                        task.status = status
+                    }
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Text(status.displayName)
+                        if task.status == status {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
                 Circle()
-                    .fill(priority.color)
-                    .frame(width: 4, height: 4)
-            )
+                    .fill(statusColor.opacity(0.2))
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .fill(statusColor)
+                            .frame(width: 6, height: 6)
+                    )
+                Text(task.status.displayName)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var statusColor: Color {
+        switch task.status {
+        case .done:
+            return .kosmicGreen
+        case .inProgress:
+            return .orange
+        case .cancelled:
+            return .gray
+        case .todo:
+            return .kosmicBlue
+        }
+    }
+}
+
+// MARK: - Interactive Priority Picker (for expanded view)
+
+struct InteractivePriorityPicker: View {
+    @Bindable var task: Task
+    @Environment(\.modelContext) private var modelContext
+    
+    var body: some View {
+        Menu {
+            ForEach(TaskPriority.allCases, id: \.self) { priority in
+                Button(action: {
+                    withAnimation(GlassMotion.Easing.spring) {
+                        task.priority = priority
+                    }
+                    try? modelContext.save()
+                }) {
+                    HStack {
+                        Circle()
+                            .fill(priority.color)
+                            .frame(width: 8, height: 8)
+                        Text(priority.displayName)
+                        if task.priority == priority {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(task.priority.color.opacity(0.2))
+                    .frame(width: 12, height: 12)
+                    .overlay(
+                        Circle()
+                            .fill(task.priority.color)
+                            .frame(width: 6, height: 6)
+                    )
+                Text(task.priority.displayName)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(6)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -366,6 +633,7 @@ struct QuickActionButton: View {
 
 struct CompletionAnimationOverlay: View {
     @State private var gradientPhase: CGFloat = -1
+    @State private var opacity: Double = 0.8
     
     var body: some View {
         RoundedRectangle(cornerRadius: 12)
@@ -390,10 +658,16 @@ struct CompletionAnimationOverlay: View {
                         )
                     )
             )
-            .opacity(0.8)
+            .opacity(opacity)
             .onAppear {
                 withAnimation(.linear(duration: 0.6)) {
                     gradientPhase = 2
+                }
+                // Fade out after animation
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        opacity = 0
+                    }
                 }
             }
     }

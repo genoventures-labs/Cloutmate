@@ -72,6 +72,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - **Conversation Compression** - Automatically summarizes long conversations (>40 messages) to manage context window limits
 - **Cognitive Health** - Self-introspection metrics for memory density, stale entries, context pressure, and theme coherence
 - **Style Adaptation** - Dynamic tone matching based on user's typing patterns (formality, energy, punctuation, emoji usage)
+- **Self-Awareness Update System** - Aurora maintains awareness of her own updates and changes through a queryable changelog. She can mention updates naturally and answer questions about her capabilities without bloating the system prompt. When new versions are released, Aurora can announce patch notes like "Hey! I've got some updates since we last talked..."
 
 **Content Studio:**
 - Brainstorm content ideas
@@ -554,6 +555,47 @@ Aurora's knowledge is documented across these files:
 7. **PHASE7_ARTE_COMPLETE.md** - ARTE implementation
 8. **PHASE8_RITUALS_COMPLETE.md** - Focus Rituals & Smart Nudges implementation
 9. **PHASE9_COGNITION_COMPLETE.md** - Predictive Reflection Engine implementation
+
+---
+
+## Self-Awareness Update System
+
+Aurora maintains awareness of her own updates and changes through a structured changelog system. This allows her to:
+
+- **Query Recent Changes**: Aurora can query her changelog for updates by date, feature, or version
+- **Natural Mentions**: Aurora naturally mentions relevant updates when users ask about capabilities or new features
+- **Patch Notes**: When new versions are released, Aurora can announce patch notes like "Hey! I've got some updates since we last talked..."
+- **Reduced Prompt Bloat**: Only recent, user-facing changes (last 14 days) are injected into the system prompt, keeping it lightweight
+
+### How It Works
+
+**Changelog Storage:**
+- Changelog entries are stored in `Cloutmate/aurora_changelog.json`
+- Each entry includes: date, version, feature name, change type (added/modified/improved/fixed/deprecated), description, impact, user-facing flag, and tags
+
+**Integration:**
+- `AuroraChangelogService` loads and manages changelog entries
+- `OllamaBridgeService` queries the changelog and injects recent changes into Aurora's system prompt
+- Aurora can query her changelog programmatically using `queryChangelog()` method
+
+**Adding New Entries:**
+When adding new capabilities or making significant changes:
+1. Add a new entry to `aurora_changelog.json` with:
+   - Unique UUID
+   - ISO 8601 timestamp
+   - Version number
+   - Feature name and description
+   - Change type
+   - Impact description
+   - `userFacing: true` if Aurora should mention it
+   - Relevant tags for filtering
+2. Aurora will automatically include it in recent updates (last 14 days)
+3. Aurora can query it when users ask about capabilities
+
+**Patch Notes:**
+- Aurora compares current changelog entries to the last seen version/date
+- On first response after app launch, if new entries exist, Aurora formats them as patch notes
+- After announcing, Aurora marks the changelog as seen to prevent repeat announcements
 
 ---
 

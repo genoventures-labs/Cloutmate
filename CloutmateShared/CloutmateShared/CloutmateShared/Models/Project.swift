@@ -31,6 +31,7 @@ public final class Project {
     public var areaId: UUID?
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
+    public var archivedAt: Date?
     public var tags: [String] = []
     
     // Relationships (tracked via IDs for flexibility)

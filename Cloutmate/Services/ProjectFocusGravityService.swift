@@ -76,6 +76,16 @@ final class ProjectFocusGravityService {
         cache.removeAll()
     }
     
+    // MARK: - Reintegration
+    
+    func reintegrate(project: Project, modelContext: ModelContext) {
+        // Reset focus metrics cache
+        cache.removeValue(forKey: project.id)
+        // Recalculate priority score
+        // Update CPS ranking (PriorityEngine will handle this automatically)
+        logger.info("Reintegrated project \(project.id) - cache cleared")
+    }
+    
     // MARK: - Private Calculation Methods
     
     private func calculateMetrics(for project: Project, modelContext: ModelContext) -> ProjectFocusMetrics {

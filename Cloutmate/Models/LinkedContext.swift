@@ -15,6 +15,7 @@ enum ObjectType: String, Codable {
     case post
     case reminder
     case inboxItem
+    case focusSession
     
     var icon: String {
         switch self {
@@ -24,6 +25,7 @@ enum ObjectType: String, Codable {
         case .post: return "square.and.pencil"
         case .reminder: return "bell.fill"
         case .inboxItem: return "tray.fill"
+        case .focusSession: return "timer"
         }
     }
 }
@@ -35,6 +37,7 @@ struct LinkedContext: Codable {
     var linkedPosts: [UUID] = []
     var linkedReminders: [UUID] = []
     var linkedInboxItems: [UUID] = []
+    var linkedFocusSessions: [UUID] = []
     
     /// Maps mention text (e.g., "@projectname") to object type and ID
     /// Note: mentionMap is not Codable (tuples aren't Codable), so it's excluded from encoding/decoding
@@ -48,6 +51,7 @@ struct LinkedContext: Codable {
         case linkedPosts
         case linkedReminders
         case linkedInboxItems
+        case linkedFocusSessions
     }
     
     /// Add a linked object
@@ -79,6 +83,10 @@ struct LinkedContext: Codable {
             if !linkedInboxItems.contains(id) {
                 linkedInboxItems.append(id)
             }
+        case .focusSession:
+            if !linkedFocusSessions.contains(id) {
+                linkedFocusSessions.append(id)
+            }
         }
     }
     
@@ -100,6 +108,7 @@ struct LinkedContext: Codable {
         linkedPosts.removeAll()
         linkedReminders.removeAll()
         linkedInboxItems.removeAll()
+        linkedFocusSessions.removeAll()
         mentionMap.removeAll()
     }
     
@@ -110,7 +119,8 @@ struct LinkedContext: Codable {
                linkedNotes.isEmpty &&
                linkedPosts.isEmpty &&
                linkedReminders.isEmpty &&
-               linkedInboxItems.isEmpty
+               linkedInboxItems.isEmpty &&
+               linkedFocusSessions.isEmpty
     }
 }
 

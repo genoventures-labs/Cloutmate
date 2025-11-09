@@ -15,7 +15,13 @@ struct ProjectBoardView: View {
     let projects: [Project]
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let selectedProjectIDs: Set<UUID>
+    let onSelectionToggle: (Project) -> Void
     let onProjectSelected: (Project) -> Void
+    let onDuplicateProject: (Project) -> Void
+    let onArchiveProject: (Project) -> Void
+    let onDeleteProject: (Project) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -94,7 +100,13 @@ struct ProjectBoardView: View {
                         allProjects: projects,
                         tasks: tasks,
                         areas: areas,
+                        selectionMode: selectionMode,
+                        selectedProjectIDs: selectedProjectIDs,
+                        onSelectionToggle: onSelectionToggle,
                         onProjectSelected: onProjectSelected,
+                        onDuplicateProject: onDuplicateProject,
+                        onArchiveProject: onArchiveProject,
+                        onDeleteProject: onDeleteProject,
                         onProjectDropped: { project, newLane in
                             moveProject(project, to: newLane)
                         }
@@ -134,7 +146,13 @@ struct BoardLaneColumn: View {
     let allProjects: [Project]
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let selectedProjectIDs: Set<UUID>
+    let onSelectionToggle: (Project) -> Void
     let onProjectSelected: (Project) -> Void
+    let onDuplicateProject: (Project) -> Void
+    let onArchiveProject: (Project) -> Void
+    let onDeleteProject: (Project) -> Void
     let onProjectDropped: (Project, ProjectBoardView.BoardLane) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -201,11 +219,17 @@ struct BoardLaneColumn: View {
                             project: project,
                             tasks: tasks.filter { $0.projectId == project.id },
                             areas: areas,
-                            onTap: {
-                                onProjectSelected(project)
-                            }
+                            selectionMode: selectionMode,
+                            isSelected: selectedProjectIDs.contains(project.id),
+                            onSelectionToggle: { onSelectionToggle(project) },
+                            onTap: { onProjectSelected(project) },
+                            onDuplicate: { onDuplicateProject(project) },
+                            onArchive: { onArchiveProject(project) },
+                            onDelete: { onDeleteProject(project) }
                         )
-                        .draggable(ProjectDragInfo(projectID: project.id))
+                        .applyIf(!selectionMode) { view in
+                            view.draggable(ProjectDragInfo(projectID: project.id))
+                        }
                         .padding(.horizontal, 2)
                         .padding(.vertical, 1)
                     }
@@ -268,12 +292,19 @@ struct BoardLaneColumn: View {
 // MARK: - Board Project Card
 
 struct BoardProjectCard: View {
-    let project: Project
+    @Bindable var project: Project
     let tasks: [Task]
     let areas: [Area]
+    let selectionMode: Bool
+    let isSelected: Bool
+    let onSelectionToggle: () -> Void
     let onTap: () -> Void
+    let onDuplicate: () -> Void
+    let onArchive: () -> Void
+    let onDelete: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.modelContext) private var modelContext
     @State private var isHovered = false
     
     var body: some View {
@@ -291,7 +322,7 @@ struct BoardProjectCard: View {
             }
             
             HStack {
-                ProjectStatusBadge(status: project.status)
+                InteractiveProjectStatusBadge(project: project)
                 
                 if !tasks.isEmpty {
                     Text("\(tasks.filter { $0.status != .done }.count) tasks")
@@ -310,11 +341,50 @@ struct BoardProjectCard: View {
         .shadow(color: .black.opacity(isHovered ? 0.1 : 0.05), radius: isHovered ? 4 : 2, y: isHovered ? 2 : 1)
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.spring(duration: 0.3), value: isHovered)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: isSelected ? [.kosmicBlue, .kosmicPurple] : [.clear, .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: isSelected ? 2 : 0
+                )
+        )
+        .overlay(alignment: .topTrailing) {
+            if selectionMode {
+                SelectionIndicator(isSelected: isSelected)
+                    .padding(8)
+                    .onTapGesture {
+                        onSelectionToggle()
+                    }
+            }
+        }
         .onHover { hovering in
-            isHovered = hovering
+            isHovered = selectionMode ? false : hovering
         }
         .onTapGesture {
-            onTap()
+            if selectionMode {
+                onSelectionToggle()
+            } else {
+                onTap()
+            }
+        }
+        .contextMenu {
+            Button("Open") {
+                onTap()
+            }
+            Button("Duplicate", systemImage: "doc.on.doc") {
+                onDuplicate()
+            }
+            Button("Archive", systemImage: "archivebox") {
+                onArchive()
+            }
+            Divider()
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
         }
     }
 }

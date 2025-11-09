@@ -86,6 +86,47 @@ final class MigrationService {
         os_log("Migration timestamp stored: %f", log: .default, type: .info, migrationStartTime.timeIntervalSince1970)
     }
     
+    func applyAuthorMetadataAndCleanup(context: ModelContext) async throws {
+        let cutoff = Calendar.current.date(byAdding: .hour, value: -24, to: Date()) ?? Date()
+        let notes = try context.fetch(FetchDescriptor<CloutmateShared.Note>())
+        var deletedNotes = 0
+        
+        for note in notes {
+            let hasAISummaryTag = note.tags.contains { $0.compare("AI summary", options: .caseInsensitive) == .orderedSame }
+            
+            if hasAISummaryTag {
+                note.author = .aurora
+                continue
+            }
+
+            if note.author == .aurora {
+                continue
+            }
+            
+            let mostRecent = max(note.createdAt, note.updatedAt)
+            if mostRecent >= cutoff {
+                note.author = .user
+                continue
+            }
+            
+            context.delete(note)
+            deletedNotes += 1
+        }
+        
+        let journals = try context.fetch(FetchDescriptor<Journal>())
+        for journal in journals {
+            if let aiContent = journal.aiGeneratedContent,
+               !aiContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                journal.author = .aurora
+            } else if journal.author == .unknown {
+                journal.author = .user
+            }
+        }
+        
+        try context.save()
+        os_log("Author metadata migration complete. Deleted %d legacy notes.", log: .default, type: .info, deletedNotes)
+    }
+    
     // Rollback helper (for Settings → Advanced)
     func restoreDraftsFromInbox(context: ModelContext) async throws {
         let migrationDate = Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "phase3_migrated_date"))

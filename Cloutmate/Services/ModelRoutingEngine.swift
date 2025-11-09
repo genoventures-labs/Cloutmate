@@ -2,7 +2,7 @@
 //  ModelRoutingEngine.swift
 //  Cloutmate
 //
-//  Routing logic engine with confidence weighting and performance-based selection
+//  Routing logic engine with confidence weighting, casual detection, and per-model cooldown/stickiness
 //
 
 import Foundation
@@ -14,83 +14,101 @@ actor ModelRoutingEngine {
     // Cache last-used model per intent cluster
     private var clusterModelCache: [String: String] = [:]
     
+    // Per-model cooldown/stickiness tracking
+    // Tracks: model name -> remaining turns (2-3 turns of stickiness)
+    private var modelCooldown: [String: Int] = [:]
+    private let cooldownTurns = 3 // Keep same model for 3 turns after usage
+    
     private init() {}
     
-    /// Selects the best model for a given intent cluster and confidence
+    /// Selects the best model for a given input with casual detection and cooldown
     func selectModel(
+        input: String,
         intentCluster: String?,
         confidence: Double,
-        preferredModel: String?,
-        modelContext: ModelContext,
-        latencyThreshold: TimeInterval = 6.0
-    ) async -> String {
-        let clusterName = intentCluster ?? "default"
-        
-        // Check cache first
-        if let cachedModel = clusterModelCache[clusterName] {
-            return cachedModel
+        messageLength: Int,
+        userStyle: TypingStyle?,
+        conversationId: UUID?
+    ) async -> (model: String, useThinking: Bool) {
+        // Check for active cooldown first (model stickiness)
+        for (model, remainingTurns) in modelCooldown where remainingTurns > 0 {
+            // If a model has active cooldown, use it (maintains continuity)
+            let isCasualForCooldown = await CasualConversationDetector.shared.isCasual(
+                input: input,
+                intentCluster: intentCluster,
+                messageLength: messageLength,
+                userStyle: userStyle
+            )
+            let useThinking = ModelTierMap.supportsThinking(model) && !isCasualForCooldown
+            return (model, useThinking)
         }
         
-        // Check performance memory for best model
-        if let bestModel = await PerformanceMemoryService.shared.getBestModel(
-            for: clusterName,
-            modelContext: modelContext
-        ) {
-            clusterModelCache[clusterName] = bestModel
-            return bestModel
-        }
+        // No active cooldown - determine model based on conversation type
+        let isCasual = await CasualConversationDetector.shared.isCasual(
+            input: input,
+            intentCluster: intentCluster,
+            messageLength: messageLength,
+            userStyle: userStyle
+        )
         
-        // Use preferred model if provided and valid
-        if let preferred = preferredModel,
-           ModelTierMap.isCloudModel(preferred) {
-            clusterModelCache[clusterName] = preferred
-            return preferred
-        }
+        let needsDeepReasoning = await CasualConversationDetector.shared.requiresDeepReasoning(
+            input: input,
+            intentCluster: intentCluster,
+            messageLength: messageLength,
+            confidence: confidence
+        )
         
-        // Dynamic routing based on intent cluster
-        let models = ModelTierMap.modelsForIntentCluster(intentCluster)
+        let selectedModel: String
+        let useThinking: Bool
         
-        // Apply confidence-based selection
-        var selectedModel: String
-        
-        if confidence < 0.6 {
-            // Low confidence: use more capable model (first in list)
-            selectedModel = models.first ?? "gpt-oss:20b-cloud"
-        } else if confidence > 0.85 {
-            // High confidence: can use faster model (second in list if available)
-            selectedModel = models.count > 1 ? models[1] : models.first ?? "gpt-oss:20b-cloud"
+        if needsDeepReasoning {
+            // Deep reasoning → DeepSeek
+            selectedModel = ModelTierMap.deepReasoningModel()
+            useThinking = true
+        } else if isCasual {
+            // Casual → Qwen3, no thinking
+            selectedModel = ModelTierMap.defaultModel()
+            useThinking = false
         } else {
-            // Medium confidence: use primary model
-            selectedModel = models.first ?? "gpt-oss:20b-cloud"
+            // Non-casual → Qwen3 with thinking
+            selectedModel = ModelTierMap.defaultModel()
+            useThinking = true
         }
         
-        clusterModelCache[clusterName] = selectedModel
-        return selectedModel
+        // Activate cooldown for selected model
+        activateCooldown(for: selectedModel)
+        
+        return (selectedModel, useThinking)
     }
     
-    /// Escalates to a higher tier model
-    func escalateModel(_ currentModel: String, intentCluster: String?) -> String? {
-        // Clear cache for this cluster to force re-evaluation
-        if let cluster = intentCluster {
-            clusterModelCache.removeValue(forKey: cluster)
+    /// Activates cooldown/stickiness for a model
+    private func activateCooldown(for model: String) {
+        modelCooldown[model] = cooldownTurns
+        
+        // Decrement other models' cooldowns
+        for (key, value) in modelCooldown where key != model {
+            modelCooldown[key] = max(0, value - 1)
         }
         
-        return ModelTierMap.escalateModel(currentModel)
+        // Clean up expired cooldowns
+        modelCooldown = modelCooldown.filter { $0.value > 0 }
     }
     
-    /// Optimizes to a faster/lighter model
-    func optimizeModel(_ currentModel: String, intentCluster: String?) -> String? {
-        // Clear cache for this cluster to force re-evaluation
-        if let cluster = intentCluster {
-            clusterModelCache.removeValue(forKey: cluster)
-        }
-        
-        return ModelTierMap.optimizeModel(currentModel)
+    /// Records model usage (called after successful response)
+    func recordModelUsage(_ model: String) {
+        // Ensure cooldown is active
+        activateCooldown(for: model)
     }
     
-    /// Clears the cache (called on app restart or model availability changes)
+    /// Clears cooldown (called when conversation ends or topic changes significantly)
+    func clearCooldown() {
+        modelCooldown.removeAll()
+    }
+    
+    /// Clears cache (called on app restart or model availability changes)
     func clearCache() {
         clusterModelCache.removeAll()
+        modelCooldown.removeAll()
     }
     
     /// Clears cache for a specific intent cluster

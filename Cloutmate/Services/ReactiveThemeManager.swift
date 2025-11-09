@@ -386,5 +386,52 @@ final class ReactiveThemeManager: ObservableObject {
     var isTransitioning: Bool {
         interpolator.isTransitioning
     }
+    
+    // MARK: - Archive Integration
+    
+    /// Tone snapshot for timeline visualization
+    struct ToneSnapshot {
+        let date: Date
+        let tone: EmotionalState
+        let confidence: Double
+        let color: Color // From EmotionalPalette
+    }
+    
+    /// Get tone timeline for a date range
+    func toneTimeline(
+        for objectId: UUID,
+        startDate: Date,
+        endDate: Date,
+        modelContext: ModelContext
+    ) -> [ToneSnapshot] {
+        // Query StateTransitionHistory for time range
+        let descriptor = FetchDescriptor<StateTransitionHistory>(
+            predicate: #Predicate { transition in
+                transition.timestamp >= startDate && transition.timestamp <= endDate
+            },
+            sortBy: [SortDescriptor(\.timestamp, order: .forward)]
+        )
+        
+        guard let transitions = try? modelContext.fetch(descriptor) else {
+            return []
+        }
+        
+        // Map to tone snapshots with dates
+        return transitions.map { transition in
+            let palette = EmotionalPalette.palette(for: transition.toState)
+            let color = Color(
+                hue: palette.accentHue / 360.0,
+                saturation: palette.accentSaturation,
+                brightness: 0.7
+            )
+            
+            return ToneSnapshot(
+                date: transition.timestamp,
+                tone: transition.toState,
+                confidence: transition.confidence,
+                color: color
+            )
+        }
+    }
 }
 

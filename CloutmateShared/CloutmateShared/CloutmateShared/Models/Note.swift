@@ -19,6 +19,12 @@ public enum ResourceType: String, Codable, CaseIterable {
     case reference = "Reference"
 }
 
+public enum NoteAuthor: String, Codable, CaseIterable {
+    case user
+    case aurora
+    case unknown
+}
+
 @Model
 public final class Note {
     public var id: UUID = UUID()
@@ -33,9 +39,11 @@ public final class Note {
     public var type: ResourceType = ResourceType.note
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
+    public var archivedAt: Date?
     public var isArchived: Bool = false
     public var isPinned: Bool = false
     public var pinnedAt: Date?
+    public var authorRaw: String = NoteAuthor.user.rawValue
     
     public init(
         title: String,
@@ -59,8 +67,14 @@ public final class Note {
         self.isArchived = false
         self.isPinned = false
         self.pinnedAt = nil
+        self.authorRaw = NoteAuthor.user.rawValue
         self.backlinks = []
         self.highlights = []
+    }
+
+    public var author: NoteAuthor {
+        get { NoteAuthor(rawValue: authorRaw) ?? .user }
+        set { authorRaw = newValue.rawValue }
     }
 }
 

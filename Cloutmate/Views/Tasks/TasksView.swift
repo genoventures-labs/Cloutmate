@@ -77,6 +77,14 @@ struct TasksView: View {
         return sorted
     }
     
+    private var selectedTaskModels: [Task] {
+        filteredTasks.filter { selectedTasks.contains($0.id) }
+    }
+    
+    private var selectedTaskCount: Int {
+        selectedTaskModels.count
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             searchAndFiltersSection
@@ -107,6 +115,34 @@ struct TasksView: View {
             ClickableTableHeadersView(sortColumn: $sortColumn, sortOrder: $sortOrder)
                 .frame(height: 0)
         }
+        .overlay(alignment: .bottom) {
+            if !selectedTasks.isEmpty {
+                SelectionActionBar(
+                    count: selectedTaskCount,
+                    itemLabel: "task",
+                    actions: taskSelectionActions(),
+                    onCancel: { selectedTasks.removeAll() },
+                    onSelectAll: toggleSelectAll,
+                    totalItems: filteredTasks.count
+                )
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+            }
+        }
+    }
+    
+    private func taskSelectionActions() -> [SelectionActionBar.Action] {
+        [
+            .init(title: "Change Status", icon: "arrow.up.right.circle") {
+                showBulkStatusSheet = true
+            },
+            .init(title: "Change Priority", icon: "flag") {
+                showBulkPrioritySheet = true
+            },
+            .init(title: "Delete", icon: "trash", role: .danger) {
+                deleteSelectedTasks()
+            }
+        ]
     }
     
     private var searchAndFiltersSection: some View {
@@ -388,6 +424,17 @@ struct TasksView: View {
         selectedTasks.removeAll()
         try? modelContext.save()
     }
+    
+    private func toggleSelectAll() {
+        let allVisibleIDs = Set(filteredTasks.map(\.id))
+        if selectedTasks == allVisibleIDs {
+            // All selected, deselect all
+            selectedTasks.removeAll()
+        } else {
+            // Not all selected, select all visible
+            selectedTasks = allVisibleIDs
+        }
+    }
 }
 
 // MARK: - Badges
@@ -500,7 +547,16 @@ struct CreateTaskSheet: View {
                 VStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Task Title *", text: $title)
-                        TextField("Notes", text: $notes, axis: .vertical).lineLimit(3...6)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
+                        TextField("Notes", text: $notes, axis: .vertical)
+                            .lineLimit(3...6)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -556,6 +612,7 @@ struct CreateTaskSheet: View {
                 }
                 .padding()
             }
+            .background(Color(.windowBackgroundColor))
             .navigationTitle("New Task")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -602,7 +659,16 @@ struct EditTaskSheet: View {
                 VStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         TextField("Task Title *", text: $task.title)
-                        TextField("Notes", text: Binding(get: { task.notes ?? "" }, set: { task.notes = $0.isEmpty ? nil : $0 }), axis: .vertical).lineLimit(3...6)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
+                        TextField("Notes", text: Binding(get: { task.notes ?? "" }, set: { task.notes = $0.isEmpty ? nil : $0 }), axis: .vertical)
+                            .lineLimit(3...6)
+                            .textFieldStyle(.plain)
+                            .padding(12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(8)
                     }
                     
                     VStack(alignment: .leading, spacing: 8) {
@@ -661,6 +727,7 @@ struct EditTaskSheet: View {
                 }
                 .padding()
             }
+            .background(Color(.windowBackgroundColor))
             .navigationTitle("Edit Task")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -676,12 +743,14 @@ struct EditTaskSheet: View {
             }
         }
         .frame(width: 600, height: 520)
+        .background(Color(.windowBackgroundColor))
     }
 }
 
 // MARK: - Bulk Sheets
 struct BulkTaskStatusSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     let tasks: [CloutmateShared.Task]
     let onUpdate: (CloutmateShared.TaskStatus) -> Void
     
@@ -700,14 +769,15 @@ struct BulkTaskStatusSheet: View {
                             Text(status.displayName)
                             Spacer()
                         }
-                        .padding(10)
-                        .background(Color(.controlBackgroundColor))
+                        .padding(12)
+                        .background(.ultraThinMaterial)
                         .cornerRadius(8)
                     }.buttonStyle(.plain)
                 }
             }
             .padding()
-            .frame(width: 380, height: 240)
+            .background(glassColorSystem.backgroundColor())
+            .frame(width: 380, height: 280)
             .navigationTitle("Change Status")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } } }
         }
@@ -716,6 +786,7 @@ struct BulkTaskStatusSheet: View {
 
 struct BulkTaskPrioritySheet: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     let tasks: [CloutmateShared.Task]
     let onUpdate: (CloutmateShared.TaskPriority) -> Void
     
@@ -732,14 +803,15 @@ struct BulkTaskPrioritySheet: View {
                             Text(priority.displayName)
                             Spacer()
                         }
-                        .padding(10)
-                        .background(Color(.controlBackgroundColor))
+                        .padding(12)
+                        .background(.ultraThinMaterial)
                         .cornerRadius(8)
                     }.buttonStyle(.plain)
                 }
             }
             .padding()
-            .frame(width: 380, height: 240)
+            .background(glassColorSystem.backgroundColor())
+            .frame(width: 380, height: 280)
             .navigationTitle("Change Priority")
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Cancel") { dismiss() } } }
         }

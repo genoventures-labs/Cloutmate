@@ -423,6 +423,84 @@ final class AIReflectionService {
         return overview
     }
     
+    /// Reflects on journal entries for a time range
+    func reflectOnJournalEntries(
+        timeRange: AnalyticsTimeRange,
+        modelContext: ModelContext
+    ) async -> String {
+        logger.info("Reflecting on journal entries for \(timeRange.displayName)")
+        
+        let (startDate, endDate) = timeRange.dateRange
+        
+        // Fetch journal entries in range
+        let descriptor = FetchDescriptor<Journal>(
+            predicate: #Predicate { journal in
+                journal.entryDate >= startDate && journal.entryDate <= endDate && !journal.isArchived
+            },
+            sortBy: [SortDescriptor(\.entryDate, order: .reverse)]
+        )
+        
+        guard let entries = try? modelContext.fetch(descriptor) else {
+            return "Unable to load journal entries for reflection."
+        }
+        
+        guard !entries.isEmpty else {
+            return "No journal entries found for this period."
+        }
+        
+        // Analyze mood patterns
+        let moodCounts = Dictionary(grouping: entries, by: { $0.journalMood })
+            .mapValues { $0.count }
+        
+        let dominantMood = moodCounts.max(by: { $0.value < $1.value })?.key ?? .none
+        
+        // Build reflection
+        var reflection = "## Journal Reflection (\(timeRange.displayName))\n\n"
+        reflection += "**Total Entries:** \(entries.count)\n\n"
+        
+        if dominantMood != .none {
+            reflection += "**Dominant Mood:** \(dominantMood.rawValue) (\(moodCounts[dominantMood] ?? 0) entries)\n\n"
+        }
+        
+        // Analyze mood shifts
+        let halfCount = entries.count / 2
+        let earlyEntries = Array(entries.suffix(halfCount))
+        let recentEntries = Array(entries.prefix(halfCount))
+        
+        let earlyMood = earlyEntries.compactMap { $0.journalMood != .none ? $0.journalMood : nil }
+            .mostCommonElement()
+        let recentMood = recentEntries.compactMap { $0.journalMood != .none ? $0.journalMood : nil }
+            .mostCommonElement()
+        
+        if let early = earlyMood, let recent = recentMood, early != recent {
+            reflection += "**Mood Shift:** From \(early.rawValue) to \(recent.rawValue)\n\n"
+        }
+        
+        // Extract themes from content
+        let allContent = entries.map { $0.content }.joined(separator: " ")
+        let commonWords = extractCommonWords(from: allContent, limit: 5)
+        
+        if !commonWords.isEmpty {
+            reflection += "**Recurring Themes:** \(commonWords.joined(separator: ", "))\n\n"
+        }
+        
+        reflection += "Your journal entries show a pattern of reflection and growth. Continue capturing your thoughts and emotions to build deeper self-awareness."
+        
+        return reflection
+    }
+    
+    private func extractCommonWords(from text: String, limit: Int) -> [String] {
+        let words = text.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { $0.count > 4 }
+        
+        let wordCounts = Dictionary(grouping: words, by: { $0 })
+            .mapValues { $0.count }
+            .sorted { $0.value > $1.value }
+        
+        return Array(wordCounts.prefix(limit).map { $0.key })
+    }
+    
     // MARK: - Helper Functions
     
     private func determineCognitiveMode(from snapshot: AnalyticsSnapshot) -> (name: String, description: String, recommendation: String) {
@@ -473,6 +551,16 @@ final class AIReflectionService {
         } else {
             return "Challenging (\(String(format: "%.2f", valence)))"
         }
+    }
+}
+
+// MARK: - Array Extension for Most Common Element
+
+extension Array where Element: Hashable {
+    func mostCommonElement() -> Element? {
+        let counts = Dictionary(grouping: self, by: { $0 })
+            .mapValues { $0.count }
+        return counts.max(by: { $0.value < $1.value })?.key
     }
 }
 

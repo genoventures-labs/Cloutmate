@@ -208,6 +208,7 @@ struct VoiceRecordModal: View {
                 mood: .none,
                 tags: []
             )
+            journal.author = .user
             modelContext.insert(journal)
             try? modelContext.save()
         case .append(let existing):
