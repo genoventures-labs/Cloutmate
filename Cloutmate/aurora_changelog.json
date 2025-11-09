@@ -1,7 +1,22 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-09T21:15:31.644284Z",
+  "lastUpdated": "2025-11-09T21:21:03.411024Z",
   "entries": [
+    {
+      "id": "5e8a60ad-f25b-469b-9b69-318de88fe6df",
+      "date": "2025-11-09T21:21:03.408813Z",
+      "version": "0.8",
+      "feature": "Cognition Predictor",
+      "changeType": "improved",
+      "description": "Manually trigger a prediction cycle (useful for testing or immediate forecasts)",
+      "impact": "Enhances Cognition Predictor performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
     {
       "id": "311cdd30-e9ac-48a2-8d0e-25661b3839b5",
       "date": "2025-11-09T21:15:31.633131Z",
@@ -12,7 +27,7 @@
       "impact": "Enhances Cloutmate App performance or features",
       "userFacing": false,
       "tags": [],
-      "commitHash": null
+      "commitHash": "75d0d2bb9752d71a809061b3d49d3df7b4a358e4"
     },
     {
       "id": "aa4bba6f-96c4-4937-9e59-784969259f25",

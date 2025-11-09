@@ -18,6 +18,7 @@ private struct PredictionContext {
     let focusSessions: [FocusSession]
     let stateTransitions: [StateTransitionHistory]
     let nudges: [SmartNudge]
+    let modelContext: ModelContext
 }
 
 @MainActor
@@ -364,7 +365,8 @@ final class CognitionPredictor: ObservableObject {
             ritualCompletions: completions,
             focusSessions: sessions,
             stateTransitions: transitions,
-            nudges: nudges
+            nudges: nudges,
+            modelContext: modelContext
         )
     }
 
@@ -372,14 +374,20 @@ final class CognitionPredictor: ObservableObject {
         let horizonStart = Date()
         let horizonEnd = horizonStart.addingTimeInterval(currentInterval())
 
-        let fatigueMetrics = computeFatigueMetrics(context: context)
-        let focusStability = computeFocusStability(sessions: context.focusSessions)
-        let energyTrend = determineEnergyTrend(context: context)
-        let nextWindow = estimateNextFocusWindow(sessions: context.focusSessions)
+        // Fetch historical data for pattern learning
+        let historicalForecasts = fetchHistoricalForecasts(modelContext: context.modelContext, limit: 10)
+        let historicalSessions = fetchHistoricalSessions(modelContext: context.modelContext, days: 14)
+        let historicalAccuracy = calculateHistoricalAccuracy(forecasts: historicalForecasts)
+        
+        let fatigueMetrics = computeFatigueMetrics(context: context, historicalForecasts: historicalForecasts)
+        let focusStability = computeFocusStability(sessions: context.focusSessions, historicalSessions: historicalSessions)
+        let energyTrend = determineEnergyTrend(context: context, historicalForecasts: historicalForecasts)
+        let nextWindow = estimateNextFocusWindow(sessions: context.focusSessions, historicalSessions: historicalSessions)
         let confidence = computeConfidence(
             context: context,
             fatigueRisk: fatigueMetrics.fatigueRisk,
-            focusStability: focusStability
+            focusStability: focusStability,
+            historicalAccuracy: historicalAccuracy
         )
 
         var metadata: [String: String] = [:]
@@ -388,6 +396,9 @@ final class CognitionPredictor: ObservableObject {
         metadata["fatigueComponentFocus"] = String(format: "%.2f", fatigueMetrics.focusComponent)
         metadata["fatigueComponentArte"] = String(format: "%.2f", fatigueMetrics.arteComponent)
         metadata["nudgesLast48h"] = String(context.nudges.count)
+        metadata["historicalAccuracy"] = String(format: "%.2f", historicalAccuracy)
+        metadata["forecastsAnalyzed"] = String(historicalForecasts.count)
+        metadata["historicalSessionsUsed"] = String(historicalSessions.count)
 
         return FocusForecast(
             horizonStart: horizonStart,
@@ -402,8 +413,33 @@ final class CognitionPredictor: ObservableObject {
             metadata: metadata
         )
     }
+    
+    private func fetchHistoricalForecasts(modelContext: ModelContext, limit: Int = 10) -> [FocusForecast] {
+        var descriptor = FetchDescriptor<FocusForecast>(
+            sortBy: [SortDescriptor(\.generatedAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = limit
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    private func fetchHistoricalSessions(modelContext: ModelContext, days: Int = 14) -> [FocusSession] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: Date()) ?? Date()
+        let descriptor = FetchDescriptor<FocusSession>(
+            predicate: #Predicate { session in
+                session.startTime >= cutoff
+            },
+            sortBy: [SortDescriptor(\.startTime, order: .reverse)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+    
+    private func calculateHistoricalAccuracy(forecasts: [FocusForecast]) -> Double {
+        let forecastsWithAccuracy = forecasts.compactMap { $0.predictionAccuracy }
+        guard !forecastsWithAccuracy.isEmpty else { return 0.5 } // Default if no historical data
+        return forecastsWithAccuracy.reduce(0.0, +) / Double(forecastsWithAccuracy.count)
+    }
 
-    private func computeFatigueMetrics(context: PredictionContext) -> (fatigueRisk: Double, completionRate: Double, ritualComponent: Double, focusComponent: Double, arteComponent: Double, recommendedTone: EmotionalState) {
+    private func computeFatigueMetrics(context: PredictionContext, historicalForecasts: [FocusForecast]) -> (fatigueRisk: Double, completionRate: Double, ritualComponent: Double, focusComponent: Double, arteComponent: Double, recommendedTone: EmotionalState) {
         let completions = context.ritualCompletions
         let completedCount = completions.filter { $0.outcome == .completed }.count
         let completionRate = completions.isEmpty ? 1.0 : Double(completedCount) / Double(completions.count)
@@ -418,7 +454,17 @@ final class CognitionPredictor: ObservableObject {
         let fatiguedTransitions = context.stateTransitions.filter { $0.toState == .fatigued }
         let arteComponent = context.stateTransitions.isEmpty ? 0.0 : Double(fatiguedTransitions.count) / Double(context.stateTransitions.count)
 
-        let fatigueRisk = min(max(0.3 * ritualComponent + 0.4 * focusComponent + 0.3 * arteComponent, 0.0), 1.0)
+        // Incorporate historical fatigue patterns if available
+        var baseFatigueRisk = min(max(0.3 * ritualComponent + 0.4 * focusComponent + 0.3 * arteComponent, 0.0), 1.0)
+        
+        if !historicalForecasts.isEmpty {
+            let recentForecasts = Array(historicalForecasts.prefix(5))
+            let avgHistoricalFatigue = recentForecasts.map { $0.fatigueRisk }.reduce(0.0, +) / Double(recentForecasts.count)
+            // Blend current with historical (70% current, 30% historical)
+            baseFatigueRisk = (baseFatigueRisk * 0.7) + (avgHistoricalFatigue * 0.3)
+        }
+        
+        let fatigueRisk = min(max(baseFatigueRisk, 0.0), 1.0)
 
         let recommendedTone: EmotionalState
         if fatigueRisk > 0.65 {
@@ -434,8 +480,10 @@ final class CognitionPredictor: ObservableObject {
         return (fatigueRisk, completionRate, ritualComponent, focusComponent, arteComponent, recommendedTone)
     }
 
-    private func computeFocusStability(sessions: [FocusSession]) -> Double {
-        let completed = sessions.filter { $0.status == .completed }
+    private func computeFocusStability(sessions: [FocusSession], historicalSessions: [FocusSession]) -> Double {
+        // Combine recent and historical sessions for better stability calculation
+        let allSessions = sessions + historicalSessions
+        let completed = allSessions.filter { $0.status == .completed }
         guard !completed.isEmpty else { return 0.6 }
 
         let durations = completed.map { max($0.actualDuration, 1) }
@@ -450,7 +498,7 @@ final class CognitionPredictor: ObservableObject {
         return max(0.0, 1.0 - coefficientOfVariation)
     }
 
-    private func determineEnergyTrend(context: PredictionContext) -> FocusEnergyTrend {
+    private func determineEnergyTrend(context: PredictionContext, historicalForecasts: [FocusForecast]) -> FocusEnergyTrend {
         guard !context.focusSessions.isEmpty || !context.ritualCompletions.isEmpty else {
             return .stable
         }
@@ -469,24 +517,56 @@ final class CognitionPredictor: ObservableObject {
         let aggregateFirst = firstHalfScore + Double(firstHalfRituals)
         let aggregateSecond = secondHalfScore + Double(secondHalfRituals)
 
+        var trend: FocusEnergyTrend
         if aggregateSecond > aggregateFirst * 1.1 {
-            return .rising
+            trend = .rising
         } else if aggregateSecond < aggregateFirst * 0.9 {
-            return .declining
+            trend = .declining
         } else {
-            return .stable
+            trend = .stable
         }
+        
+        // Consider historical trends if available
+        if !historicalForecasts.isEmpty {
+            let recentTrends = Array(historicalForecasts.prefix(3))
+            let historicalTrendCounts = Dictionary(grouping: recentTrends.map { $0.energyTrend }, by: { $0 })
+                .mapValues { $0.count }
+            
+            if let dominantHistoricalTrend = historicalTrendCounts.max(by: { $0.value < $1.value })?.key {
+                // If historical trend is consistent, weight it slightly
+                if historicalTrendCounts[dominantHistoricalTrend] ?? 0 >= 2 {
+                    // Blend: 60% current, 40% historical
+                    if dominantHistoricalTrend == trend {
+                        return trend // Confirmed by both
+                    } else {
+                        // Historical suggests different trend, but current is primary
+                        return trend
+                    }
+                }
+            }
+        }
+        
+        return trend
     }
 
-    private func estimateNextFocusWindow(sessions: [FocusSession]) -> DateInterval? {
-        let completedSessions = sessions.filter { $0.status == .completed }
-        guard !completedSessions.isEmpty else { return nil }
+    private func estimateNextFocusWindow(sessions: [FocusSession], historicalSessions: [FocusSession]) -> DateInterval? {
+        // Use both recent and historical sessions for better pattern recognition
+        let completedRecent = sessions.filter { $0.status == .completed }
+        let completedHistorical = historicalSessions.filter { $0.status == .completed }
+        guard !completedRecent.isEmpty || !completedHistorical.isEmpty else { return nil }
 
         var hourBuckets: [Int: Double] = [:]
         let calendar = Calendar.current
-        for session in completedSessions {
+        
+        // Weight recent sessions more heavily (2x) than historical
+        for session in completedRecent {
             let hour = calendar.component(.hour, from: session.startTime)
-            hourBuckets[hour, default: 0.0] += session.actualDuration
+            hourBuckets[hour, default: 0.0] += session.actualDuration * 2.0 // Recent sessions weighted 2x
+        }
+        
+        for session in completedHistorical {
+            let hour = calendar.component(.hour, from: session.startTime)
+            hourBuckets[hour, default: 0.0] += session.actualDuration * 1.0 // Historical sessions weighted 1x
         }
 
         guard let bestHour = hourBuckets.max(by: { $0.value < $1.value })?.key else { return nil }
@@ -496,14 +576,24 @@ final class CognitionPredictor: ObservableObject {
         return DateInterval(start: nextStart, end: nextEnd)
     }
 
-    private func computeConfidence(context: PredictionContext, fatigueRisk: Double, focusStability: Double) -> Double {
+    private func computeConfidence(context: PredictionContext, fatigueRisk: Double, focusStability: Double, historicalAccuracy: Double) -> Double {
         var confidence = 0.55
         if context.ritualCompletions.count >= 6 { confidence += 0.1 }
         if context.focusSessions.count >= 4 { confidence += 0.1 }
         if context.stateTransitions.count >= 5 { confidence += 0.1 }
         if focusStability > 0.7 { confidence += 0.05 }
         if fatigueRisk < 0.3 { confidence += 0.05 }
-        return min(confidence, 0.95)
+        
+        // Incorporate historical accuracy: if past forecasts were accurate, increase confidence
+        if historicalAccuracy > 0.7 {
+            confidence += 0.1 // High historical accuracy boosts confidence
+        } else if historicalAccuracy > 0.5 {
+            confidence += 0.05 // Moderate historical accuracy
+        } else if historicalAccuracy < 0.3 {
+            confidence -= 0.05 // Low historical accuracy reduces confidence
+        }
+        
+        return min(max(confidence, 0.2), 0.95) // Clamp between 0.2 and 0.95
     }
 
     private func evaluateHistoricalForecasts(modelContext: ModelContext) {
@@ -519,9 +609,11 @@ final class CognitionPredictor: ObservableObject {
 
         for forecast in pastForecasts {
             let context = gatherContext(windowStart: forecast.horizonStart, windowEnd: forecast.horizonEnd, modelContext: modelContext)
-            let actualMetrics = computeFatigueMetrics(context: context)
+            // Use empty historical forecasts for evaluation (we're evaluating past forecasts, not using them)
+            let actualMetrics = computeFatigueMetrics(context: context, historicalForecasts: [])
             let accuracy = 1.0 - min(abs(actualMetrics.fatigueRisk - forecast.fatigueRisk), 1.0)
             forecast.recordAccuracy(accuracy)
+            logger.debug("Evaluated forecast \(forecast.id): predicted=\(String(format: "%.2f", forecast.fatigueRisk)), actual=\(String(format: "%.2f", actualMetrics.fatigueRisk)), accuracy=\(String(format: "%.2f", accuracy))")
         }
 
         do {
