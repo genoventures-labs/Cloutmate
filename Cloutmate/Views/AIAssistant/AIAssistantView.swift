@@ -428,6 +428,7 @@ struct AIAssistantView: View {
                 pendingImageAttachment: viewModel.pendingImageAttachment,
                 pendingDocumentAttachment: viewModel.pendingDocumentAttachment,
                 lastConfidenceScore: viewModel.messages.last(where: { $0.role == "assistant" })?.confidenceScore,
+                canRetry: viewModel.canRetry,
                 onSend: {
                     sendCurrentMessage(modelContext: modelContext)
                 },
@@ -442,6 +443,12 @@ struct AIAssistantView: View {
                 },
                 onClearDocument: {
                     viewModel.clearPendingDocument()
+                },
+                onStop: {
+                    viewModel.stopResponse(modelContext: modelContext)
+                },
+                onRetry: {
+                    viewModel.retryLastMessage(modelContext: modelContext)
                 }
             )
             

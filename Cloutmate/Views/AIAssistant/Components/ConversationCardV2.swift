@@ -12,12 +12,15 @@ import CloutmateShared
 struct ConversationCardV2: View {
     let conversation: AIConversation
     let isSelected: Bool
+    let isMultiSelectMode: Bool
+    let isMultiSelected: Bool
     let onTap: () -> Void
     let onRename: () -> Void
     let onDelete: () -> Void
     let onTogglePin: () -> Void
     let onRefreshSummary: () -> Void
     let onExportToDraft: () -> Void
+    let onToggleMultiSelect: () -> Void
     
     @State private var isHovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -60,6 +63,16 @@ struct ConversationCardV2: View {
     
     private var headerRow: some View {
         HStack(spacing: 8) {
+            // Checkbox for multi-select (always visible, but only functional when in multi-select mode)
+            Button(action: onToggleMultiSelect) {
+                Image(systemName: isMultiSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.caption)
+                    .foregroundColor(isMultiSelected ? .kosmicBlue : .secondary)
+                    .opacity(isMultiSelectMode ? 1.0 : 0.3)
+            }
+            .buttonStyle(.plain)
+            .help(isMultiSelectMode ? (isMultiSelected ? "Deselect" : "Select") : "Click to select multiple conversations")
+            
             if conversation.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.caption)
@@ -72,7 +85,7 @@ struct ConversationCardV2: View {
             
             Spacer()
             
-            if isHovered {
+            if isHovered && !isMultiSelectMode {
                 hoverActions
             }
         }
@@ -116,6 +129,15 @@ struct ConversationCardV2: View {
             }
             .buttonStyle(.plain)
             .help("Export to Drafts")
+            
+            Button(action: onDelete) {
+                Image(systemName: "trash")
+                    .font(.caption)
+                    .frame(width: 20, height: 20)
+                    .foregroundColor(.red)
+            }
+            .buttonStyle(.plain)
+            .help("Delete conversation")
         }
         .transition(.opacity.combined(with: .scale(scale: 0.8)))
     }
@@ -227,12 +249,15 @@ struct ConditionalFloatLiftEffect: ViewModifier {
     ConversationCardV2(
         conversation: conversation,
         isSelected: false,
+        isMultiSelectMode: false,
+        isMultiSelected: false,
         onTap: {},
         onRename: {},
         onDelete: {},
         onTogglePin: {},
         onRefreshSummary: {},
-        onExportToDraft: {}
+        onExportToDraft: {},
+        onToggleMultiSelect: {}
     )
     .padding()
     .environmentObject(GlassColorSystem())

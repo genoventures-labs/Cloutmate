@@ -40,6 +40,16 @@ final class AIAssistantViewModel {
     var pendingImageAttachment: ImageAttachmentService.ImageAttachment?
     var pendingDocumentAttachment: DocumentAttachmentService.DocumentAttachment?
     
+    // Task cancellation support
+    @ObservationIgnored private var currentResponseTask: _Concurrency.Task<Void, Never>?
+    
+    // Last message for retry functionality
+    @ObservationIgnored private var lastUserMessage: (text: String, image: ImageAttachmentService.ImageAttachment?, document: DocumentAttachmentService.DocumentAttachment?)?
+    
+    var canRetry: Bool {
+        lastUserMessage != nil
+    }
+    
     // Linked context from @ mentions
     var linkedContext: LinkedContext = LinkedContext()
     
@@ -299,7 +309,14 @@ final class AIAssistantViewModel {
         isLoading = true
         errorMessage = nil
         
-        _Concurrency.Task {
+        // Store last message for retry functionality
+        lastUserMessage = (text: trimmedText, image: resolvedImage, document: resolvedDocument)
+        
+        // Cancel any existing task
+        currentResponseTask?.cancel()
+        
+        // Create new task and store it
+        let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
             if let attachment = resolvedDocument {
                     updateActivity(.analyzingDocument)
                 await handleDocumentMessage(
@@ -375,6 +392,7 @@ final class AIAssistantViewModel {
                 styleProfile: stylePreferences
             )
         }
+        currentResponseTask = task
     }
     
     private func processMessage(
@@ -654,6 +672,7 @@ final class AIAssistantViewModel {
                 isLoading = false
                 currentActivity = .thinking // Reset activity when done
                 currentSourceModel = nil // Clear source model
+                currentResponseTask = nil // Clear task reference
                 
                 // Save after adding messages
                 try? modelContext.save()
@@ -700,6 +719,7 @@ final class AIAssistantViewModel {
                 isLoading = false
                 currentActivity = .thinking // Reset activity on error
                 currentSourceModel = nil // Clear source model
+                currentResponseTask = nil // Clear task reference
                 
                 // Save after adding error message
                 try? modelContext.save()
@@ -894,6 +914,7 @@ final class AIAssistantViewModel {
                 isLoading = false
                 currentActivity = .thinking // Reset activity when done
                 currentSourceModel = nil // Clear source model
+                currentResponseTask = nil // Clear task reference
                 try? modelContext.save()
             }
             if isFirstMessage, let conversation = currentConversation {
@@ -939,6 +960,7 @@ final class AIAssistantViewModel {
                 isLoading = false
                 currentActivity = .thinking // Reset activity on error
                 currentSourceModel = nil // Clear source model
+                currentResponseTask = nil // Clear task reference
                 try? modelContext.save()
             }
         }
@@ -3540,5 +3562,37 @@ final class AIAssistantViewModel {
             AIDebug.log("Failed to export to journal: \(error.localizedDescription)")
             return false
         }
+    }
+    
+    // MARK: - Stop & Retry
+    
+    func stopResponse(modelContext: ModelContext) {
+        currentResponseTask?.cancel()
+        currentResponseTask = nil
+        isLoading = false
+        currentActivity = .thinking
+        currentSourceModel = nil
+        
+        // Don't add any message - just stop silently
+    }
+    
+    func retryLastMessage(modelContext: ModelContext) {
+        guard let lastMessage = lastUserMessage else { return }
+        
+        // Remove the last assistant message if it exists (to retry)
+        if let lastAssistantMessage = messages.last, lastAssistantMessage.role == "assistant" {
+            messages.removeLast()
+            currentConversation?.messages?.removeLast()
+            modelContext.delete(lastAssistantMessage)
+            try? modelContext.save()
+        }
+        
+        // Re-send the last message
+        sendMessage(
+            lastMessage.text,
+            modelContext: modelContext,
+            image: lastMessage.image,
+            document: lastMessage.document
+        )
     }
 }

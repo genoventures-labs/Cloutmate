@@ -25,6 +25,7 @@ struct UnifiedFocusModeView: View {
     @State private var cpsScore: Double?
     @State private var currentTime = Date()
     @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @State private var lastRefreshTime = Date()
     
     // Objective drawer state
     @State private var objective: String = ""
@@ -95,8 +96,17 @@ struct UnifiedFocusModeView: View {
         .coordinateSpace(name: "scroll")
         .onReceive(timer) { _ in
             currentTime = Date()
+            // Periodically refresh to catch expired sessions (every 30 seconds)
+            if currentTime.timeIntervalSince(lastRefreshTime) >= 30 {
+                refreshData()
+                lastRefreshTime = currentTime
+            }
         }
         .task {
+            refreshData()
+        }
+        .onAppear {
+            // Refresh on appear to catch any stale sessions
             refreshData()
         }
         .onReceive(NotificationCenter.default.publisher(for: .focusSessionStatusChanged)) { _ in

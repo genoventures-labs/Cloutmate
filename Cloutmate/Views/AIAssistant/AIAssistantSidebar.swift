@@ -28,6 +28,7 @@ struct AIAssistantSidebar: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var themeManager = ReactiveThemeManager.shared
     @State private var cpsPriorities: [UUID] = []
+    @State private var selectedConversationIds: Set<UUID> = []
     
     // ARTE color accent based on emotional state
     private var arteAccentColor: Color {
@@ -119,6 +120,21 @@ struct AIAssistantSidebar: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 Spacer()
+                
+                if !selectedConversationIds.isEmpty {
+                    Button(action: {
+                        deleteSelectedConversations()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "trash")
+                            Text("Delete (\(selectedConversationIds.count))")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.trailing, 16)
+                }
             }
             
             Divider()
@@ -159,8 +175,19 @@ struct AIAssistantSidebar: View {
                             ConversationCardV2(
                                 conversation: conversation,
                                 isSelected: selectedConversation?.id == conversation.id,
+                                isMultiSelectMode: !selectedConversationIds.isEmpty,
+                                isMultiSelected: selectedConversationIds.contains(conversation.id),
                                 onTap: {
-                                    onConversationTap(conversation)
+                                    if !selectedConversationIds.isEmpty {
+                                        // Toggle selection in multi-select mode
+                                        if selectedConversationIds.contains(conversation.id) {
+                                            selectedConversationIds.remove(conversation.id)
+                                        } else {
+                                            selectedConversationIds.insert(conversation.id)
+                                        }
+                                    } else {
+                                        onConversationTap(conversation)
+                                    }
                                 },
                                 onRename: {
                                     onRename(conversation)
@@ -176,6 +203,13 @@ struct AIAssistantSidebar: View {
                                 },
                                 onExportToDraft: {
                                     onExportToDraft(conversation)
+                                },
+                                onToggleMultiSelect: {
+                                    if selectedConversationIds.contains(conversation.id) {
+                                        selectedConversationIds.remove(conversation.id)
+                                    } else {
+                                        selectedConversationIds.insert(conversation.id)
+                                    }
                                 }
                             )
                         }
@@ -188,6 +222,20 @@ struct AIAssistantSidebar: View {
         .background(.ultraThinMaterial)
         .onAppear {
             loadCPSPriorities()
+        }
+    }
+    
+    private func deleteSelectedConversations() {
+        let conversationsToDelete = conversations.filter { selectedConversationIds.contains($0.id) }
+        // Delete all conversations directly without showing alerts
+        for conversation in conversationsToDelete {
+            modelContext.delete(conversation)
+        }
+        do {
+            try modelContext.save()
+            selectedConversationIds.removeAll()
+        } catch {
+            print("Failed to delete conversations: \(error)")
         }
     }
     

@@ -23,6 +23,7 @@ final class FocusSessionService {
     // MARK: - Active Session Management
     
     /// Get the current active session, if any
+    /// Validates that the session is actually still active (not expired)
     func getActiveSession(modelContext: ModelContext) -> FocusSession? {
         let activeStatusRaw = "active"
         let descriptor = FetchDescriptor<FocusSession>(
@@ -30,7 +31,42 @@ final class FocusSessionService {
             sortBy: [SortDescriptor(\.startTime, order: .reverse)]
         )
         
-        return try? modelContext.fetch(descriptor).first
+        guard let session = try? modelContext.fetch(descriptor).first else {
+            return nil
+        }
+        
+        // Validate session is actually still active
+        // Auto-abandon sessions that are way past their planned duration (more than 2x planned duration or 24 hours old)
+        let elapsed = session.elapsedTime
+        let maxAllowedDuration = max(session.plannedDuration * 2, 86400) // 2x planned or 24 hours, whichever is longer
+        let isExpired = elapsed > maxAllowedDuration
+        
+        if isExpired {
+            // Auto-abandon expired sessions
+            logger.info("Auto-abandoning expired focus session: \(session.id.uuidString) (elapsed: \(elapsed / 60) min, planned: \(session.plannedDuration / 60) min)")
+            session.status = .abandoned
+            session.endTime = Date()
+            session.actualDuration = session.elapsedTime
+            session.completed = false
+            session.notes = "Auto-abandoned: Session expired (exceeded planned duration)"
+            
+            do {
+                try modelContext.save()
+                NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
+                NotificationCenter.default.post(name: .focusSessionEnded, object: session)
+                
+                // Deactivate Flow Hold if active
+                if FlowHoldService.shared.isActive {
+                    FlowHoldService.shared.deactivateFlowHold()
+                }
+            } catch {
+                logger.error("Failed to auto-abandon expired session: \(error.localizedDescription)")
+            }
+            
+            return nil
+        }
+        
+        return session
     }
     
     /// Start a new focus session

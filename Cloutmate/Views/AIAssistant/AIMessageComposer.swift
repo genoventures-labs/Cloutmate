@@ -21,12 +21,15 @@ struct AIMessageComposer: View {
     var pendingImageAttachment: ImageAttachmentService.ImageAttachment?
     var pendingDocumentAttachment: DocumentAttachmentService.DocumentAttachment?
     var lastConfidenceScore: Double? // Confidence score from last assistant message
+    var canRetry: Bool // Whether retry is available
     
     let onSend: () -> Void
     let onAttachImage: () -> Void
     let onAttachDocument: () -> Void
     let onClearImage: () -> Void
     let onClearDocument: () -> Void
+    let onStop: () -> Void
+    let onRetry: () -> Void
     
     @Environment(\.glassTier) private var glassTier
     @Environment(\.modelContext) private var modelContext
@@ -198,19 +201,54 @@ struct AIMessageComposer: View {
                     )
                 }
                 
-                    // Send button
+                    // Send button or Stop/Retry buttons
                 let hasAttachment = pendingImageAttachment != nil || pendingDocumentAttachment != nil
                 let canSend = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || hasAttachment
                 
+                if isLoading {
+                    // Stop button when loading
+                    GlassButton(
+                        icon: "stop.circle.fill",
+                        style: .iconOnly,
+                        tintColor: .red,
+                        action: onStop
+                    )
+                    .frame(width: 32, height: 32)
+                    .help("Stop response")
+                } else if canRetry {
+                    // Retry button when available
+                    HStack(spacing: 8) {
+                        GlassButton(
+                            icon: "arrow.clockwise.circle.fill",
+                            style: .iconOnly,
+                            tintColor: .kosmicBlue,
+                            action: onRetry
+                        )
+                        .frame(width: 32, height: 32)
+                        .help("Retry last message")
+                        
+                        if canSend {
+                            GlassButton(
+                                icon: "arrow.up.circle.fill",
+                                style: .iconOnly,
+                                tintColor: .kosmicBlue,
+                                action: onSend
+                            )
+                            .frame(width: 32, height: 32)
+                            .help("Send message")
+                        }
+                    }
+                } else if canSend {
+                    // Regular send button
                     GlassButton(
                         icon: "arrow.up.circle.fill",
                         style: .iconOnly,
-                        tintColor: canSend ? .kosmicBlue : nil,
+                        tintColor: .kosmicBlue,
                         action: onSend
                     )
                     .frame(width: 32, height: 32)
-                .disabled(!canSend || isRecording || isLoading)
-                .help("Send message")
+                    .help("Send message")
+                }
             }
             
             // Confidence Preview Meter (shows last response confidence or input quality estimate)
@@ -302,11 +340,14 @@ struct AIMessageComposer: View {
         pendingImageAttachment: nil,
         pendingDocumentAttachment: nil,
         lastConfidenceScore: nil,
+        canRetry: false,
         onSend: {},
         onAttachImage: {},
         onAttachDocument: {},
         onClearImage: {},
-        onClearDocument: {}
+        onClearDocument: {},
+        onStop: {},
+        onRetry: {}
     )
     .environment(\.glassTier, .contentCard)
 }

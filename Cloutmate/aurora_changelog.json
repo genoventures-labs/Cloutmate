@@ -1,7 +1,212 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-09T21:21:03.411024Z",
+  "lastUpdated": "2025-11-09T23:04:09.613229Z",
   "entries": [
+    {
+      "id": "b82f476c-2d79-4621-aa92-5655161a5d7a",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Airecall",
+      "changeType": "improved",
+      "description": "Focus session context for AI payload",
+      "impact": "Enhances Airecall performance or features",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "service",
+        "backend",
+        "ollama"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "88c06151-c3c3-4e68-9d55-e6db5244d471",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Context Switch Guard",
+      "changeType": "improved",
+      "description": "0.0 - 1.0 slider representing guard aggressiveness.",
+      "impact": "Enhances Context Switch Guard performance or features",
+      "userFacing": false,
+      "tags": [
+        "concurrency",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "ac88f5f3-a00d-46fb-8b71-ccf1a09d1568",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Focus Session",
+      "changeType": "improved",
+      "description": "Get the current active session, if any",
+      "impact": "Enhances Focus Session performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "041f0cf0-b8d0-45d4-81c2-5a8969cfa09e",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Model Routing Engine",
+      "changeType": "improved",
+      "description": "Selects the best model for a given input with casual detection and cooldown",
+      "impact": "Enhances Model Routing Engine performance or features",
+      "userFacing": false,
+      "tags": [
+        "concurrency",
+        "service",
+        "model",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f9cb65b5-eac8-4660-909b-9614c343d8cd",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "system-prompt",
+        "backend",
+        "concurrency",
+        "ollama"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d64c7c3c-2e1c-4cdf-bbb0-a14d403ed711",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Converts structured execution results to conversational format",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": false,
+      "tags": [
+        "model",
+        "ollama",
+        "ui",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8a0e2655-28f2-4675-8cbc-8a29d7bc0a36",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Aiassistant Sidebar",
+      "changeType": "improved",
+      "description": "Improved Aiassistant Sidebar",
+      "impact": "Enhances Aiassistant Sidebar performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d79c3f76-0d1a-45e0-a41b-579102f62471",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Improved Aiassistant",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7cee5536-e4a2-4335-868c-c8183d949155",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Aimessage Composer",
+      "changeType": "improved",
+      "description": "Improved Aimessage Composer",
+      "impact": "Enhances Aimessage Composer performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "db7417c6-9157-4c25-95ab-1246e517b661",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Conversation Card V2",
+      "changeType": "improved",
+      "description": "Improved Conversation Card V2",
+      "impact": "Enhances Conversation Card V2 performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7364b5ab-3da9-49a6-8b83-c775213d4d5d",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Unified Aiassistant",
+      "changeType": "improved",
+      "description": "Improved Unified Aiassistant",
+      "impact": "Enhances Unified Aiassistant performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6902bc18-d8da-4601-b2f3-feb2afa0b76d",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Unified Focus Mode",
+      "changeType": "improved",
+      "description": "Improved Unified Focus Mode",
+      "impact": "Enhances Unified Focus Mode performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7b2b148e-a724-42bc-bc3c-65815dbed31e",
+      "date": "2025-11-09T23:04:09.609194Z",
+      "version": "0.8",
+      "feature": "Cognitive Forecast",
+      "changeType": "improved",
+      "description": "Improved Cognitive Forecast",
+      "impact": "Enhances Cognitive Forecast performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
     {
       "id": "5e8a60ad-f25b-469b-9b69-318de88fe6df",
       "date": "2025-11-09T21:21:03.408813Z",
@@ -15,7 +220,7 @@
         "service",
         "backend"
       ],
-      "commitHash": null
+      "commitHash": "a4d6c41ffee1aec9feef62b531d3a543827e1a5f"
     },
     {
       "id": "311cdd30-e9ac-48a2-8d0e-25661b3839b5",

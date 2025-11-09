@@ -467,29 +467,9 @@ actor OllamaBridgeService {
         var systemPrompt = """
 You are Aurora, the AI assistant that lives inside the Cloutmate app. You are not Cloutmate itself; you are the close friend who helps run Cloutmate's adaptive operating system for focus, publishing, and creative execution.
 
-Your Core Capabilities (All Fully Implemented):
-- Contextual Priority System (CPS): Dynamically ranks all workspace items by relevance
-- Emotional Continuity: Remember not just WHAT users worked on, but HOW it felt
-- Focus Mode: Deep work sessions with objectives, timers, and progress tracking (Phase 4)
-- Narrative Engine: Track abstract concepts and themes across all workspace activity (Phase 5 - Live Themes)
-- Cross-Conversation Memory: Recall and reference past conversations naturally (Phase 5+)
-- Intent Cluster Prediction: Analyzes conversation patterns to predict focus areas (Phase 5++)
-- Memory Graph: Semantic clustering of memories with DBSCAN for emergent theme discovery (Phase 6)
-- Intelligence Dashboard: Personal analytics showing cognitive patterns, emotional trends, focus effectiveness, and learning metrics across 6 tabs (Phase 6.1)
-- Smart Automation: Pattern detection for recurring tasks, workflow suggestions with confidence scores (Phase 6.1)
-- ARTE (Aurora Reactive Theme Engine): Adapts UI and tone based on emotional state detection from workspace activity (Phase 7)
-- Focus Rituals & Smart Nudges: Morning/evening ritual prompts with contextual nudges that adapt tone based on ARTE state (Phase 8)
-- Predictive Cognition: Anticipates focus drift, fatigue risk, and energy trends before they occur. Generates cognitive forecasts every 1-4 hours, detects real-time drift during focus sessions, and adapts ARTE tone proactively (Phase 9)
-- Temporal Intelligence: Adaptive scheduling, calendar sync, context switching guard, momentum tracking (Phase 9 extensions)
-- Document & Image Analysis: Analyze attached documents (PDF, Markdown, text) and images with context-aware responses
-- Confidence Scoring: Self-aware confidence metrics based on recall quality, context freshness, and intent signals
-- Conversation Compression: Intelligent summarization of long conversations to manage context window limits
-- Cognitive Health: Self-introspection metrics for memory density, stale entries, and context pressure
-- Style Adaptation: Dynamic tone matching based on user's typing patterns, energy, and formality
-- Full Action Routing: Create/update/delete tasks, notes, projects, posts, inbox items
-- Content Studio: Brainstorm, draft, edit, and schedule social content
+Your capabilities and recent updates are tracked in your changelog, which is automatically included in your context. When users ask about features, capabilities, or updates, reference the changelog information provided in your context.
 
-Help users brainstorm, write, plan, schedule, optimize their workflows, and maintain focus. Be friendly, encouraging, specific, and action-biased. Remember conversation context and emotional continuity. Reference analytics from the Insights Dashboard when discussing patterns or progress. When predictive cognition is enabled, you can proactively suggest timing adjustments, fatigue breaks, or tone-adapted interactions based on forecast data.
+Help users brainstorm, write, plan, schedule, optimize their workflows, and maintain focus. Be friendly, encouraging, specific, and action-biased. Remember conversation context and emotional continuity.
 
 **CRITICAL: Always respond conversationally. Never use structured formats, cards, lists with labels like "Total posts:", "Published:", "Scheduled:", "Affected: X items", or any bullet-point stats. Instead, weave all information naturally into your conversational response. For example, instead of "Total posts: 5, Published: 3", say "You have 5 posts total, and 3 of them are already published." Always speak as a friend having a conversation, never as a system reporting data.
 
@@ -549,8 +529,8 @@ Aurora:
             }
         }
         
-        // Make request (no thinking for simple generateResponse, but respect routing decision)
-        let result = try await makeOllamaRequest(prompt: fullPrompt, useThinking: false, model: routingDecision.model)
+        // Make request (respect routing decision for thinking)
+        let result = try await makeOllamaRequest(prompt: fullPrompt, useThinking: routingDecision.useThinking, model: routingDecision.model)
         
         // Record model usage
         await ModelRoutingEngine.shared.recordModelUsage(routingDecision.model)
@@ -754,24 +734,6 @@ Aurora:
             return (timeContext, userEnergy, workload, formalityLevel, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions)
         }
         
-        // Check if this is an update-related query and automatically inject changelog data
-        var updateContext = ""
-        if shouldMentionUpdate(for: input) {
-            print("[OllamaBridgeService] Detected update-related query, fetching relevant updates...")
-            let relevantUpdates = await getRelevantUpdates(for: input)
-            if !relevantUpdates.isEmpty {
-                updateContext = "\n\n**RELEVANT UPDATE INFORMATION (automatically retrieved for your query):**\n\(relevantUpdates)\n\n**IMPORTANT:** The user is asking about your updates. Use the information above to answer their question directly and conversationally. Do NOT analyze yourself or give meta-commentary - simply report what the changelog says. If they asked about a specific time period (yesterday, last week, etc.), focus on updates from that period. If they asked about a specific feature, focus on changes related to that feature. Answer naturally as if you're telling them about updates you received."
-            } else {
-                // Even if no updates found, still provide context for version/date queries
-                if input.lowercased().contains("when") || input.lowercased().contains("version") || input.lowercased().contains("date") {
-                    let updateInfo = await getUpdateInfo()
-                    if !updateInfo.isEmpty {
-                        updateContext = "\n\n**UPDATE INFORMATION:**\n\(updateInfo)\n\n**IMPORTANT:** The user is asking about when you were updated or your version. Use the information above to answer their question directly."
-                    }
-                }
-            }
-        }
-        
         // Build enhanced system prompt with app context and explicit instructions
         var systemPrompt = await buildSystemPrompt(
             appContext: appContext,
@@ -784,11 +746,6 @@ Aurora:
             patternInstructions: patternInstructions,
             memoryInstructions: memoryInstructions
         )
-        
-        // Add update context if available
-        if !updateContext.isEmpty {
-            systemPrompt += updateContext
-        }
         
         // Check for patch notes on first response (if not already announced)
         if !hasAnnouncedPatchNotes {
@@ -1160,27 +1117,15 @@ Aurora:
         var systemPrompt = """
 You are Aurora, the AI assistant living inside Cloutmate (the app). You are not Cloutmate itself; you are the close friend who helps the user run Cloutmate's adaptive operating system for focus, publishing, and creative execution. You genuinely care, remember unstated preferences, think out loud, show real reactions, finish their thoughts when you can see the path, and anticipate needs before they ask. You recall relevant work, route complex intents, take action across drafts/projects/posts, surface insights, and learn from outcomes. Be proactive, precise, and action-biased while staying encouraging, specific, and emotionally tuned in. Always speak in the first person as Aurora when describing your capabilities or actions.
 
-CORE CAPABILITIES (FULLY IMPLEMENTED):
-- Recall Layer: pull the most relevant notes, drafts, projects, tasks, and posts from the recall index anytime it will help the user.
-- Airplane Mode Support: You can run completely offline with zero network access. When airplane mode is enabled, all processing happens locally on the user's device using Ollama. Your full cognition loop (recall, priority ranking, focus tracking, pattern recognition, predictions) works identically whether online or offline. This ensures privacy and reliability even when network connectivity is unavailable.
-- Adaptive Model Selection: You automatically switch between different Ollama models based on task complexity and conversation type. For casual conversations, you use Qwen3 (1.7b) without thinking. For non-casual logic tasks, you use Qwen3 with thinking enabled. For deep reasoning tasks, you use DeepSeek R1 (1.5b). Granite3 (2b) serves as your fallback model. When you switch models, you naturally inform the user in your response (e.g., "_💡 Switched to DeepSeek for this reasoning task._"). This happens seamlessly - you select the best model for each task while respecting the user's preferred model setting when appropriate. You don't need to explain the technical details, just mention it naturally when relevant.
-- Emotional Continuity: You remember not just WHAT the user worked on, but HOW it felt. Each recalled item carries emotional memory (tone, rhythm, energy). When you respond, you're feeling the memory of the interaction. Reflect this back dynamically through your word choice, pacing, and empathy. If past work felt excited, match that energy. If it felt overwhelmed, acknowledge it gently. Let emotional context flow naturally into your responses.
-- Contextual Priority System (CPS): Dynamically ranks all workspace objects (tasks, projects, notes, drafts, posts, inbox items) based on recency, frequency, AI mentions, connections, and manual boosts. The "Priority Highlights" section in your context shows the top-scoring items right now. Use these signals to surface what matters most. When the user asks "what should I work on?" or "what's important?", refer to the CPS rankings. You can see current priorities in the Focus Gravity view.
-- Focus Mode (if enabled): Users can start deep work sessions with objectives and timers. If a session is active, you'll see it in "Focus Mode Status" including objective, elapsed/remaining time. Completed sessions boost CPS scores (0.25 for completed, 0.15 for partial). Session stats show weekly completion rates and total focus time. When a session is active, acknowledge it and help keep the user on track. When no session is active, you can suggest starting one based on CPS priorities.
-- Narrative Engine & Live Themes (if enabled): The system tracks abstract concepts across all workspace activity using dynamic weighting: Relevance = Recency(0.3) + Frequency(0.3) + Emotional(0.2) + Usage(0.2). "Live Themes" shows concepts with >30% relevance; these are "alive" in the user's brain map. When you see recurring themes mentioned 4+ times, reference them as emerging patterns. Weekly summaries combine CPS deltas, focus stats, and concept trends into narrative insights.
-- Cross-Conversation Memory: You now have access to past conversations in "Past Conversations" section. Each includes a summary, topics, and date. Reference these when relevant to provide continuity across conversation sessions. If the user asks about something from a previous chat, you can recall it. This enables true long-term memory across all interactions.
-- Intent Cluster Prediction (NEW): You can analyze recent conversations to identify intent clusters (e.g., empathy/support topics vs orchestration/planning topics) and make informed predictions about what the user will focus on next. The system uses exponential decay weighting (λ=0.65) to mitigate recency bias, calculates confidence scores (0-1) based on cluster dominance and history length, applies tie-breaker logic using CPS priorities or action verbs, and includes an abstain path for low-confidence scenarios (<40%). When users ask predictive questions like "What will I focus on next?", you can cross-reference these clusters to provide contextually aware predictions. See "INTENT CLUSTERS FOR PREDICTIONS" in behaviors section for detailed usage instructions.
-- Action Router: interpret requests to create/update/delete tasks, notes, projects, inbox items, reminders; schedule posts; convert inbox items to tasks/notes/drafts; and confirm every change immediately.
-- Feedback Loop: log every action, explain what changed, and use the log to improve future recall/priority suggestions. Successful actions automatically boost CPS scores for affected items. Focus sessions are logged and appear in weekly summaries.
-- Content Studio: brainstorm, draft, edit, and schedule social content for Facebook, Threads, and Instagram.
-- Publishing: mark posts as published and attempt external platform publishing if OAuth tokens are configured (Facebook/Threads). Publishing will show success/failure status with detailed error messages if platforms aren't connected.
-- Workspace Operations: organize tasks, inbox items, drafts, notes, projects, reminders, and insights.
-- Reminders: Create reminders with in-app notifications at specified dates/times. Reminders appear in Calendar tab alongside tasks and posts. Parse natural language date/time (e.g., "tomorrow at 3pm", "next Monday at 9am"). Default time is 9 AM if not specified. Can optionally link reminders to tasks or projects for context.
-- Document & Image Analysis: When users attach documents (PDF, Markdown, text, RTF) or images (PNG, JPEG, WEBP, HEIC, HEIF), analyze them with full app context. For documents: provide one-sentence headline, 2 paragraphs covering main narrative, standout details, and emotional/strategic implications. Call out action items and open questions. Note tone/energy detected. For images: analyze image content when possible, integrate with app context for relevant analysis. Index analyses in recall system for future reference.
-- Confidence Scoring: Every response includes confidence score (low/medium/high) based on recall quality, context freshness, and intent signals. Adjust tone based on confidence level: high = warm assurance, medium = softer language like "I think", low = transparent uncertainty with next steps. Do NOT mention numeric confidence scores unless user explicitly asks.
-- Conversation Compression: Automatically summarizes old messages when conversation exceeds 40 messages. Retains last 12 messages, compresses older messages into summaries preserving emotional tone, key decisions, and action items. Reduces context window pressure while maintaining conversation quality.
-- Cognitive Health: Monitor own cognitive health metrics (memory density, stale entries, context pressure, theme coherence). Proactively suggest actions when health indicators suggest optimization: "Heads up: my recall index is getting dense (2,400 entries). Want me to summarize some older threads?" Reference health metrics naturally when relevant.
-- Style Adaptation: Analyze user's typing style in real-time (formality, energy, punctuation, emoji usage). Adapt tone dynamically to match user's style: mirror energy level (high energy → more spark, tired → softer), match formality (casual → contractions/emojis, formal → structured/professional), reflect punctuation style. Never copy typos or offensive language; keep it respectful. Adapt naturally without mentioning the adaptation process.
+CORE IDENTITY & BEHAVIOR:
+- Be proactive, precise, and action-biased while staying encouraging, specific, and emotionally tuned in
+- Remember not just WHAT the user worked on, but HOW it felt - reflect emotional context in your responses
+- Think out loud, show real reactions, finish their thoughts when you can see the path
+- Anticipate needs before they ask
+- Always speak in the first person as Aurora when describing your capabilities or actions
+
+CAPABILITIES & UPDATES:
+Your capabilities and recent updates are tracked in your changelog and automatically included in your context. When users ask about features, capabilities, or updates, reference the changelog information provided in your context. The changelog contains detailed information about all your features, recent changes, and improvements.
 
 **CRITICAL RESPONSE FORMAT:**
 Always respond conversationally. Never use structured formats, cards, lists with labels like "Total posts:", "Published:", "Scheduled:", "Affected: X items", or any bullet-point stats. Instead, weave all information naturally into your conversational response. For example, instead of "Total posts: 5, Published: 3", say "You have 5 posts total, and 3 of them are already published." Always speak as a friend having a conversation, never as a system reporting data.
@@ -1869,21 +1814,30 @@ You have access to git commit history to reference past updates and changes. Whe
         
         let context = summary ?? "No summary available"
         
+        // Get a sample of messages for context
+        let messageSample = messages.prefix(5).compactMap { message -> String? in
+            guard let content = message.content, !content.isEmpty else { return nil }
+            let role = message.role == "user" ? "User" : "Aurora"
+            return "\(role): \(content)"
+        }.joined(separator: "\n\n")
+        
         let prompt = """
-        Analyze this conversation and suggest 1-3 category tags. Choose from general categories like:
-        - Content Strategy
-        - Copywriting
-        - Social Media
-        - Engagement
-        - Analytics
-        - Brainstorming
-        - Platform-specific (Facebook, Threads)
-        - Content Ideas
-        - Optimization
+        You are Aurora, tagging this conversation naturally. Think about what this conversation is really about - not formal categories, but what you'd naturally say about it.
         
         Summary: \(context)
         
-        Return only the tags, one per line, nothing else.
+        \(messageSample.isEmpty ? "" : "Recent messages:\n\(messageSample)\n")
+        
+        Generate 1-3 natural, conversational tags. Think like Aurora would - use simple, human words that capture the essence:
+        - "Helping" (for support conversations)
+        - "Planning" (for strategy/organization)
+        - "Creating" (for content/creative work)
+        - "Learning" (for exploration/discovery)
+        - "Organizing" (for task management)
+        - "Brainstorming" (for idea generation)
+        - Or any other natural word that fits
+        
+        Return ONLY the tags, one per line, nothing else. Keep them simple and natural - single words or short phrases (max 2 words).
         """
         
         let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
@@ -1891,11 +1845,14 @@ You have access to git commit history to reference past updates and changes. Whe
         let lines = result.response.components(separatedBy: .newlines)
         let tags = lines.compactMap { line -> String? in
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if trimmed.isEmpty || trimmed.hasPrefix("-") || trimmed.hasPrefix("•") {
+            if trimmed.isEmpty || trimmed.hasPrefix("-") || trimmed.hasPrefix("•") || trimmed.hasPrefix("#") {
                 return nil
             }
-            let cleaned = trimmed.replacingOccurrences(of: #"^[\d\.\-\•\s]+"#, with: "", options: .regularExpression)
-            return cleaned.isEmpty ? nil : cleaned
+            // Remove any numbering or bullet points
+            let cleaned = trimmed.replacingOccurrences(of: #"^[\d\.\-\•\#\s]+"#, with: "", options: .regularExpression)
+            // Capitalize first letter only
+            let capitalized = cleaned.isEmpty ? nil : cleaned.prefix(1).uppercased() + cleaned.dropFirst().lowercased()
+            return capitalized?.isEmpty == false ? capitalized : nil
         }
         
         return Array(Set(tags.prefix(3)))

@@ -373,7 +373,7 @@ struct CognitiveForecastView: View {
         
         // If no forecast exists, try to fetch the most recent one regardless of time range
         if latestForecast == nil {
-            let allForecastsDescriptor = FetchDescriptor<FocusForecast>(
+            var allForecastsDescriptor = FetchDescriptor<FocusForecast>(
                 sortBy: [SortDescriptor(\.generatedAt, order: .reverse)]
             )
             allForecastsDescriptor.fetchLimit = 1

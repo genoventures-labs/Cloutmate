@@ -49,8 +49,16 @@ final class ContextSwitchGuard: ObservableObject {
     ) -> InterceptDecision {
         guard ContextGuardSettings.shared.isGuardEnabled else { return .allow }
         guard currentTab != destinationTab else { return .allow }
+        
+        // Don't show prompts when switching TO focus mode - allow it freely
+        if destinationTab == .focusMode {
+            return .allow
+        }
 
         let activeSession = FocusSessionService.shared.getActiveSession(modelContext: modelContext)
+        
+        // If there's no valid active session, don't show prompts based on focus mode
+        // Only show prompts based on other factors (momentum, emotional state)
         let context = SwitchContext(
             from: currentTab,
             to: destinationTab,

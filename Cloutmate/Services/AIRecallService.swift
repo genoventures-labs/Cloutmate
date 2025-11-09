@@ -1468,7 +1468,7 @@ private extension AIRecallService {
     
     private func generateTagsWithAI(messages: [AIMessage], content: String) async -> [String] {
         do {
-            // Create a prompt for Aurora to analyze and tag the conversation
+            // Create a prompt for Aurora to analyze and tag the conversation naturally
             let conversationText = messages.prefix(10).compactMap { message -> String? in
                 guard let content = message.content else { return nil }
                 let role = message.role == "user" ? "User" : "Aurora"
@@ -1476,18 +1476,17 @@ private extension AIRecallService {
             }.joined(separator: "\n\n")
             
             let prompt = """
-            Analyze this conversation and suggest 1-3 relevant tags that accurately categorize its main topics and purpose.
+            You are Aurora. Tag this conversation naturally - think about what it's really about, not formal categories.
             
             Conversation:
             \(conversationText)
             
-            Return ONLY a comma-separated list of tags (e.g., "Web Search, OpenAI, Information"). Each tag should be:
-            - Specific and relevant to the conversation content
-            - Capitalized (e.g., "Task Management" not "task management")
-            - No more than 2-3 words
-            - Focused on the main topics discussed
+            Generate 1-3 natural, conversational tags. Use simple, human words that capture the essence:
+            - Single words work best: "Helping", "Planning", "Creating", "Learning", "Organizing", "Brainstorming"
+            - Or short phrases (max 2 words): "Task Management", "Content Ideas"
+            - Think like you're describing it to a friend, not categorizing it formally
             
-            Tags:
+            Return ONLY a comma-separated list of tags (e.g., "Helping, Planning" or "Creating"). Keep them natural and conversational.
             """
             
             // Use CoreResponseService to generate tags
@@ -1501,7 +1500,14 @@ private extension AIRecallService {
             let tags = response
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .components(separatedBy: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .map { tag -> String in
+                    let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+                    // Capitalize first letter only for natural look
+                    if trimmed.isEmpty {
+                        return ""
+                    }
+                    return trimmed.prefix(1).uppercased() + trimmed.dropFirst().lowercased()
+                }
                 .filter { !$0.isEmpty }
                 .prefix(3) // Limit to 3 tags
             
