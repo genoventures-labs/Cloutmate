@@ -1,7 +1,37 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-09T17:31:32.558603Z",
+  "lastUpdated": "2025-11-09T21:09:19.632980Z",
   "entries": [
+    {
+      "id": "8955a609-1bda-4215-909b-0de01294345f",
+      "date": "2025-11-09T21:09:19.630640Z",
+      "version": "0.8",
+      "feature": "Cloutmate App",
+      "changeType": "improved",
+      "description": "Improved Cloutmate App",
+      "impact": "Enhances Cloutmate App performance or features",
+      "userFacing": false,
+      "tags": [],
+      "commitHash": null
+    },
+    {
+      "id": "9b75b980-cf8d-4b85-9b6e-960099bcacb5",
+      "date": "2025-11-09T21:09:19.630640Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "system-prompt",
+        "concurrency",
+        "service",
+        "backend",
+        "ollama"
+      ],
+      "commitHash": null
+    },
     {
       "id": "b70f1d8e-6902-42e0-a97f-ab420b485996",
       "date": "2025-11-09T17:31:32.505375Z",
@@ -12,7 +42,7 @@
       "impact": "Enhances Cloutmate App performance or features",
       "userFacing": false,
       "tags": [],
-      "commitHash": null
+      "commitHash": "cb339d7b0f95642b4dd77f0afa39707ecb0be154"
     },
     {
       "id": "311fdc57-7a12-46ed-bed8-b426797a9217",

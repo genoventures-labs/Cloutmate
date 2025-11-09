@@ -48,6 +48,10 @@ struct CloutmateApp: App {
                         startRitualSystemsIfNeeded()
                         startAIFlowCompanion()
                         startFlowCompanionEngine()
+                        // Clear routing engine cooldown on app start to ensure fresh model selection
+                        _Concurrency.Task {
+                            await ModelRoutingEngine.shared.clearCooldown()
+                        }
                         // Start ARTE after other systems
                         _Concurrency.Task { @MainActor in
                             try? await _Concurrency.Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds to ensure SwiftData is ready

@@ -315,12 +315,8 @@ actor OllamaBridgeService {
             }
         }
         
-        // Default to granite3.2:2b or first available model
-        if availableModels.contains("granite3.2:2b") {
-            return "granite3.2:2b"
-        }
-        
-        return availableModels.first ?? "granite3.2:2b"
+        // Default to routing engine's default model
+        return ModelTierMap.defaultModel()
     }
     
     /// Switches to optimal model for current task and returns whether a switch occurred
@@ -368,34 +364,41 @@ actor OllamaBridgeService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 10.0
+        request.timeoutInterval = 5.0 // Reduced timeout to fail faster
         
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw OllamaError.connectionFailed
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                throw OllamaError.connectionFailed
+            }
+            
+            // Parse response
+            struct OllamaTagsResponse: Codable {
+                let models: [OllamaModel]
+            }
+            
+            struct OllamaModel: Codable {
+                let name: String
+            }
+            
+            let decoder = JSONDecoder()
+            let tagsResponse = try decoder.decode(OllamaTagsResponse.self, from: data)
+            
+            let models = tagsResponse.models.map { $0.name }
+            
+            // Update cache
+            cachedAvailableModels = models
+            lastModelFetch = Date()
+            
+            return models
+        } catch {
+            // If fetch fails, return empty array - don't throw
+            // This allows the app to continue working even if Ollama is slow
+            print("[OllamaBridgeService] Failed to fetch available models: \(error.localizedDescription)")
+            return []
         }
-        
-        // Parse response
-        struct OllamaTagsResponse: Codable {
-            let models: [OllamaModel]
-        }
-        
-        struct OllamaModel: Codable {
-            let name: String
-        }
-        
-        let decoder = JSONDecoder()
-        let tagsResponse = try decoder.decode(OllamaTagsResponse.self, from: data)
-        
-        let models = tagsResponse.models.map { $0.name }
-        
-        // Update cache
-        cachedAvailableModels = models
-        lastModelFetch = Date()
-        
-        return models
     }
     
     func checkOllamaAvailability() async -> Bool {
@@ -754,9 +757,18 @@ Aurora:
         // Check if this is an update-related query and automatically inject changelog data
         var updateContext = ""
         if shouldMentionUpdate(for: input) {
+            print("[OllamaBridgeService] Detected update-related query, fetching relevant updates...")
             let relevantUpdates = await getRelevantUpdates(for: input)
             if !relevantUpdates.isEmpty {
-                updateContext = "\n\n**RELEVANT UPDATE INFORMATION (automatically retrieved for your query):**\n\(relevantUpdates)\n\nUse this information to answer the user's question directly. Do not analyze yourself or give meta-commentary - simply report what the changelog says."
+                updateContext = "\n\n**RELEVANT UPDATE INFORMATION (automatically retrieved for your query):**\n\(relevantUpdates)\n\n**IMPORTANT:** The user is asking about your updates. Use the information above to answer their question directly and conversationally. Do NOT analyze yourself or give meta-commentary - simply report what the changelog says. If they asked about a specific time period (yesterday, last week, etc.), focus on updates from that period. If they asked about a specific feature, focus on changes related to that feature. Answer naturally as if you're telling them about updates you received."
+            } else {
+                // Even if no updates found, still provide context for version/date queries
+                if input.lowercased().contains("when") || input.lowercased().contains("version") || input.lowercased().contains("date") {
+                    let updateInfo = await getUpdateInfo()
+                    if !updateInfo.isEmpty {
+                        updateContext = "\n\n**UPDATE INFORMATION:**\n\(updateInfo)\n\n**IMPORTANT:** The user is asking about when you were updated or your version. Use the information above to answer their question directly."
+                    }
+                }
             }
         }
         
@@ -846,6 +858,12 @@ Aurora:
         
         // Use non-streaming to get thinking content
         let result = try await makeOllamaRequest(prompt: fullPrompt, useThinking: useThinkingForModel, model: modelToUse)
+        
+        // Update currentModel to persist the selected model for next request
+        // This ensures continuity when routing engine has cooldown active
+        if modelToUse != currentModel {
+            setModel(modelToUse)
+        }
         
         // Append model switch notification if model was switched
         let finalResponse = normalizeTextSpacing(result.response) + modelSwitchNotification
@@ -1218,13 +1236,19 @@ Current app context:
 You have access to your own changelog that tracks updates and changes to your capabilities. When users ask about new features, recent changes, or your capabilities, you can query your changelog to provide accurate, up-to-date information. You can naturally mention relevant updates when they would be helpful to the user (e.g., "I can now do X" when user asks about X). Use the `queryChangelog()` method to retrieve specific information about changes.
 
 **UPDATE INFORMATION:**
-When users ask "when were you updated?", "what's your latest update?", "when did you last change?", "what new things did you get yesterday?", "what did you learn recently?", or similar questions about your updates, you MUST:
-1. Use `getUpdateInfo()` or `queryChangelog(days: X)` to retrieve actual changelog entries
-2. Answer based on the changelog data, NOT by analyzing yourself or your responses
-3. For temporal queries like "yesterday", "today", "last week", use the appropriate days parameter (1 day for yesterday/today, 7 days for last week)
-4. Answer conversationally and naturally, like: "Yesterday I got [feature name] - [description]. It [impact]."
+When users ask "when were you updated?", "what's your latest update?", "when did you last change?", "what new things did you get yesterday?", "what did you learn recently?", "what updates did you get?", or similar questions about your updates, you MUST:
 
-CRITICAL: Do NOT analyze your own responses or give meta-commentary. Simply query your changelog and report what it says. If asked "what did you get yesterday?", look up changelog entries from yesterday and tell the user what features were added or changed. Never respond by analyzing your own thinking process or giving self-reflective commentary about your responses.
+1. **Use the automatically injected update context** - When update-related queries are detected, relevant changelog information is automatically added to your context in a section labeled "RELEVANT UPDATE INFORMATION". Use this information directly to answer the user's question.
+
+2. **Answer based on changelog data, NOT by analyzing yourself** - Do NOT analyze your own responses, capabilities, or give meta-commentary. Simply report what the changelog says. If asked "what did you get yesterday?", look up changelog entries from yesterday and tell the user what features were added or changed.
+
+3. **For temporal queries** - If the user asks about "yesterday", "today", "last week", etc., the system automatically retrieves updates from that time period. Use those specific updates in your response.
+
+4. **For version/date queries** - If asked "when were you updated?" or "what version are you?", use the update information provided in your context to give the exact date and version.
+
+5. **Answer conversationally** - Format your response naturally, like: "Yesterday I got [feature name] - [description]. It [impact]." or "I was last updated on [date]. The latest update added [feature]."
+
+**CRITICAL:** When you see "RELEVANT UPDATE INFORMATION" in your context, that means the user is asking about updates. Use that information directly - don't ignore it or try to analyze yourself. Simply report what the changelog says in a conversational way.
 
 **GIT COMMIT HISTORY:**
 You have access to git commit history to reference past updates and changes. When discussing updates or changes, you can reference specific commits and their changes. Use `getCommitHistory()`, `getCommitsForFeature()`, or `getCommitDetails()` methods to retrieve commit information. This allows you to link changelog entries to actual code changes and provide detailed context about what changed and when.
@@ -2517,23 +2541,71 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
     /// Check if a user query relates to a recent update
     nonisolated func shouldMentionUpdate(for query: String) -> Bool {
         let lowercasedQuery = query.lowercased()
-        let updateKeywords = ["new", "update", "change", "feature", "capability", "can you", "what can", "recent", "latest", "what did you get", "what did you learn", "what's new", "what changed"]
+        
+        // Core update keywords
+        let updateKeywords = [
+            "new", "update", "change", "feature", "capability", "can you", "what can", 
+            "recent", "latest", "what did you get", "what did you learn", "what's new", 
+            "what changed", "when were you updated", "when did you last change",
+            "what have you learned", "what have you got", "what did you receive",
+            "tell me about your updates", "show me your updates", "what updates",
+            "any updates", "any changes", "any new features", "what's changed",
+            "what's different", "what's new with you", "what have you been up to",
+            "what improvements", "what enhancements", "what additions"
+        ]
         
         // Check for temporal update queries
-        let temporalPatterns = ["yesterday", "today", "last week", "recently", "lately", "this week"]
+        let temporalPatterns = ["yesterday", "today", "last week", "recently", "lately", "this week", "last month"]
         let hasTemporal = temporalPatterns.contains { lowercasedQuery.contains($0) }
         let hasUpdateKeyword = updateKeywords.contains { lowercasedQuery.contains($0) }
         
-        // Also check for "what did you get/learn/receive" patterns
-        let getPatterns = ["what did you get", "what did you learn", "what did you receive", "what have you got", "what have you learned"]
+        // Check for "what did you get/learn/receive" patterns
+        let getPatterns = [
+            "what did you get", "what did you learn", "what did you receive", 
+            "what have you got", "what have you learned", "what did you add",
+            "what did you change", "what did you improve"
+        ]
         let hasGetPattern = getPatterns.contains { lowercasedQuery.contains($0) }
         
-        return hasUpdateKeyword || (hasTemporal && hasGetPattern) || hasGetPattern
+        // Check for version/update date queries
+        let versionPatterns = [
+            "when were you updated", "when did you update", "when was your last update",
+            "when did you last change", "when were you last updated", "last update date",
+            "update date", "version", "what version"
+        ]
+        let hasVersionPattern = versionPatterns.contains { lowercasedQuery.contains($0) }
+        
+        return hasUpdateKeyword || (hasTemporal && (hasGetPattern || hasUpdateKeyword)) || hasGetPattern || hasVersionPattern
     }
     
     /// Get relevant updates for a user query
     func getRelevantUpdates(for query: String) async -> String {
         let lowercasedQuery = query.lowercased()
+        
+        // Check for version/date queries first - these need general update info
+        if lowercasedQuery.contains("when were you updated") || 
+           lowercasedQuery.contains("when did you update") ||
+           lowercasedQuery.contains("when was your last update") ||
+           lowercasedQuery.contains("when did you last change") ||
+           lowercasedQuery.contains("last update date") ||
+           lowercasedQuery.contains("update date") ||
+           lowercasedQuery.contains("what version") {
+            // Return general update info for version/date queries
+            let updateInfo = await getUpdateInfo()
+            if !updateInfo.isEmpty {
+                return updateInfo
+            }
+            // Fallback to latest update if general info not available
+            return await getLatestUpdate()
+        }
+        
+        // Check for "latest" or "most recent" queries
+        if lowercasedQuery.contains("latest") || lowercasedQuery.contains("most recent") || lowercasedQuery.contains("last update") {
+            let latest = await getLatestUpdate()
+            if !latest.isEmpty && latest != "No update information available." {
+                return latest
+            }
+        }
         
         // Check for temporal queries (yesterday, today, last week, etc.)
         if lowercasedQuery.contains("yesterday") {
@@ -2542,15 +2614,20 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
             return await queryChangelog(days: 1, userFacingOnly: true)
         } else if lowercasedQuery.contains("last week") || lowercasedQuery.contains("this week") {
             return await queryChangelog(days: 7, userFacingOnly: true)
+        } else if lowercasedQuery.contains("last month") || lowercasedQuery.contains("this month") {
+            return await queryChangelog(days: 30, userFacingOnly: true)
         } else if lowercasedQuery.contains("recently") || lowercasedQuery.contains("lately") {
             return await queryChangelog(days: 7, userFacingOnly: true)
         }
         
         // Check for specific feature mentions
-        let features = ["model", "ollama", "offline", "airplane", "focus", "memory", "priority", "ritual", "predictive", "temporal", "document", "image", "changelog"]
+        let features = ["model", "ollama", "offline", "airplane", "focus", "memory", "priority", "ritual", "predictive", "temporal", "document", "image", "changelog", "routing", "thinking", "deepseek", "qwen", "granite"]
         for feature in features {
             if lowercasedQuery.contains(feature) {
-                return await queryChangelog(feature: feature, userFacingOnly: true)
+                let featureUpdates = await queryChangelog(feature: feature, userFacingOnly: true)
+                if !featureUpdates.isEmpty && featureUpdates != "No matching changes found in the changelog." {
+                    return featureUpdates
+                }
             }
         }
         
