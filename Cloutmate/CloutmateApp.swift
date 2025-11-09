@@ -163,6 +163,11 @@ struct CloutmateApp: App {
         focusRitualManager.start(modelContext: context)
         smartNudgeService.start(modelContext: context)
 
+        // Enable predictive mode by default if not set
+        if UserDefaults.standard.object(forKey: "predictiveModeEnabled") == nil {
+            UserDefaults.standard.set(true, forKey: "predictiveModeEnabled")
+        }
+        
         if UserDefaults.standard.bool(forKey: "predictiveModeEnabled") {
             _Concurrency.Task { @MainActor in
                 await CognitionPredictor.shared.start(modelContext: context)

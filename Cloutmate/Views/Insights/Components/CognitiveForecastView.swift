@@ -22,6 +22,7 @@ struct CognitiveForecastView: View {
     @State private var forecastHistory: [(Date, Double)] = []
     @State private var driftCount: Int = 0
     @State private var auroraAdvice: String = ""
+    @State private var isGeneratingForecast = false
     
     var body: some View {
         ScrollView {
@@ -40,20 +41,34 @@ struct CognitiveForecastView: View {
     private var contentView: some View {
         VStack(alignment: .leading, spacing: 24) {
             sectionHeader
-            if let forecast = latestForecast, let nextWindow = forecast.nextFocusWindowStart {
-                nextFocusPeakCard(forecast: forecast, nextWindow: nextWindow)
+            
+            // Always show Aurora's advice (generate from available data)
+            if !auroraAdvice.isEmpty {
+                auroraAdviceCard
+            } else {
+                defaultAdviceCard
             }
+            
+            // Show forecast data if available
             if let forecast = latestForecast {
+                if let nextWindow = forecast.nextFocusWindowStart {
+                    nextFocusPeakCard(forecast: forecast, nextWindow: nextWindow)
+                }
                 fatigueRiskCard(forecast: forecast)
+            } else {
+                // Fallback: Show basic cognitive insights based on focus patterns
+                cognitiveInsightsCard
             }
+            
             if driftCount > 0 {
                 driftAlertsCard
             }
-            if !auroraAdvice.isEmpty {
-                auroraAdviceCard
-            }
+            
             if !forecastHistory.isEmpty {
                 forecastConfidenceChart
+            } else {
+                // Show a message about building forecast history
+                forecastBuildingCard
             }
         }
         .padding(.bottom, 40)
@@ -78,9 +93,45 @@ struct CognitiveForecastView: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
+            
+            // Manual forecast trigger button
+            Button(action: {
+                _Concurrency.Task {
+                    await triggerForecast()
+                }
+            }) {
+                HStack(spacing: 6) {
+                    if isGeneratingForecast {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 12))
+                    }
+                    Text("Generate Forecast")
+                        .font(.system(.caption, design: .rounded))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(Color.kosmicBlue.opacity(0.2))
+                )
+                .foregroundColor(.kosmicBlue)
+            }
+            .buttonStyle(.plain)
+            .disabled(isGeneratingForecast)
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)
+    }
+    
+    private func triggerForecast() async {
+        isGeneratingForecast = true
+        await CognitionPredictor.shared.triggerPrediction(modelContext: modelContext)
+        // Reload data after generating forecast
+        await loadForecastData()
+        isGeneratingForecast = false
     }
     
     private func nextFocusPeakCard(forecast: FocusForecast, nextWindow: Date) -> some View {
@@ -172,6 +223,86 @@ struct CognitiveForecastView: View {
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
     
+    private var defaultAdviceCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .foregroundColor(.kosmicPurple)
+                    Text("Aurora's Insights")
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.primary)
+                }
+                
+                Text("Continue using focus sessions and rituals to build cognitive forecasts. Aurora learns from your patterns over time.")
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(20)
+        }
+        .padding(.horizontal, 20)
+        .floatLift()
+    }
+    
+    private var cognitiveInsightsCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Cognitive Insights")
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.primary)
+                
+                if let snapshot = snapshot {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "brain.head.profile")
+                                .foregroundColor(.kosmicBlue)
+                            Text("Focus Completion: \(Int(snapshot.focusCompletionRate * 100))%")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        HStack {
+                            Image(systemName: "heart.fill")
+                                .foregroundColor(.kosmicPurple)
+                            Text("Emotional Trend: \(snapshot.emotionalTrend.rawValue.capitalized)")
+                                .font(.system(.body, design: .rounded))
+                                .foregroundColor(.primary)
+                        }
+                        
+                        if snapshot.focusSessionsCount > 0 {
+                            Text("With \(snapshot.focusSessionsCount) focus sessions tracked, Aurora can start building predictive insights.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.top, 4)
+                        }
+                    }
+                }
+            }
+            .padding(20)
+        }
+        .padding(.horizontal, 20)
+        .floatLift()
+    }
+    
+    private var forecastBuildingCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Building Forecast History")
+                    .font(.system(.headline, design: .rounded))
+                    .foregroundColor(.primary)
+                
+                Text("As Aurora generates more forecasts and tracks their accuracy, you'll see a confidence graph here showing prediction reliability over time.")
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(20)
+        }
+        .padding(.horizontal, 20)
+        .floatLift()
+    }
+    
     private var forecastConfidenceChart: some View {
         GlassPanel(tier: .contentCard, cornerRadius: 12) {
             VStack(alignment: .leading, spacing: 16) {
@@ -240,6 +371,15 @@ struct CognitiveForecastView: View {
         // Get latest forecast
         latestForecast = snapshot.latestForecast
         
+        // If no forecast exists, try to fetch the most recent one regardless of time range
+        if latestForecast == nil {
+            let allForecastsDescriptor = FetchDescriptor<FocusForecast>(
+                sortBy: [SortDescriptor(\.generatedAt, order: .reverse)]
+            )
+            allForecastsDescriptor.fetchLimit = 1
+            latestForecast = (try? modelContext.fetch(allForecastsDescriptor))?.first
+        }
+        
         // Load forecast history for confidence graph
         let (startDate, endDate) = timeRange.dateRange
         
@@ -263,12 +403,31 @@ struct CognitiveForecastView: View {
         // Calculate drift count (simplified - using forecast accuracy variance)
         driftCount = snapshot.driftEventsCount
         
-        // Generate Aurora advice
+        // Generate Aurora advice - always generate something
         if let forecast = latestForecast {
             auroraAdvice = AuroraInsightGenerator.shared.generateForecastAdvice(
                 forecast: forecast,
                 currentEmotionalState: themeManager.currentState
             )
+        } else {
+            // Generate advice based on focus patterns and emotional state
+            auroraAdvice = generateFallbackAdvice(snapshot: snapshot)
+        }
+    }
+    
+    private func generateFallbackAdvice(snapshot: AnalyticsSnapshot) -> String {
+        let focusRate = snapshot.focusCompletionRate
+        let emotionalTrend = snapshot.emotionalTrend
+        let dominantEmotion = snapshot.dominantEmotion
+        
+        if focusRate > 0.7 && emotionalTrend == .improving {
+            return "Your focus patterns are strong and emotions are improving. Consider scheduling your most important work during your peak hours."
+        } else if focusRate < 0.5 {
+            return "Focus completion is below your usual pace. Try blocking time for deep work and minimizing distractions."
+        } else if emotionalTrend == .declining {
+            return "Your emotional patterns suggest some challenges. Remember to balance work with reflection and rest."
+        } else {
+            return "Aurora is learning your cognitive patterns. Continue using focus sessions and rituals to build more accurate forecasts."
         }
     }
     

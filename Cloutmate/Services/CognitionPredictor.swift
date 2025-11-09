@@ -50,8 +50,16 @@ final class CognitionPredictor: ObservableObject {
 
         isRunning = true
         logger.info("Starting cognition predictor")
+        
+        // Always run an initial prediction cycle on start
         await runPredictionCycle(modelContext: modelContext)
         scheduleTimer(modelContext: modelContext)
+    }
+    
+    /// Manually trigger a prediction cycle (useful for testing or immediate forecasts)
+    func triggerPrediction(modelContext: ModelContext) async {
+        logger.info("Manually triggering prediction cycle")
+        await runPredictionCycle(modelContext: modelContext)
     }
 
     func stop() {
@@ -71,22 +79,30 @@ final class CognitionPredictor: ObservableObject {
     func runPredictionCycle(modelContext: ModelContext) async {
         let now = Date()
         let windowEnd = now
-        guard let windowStart = Calendar.current.date(byAdding: .hour, value: -48, to: now) else { return }
+        guard let windowStart = Calendar.current.date(byAdding: .hour, value: -48, to: now) else {
+            logger.error("Failed to calculate window start for prediction cycle")
+            return
+        }
 
-        logger.debug("Running cognition prediction cycle")
+        logger.info("Running cognition prediction cycle (analyzing data from \(windowStart) to \(windowEnd))")
 
         let context = gatherContext(windowStart: windowStart, windowEnd: windowEnd, modelContext: modelContext)
+        logger.debug("Gathered context: \(context.ritualCompletions.count) rituals, \(context.focusSessions.count) focus sessions, \(context.stateTransitions.count) state transitions")
+        
         let forecast = generateForecast(context: context)
+        logger.info("Generated forecast: fatigueRisk=\(String(format: "%.2f", forecast.fatigueRisk)), confidence=\(String(format: "%.2f", forecast.confidence)), energyTrend=\(forecast.energyTrend.rawValue)")
 
         modelContext.insert(forecast)
         do {
             try modelContext.save()
+            logger.info("Successfully saved forecast with ID \(forecast.id)")
         } catch {
             logger.error("Failed to save forecast: \(error.localizedDescription)")
         }
 
         ToneProfileCache.shared.markPredictionRun(at: now)
         forecastSubject.send(forecast)
+        logger.info("Broadcast forecast to subscribers")
 
         evaluateHistoricalForecasts(modelContext: modelContext)
     }
