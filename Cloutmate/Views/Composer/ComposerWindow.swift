@@ -22,7 +22,6 @@ struct ComposerWindow: View {
     let onSave: ((DraftConversionResult) -> Void)?
     
     @State private var caption = ""
-    @State private var selectedPlatforms: Set<CloutmateShared.Platform> = []
     @State private var scheduledDate: Date?
     @State private var tags: [String] = []
     @State private var isScheduled = false
@@ -33,7 +32,6 @@ struct ComposerWindow: View {
     @State private var showAIPopover = false
     @State private var showAISelectionSheet = false
     @State private var aiGeneratedItems: [AIGeneratedItem] = []
-    @State private var pageIDs: [String: String] = [:]
     @State private var selectedAITool: AITool?
     @State private var showAIPromptDialog = false
     @State private var userPromptText = ""
@@ -92,8 +90,7 @@ struct ComposerWindow: View {
                     showAIPopover = false
                     selectedAITool = tool
                     showAIPromptDialog = true
-                },
-                platform: selectedPlatforms.first ?? CloutmateShared.Platform.facebook
+                }
             )
         }
     }
@@ -107,26 +104,6 @@ struct ComposerWindow: View {
                     .frame(minHeight: 150)
                     .scrollContentBackground(.hidden)
                     .padding(8)
-            }
-        }
-    }
-    
-    private var platformsSection: some View {
-        Section("Platforms") {
-            ForEach(CloutmateShared.Platform.allCases, id: \.self) { platform in
-                GlassPanel(tier: .overlay, cornerRadius: 10, showInnerStroke: false) {
-                    Toggle(platform.displayName, isOn: Binding(
-                        get: { selectedPlatforms.contains(platform) },
-                        set: { isOn in
-                            if isOn {
-                                selectedPlatforms.insert(platform)
-                            } else {
-                                selectedPlatforms.remove(platform)
-                            }
-                        }
-                    ))
-                    .padding(4)
-                }
             }
         }
     }
@@ -193,17 +170,16 @@ struct ComposerWindow: View {
     
     @ViewBuilder
     private var aiSuggestionsSection: some View {
-        if !caption.isEmpty && !selectedPlatforms.isEmpty {
+        if !caption.isEmpty {
             Section {
                 PerformancePredictorPanel(post: createPreviewPost(), refreshID: analyticsRefreshID)
             }
         }
         
-        if !selectedPlatforms.isEmpty {
+        if !caption.isEmpty {
             Section("Hashtag Suggestions") {
                 HashtagSuggestionPanel(
                     caption: caption,
-                    platform: Cloutmate.Platform(rawValue: (selectedPlatforms.first ?? CloutmateShared.Platform.facebook).rawValue) ?? .facebook,
                     selectedHashtags: $tags
                 )
             }
@@ -245,7 +221,6 @@ struct ComposerWindow: View {
     var body: some View {
         Form {
             contentSection
-            platformsSection
             scheduleSection
             mediaSection
             tagsSection
@@ -261,7 +236,6 @@ struct ComposerWindow: View {
         .presentationDragIndicator(.visible)
         .sheet(isPresented: $showAIPromptDialog) {
             AIPromptDialog(
-                                    platform: selectedPlatforms.first ?? CloutmateShared.Platform.facebook,
                 onConfirm: { prompt in
                     userPromptText = prompt
                     showAIPromptDialog = false
@@ -279,7 +253,6 @@ struct ComposerWindow: View {
                 AISelectionSheet(
                     tool: tool,
                     items: aiGeneratedItems,
-                                    platform: selectedPlatforms.first ?? CloutmateShared.Platform.facebook,
                     onInsert: { content in
                         insertAIContent(content, tool: tool)
                     },
@@ -320,8 +293,6 @@ struct ComposerWindow: View {
                 caption = post.caption
                 tags = post.tags
                 mediaURLs = post.mediaURLs.compactMap { URL(fileURLWithPath: $0) }
-                let platforms = post.postPlatforms.compactMap { CloutmateShared.Platform(rawValue: $0.rawValue) }
-                selectedPlatforms = Set(platforms)
                 if let postScheduledDate = post.scheduledDate {
                     isScheduled = true
                     scheduledDate = postScheduledDate
@@ -333,9 +304,6 @@ struct ComposerWindow: View {
             }
         }
         .onChange(of: caption) { _, _ in
-            triggerAnalyticsRefresh()
-        }
-        .onChange(of: selectedPlatforms) { _, _ in
             triggerAnalyticsRefresh()
         }
         .onChange(of: tags) { _, _ in
@@ -358,11 +326,6 @@ struct ComposerWindow: View {
         
         if caption.isEmpty {
             validationError = "Caption cannot be empty"
-            return false
-        }
-        
-        if selectedPlatforms.isEmpty {
-            validationError = "Please select at least one platform"
             return false
         }
         
@@ -392,7 +355,6 @@ struct ComposerWindow: View {
                 post.caption = caption
                 post.mediaURLs = mediaURLs.map { $0.path }
                 post.scheduledDate = isScheduled ? scheduledDate : nil
-                post.platforms = Array(selectedPlatforms).map { $0.rawValue }
                 post.status = isScheduled ? PostStatus.scheduled.rawValue : PostStatus.publishing.rawValue
                 post.tags = tags
                 post.updatedAt = Date()
@@ -402,7 +364,6 @@ struct ComposerWindow: View {
                     caption: caption,
                     mediaURLs: mediaURLs.map { $0.path },
                     scheduledDate: isScheduled ? scheduledDate : nil,
-                    platforms: Array(selectedPlatforms).map { $0.rawValue },
                     status: isScheduled ? PostStatus.scheduled.rawValue : PostStatus.publishing.rawValue,
                     tags: tags
                 )
@@ -410,22 +371,6 @@ struct ComposerWindow: View {
                 modelContext.insert(post)
             }
             
-            // Get pageIDs for Facebook accounts and store in post
-            var pageIDsDict: [String: String] = [:]
-            for platform in selectedPlatforms {
-                if platform == .facebook {
-                    let descriptor = FetchDescriptor<PlatformAccount>(
-                        predicate: #Predicate { $0.platform == "facebook" }
-                    )
-                    if let facebookAccount = try? modelContext.fetch(descriptor).first {
-                        pageIDsDict["facebook"] = facebookAccount.accountID
-                    }
-                }
-            }
-            // Store pageIDs on post
-            post.pageIDs = pageIDsDict
-            // Also store in state for publishPostDirectly
-            pageIDs = pageIDsDict
             try? modelContext.save()
             
             if isScheduled {
@@ -466,7 +411,6 @@ struct ComposerWindow: View {
             caption: caption,
             mediaURLs: mediaURLs.map { $0.path },
             scheduledDate: isScheduled ? scheduledDate : nil,
-            platforms: Array(selectedPlatforms).map { $0.rawValue },
             status: PostStatus.draft.rawValue,
             tags: tags
         )
@@ -478,8 +422,7 @@ struct ComposerWindow: View {
         
         _Concurrency.Task {
             // Use the user's prompt instead of the caption
-            let platformContext = selectedPlatforms.first?.rawValue ?? "facebook"
-            let result = await AICreativeService.shared.executeTool(tool, input: userPrompt, context: platformContext)
+            let result = await AICreativeService.shared.executeTool(tool, input: userPrompt, context: "")
             
             // Clean the response - remove markdown and headers
             let cleanedResult = cleanAIResponse(result.result)

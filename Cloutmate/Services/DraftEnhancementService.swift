@@ -139,8 +139,7 @@ actor DraftEnhancementService {
     // MARK: - Captions
     
     func generateCaption(
-        for draft: Draft,
-        platform: SocialPlatformHint
+        for draft: Draft
     ) async throws -> String {
         let draftTitle = await MainActor.run { draft.title.trimmingCharacters(in: .whitespacesAndNewlines) }
         let fallbackTitle = await MainActor.run { draft.displayTitle }
@@ -149,7 +148,7 @@ actor DraftEnhancementService {
         let effectiveTitle = draftTitle.isEmpty ? fallbackTitle : draftTitle
         
         let prompt = """
-        Create a short social media caption tailored for \(platform.displayName).
+        Create a short caption for this content.
         Keep it under 220 characters, include a positive call-to-action, and mirror the draft's tone.
         
         Draft title: \(effectiveTitle)

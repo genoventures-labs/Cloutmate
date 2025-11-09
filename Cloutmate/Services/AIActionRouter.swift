@@ -98,7 +98,6 @@ enum AIIntentAction {
         case .createPost(let request):
             var data: [String: String] = [
                 "createDraft": request.createDraft ? "true" : "false",
-                "platforms": request.platforms.map(\.rawValue).joined(separator: ",")
             ]
             if let scheduledDate = request.scheduledDate {
                 data["scheduledDate"] = isoString(from: scheduledDate)
@@ -197,7 +196,6 @@ enum AIIntentAction {
 
 struct PostCreationRequest {
     let caption: String
-    let platforms: [Platform]
     let scheduledDate: Date?
     let tags: [String]
     let notes: String?
@@ -438,12 +436,12 @@ final class AIActionRouter {
 
             let post: Post
             if let draft = createdDraft {
-                post = draft.toPost(platforms: request.platforms, scheduledDate: request.scheduledDate)
+                post = draft.toPost(scheduledDate: request.scheduledDate)
                 draft.associatedPostID = post.id
                 draft.convertedAt = now
             } else if let draftId = request.draftId,
                       let existingDraft = fetchDraft(by: draftId, context: modelContext) {
-                post = existingDraft.toPost(platforms: request.platforms, scheduledDate: request.scheduledDate)
+                post = existingDraft.toPost(scheduledDate: request.scheduledDate)
                 existingDraft.associatedPostID = post.id
                 existingDraft.convertedAt = now
                 createdDraft = existingDraft
@@ -453,7 +451,6 @@ final class AIActionRouter {
                     caption: request.caption,
                     mediaURLs: [],
                     scheduledDate: request.scheduledDate,
-                    platforms: request.platforms.map { $0.rawValue },
                     status: request.scheduledDate != nil ? PostStatus.scheduled.rawValue : PostStatus.draft.rawValue,
                     tags: request.tags
                 )
@@ -484,13 +481,11 @@ final class AIActionRouter {
                 throw error
             }
 
-            let platformList = request.platforms.map(\.displayName).joined(separator: ", ")
             let summaryMessage = request.scheduledDate != nil
-                ? "Post scheduled for \(formattedDateTime(request.scheduledDate!)) on \(platformList)"
-                : "Post created for \(platformList)"
+                ? "Post scheduled for \(formattedDateTime(request.scheduledDate!))"
+                : "Post created"
 
             var markdown = "✅ **Post ready**\n\n"
-            markdown += "**Platforms:** \(platformList)\n"
             if let scheduled = request.scheduledDate {
                 markdown += "**Scheduled:** \(formattedDateTime(scheduled))\n"
             }
@@ -979,9 +974,6 @@ extension AIIntentAction {
                   !caption.isEmpty else {
                 return nil
             }
-            let platformStrings = executionIntent.platforms ?? ["facebook"]
-            let platforms = platformStrings.compactMap { Platform(rawValue: $0.lowercased()) }
-            guard !platforms.isEmpty else { return nil }
             
             let scheduledDate = executionIntent.scheduledDate.flatMap { parseISODate($0) }
             let tags = executionIntent.tags ?? []
@@ -991,7 +983,6 @@ extension AIIntentAction {
             
             let request = PostCreationRequest(
                 caption: caption,
-                platforms: platforms,
                 scheduledDate: scheduledDate,
                 tags: tags,
                 notes: notes,
@@ -1098,7 +1089,6 @@ extension AIIntentAction {
             )
             let postRequest = PostCreationRequest(
                 caption: executionIntent.caption ?? (executionIntent.inboxContent ?? ""),
-                platforms: (executionIntent.platforms ?? ["facebook"]).compactMap { Platform(rawValue: $0.lowercased()) },
                 scheduledDate: executionIntent.scheduledDate.flatMap { parseISODate($0) },
                 tags: executionIntent.tags ?? [],
                 notes: executionIntent.notes,
@@ -1112,17 +1102,7 @@ extension AIIntentAction {
             case "note":
                 target = .note(noteRequest)
             case "draft", "post":
-                let platforms = postRequest.platforms.isEmpty ? [Platform.facebook] : postRequest.platforms
-                let adjusted = PostCreationRequest(
-                    caption: postRequest.caption,
-                    platforms: platforms,
-                    scheduledDate: postRequest.scheduledDate,
-                    tags: postRequest.tags,
-                    notes: postRequest.notes,
-                    createDraft: true,
-                    draftId: nil
-                )
-                target = .draft(adjusted)
+                target = .draft(postRequest)
             default:
                 return nil
             }

@@ -17,7 +17,6 @@ struct DraftEditor: View {
     @State private var showAISelectionSheet = false
     @State private var aiGeneratedItems: [AIGeneratedItem] = []
     @State private var selectedAITool: AITool?
-    @State private var selectedPlatform: CloutmateShared.Platform = .facebook
     @State private var showAIPromptDialog = false
     @State private var userPromptText = ""
     @State private var isAIGenerating = false
@@ -81,8 +80,7 @@ struct DraftEditor: View {
                                         showAIPopover = false
                                         selectedAITool = tool
                                         showAIPromptDialog = true
-                                    },
-                                    platform: selectedPlatform
+                                    }
                                 )
                             }
                         }
@@ -225,7 +223,6 @@ struct DraftEditor: View {
         }
         .sheet(isPresented: $showAIPromptDialog) {
             AIPromptDialog(
-                platform: selectedPlatform,
                 onConfirm: { prompt in
                     userPromptText = prompt
                     showAIPromptDialog = false
@@ -243,7 +240,6 @@ struct DraftEditor: View {
                 AISelectionSheet(
                     tool: tool,
                     items: aiGeneratedItems,
-                    platform: selectedPlatform,
                     onInsert: { content in
                         insertAIContent(content, tool: tool)
                     },
@@ -272,7 +268,7 @@ struct DraftEditor: View {
         
 		_Concurrency.Task {
             // Use the user's prompt instead of the draft caption
-            let result = await AICreativeService.shared.executeTool(tool, input: userPrompt, context: selectedPlatform.rawValue)
+            let result = await AICreativeService.shared.executeTool(tool, input: userPrompt, context: "")
             
             // Clean the response - remove markdown and headers
             let cleanedResult = cleanAIResponse(result.result)

@@ -360,6 +360,7 @@ struct CreateProjectSheet: View {
     @State private var areaId: UUID?
     @State private var tags = ""
     @State private var hasDueDate = false
+    @State private var energyRequirement: EnergyRequirement? = nil
     
     var body: some View {
         NavigationStack {
@@ -437,6 +438,22 @@ struct CreateProjectSheet: View {
                                 .padding(12)
                                 .background(.ultraThinMaterial)
                                 .cornerRadius(8)
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Energy Requirement")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Picker("Energy Requirement", selection: $energyRequirement) {
+                                Text("None").tag(EnergyRequirement?.none)
+                                ForEach(EnergyRequirement.allCases, id: \.self) { energy in
+                                    Text(energy.displayName).tag(energy as EnergyRequirement?)
+                                }
+                            }
+                            
+                            if let energy = energyRequirement {
+                                EnergyRequirementIndicator(energyRequirement: energy)
+                            }
                         }
                     }
                 }

@@ -164,11 +164,6 @@ struct PerformancePredictorPanel: View {
                 await analyzePost()
             }
         }
-        .onChange(of: post.postPlatforms) { _, _ in
-            _Concurrency.Task {
-                await analyzePost()
-            }
-        }
         .onChange(of: refreshID) { _, _ in
             _Concurrency.Task {
                 await analyzePost()

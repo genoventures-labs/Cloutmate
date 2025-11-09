@@ -90,18 +90,17 @@ struct DataManagementSection: View {
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             
-            var csvString = "Type,ID,Caption,Platform,Status,Scheduled Date,Published Date,Tags,Media URLs\n"
+            var csvString = "Type,ID,Caption,Status,Scheduled Date,Published Date,Tags,Media URLs\n"
             
             // Export posts
             for post in allPosts {
                 let escapedCaption = post.caption.replacingOccurrences(of: "\"", with: "\"\"")
-                let platforms = post.postPlatforms.map { $0.displayName }.joined(separator: "|")
                 let scheduledDate = post.scheduledDate?.ISO8601Format() ?? ""
                 let publishedDate = post.publishedDate?.ISO8601Format() ?? ""
                 let tags = post.tags.joined(separator: "|")
                 let mediaURLs = post.mediaURLs.joined(separator: "|")
                 
-                csvString += "Post,\(post.id.uuidString),\"\(escapedCaption)\",\(platforms),\(post.postStatus.displayName),\(scheduledDate),\(publishedDate),\(tags),\(mediaURLs)\n"
+                csvString += "Post,\(post.id.uuidString),\"\(escapedCaption)\",\(post.postStatus.displayName),\(scheduledDate),\(publishedDate),\(tags),\(mediaURLs)\n"
             }
             
             // Export drafts
@@ -111,16 +110,15 @@ struct DataManagementSection: View {
                 let mediaURLs = draft.mediaURLs.joined(separator: "|")
                 let updatedAt = draft.updatedAt.ISO8601Format()
                 
-                csvString += "Draft,\(draft.id.uuidString),\"\(escapedCaption)\",-,Draft,-,\(updatedAt),\(tags),\(mediaURLs)\n"
+                csvString += "Draft,\(draft.id.uuidString),\"\(escapedCaption)\",Draft,-,\(updatedAt),\(tags),\(mediaURLs)\n"
             }
             
             // Export templates
             for template in templates {
                 let escapedCaption = template.caption.replacingOccurrences(of: "\"", with: "\"\"")
-                let platforms = template.templatePlatforms.map { $0.displayName }.joined(separator: "|")
                 let tags = template.tags.joined(separator: "|")
                 
-                csvString += "Template,\(template.id.uuidString),\"\(escapedCaption)\",\(platforms),Template,-,-,\(tags),-\n"
+                csvString += "Template,\(template.id.uuidString),\"\(escapedCaption)\",Template,-,-,\(tags),-\n"
             }
             
             do {

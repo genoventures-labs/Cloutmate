@@ -343,7 +343,6 @@ struct ExecutionIntent: Codable {
     let reportType: String?
     let daysAhead: Int?
     let caption: String?
-    let platforms: [String]?
     let scheduledDate: String?
     let tags: [String]?
     let notes: String?

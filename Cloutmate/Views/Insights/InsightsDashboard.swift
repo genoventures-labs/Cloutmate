@@ -13,20 +13,24 @@ enum InsightsTab: String, CaseIterable {
     case overview = "Overview"
     case productivity = "Productivity"
     case emotional = "Emotional"
+    case moodTrends = "Mood Trends"
     case memoryGraph = "Memory Graph"
     case learning = "Learning"
     case content = "Content"
     case automation = "Automation"
+    case arcView = "Arc View"
     
     var icon: String {
         switch self {
         case .overview: return "chart.bar.doc.horizontal"
         case .productivity: return "checkmark.circle"
         case .emotional: return "heart.text.square"
+        case .moodTrends: return "chart.line.uptrend.xyaxis"
         case .memoryGraph: return "brain.head.profile"
         case .learning: return "chart.line.uptrend.xyaxis"
         case .content: return "megaphone"
         case .automation: return "gearshape.2"
+        case .arcView: return "timeline.selection"
         }
     }
 }
@@ -108,6 +112,9 @@ struct InsightsDashboard: View {
                 timeRange: timeRange
             )
             
+        case .moodTrends:
+            MoodTrendsView()
+            
         case .memoryGraph:
             ConceptGraphView()
             
@@ -133,6 +140,9 @@ struct InsightsDashboard: View {
             
         case .automation:
             AutomationDashboardView()
+            
+        case .arcView:
+            ArcViewTimeline()
         }
     }
     

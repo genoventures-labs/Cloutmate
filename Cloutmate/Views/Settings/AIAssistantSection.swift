@@ -24,6 +24,8 @@ struct AIAssistantSection: View {
             Divider().padding(.vertical, 4)
             modelInfoSection
             Divider().padding(.vertical, 4)
+            selfReflectionDiagnostic
+            Divider().padding(.vertical, 4)
             ollamaServerControl
         }
         .onAppear {
@@ -210,6 +212,31 @@ struct AIAssistantSection: View {
             }
             .padding(.leading, 28)
         }
+    }
+    
+    private var selfReflectionDiagnostic: some View {
+        NavigationLink {
+            AuroraSelfReflectionView()
+                .navigationTitle("Aurora's Self-Reflection")
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "brain.head.profile")
+                    .foregroundColor(.kosmicPurple)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Self-Reflection Diagnostic")
+                        .font(.body)
+                    Text("View Aurora's introspection about her cognitive state and memory management")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .buttonStyle(.plain)
     }
     
     private var ollamaServerControl: some View {

@@ -16,26 +16,18 @@ public final class Post {
     public var mediaURLs: [String] = [] // Array of local file URLs or URLs
     public var scheduledDate: Date?
     public var publishedDate: Date?
-    public var platforms: [String] = [] // Array of Platform raw values
     public var status: String = PostStatus.draft.rawValue // PostStatus raw value
     public var tags: [String] = []
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
     
-    // Engagement metrics from Meta API
+    // Engagement metrics (kept for internal tracking)
     public var engagementRate: Double?
     public var impressions: Int?
     public var likes: Int?
     public var comments: Int?
     public var saves: Int?
     public var reach: Int?
-    
-    // API IDs for tracking
-    public var threadsPostID: String?
-    public var facebookPostID: String?
-    
-    // Platform-specific page IDs (e.g., Facebook page IDs)
-    public var pageIDs: [String: String] = [:]
     
     // Custom properties for database views
     public var customProperties: [String: String] = [:]
@@ -55,7 +47,6 @@ public final class Post {
         caption: String,
         mediaURLs: [String] = [],
         scheduledDate: Date? = nil,
-        platforms: [String] = [],
         status: String = PostStatus.draft.rawValue,
         tags: [String] = [],
         projectId: UUID? = nil,
@@ -66,7 +57,6 @@ public final class Post {
         self.mediaURLs = mediaURLs
         self.scheduledDate = scheduledDate
         self.publishedDate = nil
-        self.platforms = platforms
         self.status = status
         self.tags = tags
         self.createdAt = Date()
@@ -79,16 +69,6 @@ public final class Post {
     public var postStatus: PostStatus {
         get { PostStatus(rawValue: status) ?? .draft }
         set { status = newValue.rawValue }
-    }
-    
-    public var postPlatforms: [Platform] {
-        get { platforms.compactMap { Platform(rawValue: $0) } }
-        set { platforms = newValue.map { $0.rawValue } }
-    }
-    
-    // Helper method to safely access page IDs
-    public func getPageID(for platform: Platform) -> String? {
-        return pageIDs[platform.rawValue]
     }
     
     public func updateEngagementMetrics(
@@ -139,4 +119,3 @@ extension Post {
         return lines.first?.count ?? 0 > 50 ? String(lines.first!.dropFirst(50)) : ""
     }
 }
-

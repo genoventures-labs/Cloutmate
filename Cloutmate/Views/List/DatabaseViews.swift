@@ -112,14 +112,7 @@ private struct KanbanCard: View {
                 .lineLimit(4)
             
             HStack(spacing: 6) {
-                ForEach(post.postPlatforms, id: \.self) { platform in
-                    Text(platform.displayName)
-                        .font(.caption)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(color.opacity(0.2))
-                        .cornerRadius(6)
-                }
+                PostStatusBadge(status: post.postStatus)
             }
             
             if let date = post.scheduledDate ?? post.publishedDate {
@@ -182,10 +175,7 @@ struct PostGalleryView: View {
                             .foregroundColor(.primary)
                         
                         HStack {
-                            ForEach(post.postPlatforms, id: \.self) { platform in
-                                Image(systemName: platform == .threads ? "number" : "f.square")
-                                    .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
-                            }
+                            PostStatusBadge(status: post.postStatus)
                             Spacer()
                             if let date = post.scheduledDate ?? post.publishedDate {
                                 Text(date, style: .date)
@@ -252,14 +242,7 @@ struct PostTimelineView: View {
                                     Text(post.caption.prefix(140) + (post.caption.count > 140 ? "..." : ""))
                                         .font(.body)
                                     HStack(spacing: 6) {
-                                        ForEach(post.postPlatforms, id: \.self) { platform in
-                                            Text(platform.displayName)
-                                                .font(.caption2)
-                                                .padding(.horizontal, 6)
-                                                .padding(.vertical, 2)
-                                                .background(Color.secondary.opacity(0.2))
-                                                .cornerRadius(4)
-                                        }
+                                        PostStatusBadge(status: post.postStatus)
                                     }
                                 }
                             }

@@ -111,8 +111,7 @@ struct ArtifactComposerView: View {
                     showAIPopover = false
                     selectedAITool = tool
                     showAIPromptDialog = true
-                },
-                platform: .facebook // Default for compatibility
+                }
             )
         }
     }
@@ -275,7 +274,6 @@ struct ArtifactComposerView: View {
         .presentationDragIndicator(.visible)
         .sheet(isPresented: $showAIPromptDialog) {
             AIPromptDialog(
-                platform: .facebook, // Default for compatibility
                 onConfirm: { prompt in
                     userPromptText = prompt
                     showAIPromptDialog = false
@@ -293,7 +291,6 @@ struct ArtifactComposerView: View {
                 AISelectionSheet(
                     tool: tool,
                     items: aiGeneratedItems,
-                    platform: .facebook, // Default for compatibility
                     onInsert: { content in
                         insertAIContent(content, tool: tool)
                     },

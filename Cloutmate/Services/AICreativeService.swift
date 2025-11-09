@@ -63,28 +63,4 @@ actor AICreativeService {
             )
         }
     }
-    
-    // MARK: - Platform Context
-    
-    func getCharacterLimit(for platform: Platform) -> Int {
-        switch platform {
-        case .facebook:
-            return 5000
-        case .threads:
-            return 500
-        @unknown default:
-            return 500
-        }
-    }
-    
-    func getPlatformGuidance(for platform: Platform) -> String {
-        switch platform {
-        case .facebook:
-            return "Facebook posts perform well with storytelling, asking questions, and sharing personal experiences. Keep it conversational and authentic."
-        case .threads:
-            return "Threads favors concise, engaging content with emojis. Make it punchy and conversation-starting."
-        @unknown default:
-            return "Focus on clear, engaging copy tailored to the platform's audience."
-        }
-    }
 }

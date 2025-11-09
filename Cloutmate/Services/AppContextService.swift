@@ -117,14 +117,7 @@ final class AppContextService {
         if !todayPosts.isEmpty {
             context += "Posts scheduled today:\n"
             for post in todayPosts.prefix(5) {
-                context += "- \(post.caption.prefix(100))"
-                let platformNames = post.platforms.compactMap { raw in
-                    Platform(rawValue: raw)?.rawValue.capitalized
-                }
-                if !platformNames.isEmpty {
-                    context += " [\(platformNames.joined(separator: ", "))]"
-                }
-                context += "\n"
+                context += "- \(post.caption.prefix(100))\n"
             }
         }
         
@@ -168,13 +161,8 @@ final class AppContextService {
             }
         }
 
-        // 9. Accounts
-        let accounts = try modelContext.fetch(FetchDescriptor<PlatformAccount>())
-        let threadsAccounts = accounts.filter { $0.platform == "threads" }
-        let facebookAccounts = accounts.filter { $0.platform == "facebook" }
-        context += "\n## Connected Accounts\n"
-        context += "- Threads: \(threadsAccounts.count)\n"
-        context += "- Facebook Pages: \(facebookAccounts.count)\n"
+        // 9. Accounts (removed - social media accounts no longer supported)
+        // Platform accounts removed
 
         // 10. Insights
         let insights = try modelContext.fetch(FetchDescriptor<InsightSnapshot>())

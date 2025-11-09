@@ -11,6 +11,32 @@ import os
 import Combine
 import CloutmateShared
 
+// MARK: - Conversation Modes
+
+enum ConversationMode: String, CaseIterable {
+    case reflective = "Reflective"
+    case operational = "Operational"
+    case creative = "Creative"
+    
+    var description: String {
+        switch self {
+        case .reflective:
+            return "Pulls related personal insights and reflections"
+        case .operational:
+            return "Pulls relevant data objects and actionable items"
+        case .creative:
+            return "Cross-pollinates themes for idea generation"
+        }
+    }
+}
+
+struct RecallSnippetWithTemporalContext: Identifiable, Hashable, Sendable {
+    let snippet: RecallSnippet
+    let temporalContext: String
+    
+    var id: UUID { snippet.id }
+}
+
 // MARK: - Adaptive Context Contract
 
 struct AIPayloadContext: Sendable {
@@ -516,7 +542,8 @@ final class AIRecallService {
         for query: String,
         limit: Int = 5,
         modelContext: ModelContext,
-        shouldRegisterView: Bool = true
+        shouldRegisterView: Bool = true,
+        mode: ConversationMode = .operational
     ) -> [RecallSnippet] {
         guard config.featureFlags.recallEnabled else { return [] }
         
@@ -537,7 +564,10 @@ final class AIRecallService {
             entries = Array(cache.values)
         }
         
-        let scored = entries
+        // Filter and score based on conversation mode
+        let filteredEntries = filterEntriesByMode(entries, mode: mode, modelContext: modelContext)
+        
+        let scored = filteredEntries
             .filter { $0.matches(query: normalizedQuery) }
             .map { entry -> (score: Double, entry: RecallIndexEntry) in
                 let base = entry.score(using: weights, referenceDate: now)
@@ -548,7 +578,11 @@ final class AIRecallService {
                         queryBoost = 0.1
                     }
                 }
-                return (min(1.0, base + queryBoost), entry)
+                
+                // Mode-specific boosting
+                let modeBoost = calculateModeBoost(entry: entry, mode: mode, modelContext: modelContext)
+                
+                return (min(1.0, base + queryBoost + modeBoost), entry)
             }
             .sorted { $0.score > $1.score }
         
@@ -581,6 +615,106 @@ final class AIRecallService {
         }
         
         return top.map { RecallSnippet(entry: $0.entry, score: $0.score) }
+    }
+    
+    /// Filter entries based on conversation mode
+    private func filterEntriesByMode(
+        _ entries: [RecallIndexEntry],
+        mode: ConversationMode,
+        modelContext: ModelContext
+    ) -> [RecallIndexEntry] {
+        switch mode {
+        case .reflective:
+            // Prefer journal entries, notes, and reflections
+            return entries.filter { entry in
+                entry.objectType == "document" || entry.objectType == "note"
+            }
+        case .operational:
+            // Prefer tasks, projects, and actionable items
+            return entries.filter { entry in
+                entry.objectType == "task" || entry.objectType == "project" || entry.objectType == "reminder"
+            }
+        case .creative:
+            // Prefer notes, drafts, and posts for cross-pollination
+            return entries.filter { entry in
+                entry.objectType == "note" || entry.objectType == "draft" || entry.objectType == "post"
+            }
+        }
+    }
+    
+    /// Calculate mode-specific boost for entries
+    private func calculateModeBoost(
+        entry: RecallIndexEntry,
+        mode: ConversationMode,
+        modelContext: ModelContext
+    ) -> Double {
+        switch mode {
+        case .reflective:
+            // Boost entries with emotional content
+            if abs(entry.emotionScore) > 0.3 || entry.emotionIntensity > 0.3 {
+                return 0.15
+            }
+            return 0.0
+        case .operational:
+            // Boost high-importance items
+            if entry.importance > 0.7 {
+                return 0.1
+            }
+            return 0.0
+        case .creative:
+            // Boost entries with many keywords (rich content)
+            if entry.keywords.count > 5 {
+                return 0.12
+            }
+            return 0.0
+        }
+    }
+    
+    /// Fetch relevant snippets with temporal context
+    func fetchRelevantSnippetsWithTemporalContext(
+        for query: String,
+        limit: Int = 5,
+        modelContext: ModelContext,
+        mode: ConversationMode = .operational
+    ) -> [RecallSnippetWithTemporalContext] {
+        let snippets = fetchRelevantSnippets(
+            for: query,
+            limit: limit,
+            modelContext: modelContext,
+            mode: mode
+        )
+        
+        return snippets.map { snippet in
+            let temporalContext = generateTemporalContext(for: snippet, modelContext: modelContext)
+            return RecallSnippetWithTemporalContext(
+                snippet: snippet,
+                temporalContext: temporalContext
+            )
+        }
+    }
+    
+    /// Generate temporal context for a snippet
+    private func generateTemporalContext(
+        for snippet: RecallSnippet,
+        modelContext: ModelContext
+    ) -> String {
+        let daysSinceUpdate = Calendar.current.dateComponents([.day], from: snippet.lastUpdated, to: Date()).day ?? 0
+        
+        if daysSinceUpdate == 0 {
+            return "Updated today"
+        } else if daysSinceUpdate == 1 {
+            return "Updated yesterday"
+        } else if daysSinceUpdate < 7 {
+            return "Updated \(daysSinceUpdate) days ago"
+        } else if daysSinceUpdate < 30 {
+            let weeks = daysSinceUpdate / 7
+            return "Updated \(weeks) week\(weeks == 1 ? "" : "s") ago"
+        } else if daysSinceUpdate < 365 {
+            let months = daysSinceUpdate / 30
+            return "Last mentioned \(months) month\(months == 1 ? "" : "s") ago"
+        } else {
+            return "From your archive"
+        }
     }
     
     func allEntries(modelContext: ModelContext) -> [RecallIndexEntry] {
@@ -1156,7 +1290,6 @@ extension Post: RecallTrackable {
     }
     var recallKeywords: [String] {
         var values = tags.map { $0.lowercased() }
-        values.append(contentsOf: platforms.map { $0.lowercased() })
         if let campaignId {
             values.append(campaignId.uuidString)
         }

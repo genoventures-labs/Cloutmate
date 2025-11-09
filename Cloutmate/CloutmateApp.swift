@@ -13,7 +13,6 @@ import CloutmateShared
 import os.log
 import Carbon
 
-typealias Platform = CloutmateShared.Platform
 typealias PostStatus = CloutmateShared.PostStatus
 
 @main
@@ -387,7 +386,6 @@ extension CloutmateApp {
             CloutmateShared.ArtifactMention.self,  // Artifact mentions tracking
             Draft.self,  // Draft is app-local, not in CloutmateShared
             CloutmateShared.Template.self,
-            CloutmateShared.PlatformAccount.self,
             CloutmateShared.PerformancePrediction.self,
             CloutmateShared.RecyclablePost.self,
             CloutmateShared.ContentTopic.self,
@@ -456,7 +454,9 @@ extension CloutmateApp {
             StoryChapter.self,
             StoryScene.self,
             MoodEntry.self,
-            ReflectionNote.self
+            ReflectionNote.self,
+            MemorySummary.self,
+            AuroraSelfDiagnostic.self
         ])
         
         let appGroupID = "group.kosmicapps.cloutmate"

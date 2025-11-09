@@ -16,7 +16,6 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @StateObject private var themeManager = ReactiveThemeManager.shared
-    @Query private var accounts: [PlatformAccount]
     
     var body: some View {
         ScrollView {
@@ -272,12 +271,6 @@ struct SettingsView: View {
                         Text("Social media account connections are no longer available.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        
-                        if !accounts.isEmpty {
-                            Text("\(accounts.count) account(s) connected (legacy)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
                     }
                 }
                 
@@ -452,5 +445,5 @@ private extension SettingsView {
 
 #Preview {
     SettingsView()
-        .modelContainer(for: [PlatformAccount.self])
+        .modelContainer(for: [])
 }

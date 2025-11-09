@@ -43,15 +43,8 @@ final class ArtifactMigrationService {
             artifactState = .draft // Failed posts become drafts
         }
         
-        // Map Platform to OutputFormat (best guess)
-        let outputFormat: OutputFormat
-        if post.platforms.isEmpty {
-            outputFormat = .brief
-        } else {
-            // Use first platform as format hint
-            let platform = post.postPlatforms.first ?? .threads
-            outputFormat = mapPlatformToFormat(platform)
-        }
+        // Default to brief format (platforms removed)
+        let outputFormat: OutputFormat = .brief
         
         // Create artifact
         let artifact = Artifact(
@@ -171,17 +164,5 @@ final class ArtifactMigrationService {
         return count
     }
     
-    // MARK: - Helper Methods
-    
-    private func mapPlatformToFormat(_ platform: Platform) -> OutputFormat {
-        // Map social platforms to narrative formats
-        // This is a best-guess mapping - user can adjust later
-        switch platform {
-        case .threads:
-            return .brief // Threads are typically brief
-        case .facebook:
-            return .summary // Facebook posts can be longer summaries
-        }
-    }
 }
 

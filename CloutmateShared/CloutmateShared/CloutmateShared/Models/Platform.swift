@@ -7,28 +7,8 @@
 
 import Foundation
 
-public enum Platform: String, Codable, CaseIterable {
-    case threads = "threads"
-    case facebook = "facebook"
-    
-    public var displayName: String {
-        switch self {
-        case .threads:
-            return "Threads"
-        case .facebook:
-            return "Facebook"
-        }
-    }
-    
-    public var colorName: String {
-        switch self {
-        case .threads:
-            return "purple"
-        case .facebook:
-            return "blue"
-        }
-    }
-}
+// Platform enum removed - Cloutmate is no longer a social media scheduling app
+// PostStatus enum kept for internal post status tracking
 
 public enum PostStatus: String, Codable, CaseIterable {
     case draft = "draft"
@@ -52,4 +32,5 @@ public enum PostStatus: String, Codable, CaseIterable {
         }
     }
 }
+
 

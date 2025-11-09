@@ -13,7 +13,6 @@ struct HashtagSuggestionPanel: View {
     @Environment(\.modelContext) private var modelContext
     
     let caption: String
-    let platform: Platform
     let selectedHashtags: Binding<[String]>
     
     @State private var suggestions: [HashtagSuggestion] = []
@@ -151,15 +150,14 @@ struct HashtagSuggestionPanel: View {
         }
         
         // Note: HashtagPerformanceService was removed as part of social media posting removal
-        // Load top performing hashtags directly from SwiftData
+        // Load top performing hashtags directly from SwiftData (all platforms)
         var hashtagDescriptor = FetchDescriptor<HashtagPerformance>(
             sortBy: [SortDescriptor(\.averageEngagement, order: .reverse)]
         )
         hashtagDescriptor.fetchLimit = 10
         if let hashtags = try? modelContext.fetch(hashtagDescriptor) {
-            let filtered = hashtags.filter { $0.platform == platform.rawValue }
             await MainActor.run {
-                self.topHashtags = Array(filtered.prefix(10))
+                self.topHashtags = Array(hashtags.prefix(10))
             }
         }
         
@@ -184,10 +182,9 @@ struct HashtagSuggestionPanel: View {
         
         for hashtag in hashtags {
             let cleaned = hashtag.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-            let platformRawValue = platform.rawValue
             let descriptor = FetchDescriptor<HashtagPerformance>(
                 predicate: #Predicate<HashtagPerformance> { performance in
-                    performance.hashtag == cleaned && performance.platform == platformRawValue
+                    performance.hashtag == cleaned
                 }
             )
             

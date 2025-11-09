@@ -15,7 +15,6 @@ public final class SharedDataManager {
             Post.self,
             Artifact.self,  // New Artifact model for cognitive workspace
             Template.self,
-            PlatformAccount.self,
             PerformancePrediction.self,
             RecyclablePost.self,
             ContentTopic.self,

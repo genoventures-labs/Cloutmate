@@ -223,31 +223,11 @@ struct PostCard: View {
     
     var body: some View {
         HStack(spacing: 10) {
-            // Platform badges
-            ForEach(post.postPlatforms, id: \.self) { platform in
-                Image(systemName: platform == .threads ? "t.square.fill" : "f.square.fill")
-                    .font(.system(size: 15))
-                    .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
-                    .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
-            }
+            // Status badge
+            statusBadge
             
             // Time
-            if let scheduledDate = post.scheduledDate {
-                Text(scheduledDate, style: .time)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.accentColor)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        LinearGradient(
-                            colors: [Color.accentColor.opacity(0.15), Color.accentColor.opacity(0.1)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .cornerRadius(6)
-            }
+            timeBadge
             
             // Caption preview
             Text(post.caption)
@@ -258,37 +238,10 @@ struct PostCard: View {
             Spacer()
         }
         .padding(12)
-        .background(
-            Group {
-                if isHovering {
-                    LinearGradient(
-                        colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                } else {
-                    LinearGradient(
-                        colors: [Color.secondary.opacity(0.12), Color.secondary.opacity(0.08)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                }
-            }
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(
-                    isHovering ? Color.accentColor.opacity(0.4) : Color.accentColor.opacity(0.2),
-                    lineWidth: isHovering ? 1.5 : 1
-                )
-        )
+        .background(cardBackground)
+        .overlay(cardBorder)
         .cornerRadius(12)
-        .shadow(
-            color: isHovering ? Color.accentColor.opacity(0.3) : .black.opacity(0.05),
-            radius: isHovering ? 4 : 2,
-            x: 0,
-            y: isHovering ? 2 : 1
-        )
+        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: shadowY)
         .onHover { hovering in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 isHovering = hovering
@@ -298,6 +251,77 @@ struct PostCard: View {
             onTap?()
         }
         .draggable(post.dragInfo)
+    }
+    
+    private var statusBadge: some View {
+        Text(post.postStatus.displayName)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Color.secondary.opacity(0.1))
+            .cornerRadius(4)
+    }
+    
+    @ViewBuilder
+    private var timeBadge: some View {
+        if let scheduledDate = post.scheduledDate {
+            Text(scheduledDate, style: .time)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.accentColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(timeBadgeBackground)
+                .cornerRadius(6)
+        }
+    }
+    
+    private var timeBadgeBackground: some View {
+        LinearGradient(
+            colors: [Color.accentColor.opacity(0.15), Color.accentColor.opacity(0.1)],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+    
+    private var cardBackground: some View {
+        Group {
+            if isHovering {
+                LinearGradient(
+                    colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            } else {
+                LinearGradient(
+                    colors: [Color.secondary.opacity(0.12), Color.secondary.opacity(0.08)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
+    }
+    
+    private var cardBorder: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(
+                isHovering ? Color.accentColor.opacity(0.4) : Color.accentColor.opacity(0.2),
+                lineWidth: isHovering ? 1.5 : 1
+            )
+    }
+    
+    private var shadowColor: Color {
+        isHovering ? Color.accentColor.opacity(0.3) : .black.opacity(0.05)
+    }
+    
+    private var shadowRadius: CGFloat {
+        isHovering ? 4 : 2
+    }
+    
+    private var shadowY: CGFloat {
+        isHovering ? 2 : 1
     }
 }
 

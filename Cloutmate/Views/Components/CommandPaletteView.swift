@@ -130,7 +130,7 @@ struct CommandPaletteView: View {
                 SearchResult(
                     id: post.id.uuidString,
                     title: post.caption.isEmpty ? "Empty Post" : String(post.caption.prefix(50)),
-                    subtitle: post.postStatus.displayName + " · " + post.postPlatforms.map { $0.displayName }.joined(separator: ", "),
+                    subtitle: post.postStatus.displayName,
                     category: .posts,
                     entity: post
                 )

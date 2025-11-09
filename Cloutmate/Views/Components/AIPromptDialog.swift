@@ -9,7 +9,6 @@ import SwiftUI
 import CloutmateShared
 
 struct AIPromptDialog: View {
-    let platform: CloutmateShared.Platform
     let onConfirm: (String) -> Void
     let onCancel: () -> Void
     
@@ -124,50 +123,19 @@ struct AIPromptDialog: View {
     }
     
     private func getPromptHint() -> String {
-        switch platform {
-        case .facebook:
-            return "Tell me about your content idea, topic, or theme for Facebook"
-        case .threads:
-            return "Tell me about your content idea, topic, or theme for Threads"
-        @unknown default:
-            return "Tell me about your content idea, topic, or theme"
-        }
+        return "Tell me about your content idea, topic, or theme"
     }
     
     private func getPlaceholder() -> String {
-        switch platform {
-        case .facebook:
-            return "e.g., Share tips about productivity, announce a new product, or brainstorm content ideas about..."
-        case .threads:
-            return "e.g., Share a quick tip, ask a question, or discuss..."
-        @unknown default:
-            return "e.g., Share your content idea or topic..."
-        }
+        return "e.g., Share your content idea, topic, or what you'd like to create..."
     }
     
     private func getExamplePrompts() -> [String] {
-        switch platform {
-        case .facebook:
-            return [
-                "Tips for productivity",
-                "New product announcement",
-                "Behind the scenes",
-                "Community spotlight"
-            ]
-        case .threads:
-            return [
-                "Quick tip",
-                "Ask a question",
-                "Share a thought",
-                "Start a discussion"
-            ]
-        @unknown default:
-            return [
-                "Content idea",
-                "Topic discussion",
-                "Share thoughts",
-                "Engage audience"
-            ]
-        }
+        return [
+            "Content idea",
+            "Topic discussion",
+            "Share thoughts",
+            "Engage audience"
+        ]
     }
 }

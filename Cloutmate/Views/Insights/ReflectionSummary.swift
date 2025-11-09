@@ -62,15 +62,6 @@ struct ReflectionSummary: View {
             summary += " Your best-performing post achieved \(String(format: "%.1f", engagement))% engagement."
         }
         
-        let threadsPosts = posts.filter { $0.postPlatforms.contains(.threads) }
-        let facebookPosts = posts.filter { $0.postPlatforms.contains(.facebook) }
-        
-        if threadsPosts.count > facebookPosts.count {
-            summary += " You've been posting more frequently on Threads."
-        } else if facebookPosts.count > threadsPosts.count {
-            summary += " You've been posting more frequently on Facebook."
-        }
-        
         return summary
     }
 }

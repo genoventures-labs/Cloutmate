@@ -16,68 +16,9 @@ struct PostDetailPopup: View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Caption
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Caption")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        Text(post.caption)
-                            .font(.body)
-                    }
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
-                    
-                    // Engagement metrics
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Engagement Metrics")
-                            .font(.headline)
-                            .foregroundColor(.secondary)
-                        
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            PostDetailMetricRow(label: "Engagement Rate", value: String(format: "%.1f%%", post.engagementRate ?? 0), icon: "heart.fill", color: .pink)
-                            PostDetailMetricRow(label: "Likes", value: "\(post.likes ?? 0)", icon: "hand.thumbsup.fill", color: .orange)
-                            PostDetailMetricRow(label: "Comments", value: "\(post.comments ?? 0)", icon: "bubble.left.fill", color: .kosmicBlue)
-                            PostDetailMetricRow(label: "Reach", value: "\(post.reach ?? 0)", icon: "eye.fill", color: .kosmicPurple)
-                        }
-                    }
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
-                    
-                    // Post details
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("Published", systemImage: "calendar")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            if let publishedDate = post.publishedDate {
-                                Text(publishedDate, format: .dateTime.month().day().year().hour().minute())
-                                    .font(.subheadline)
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        HStack {
-                            Label("Platforms", systemImage: "square.stack.3d.up")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            HStack(spacing: 8) {
-                                ForEach(post.postPlatforms, id: \.self) { platform in
-                                    Text(platform.displayName)
-                                        .font(.caption)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(platform == .threads ? Color.kosmicPurple.opacity(0.2) : Color.kosmicBlue.opacity(0.2))
-                                        .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
-                                        .cornerRadius(6)
-                                }
-                            }
-                        }
-                    }
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
+                    captionSection
+                    engagementMetricsSection
+                    postDetailsSection
                 }
                 .padding(.vertical)
             }
@@ -91,6 +32,83 @@ struct PostDetailPopup: View {
                 }
             }
         }
+    }
+    
+    private var captionSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Caption")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            Text(post.caption)
+                .font(.body)
+        }
+        .glassPanel(tier: .contentCard, cornerRadius: 12)
+        .padding(.horizontal)
+    }
+    
+    private var engagementMetricsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Engagement Metrics")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                PostDetailMetricRow(
+                    label: "Engagement Rate",
+                    value: String(format: "%.1f%%", post.engagementRate ?? 0),
+                    icon: "heart.fill",
+                    color: .pink
+                )
+                PostDetailMetricRow(
+                    label: "Likes",
+                    value: "\(post.likes ?? 0)",
+                    icon: "hand.thumbsup.fill",
+                    color: .orange
+                )
+                PostDetailMetricRow(
+                    label: "Comments",
+                    value: "\(post.comments ?? 0)",
+                    icon: "bubble.left.fill",
+                    color: .kosmicBlue
+                )
+                PostDetailMetricRow(
+                    label: "Reach",
+                    value: "\(post.reach ?? 0)",
+                    icon: "eye.fill",
+                    color: .kosmicPurple
+                )
+            }
+        }
+        .glassPanel(tier: .contentCard, cornerRadius: 12)
+        .padding(.horizontal)
+    }
+    
+    private var postDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Published", systemImage: "calendar")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                if let publishedDate = post.publishedDate {
+                    Text(publishedDate, format: .dateTime.month().day().year().hour().minute())
+                        .font(.subheadline)
+                }
+            }
+            
+            Divider()
+            
+            HStack {
+                Label("Status", systemImage: "checkmark.circle")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(post.postStatus.displayName)
+                    .font(.subheadline)
+            }
+        }
+        .glassPanel(tier: .contentCard, cornerRadius: 12)
+        .padding(.horizontal)
     }
 }
 

@@ -119,7 +119,6 @@ final class AIExecutionService {
         case all
         case byArea
         case byProject
-        case byPlatform
         case byTag
         case published
         case scheduled
@@ -144,14 +143,6 @@ final class AIExecutionService {
             
         case .scheduled:
             filteredPosts = allPosts.filter { $0.status == "scheduled" }
-            
-        case .byPlatform:
-            guard let platformValue = filterValue else {
-                throw ExecutionError.invalidParameter("platform required for byPlatform filter")
-            }
-            filteredPosts = allPosts.filter { post in
-                post.platforms.contains(platformValue)
-            }
             
         case .byTag:
             guard let tag = filterValue else {

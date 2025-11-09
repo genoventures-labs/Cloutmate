@@ -751,6 +751,15 @@ Aurora:
             return (timeContext, userEnergy, workload, formalityLevel, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions)
         }
         
+        // Check if this is an update-related query and automatically inject changelog data
+        var updateContext = ""
+        if shouldMentionUpdate(for: input) {
+            let relevantUpdates = await getRelevantUpdates(for: input)
+            if !relevantUpdates.isEmpty {
+                updateContext = "\n\n**RELEVANT UPDATE INFORMATION (automatically retrieved for your query):**\n\(relevantUpdates)\n\nUse this information to answer the user's question directly. Do not analyze yourself or give meta-commentary - simply report what the changelog says."
+            }
+        }
+        
         // Build enhanced system prompt with app context and explicit instructions
         var systemPrompt = await buildSystemPrompt(
             appContext: appContext,
@@ -763,6 +772,11 @@ Aurora:
             patternInstructions: patternInstructions,
             memoryInstructions: memoryInstructions
         )
+        
+        // Add update context if available
+        if !updateContext.isEmpty {
+            systemPrompt += updateContext
+        }
         
         // Check for patch notes on first response (if not already announced)
         if !hasAnnouncedPatchNotes {
@@ -1093,8 +1107,8 @@ Aurora:
                     if urlError.code.rawValue == 61 || urlError.localizedDescription.lowercased().contains("connection refused") {
                         lastAvailabilityCheck = nil
                         isAvailableCache = false
-                        throw OllamaError.connectionFailed
-                    }
+                    throw OllamaError.connectionFailed
+                }
                     throw OllamaError.apiError("Network error: \(urlError.localizedDescription)")
                 }
             }
@@ -1204,12 +1218,13 @@ Current app context:
 You have access to your own changelog that tracks updates and changes to your capabilities. When users ask about new features, recent changes, or your capabilities, you can query your changelog to provide accurate, up-to-date information. You can naturally mention relevant updates when they would be helpful to the user (e.g., "I can now do X" when user asks about X). Use the `queryChangelog()` method to retrieve specific information about changes.
 
 **UPDATE INFORMATION:**
-When users ask "when were you updated?", "what's your latest update?", "when did you last change?", or similar questions, you can use:
-- `getUpdateInfo()` - Get comprehensive update information including version, last updated date, total updates, and latest update details
-- `getLatestUpdate()` - Get details about your most recent update
-- `getLastUpdatedDate()` - Get just the date when you were last updated
+When users ask "when were you updated?", "what's your latest update?", "when did you last change?", "what new things did you get yesterday?", "what did you learn recently?", or similar questions about your updates, you MUST:
+1. Use `getUpdateInfo()` or `queryChangelog(days: X)` to retrieve actual changelog entries
+2. Answer based on the changelog data, NOT by analyzing yourself or your responses
+3. For temporal queries like "yesterday", "today", "last week", use the appropriate days parameter (1 day for yesterday/today, 7 days for last week)
+4. Answer conversationally and naturally, like: "Yesterday I got [feature name] - [description]. It [impact]."
 
-Answer these questions naturally and conversationally. For example: "I was last updated on [date]. My latest update was [feature description]."
+CRITICAL: Do NOT analyze your own responses or give meta-commentary. Simply query your changelog and report what it says. If asked "what did you get yesterday?", look up changelog entries from yesterday and tell the user what features were added or changed. Never respond by analyzing your own thinking process or giving self-reflective commentary about your responses.
 
 **GIT COMMIT HISTORY:**
 You have access to git commit history to reference past updates and changes. When discussing updates or changes, you can reference specific commits and their changes. Use `getCommitHistory()`, `getCommitsForFeature()`, or `getCommitDetails()` methods to retrieve commit information. This allows you to link changelog entries to actual code changes and provide detailed context about what changed and when.
@@ -1500,7 +1515,6 @@ You have access to git commit history to reference past updates and changes. Whe
         - reportType: for reports, one of "weekly", "daily", "monthly"
         - daysAhead: for predictions, number of days ahead (default 7)
         - caption: for create_post, the post caption text
-        - platforms: for create_post, array of platforms (each "facebook" or "threads"); default to ["facebook"] if omitted
         - scheduledDate: ISO8601 formatted string for when the post should be scheduled, or null/empty if not scheduling
         - tags: optional array of tags/keywords for the post
         - notes: optional notes for draft metadata
@@ -1729,7 +1743,6 @@ You have access to git commit history to reference past updates and changes. Whe
         let prompt = """
         Extract user preference updates from this message for Cloutmate. Return ONLY JSON with any of these keys when present:
         - preferredPostingHours: array of integers (0-23)
-        - defaultPlatforms: array of strings from {threads, facebook}
         - defaultTone: string (e.g., friendly, professional, playful)
         
         If nothing relevant, return an empty JSON object {}.
@@ -1749,7 +1762,6 @@ You have access to git commit history to reference past updates and changes. Whe
         if let data = cleaned.data(using: .utf8),
            let prefs = try? JSONDecoder().decode(PreferenceUpdate.self, from: data) {
             if (prefs.preferredPostingHours ?? []).isEmpty &&
-                (prefs.defaultPlatforms ?? []).isEmpty &&
                 prefs.defaultTone == nil {
                 return nil
             }
@@ -2372,7 +2384,6 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
                 reportType: intent.reportType,
                 daysAhead: intent.daysAhead,
                 caption: intent.caption,
-                platforms: intent.platforms,
                 scheduledDate: intent.scheduledDate,
                 tags: intent.tags,
                 notes: intent.notes,
@@ -2431,41 +2442,37 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
     }
     
     private func buildToolPrompt(for tool: AITool, input: String, context: String) async -> String {
-        let platformContext = context.isEmpty ? "social media" : context
-        let platform = context.isEmpty ? Platform.facebook : Platform(rawValue: context) ?? .facebook
-        let config = await MainActor.run { PlatformAIConfiguration.configuration(for: platform) }
-        
         switch tool {
         case .brainstorm:
             return """
-            Generate \(config.brainstormCount) distinct content ideas for the following topic on \(platformContext).
+            Generate 5 distinct content ideas for the following topic.
             
             Topic: \(input)
             
-            Format each idea as a numbered list (1., 2., 3., etc.). Each idea should be 1-2 sentences. Focus on engagement, authenticity, and platform-appropriate content.
+            Format each idea as a numbered list (1., 2., 3., etc.). Each idea should be 1-2 sentences. Focus on engagement, authenticity, and clear communication.
             """
             
         case .generateCaptions:
             return """
-            Generate \(config.captionCount) different caption options for \(platformContext).
+            Generate 3 different caption options.
             
             Topic: \(input)
             
-            Format as a numbered list (1., 2., 3., etc.). Each caption should be complete and ready to use. Keep the tone \(config.tone). Platform: \(platformContext).
+            Format as a numbered list (1., 2., 3., etc.). Each caption should be complete and ready to use. Keep the tone engaging and authentic.
             """
             
         case .improveText:
             return """
-            Provide 3 improved versions of this social media post for \(platformContext).
+            Provide 3 improved versions of this text.
             
             Original text: \(input)
             
-            Format as a numbered list (1., 2., 3.). Each version should be a complete improved version. Focus on: better flow, engagement, readability, and keeping a \(config.tone) tone.
+            Format as a numbered list (1., 2., 3.). Each version should be a complete improved version. Focus on: better flow, engagement, readability, and maintaining an authentic tone.
             """
             
         case .suggestHashtags:
             return """
-            Suggest \(config.maxHashtags) relevant hashtags for this content on \(platformContext).
+            Suggest 10 relevant hashtags for this content.
             
             Content: \(input)
             
@@ -2475,7 +2482,7 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
         case .adjustTone:
             let toneRequest = context.isEmpty ? "make it more engaging and personal" : context
             return """
-            Provide 3 tone variations of this text for \(platformContext).
+            Provide 3 tone variations of this text.
             
             Original text: \(input)
             
@@ -2510,13 +2517,34 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
     /// Check if a user query relates to a recent update
     nonisolated func shouldMentionUpdate(for query: String) -> Bool {
         let lowercasedQuery = query.lowercased()
-        let updateKeywords = ["new", "update", "change", "feature", "capability", "can you", "what can", "recent", "latest"]
-        return updateKeywords.contains { lowercasedQuery.contains($0) }
+        let updateKeywords = ["new", "update", "change", "feature", "capability", "can you", "what can", "recent", "latest", "what did you get", "what did you learn", "what's new", "what changed"]
+        
+        // Check for temporal update queries
+        let temporalPatterns = ["yesterday", "today", "last week", "recently", "lately", "this week"]
+        let hasTemporal = temporalPatterns.contains { lowercasedQuery.contains($0) }
+        let hasUpdateKeyword = updateKeywords.contains { lowercasedQuery.contains($0) }
+        
+        // Also check for "what did you get/learn/receive" patterns
+        let getPatterns = ["what did you get", "what did you learn", "what did you receive", "what have you got", "what have you learned"]
+        let hasGetPattern = getPatterns.contains { lowercasedQuery.contains($0) }
+        
+        return hasUpdateKeyword || (hasTemporal && hasGetPattern) || hasGetPattern
     }
     
     /// Get relevant updates for a user query
     func getRelevantUpdates(for query: String) async -> String {
         let lowercasedQuery = query.lowercased()
+        
+        // Check for temporal queries (yesterday, today, last week, etc.)
+        if lowercasedQuery.contains("yesterday") {
+            return await queryChangelog(days: 1, userFacingOnly: true)
+        } else if lowercasedQuery.contains("today") {
+            return await queryChangelog(days: 1, userFacingOnly: true)
+        } else if lowercasedQuery.contains("last week") || lowercasedQuery.contains("this week") {
+            return await queryChangelog(days: 7, userFacingOnly: true)
+        } else if lowercasedQuery.contains("recently") || lowercasedQuery.contains("lately") {
+            return await queryChangelog(days: 7, userFacingOnly: true)
+        }
         
         // Check for specific feature mentions
         let features = ["model", "ollama", "offline", "airplane", "focus", "memory", "priority", "ritual", "predictive", "temporal", "document", "image", "changelog"]

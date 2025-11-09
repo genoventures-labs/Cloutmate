@@ -27,7 +27,6 @@ struct PostPreviewSheet: View {
         NavigationStack {
             Form {
                 captionSection(post)
-                platformsSection(post)
                 scheduleSection(post)
                 publishedSection(post)
                 statusSection(post)
@@ -80,21 +79,6 @@ struct PostPreviewSheet: View {
             Text("\(post.caption.count) characters")
                 .font(.caption)
                 .foregroundColor(.secondary)
-        }
-    }
-    
-    private func platformsSection(_ post: CloutmateShared.Post) -> some View {
-        Section("Platforms") {
-            ForEach(post.postPlatforms, id: \.self) { platform in
-                HStack {
-                    Image(systemName: platform == .threads ? "t.square.fill" : "f.square.fill")
-                        .font(.title3)
-                        .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
-                    
-                    Text(platform.displayName)
-                        .font(.body)
-                }
-            }
         }
     }
     
@@ -272,7 +256,7 @@ struct MetricRow: View {
 }
 
 #Preview {
-    PostPreviewSheet(post: .constant(CloutmateShared.Post(caption: "Test caption", platforms: ["threads"])))
+    PostPreviewSheet(post: .constant(CloutmateShared.Post(caption: "Test caption")))
         .modelContainer(for: [CloutmateShared.Post.self])
 }
 

@@ -39,7 +39,9 @@ actor ModelRoutingEngine {
                 messageLength: messageLength,
                 userStyle: userStyle
             )
-            let useThinking = ModelTierMap.supportsThinking(model) && !isCasualForCooldown
+            // Disable thinking for short queries even during cooldown
+            let isShortQuery = messageLength < 80
+            let useThinking = ModelTierMap.supportsThinking(model) && !isCasualForCooldown && !isShortQuery
             return (model, useThinking)
         }
         
@@ -61,12 +63,15 @@ actor ModelRoutingEngine {
         let selectedModel: String
         let useThinking: Bool
         
+        // Disable thinking for short, casual queries (< 80 chars)
+        let isShortQuery = messageLength < 80
+        
         if needsDeepReasoning {
             // Deep reasoning → DeepSeek
             selectedModel = ModelTierMap.deepReasoningModel()
             useThinking = true
-        } else if isCasual {
-            // Casual → Qwen3, no thinking
+        } else if isCasual || isShortQuery {
+            // Casual or short → Qwen3, no thinking
             selectedModel = ModelTierMap.defaultModel()
             useThinking = false
         } else {

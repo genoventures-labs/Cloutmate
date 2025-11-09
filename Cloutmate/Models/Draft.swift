@@ -55,12 +55,11 @@ final class Draft {
         self.wordCount = Draft.calculateWordCount(for: caption, notes: notes, title: title)
     }
     
-    func toPost(platforms: [Platform], scheduledDate: Date?) -> Post {
+    func toPost(scheduledDate: Date?) -> Post {
         let post = Post(
             caption: caption,
             mediaURLs: mediaURLs,
             scheduledDate: scheduledDate,
-            platforms: platforms.map { $0.rawValue },
             status: scheduledDate != nil ? PostStatus.scheduled.rawValue : PostStatus.draft.rawValue,
             tags: tags
         )

@@ -15,7 +15,6 @@ struct AreaCadenceSettingsView: View {
     @State private var postsPerWeek = 3
     @State private var quietHoursStart = 21
     @State private var quietHoursEnd = 8
-    @State private var selectedPlatforms: Set<Platform> = [.threads]
     @State private var autoSchedule = false
     
     var body: some View {
@@ -100,34 +99,6 @@ struct AreaCadenceSettingsView: View {
                     .glassPanel(tier: .contentCard, cornerRadius: 12)
                     .padding(.horizontal)
                     
-                    // Platform preferences
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Preferred Platforms")
-                            .font(.subheadline)
-                            .padding(.horizontal)
-                        
-                        ForEach(Platform.allCases, id: \.self) { platform in
-                            Toggle(isOn: Binding(
-                                get: { selectedPlatforms.contains(platform) },
-                                set: { selected in
-                                    if selected {
-                                        selectedPlatforms.insert(platform)
-                                    } else {
-                                        selectedPlatforms.remove(platform)
-                                    }
-                                }
-                            )) {
-                                HStack {
-                                    Image(systemName: platform == .threads ? "t.square.fill" : "f.square.fill")
-                                    Text(platform.displayName)
-                                }
-                            }
-                        }
-                    }
-                    .padding()
-                    .glassPanel(tier: .contentCard, cornerRadius: 12)
-                    .padding(.horizontal)
-                    
                     // Auto schedule
                     Toggle(isOn: $autoSchedule) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -170,10 +141,6 @@ struct AreaCadenceSettingsView: View {
                     }
                 }
                 
-                if let platforms = settings["preferred_platforms"] as? [String] {
-                    selectedPlatforms = Set(platforms.compactMap { Platform(rawValue: $0) })
-                }
-                
                 autoSchedule = settings["auto_schedule"] as? Bool ?? false
             }
         } catch {
@@ -185,7 +152,6 @@ struct AreaCadenceSettingsView: View {
         var settings: [String: Any] = [:]
         settings["posts_per_week"] = postsPerWeek
         settings["quiet_hours"] = "\(quietHoursStart)-\(quietHoursEnd)"
-        settings["preferred_platforms"] = selectedPlatforms.map { $0.rawValue }
         settings["auto_schedule"] = autoSchedule
         
         do {

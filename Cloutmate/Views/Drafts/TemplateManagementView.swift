@@ -77,7 +77,6 @@ struct CreateTemplateSheet: View {
     
     @State private var name = ""
     @State private var caption = ""
-    @State private var selectedPlatforms: Set<Platform> = []
     @State private var tags: [String] = []
     
     var body: some View {
@@ -90,21 +89,6 @@ struct CreateTemplateSheet: View {
                 Section("Content") {
                     TextEditor(text: $caption)
                         .frame(minHeight: 100)
-                }
-                
-                Section("Platforms") {
-                    ForEach(Platform.allCases, id: \.self) { platform in
-                        Toggle(platform.displayName, isOn: Binding(
-                            get: { selectedPlatforms.contains(platform) },
-                            set: { isOn in
-                                if isOn {
-                                    selectedPlatforms.insert(platform)
-                                } else {
-                                    selectedPlatforms.remove(platform)
-                                }
-                            }
-                        ))
-                    }
                 }
                 
                 Section("Tags") {
@@ -134,7 +118,6 @@ struct CreateTemplateSheet: View {
         let template = Template(
             name: name,
             caption: caption,
-            platforms: Array(selectedPlatforms).map { $0.rawValue },
             tags: tags
         )
         modelContext.insert(template)
@@ -154,20 +137,6 @@ struct TemplateEditorView: View {
             Section("Content") {
                 TextEditor(text: $template.caption)
                     .frame(minHeight: 100)
-            }
-            
-            Section("Platforms") {
-                HStack(spacing: 8) {
-                    ForEach(template.templatePlatforms, id: \.self) { platform in
-                        Text(platform.displayName)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(platform == .threads ? Color.kosmicPurple.opacity(0.2) : Color.kosmicBlue.opacity(0.2))
-                            .foregroundColor(platform == .threads ? .kosmicPurple : .kosmicBlue)
-                            .cornerRadius(8)
-                    }
-                }
             }
             
             Section("Tags") {

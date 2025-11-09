@@ -34,7 +34,6 @@ struct DraftPublishingSheet: View {
     @State private var destinationNotesTitle: String = ""
     @State private var destinationNotesTags: String = ""
     
-    @State private var socialPlatformHint: SocialPlatformHint = .threads
     @State private var customExportFileName: String = ""
     
     private let titleSuggestionLimit: Int = 3
@@ -195,18 +194,11 @@ struct DraftPublishingSheet: View {
     private var captionGeneratorSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $includeCaptionGenerator.animation()) {
-                Label("Generate social caption", systemImage: "sparkles.tv")
+                Label("Generate caption", systemImage: "sparkles.tv")
                     .font(.headline)
             }
             
             if includeCaptionGenerator {
-                Picker("Platform focus", selection: $socialPlatformHint) {
-                    ForEach(SocialPlatformHint.allCases) { hint in
-                        Text(hint.displayName).tag(hint)
-                    }
-                }
-                .pickerStyle(.segmented)
-                
                 Button {
                     Task { await generateCaption() }
                 } label: {
@@ -363,10 +355,7 @@ struct DraftPublishingSheet: View {
     
     private func generateCaption() async {
         do {
-            let caption = try await DraftEnhancementService.shared.generateCaption(
-                for: draft,
-                platform: socialPlatformHint
-            )
+            let caption = try await DraftEnhancementService.shared.generateCaption(for: draft)
             await MainActor.run {
                 self.generatedCaption = caption
             }
@@ -517,22 +506,6 @@ enum ExternalExportFormat: String, CaseIterable, Identifiable {
         switch self {
         case .markdown: return "Markdown"
         case .pdf: return "PDF"
-        }
-    }
-}
-
-enum SocialPlatformHint: String, CaseIterable, Identifiable {
-    case threads
-    case instagram
-    case linkedin
-    
-    var id: String { rawValue }
-    
-    var displayName: String {
-        switch self {
-        case .threads: return "Threads"
-        case .instagram: return "Instagram"
-        case .linkedin: return "LinkedIn"
         }
     }
 }

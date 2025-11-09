@@ -34,7 +34,7 @@ final class AIAssistantViewModel {
     var searchText = ""
     var selectedDateFilter: DateFilter = .all
     var selectedTags: Set<String> = []
-    var selectedPlatform: Platform = .facebook
+    var conversationMode: ConversationMode = .operational
     var isLoading = false
     var errorMessage: String?
     var pendingImageAttachment: ImageAttachmentService.ImageAttachment?
@@ -342,7 +342,7 @@ final class AIAssistantViewModel {
                         prefs.preferredPostingHours = hours
                     }
                     if let platforms = prefUpdate.defaultPlatforms, !platforms.isEmpty {
-                        prefs.defaultPlatforms = platforms
+                        // Platforms removed - no longer used
                     }
                     if let tone = prefUpdate.defaultTone, !tone.isEmpty {
                         prefs.defaultTone = tone
@@ -621,13 +621,28 @@ final class AIAssistantViewModel {
             let webSearchResultsForMessage: WebSearchResults? = webSearchResult.map { WebSearchResults(from: $0) }
             let webSearchConfidenceScore: Double? = webSearchResult?.confidence
             
+            // Limit thinking content to 600-800 chars max for storage efficiency
+            let limitedThinkingContent: String? = {
+                guard let thinking = result.thinking, !thinking.isEmpty else { return nil }
+                let maxLength = 700 // Target ~700 chars (middle of 600-800 range)
+                if thinking.count > maxLength {
+                    // Truncate at word boundary near the limit
+                    let truncated = String(thinking.prefix(maxLength))
+                    if let lastSpace = truncated.lastIndex(of: " ") {
+                        return String(truncated[..<lastSpace]) + "..."
+                    }
+                    return truncated + "..."
+                }
+                return thinking
+            }()
+            
             let assistantMessage = AIMessage(
                 role: "assistant",
                 content: response,
                 confidenceScore: confidenceSnapshot.score,
                 webSearchResults: webSearchResultsForMessage,
                 webSearchConfidence: webSearchConfidenceScore,
-                thinkingContent: result.thinking,
+                thinkingContent: limitedThinkingContent,
                 modelUsed: result.modelUsed,
                 wasThinking: result.thinking != nil && !result.thinking!.isEmpty
             )
@@ -719,7 +734,8 @@ final class AIAssistantViewModel {
         }
         let recallSnippets = AIRecallService.shared.fetchRelevantSnippets(
             for: text,
-            modelContext: modelContext
+            modelContext: modelContext,
+            mode: conversationMode
         )
         let conversationReferencedIDs = recallSnippets.filter { $0.score >= 0.65 }.map { $0.objectId }
         if !conversationReferencedIDs.isEmpty {
@@ -1200,7 +1216,6 @@ final class AIAssistantViewModel {
                     reportType: intent.reportType,
                     daysAhead: intent.daysAhead,
                     caption: intent.caption,
-                    platforms: intent.platforms,
                     scheduledDate: intent.scheduledDate,
                     tags: intent.tags,
                     notes: intent.notes,
@@ -1539,15 +1554,12 @@ final class AIAssistantViewModel {
                     }
                 }
                 
-                let platformStrings = intent.platforms ?? ["facebook"]
-                let platforms = platformStrings.compactMap { Platform(rawValue: $0.lowercased()) }
                 let scheduledDate = parseISODate(intent.scheduledDate)
                 let tags = intent.tags ?? []
                 
                 for (index, caption) in postCaptions.enumerated() {
                     let postRequest = PostCreationRequest(
                         caption: caption,
-                        platforms: platforms.isEmpty ? [.facebook] : platforms,
                         scheduledDate: scheduledDate,
                         tags: tags,
                         notes: intent.notes,
@@ -1779,15 +1791,12 @@ final class AIAssistantViewModel {
                     }
                 }
                 
-                let platformStrings = intent.platforms ?? ["facebook"]
-                let platforms = platformStrings.compactMap { Platform(rawValue: $0.lowercased()) }
                 let scheduledDate = parseISODate(intent.scheduledDate)
                 let tags = intent.tags ?? []
                 
                 for (index, caption) in postCaptions.enumerated() {
                     let postRequest = PostCreationRequest(
                         caption: caption,
-                        platforms: platforms.isEmpty ? [.facebook] : platforms,
                         scheduledDate: scheduledDate,
                         tags: tags,
                         notes: intent.notes,
@@ -1871,15 +1880,12 @@ final class AIAssistantViewModel {
             return
         }
         
-        let platformStrings = intent.platforms ?? ["facebook"]
-        let platforms = platformStrings.compactMap { Platform(rawValue: $0.lowercased()) }
         let scheduledDate = parseISODate(intent.scheduledDate)
         let tags = intent.tags ?? []
         
         do {
             let postRequest = PostCreationRequest(
                 caption: caption,
-                platforms: platforms.isEmpty ? [.facebook] : platforms,
                 scheduledDate: scheduledDate,
                 tags: tags,
                 notes: intent.notes,
@@ -2319,7 +2325,7 @@ final class AIAssistantViewModel {
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
         
-        let result = await aiService.executeTool(tool, input: topic, context: selectedPlatform.rawValue)
+        let result = await aiService.executeTool(tool, input: topic, context: "")
         
         // Extract clean content for the tool result
         let cleanResult = extractCleanContent(from: result.result, tool: tool)
@@ -2521,8 +2527,6 @@ final class AIAssistantViewModel {
             guard let caption = pending.collectedFields[.postCaption] ?? trimmed(pending.intent.caption), !caption.isEmpty else {
                 return nil
             }
-            let platformStrings = pending.intent.platforms ?? ["facebook"]
-            let platforms = platformStrings.compactMap { Platform(rawValue: $0.lowercased()) }
             let scheduledDate = parseISODate(pending.intent.scheduledDate)
             let tags = pending.intent.tags ?? []
             let notes = pending.intent.notes
@@ -2530,7 +2534,6 @@ final class AIAssistantViewModel {
             let draftId = pending.intent.draftId.flatMap(UUID.init(uuidString:))
             let request = PostCreationRequest(
                 caption: caption,
-                platforms: platforms.isEmpty ? [.facebook] : platforms,
                 scheduledDate: scheduledDate,
                 tags: tags,
                 notes: notes,

@@ -102,7 +102,7 @@ class WorkspaceObjectSearchService {
             for post in posts {
                 let score = calculateMatchScore(text: post.caption.lowercased(), query: lowerQuery)
                 if score > 0 {
-                    let subtitle = post.postStatus.displayName + " · " + post.postPlatforms.map { $0.displayName }.joined(separator: ", ")
+                    let subtitle = post.postStatus.displayName
                     results.append(WorkspaceObjectResult(
                         id: post.id,
                         type: .post,
@@ -247,7 +247,7 @@ class WorkspaceObjectSearchService {
                 predicate: #Predicate { $0.id == id }
             )
             if let post = try? modelContext.fetch(descriptor).first {
-                let subtitle = post.postStatus.displayName + " · " + post.postPlatforms.map { $0.displayName }.joined(separator: ", ")
+                let subtitle = post.postStatus.displayName
                 return (title: post.caption.isEmpty ? "Empty Post" : String(post.caption.prefix(50)), subtitle: subtitle)
             }
         case .reminder:

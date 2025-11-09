@@ -11,23 +11,10 @@ import CloutmateShared
 struct AIAssistantPopover: View {
     let onToolSelected: (AITool) -> Void
     let contextText: String = ""
-    let platform: CloutmateShared.Platform
     
     var availableTools: [AITool] {
-        // Convert CloutmateShared.Platform to local Platform for configuration
-        // Local Platform enum is in Cloutmate/Models/Platform.swift
-        enum LocalPlatform: String {
-            case threads = "threads"
-            case facebook = "facebook"
-        }
-        let localPlatformValue = LocalPlatform(rawValue: platform.rawValue) ?? .facebook
-        // Use platform-specific tool availability
-        switch localPlatformValue {
-        case .facebook:
-            return [.brainstorm, .generateCaptions, .suggestHashtags, .improveText, .adjustTone]
-        case .threads:
-            return [.brainstorm, .generateCaptions, .suggestHashtags, .improveText]
-        }
+        // All tools available for internal content creation
+        return [.brainstorm, .generateCaptions, .suggestHashtags, .improveText, .adjustTone]
     }
     
     var body: some View {
@@ -84,6 +71,6 @@ struct AIAssistantPopover: View {
 }
 
 #Preview {
-    AIAssistantPopover(onToolSelected: { _ in }, platform: .facebook)
+    AIAssistantPopover(onToolSelected: { _ in })
         .padding()
 }

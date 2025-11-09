@@ -191,9 +191,9 @@ struct CalendarDayCell: View {
             if !posts.isEmpty {
                 HStack(spacing: 3) {
                     ForEach(posts.prefix(2), id: \.id) { post in
-                        Image(systemName: post.postPlatforms.contains(.threads) ? "t.square.fill" : "f.square.fill")
+                        Image(systemName: "doc.text")
                             .font(.system(size: 11))
-                            .foregroundColor(post.postPlatforms.contains(.threads) ? .kosmicPurple : .kosmicBlue)
+                            .foregroundColor(.kosmicBlue)
                             .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
                             .onTapGesture {
                                 onPostClick?(post)
@@ -250,12 +250,7 @@ struct CalendarDayCell: View {
     }
     
     private func colorForPost(_ post: CloutmateShared.Post) -> Color {
-        if post.postPlatforms.contains(.threads) {
-            return .kosmicPurple
-        } else if post.postPlatforms.contains(.facebook) {
-            return .kosmicBlue
-        }
-        return .gray
+        return .kosmicBlue
     }
 }
 

@@ -45,7 +45,6 @@ nonisolated enum SchemaIntrospector {
             "mediaURLs: [String]",
             "scheduledDate: Date?",
             "publishedDate: Date?",
-            "platforms: [String] (Platform.rawValue)",
             "status: String (PostStatus)",
             "tags: [String]",
             "engagementRate: Double?",
@@ -54,8 +53,6 @@ nonisolated enum SchemaIntrospector {
             "comments: Int?",
             "saves: Int?",
             "reach: Int?",
-            "threadsPostID: String?",
-            "facebookPostID: String?",
             "retryCount: Int",
             "lastError: String?",
             "projectId: UUID?",
@@ -125,13 +122,6 @@ nonisolated enum SchemaIntrospector {
             "convertedToType: String? (task|note|post|project)",
             "convertedToId: UUID?",
             "convertedAt: Date?"
-        ])
-        doc += section("PlatformAccount", fields: [
-            "id: UUID",
-            "platform: String (threads|facebook)",
-            "accountID: String",
-            "displayName: String?",
-            "connectedAt: Date"
         ])
         doc += section("InsightSnapshot", fields: [
             "id: UUID",

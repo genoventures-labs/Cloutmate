@@ -228,7 +228,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				CloutmateShared/CloutmateShared/Models/Platform.swift,
-				CloutmateShared/CloutmateShared/Models/PlatformAccount.swift,
 				CloutmateShared/CloutmateShared/Models/Post.swift,
 				CloutmateShared/CloutmateShared/Models/Template.swift,
 			);
@@ -238,7 +237,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				CloutmateShared/CloutmateShared/Models/Platform.swift,
-				CloutmateShared/CloutmateShared/Models/PlatformAccount.swift,
 				CloutmateShared/CloutmateShared/Models/Post.swift,
 				CloutmateShared/CloutmateShared/Models/Template.swift,
 			);

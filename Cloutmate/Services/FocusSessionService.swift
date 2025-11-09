@@ -8,6 +8,7 @@
 
 import Foundation
 import SwiftData
+import Combine
 import os.log
 
 @MainActor
@@ -70,6 +71,13 @@ final class FocusSessionService {
             try modelContext.save()
             logger.info("Focus session started: \(session.objective) for \(session.plannedDuration / 60) minutes")
             AIDebug.log("Focus session started: \(session.id.uuidString)")
+            
+            // Auto-activate Flow Hold for deep work sessions
+            if shouldActivateFlowHold(for: session) {
+                FlowHoldService.shared.activateFlowHold(duration: session.plannedDuration)
+                logger.info("Flow Hold activated for deep work session")
+            }
+            
             NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
             NotificationCenter.default.post(name: .focusSessionStarted, object: session)
         } catch {
@@ -134,6 +142,12 @@ final class FocusSessionService {
 
             NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
             NotificationCenter.default.post(name: .focusSessionEnded, object: session)
+            
+            // Deactivate Flow Hold when session ends
+            if FlowHoldService.shared.isActive {
+                FlowHoldService.shared.deactivateFlowHold()
+                logger.info("Flow Hold deactivated after session completion")
+            }
         } catch {
             logger.error("Failed to commit focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
@@ -173,6 +187,12 @@ final class FocusSessionService {
 
             NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
             NotificationCenter.default.post(name: .focusSessionEnded, object: session)
+            
+            // Deactivate Flow Hold when session ends
+            if FlowHoldService.shared.isActive {
+                FlowHoldService.shared.deactivateFlowHold()
+                logger.info("Flow Hold deactivated after session abandonment")
+            }
         } catch {
             logger.error("Failed to abandon focus session: \(error.localizedDescription)")
             throw FocusSessionError.saveFailed
@@ -181,7 +201,26 @@ final class FocusSessionService {
         return session
     }
     
-    // MARK: - Streak & Analytics
+    // MARK: - Flow Hold Integration
+    
+    /// Determine if Flow Hold should be activated for this session
+    private func shouldActivateFlowHold(for session: FocusSession) -> Bool {
+        // Check if auto-activation is enabled
+        guard FlowHoldSettings.shared.isAutoActivationEnabled else {
+            return false
+        }
+        
+        // Activate for deep work sessions (longer duration or specific energy requirement)
+        // Sessions >= 45 minutes are considered deep work
+        if session.plannedDuration >= FlowHoldSettings.shared.minimumDuration {
+            return true
+        }
+        
+        // Could also check energy requirement if stored on session
+        // For now, use duration as the primary indicator
+        
+        return false
+    }
     
     /// Get current focus streak count (consecutive days with completed sessions)
     func getStreakCount(modelContext: ModelContext) -> Int {
@@ -313,6 +352,39 @@ Items finished: \(session.itemsCompleted.count)
             detail: detail,
             timestamp: session.endTime ?? session.startTime
         )
+    }
+}
+
+// MARK: - Flow Hold Settings
+
+@MainActor
+final class FlowHoldSettings: ObservableObject {
+    static let shared = FlowHoldSettings()
+    
+    private struct Keys {
+        static let autoActivationEnabled = "flowHold.autoActivationEnabled"
+        static let minimumDuration = "flowHold.minimumDuration"
+    }
+    
+    @Published var isAutoActivationEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isAutoActivationEnabled, forKey: Keys.autoActivationEnabled)
+        }
+    }
+    
+    @Published var minimumDuration: TimeInterval {
+        didSet {
+            UserDefaults.standard.set(minimumDuration, forKey: Keys.minimumDuration)
+        }
+    }
+    
+    private init() {
+        self.isAutoActivationEnabled = UserDefaults.standard.object(forKey: Keys.autoActivationEnabled) as? Bool ?? true
+        if let value = UserDefaults.standard.object(forKey: Keys.minimumDuration) as? TimeInterval {
+            self.minimumDuration = value
+        } else {
+            self.minimumDuration = 2700 // Default 45 minutes
+        }
     }
 }
 

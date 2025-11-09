@@ -19,11 +19,12 @@ struct CalendarPostListSheet: View {
         var result: [String: [CloutmateShared.Post]] = [:]
         
         for post in posts {
-            let platformName = post.postPlatforms.map { $0.displayName }.joined(separator: ", ")
-            if result[platformName] == nil {
-                result[platformName] = []
+            // Group by status instead of platform
+            let groupKey = post.postStatus.displayName
+            if result[groupKey] == nil {
+                result[groupKey] = []
             }
-            result[platformName]?.append(post)
+            result[groupKey]?.append(post)
         }
         
         return result
@@ -91,9 +92,9 @@ struct CalendarPostListSheet: View {
     }
     
     private var postsList: some View {
-        ForEach(Array(groupedPosts.keys.sorted()), id: \.self) { platform in
-            if let platformPosts = groupedPosts[platform] {
-                platformPostsSection(platform: platform, posts: platformPosts)
+        ForEach(Array(groupedPosts.keys.sorted()), id: \.self) { groupKey in
+            if let groupPosts = groupedPosts[groupKey] {
+                platformPostsSection(platform: groupKey, posts: groupPosts)
             }
         }
     }

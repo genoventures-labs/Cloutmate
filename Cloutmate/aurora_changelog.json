@@ -1,7 +1,832 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-09T08:41:04.263491Z",
+  "lastUpdated": "2025-11-09T17:31:32.558603Z",
   "entries": [
+    {
+      "id": "b70f1d8e-6902-42e0-a97f-ab420b485996",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Cloutmate App",
+      "changeType": "improved",
+      "description": "Improved Cloutmate App",
+      "impact": "Enhances Cloutmate App performance or features",
+      "userFacing": false,
+      "tags": [],
+      "commitHash": null
+    },
+    {
+      "id": "311fdc57-7a12-46ed-bed8-b426797a9217",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aurora Self Diagnostic",
+      "changeType": "added",
+      "description": "Format space saved as human-readable string",
+      "impact": "Adds new Aurora Self Diagnostic capability",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "886e5ecb-6178-4d32-8031-34e503cdb697",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Draft",
+      "changeType": "improved",
+      "description": "Improved Draft",
+      "impact": "Enhances Draft performance or features",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "ede7c0be-c494-4580-8058-85fba4d36c21",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Memory Summary",
+      "changeType": "added",
+      "description": "Set embedding vector",
+      "impact": "Adds new Memory Summary capability",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2a3faa84-db34-45f7-91da-c5bf27c33881",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiaction Router",
+      "changeType": "improved",
+      "description": "Resolve a mention text to an entity (type, ID, display name)",
+      "impact": "Enhances Aiaction Router performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "02434ba3-c484-4d03-a96b-ceb2c170a61a",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aicreative",
+      "changeType": "improved",
+      "description": "Improved Aicreative",
+      "impact": "Enhances Aicreative performance or features",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "ollama",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "28495f90-ea67-47d2-b776-5f12136abc3c",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiexecution",
+      "changeType": "improved",
+      "description": "Improved Aiexecution",
+      "impact": "Enhances Aiexecution performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e0e70bbd-d690-4222-ae1a-74a6a6c97b1c",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Airecall",
+      "changeType": "improved",
+      "description": "Focus session context for AI payload",
+      "impact": "Enhances Airecall performance or features",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "ollama",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "78ab2cd6-9e29-457e-9ffc-a593c57d5902",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "App Context",
+      "changeType": "improved",
+      "description": "Improved App Context",
+      "impact": "Enhances App Context performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f4727fad-f158-4270-a0cb-d57c7c475103",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Artifact Migration",
+      "changeType": "improved",
+      "description": "Improved Artifact Migration",
+      "impact": "Enhances Artifact Migration performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "96510bc4-2d89-40c9-b221-b15ca01afc4a",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aurora Self Reflection",
+      "changeType": "added",
+      "description": "Generate a self-reflection diagnostic for Aurora",
+      "impact": "Adds new Aurora Self Reflection capability",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d70da5c7-bd80-480c-93a5-8f4cb39937c9",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Core Response",
+      "changeType": "improved",
+      "description": "Converts AIMessage array to ConversationMessage array",
+      "impact": "Enhances Core Response performance or features",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "ollama",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2e51af80-f4d6-4d87-96e3-d25b96a742ae",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Draft Enhancement",
+      "changeType": "improved",
+      "description": "Improved Draft Enhancement",
+      "impact": "Enhances Draft Enhancement performance or features",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f41b9227-6940-4834-b7c7-ab0646020fd9",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Focus Session",
+      "changeType": "improved",
+      "description": "Get the current active session, if any",
+      "impact": "Enhances Focus Session performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b96d9ae6-c508-44e9-b763-5aea134d91db",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Memory Compression",
+      "changeType": "added",
+      "description": "Compress old/inactive data (>90 days)",
+      "impact": "Adds new Memory Compression capability",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "ollama",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "703f8cdf-4fe0-41f6-b7b4-16d2fbf9b217",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Model Routing Engine",
+      "changeType": "improved",
+      "description": "Selects the best model for a given input with casual detection and cooldown",
+      "impact": "Enhances Model Routing Engine performance or features",
+      "userFacing": false,
+      "tags": [
+        "concurrency",
+        "service",
+        "model",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4f14a1e7-200e-4857-87d8-76970fdab857",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "ollama",
+        "system-prompt",
+        "backend",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "dc11cb1c-2f14-4268-a624-64235f730b1a",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Ritual Analytics",
+      "changeType": "improved",
+      "description": "Improved Ritual Analytics",
+      "impact": "Enhances Ritual Analytics performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "054cd037-aaed-4898-ad39-4aa19541587b",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Schema Introspector",
+      "changeType": "improved",
+      "description": "Improved Schema Introspector",
+      "impact": "Enhances Schema Introspector performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4552b450-1120-4869-92a6-29561230cb91",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Smart Automation Engine",
+      "changeType": "improved",
+      "description": "Analyze user behavior and detect recurring patterns",
+      "impact": "Enhances Smart Automation Engine performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "becc0789-48c5-4672-954d-cb12078729f3",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Workspace Object Search",
+      "changeType": "improved",
+      "description": "Search all workspace objects by query string",
+      "impact": "Enhances Workspace Object Search performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "674db62c-19e1-4e69-895a-f68eeef7822f",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Converts structured execution results to conversational format",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "ui",
+        "model",
+        "ollama"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "fca63a39-3619-4408-868c-067435c28dcf",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aurora Self Reflection",
+      "changeType": "added",
+      "description": "Added Aurora Self Reflection functionality",
+      "impact": "Adds new Aurora Self Reflection capability",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "410955cb-0b87-48f7-ac7c-38b77ec67927",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Area Cadence Settings",
+      "changeType": "improved",
+      "description": "Improved Area Cadence Settings",
+      "impact": "Enhances Area Cadence Settings performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d61da550-ab95-47de-a496-aaaaea809cd0",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Calendar Post List Sheet",
+      "changeType": "improved",
+      "description": "Improved Calendar Post List Sheet",
+      "impact": "Enhances Calendar Post List Sheet performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d7bd8f58-9ebb-4238-9447-8f1fb5354147",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Monthly Calendar",
+      "changeType": "improved",
+      "description": "Improved Monthly Calendar",
+      "impact": "Enhances Monthly Calendar performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8e198050-307e-487b-a66e-9526f948168a",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Post Preview Sheet",
+      "changeType": "improved",
+      "description": "Improved Post Preview Sheet",
+      "impact": "Enhances Post Preview Sheet performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "86d0027d-ec6d-4d12-ad56-3ea400f583d1",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Weekly Calendar",
+      "changeType": "improved",
+      "description": "Improved Weekly Calendar",
+      "impact": "Enhances Weekly Calendar performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4c2a0599-c442-41c3-b81a-5c795a3e6a1c",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiassistant Popover",
+      "changeType": "modified",
+      "description": "Updated Aiassistant Popover",
+      "impact": "Affects Aiassistant Popover functionality",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "fccfeb81-c8b5-412f-85ac-ca46a6239627",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiprompt Dialog",
+      "changeType": "improved",
+      "description": "Improved Aiprompt Dialog",
+      "impact": "Enhances Aiprompt Dialog performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b0e31d85-dbc0-4c9f-b225-6e0964c2f4a2",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiselection Sheet",
+      "changeType": "improved",
+      "description": "Improved Aiselection Sheet",
+      "impact": "Enhances Aiselection Sheet performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bfa1e631-334c-4978-a7fa-5a332eb6743f",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Command Palette",
+      "changeType": "improved",
+      "description": "Improved Command Palette",
+      "impact": "Enhances Command Palette performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "1fa37419-d837-4942-9060-1d2bf64e942a",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Artifact Composer",
+      "changeType": "improved",
+      "description": "Improved Artifact Composer",
+      "impact": "Enhances Artifact Composer performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "427a0faa-09c7-48a6-a368-0f3b4ef87b0f",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Composer Window",
+      "changeType": "improved",
+      "description": "Improved Composer Window",
+      "impact": "Enhances Composer Window performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f38de855-663a-4ec0-811a-c802fad94d95",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Hashtag Suggestion Panel",
+      "changeType": "improved",
+      "description": "Improved Hashtag Suggestion Panel",
+      "impact": "Enhances Hashtag Suggestion Panel performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "37373a7a-354e-40df-9a14-78f51ed27384",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Performance Predictor Panel",
+      "changeType": "improved",
+      "description": "Improved Performance Predictor Panel",
+      "impact": "Enhances Performance Predictor Panel performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "concurrency",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6bd98ab2-3b74-418a-bd07-74e9343ac632",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Draft Publishing Sheet",
+      "changeType": "improved",
+      "description": "Improved Draft Publishing Sheet",
+      "impact": "Enhances Draft Publishing Sheet performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "eeb56d13-1ad0-4be0-8a15-b8e9f62e583f",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Draft Editor",
+      "changeType": "improved",
+      "description": "Improved Draft Editor",
+      "impact": "Enhances Draft Editor performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "26153c5d-4ee1-4b04-8a27-427373113b0d",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Template Management",
+      "changeType": "improved",
+      "description": "Improved Template Management",
+      "impact": "Enhances Template Management performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f550ed35-1445-43ef-9fbd-85114bcc36aa",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Auto Block Allocation",
+      "changeType": "added",
+      "description": "Added Auto Block Allocation functionality",
+      "impact": "Adds new Auto Block Allocation capability",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "0ce29c72-33cc-4ba5-85ce-31b1f9f3d51b",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Post Detail Popup",
+      "changeType": "modified",
+      "description": "Updated Post Detail Popup",
+      "impact": "Affects Post Detail Popup functionality",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "c8940008-21d5-4f1e-8895-b1f7c35bb6ca",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Insights Dashboard",
+      "changeType": "improved",
+      "description": "Improved Insights Dashboard",
+      "impact": "Enhances Insights Dashboard performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8e93b110-c3c4-44a9-a245-4e30d084c690",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Reflection Summary",
+      "changeType": "improved",
+      "description": "Improved Reflection Summary",
+      "impact": "Enhances Reflection Summary performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7af898c9-850e-4e0f-bdea-a2bcbc4bd70b",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Visual Knowledge Map",
+      "changeType": "added",
+      "description": "Added Visual Knowledge Map functionality",
+      "impact": "Adds new Visual Knowledge Map capability",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "5c13b5ed-b3ed-4cf0-851f-9bb2ae863fcd",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Adaptive Journal",
+      "changeType": "added",
+      "description": "Added Adaptive Journal functionality",
+      "impact": "Adds new Adaptive Journal capability",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "3cbab010-8d43-4652-b9e7-384136ae436c",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Database Views",
+      "changeType": "improved",
+      "description": "Improved Database Views",
+      "impact": "Enhances Database Views performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "541328df-fc35-4827-b3e0-ea1568314491",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "List Table",
+      "changeType": "improved",
+      "description": "Improved List Table",
+      "impact": "Enhances List Table performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d0e7773c-a979-4ddf-812b-2268bc67e49f",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Projects",
+      "changeType": "improved",
+      "description": "Improved Projects",
+      "impact": "Enhances Projects performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "41681922-9755-487b-838b-42867f639693",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Aiassistant Section",
+      "changeType": "improved",
+      "description": "Improved Aiassistant Section",
+      "impact": "Enhances Aiassistant Section performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui",
+        "ollama"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f84545e9-c4f9-479c-a26c-b3d1565be590",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Data Management Section",
+      "changeType": "improved",
+      "description": "Improved Data Management Section",
+      "impact": "Enhances Data Management Section performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2b36b863-98f0-4c8e-a230-ffb8471d986e",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Settings",
+      "changeType": "improved",
+      "description": "Improved Settings",
+      "impact": "Enhances Settings performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "45a0e409-98b8-4393-8b22-33b2afbe2a11",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Arc View Timeline",
+      "changeType": "added",
+      "description": "Added Arc View Timeline functionality",
+      "impact": "Adds new Arc View Timeline capability",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e2bd8088-4b36-4428-87d4-f785b40c074b",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Mood Trends",
+      "changeType": "added",
+      "description": "Added Mood Trends functionality",
+      "impact": "Adds new Mood Trends capability",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "15f2babb-6fa9-4a13-8b3b-69e52d999547",
+      "date": "2025-11-09T17:31:32.505375Z",
+      "version": "0.8",
+      "feature": "Tasks",
+      "changeType": "improved",
+      "description": "Improved Tasks",
+      "impact": "Enhances Tasks performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
     {
       "id": "ed4a922d-6061-4592-95cd-ecc6ed146f51",
       "date": "2025-11-09T08:41:04.239098Z",
@@ -24,7 +849,7 @@
       "impact": "Affects Notification+Names functionality",
       "userFacing": false,
       "tags": [],
-      "commitHash": null
+      "commitHash": "51fe713526603052fd0180d8b11245ee9138cd18"
     },
     {
       "id": "b5eee3c2-bddf-4634-9514-a6bb50f6f4d0",

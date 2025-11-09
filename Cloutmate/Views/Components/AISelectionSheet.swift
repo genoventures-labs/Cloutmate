@@ -23,7 +23,6 @@ struct AIGeneratedItem: Identifiable {
 struct AISelectionSheet: View {
     let tool: AITool
     let items: [AIGeneratedItem]
-    let platform: CloutmateShared.Platform
     let onInsert: (String) -> Void
     let onGenerate: ((String) async -> Void)?
     
@@ -144,12 +143,12 @@ struct AISelectionSheet: View {
         
         _Concurrency.Task {
             do {
-                let prompt = "Write a complete social media post about: \(selectedItem.content). Make it engaging, platform-appropriate for \(platform.displayName), and ready to use."
+                let prompt = "Write a complete post about: \(selectedItem.content). Make it engaging and ready to use."
                 
                 if let onGenerate = onGenerate {
                     await onGenerate(prompt)
                 } else {
-                    let result = try await CoreResponseService.shared.generateResponse(for: prompt, context: platform.rawValue)
+                    let result = try await CoreResponseService.shared.generateResponse(for: prompt, context: "")
                     await MainActor.run {
                         onInsert(result)
                         isGenerating = false

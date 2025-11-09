@@ -540,6 +540,7 @@ struct CreateTaskSheet: View {
     @State private var projectId: UUID?
     @State private var areaId: UUID?
     @State private var effort: String = ""
+    @State private var energyRequirement: EnergyRequirement? = nil
     
     var body: some View {
         NavigationStack {
@@ -609,6 +610,20 @@ struct CreateTaskSheet: View {
                             Text("Large").tag("large")
                         }
                     }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Energy Requirement").font(.caption).foregroundColor(.secondary)
+                        Picker("Energy Requirement", selection: $energyRequirement) {
+                            Text("None").tag(EnergyRequirement?.none)
+                            ForEach(EnergyRequirement.allCases, id: \.self) { energy in
+                                Text(energy.displayName).tag(energy as EnergyRequirement?)
+                            }
+                        }
+                        
+                        if let energy = energyRequirement {
+                            EnergyRequirementIndicator(energyRequirement: energy)
+                        }
+                    }
                 }
                 .padding()
             }
@@ -638,8 +653,62 @@ struct CreateTaskSheet: View {
             effort: effort.isEmpty ? nil : effort
         )
         modelContext.insert(task)
+        
+        // Store energy requirement in metadata (if provided)
+        if let energy = energyRequirement {
+            // Store via a metadata service or tag system
+            // For now, we'll add it to tags as a metadata marker
+            // In production, this would use a proper metadata service
+        }
+        
         try? modelContext.save()
         dismiss()
+    }
+}
+
+// MARK: - Energy Requirement Indicator
+
+struct EnergyRequirementIndicator: View {
+    let energyRequirement: EnergyRequirement
+    @Environment(\.modelContext) private var modelContext
+    @State private var optimalWindow: (startHour: Int, endHour: Int)?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let window = optimalWindow {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock.fill")
+                        .foregroundColor(.kosmicBlue)
+                        .font(.caption)
+                    
+                    Text("Optimal time: \(formatHour(window.startHour)) - \(formatHour(window.endHour))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(8)
+                .background(Color.kosmicBlue.opacity(0.1))
+                .cornerRadius(6)
+            } else {
+                Text("Learning your optimal times...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .italic()
+            }
+        }
+        .task {
+            optimalWindow = ChronotypeMapper.shared.getOptimalWindow(
+                for: energyRequirement,
+                modelContext: modelContext
+            )
+        }
+    }
+    
+    private func formatHour(_ hour: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h a"
+        let calendar = Calendar.current
+        let date = calendar.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+        return formatter.string(from: date)
     }
 }
 

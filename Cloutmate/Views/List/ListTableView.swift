@@ -19,7 +19,6 @@ struct ListTableView: View {
     @State private var searchText = ""
     @State private var selectedStatus: PostStatus?
     @State private var selectedFormat: OutputFormat?
-    @State private var selectedPlatform: Platform?
     @State private var selectedPosts = Set<UUID>()
     @State private var selectedArtifacts = Set<UUID>()
     @State private var showComposer = false
@@ -101,15 +100,6 @@ struct ListTableView: View {
             }
         }
         
-        if let platform = selectedPlatform {
-            filtered = filtered.filter { item in
-                if case .post(let post) = item {
-                    return post.postPlatforms.contains(platform)
-                }
-                return false
-            }
-        }
-        
         return filtered
     }
     
@@ -130,8 +120,8 @@ struct ListTableView: View {
                 HStack(spacing: 8) {
                     FilterChip(
                         title: "All",
-                        isSelected: selectedStatus == nil && selectedFormat == nil && selectedPlatform == nil,
-                        action: { selectedStatus = nil; selectedFormat = nil; selectedPlatform = nil }
+                        isSelected: selectedStatus == nil && selectedFormat == nil,
+                        action: { selectedStatus = nil; selectedFormat = nil }
                     )
                     
                     // Post Status filters
@@ -155,15 +145,6 @@ struct ListTableView: View {
                                 selectedFormat = format
                                 selectedStatus = nil
                             }
-                        )
-                    }
-                    
-                    // Platform filters (backward compatibility)
-                    ForEach(Platform.allCases, id: \.self) { platform in
-                        FilterChip(
-                            title: platform.displayName,
-                            isSelected: selectedPlatform == platform,
-                            action: { selectedPlatform = platform }
                         )
                     }
                 }
@@ -417,11 +398,10 @@ struct ListTableView: View {
             var csvString = "Type,Title/Caption,Format/Platform,Status,Date,Published Date\n"
             
             for post in selectedPostsList {
-                let platforms = post.postPlatforms.map { $0.displayName }.joined(separator: "|")
                 let scheduledDate = post.scheduledDate?.formatted() ?? ""
                 let publishedDate = post.publishedDate?.formatted() ?? ""
                 let escapedCaption = post.caption.replacingOccurrences(of: "\"", with: "\"\"")
-                csvString += "Post,\"\(escapedCaption)\",\(platforms),\(post.postStatus.displayName),\(scheduledDate),\(publishedDate)\n"
+                csvString += "Post,\"\(escapedCaption)\",\(post.postStatus.displayName),\(scheduledDate),\(publishedDate)\n"
             }
             
             for artifact in selectedArtifactsList {
@@ -505,7 +485,6 @@ struct ListTableView: View {
             caption: post.caption,
             mediaURLs: post.mediaURLs,
             scheduledDate: nil,
-            platforms: post.postPlatforms.map { $0.rawValue },
             status: PostStatus.draft.rawValue
         )
         modelContext.insert(duplicatedPost)

@@ -392,7 +392,7 @@ final class SmartAutomationEngine {
             
         case .createDraft:
             guard let caption = action.parameters["caption"] else { return }
-            let post = Post(caption: caption, platforms: ["facebook"])
+            let post = Post(caption: caption)
             modelContext.insert(post)
             
         case .schedulePost:
