@@ -26,6 +26,7 @@ struct UnifiedFocusModeView: View {
     @State private var currentTime = Date()
     @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var lastRefreshTime = Date()
+    @State private var pendingSessionParams: PendingFocusSessionParams?
     
     // Objective drawer state
     @State private var objective: String = ""
@@ -109,16 +110,62 @@ struct UnifiedFocusModeView: View {
             // Refresh on appear to catch any stale sessions
             refreshData()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .focusSessionStarted)) { notification in
+            // Immediately refresh when a session starts
+            refreshData()
+        }
         .onReceive(NotificationCenter.default.publisher(for: .focusSessionStatusChanged)) { _ in
             refreshData()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startPendingFocusSession)) { notification in
+            // Handle pending session from task/project cards
+            // Open drawer with pre-filled values instead of starting immediately
+            if let params = notification.object as? PendingFocusSessionParams {
+                pendingSessionParams = params
+                // Pre-fill the drawer with the pending session params
+                objective = params.objective
+                selectedDuration = params.plannedDuration
+                // Open the drawer so user can confirm or cancel
+                showObjectiveDrawer = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .currentTabUpdated)) { notification in
+            // When tab switches to Focus Mode, if there are pending params, open drawer
+            if let tab = notification.object as? TabIdentifier,
+               tab == .focusMode,
+               pendingSessionParams != nil {
+                // Don't auto-start, just open drawer if not already open
+                if !showObjectiveDrawer {
+                    if let params = pendingSessionParams {
+                        objective = params.objective
+                        selectedDuration = params.plannedDuration
+                        showObjectiveDrawer = true
+                    }
+                }
+            }
         }
         .sheet(isPresented: $showObjectiveDrawer) {
             FocusObjectiveDrawer(
                 objective: $objective,
                 selectedDuration: $selectedDuration,
                 reflectAfterSession: $reflectAfterSession,
-                onSave: startSession
+                onSave: { obj, dur, targetId, targetType, reflect in
+                    // User confirmed - start the session
+                    startSession(
+                        objective: obj,
+                        duration: dur,
+                        targetObjectId: targetId,
+                        targetObjectType: targetType,
+                        reflectAfterSession: reflect
+                    )
+                    // Clear pending params after starting
+                    pendingSessionParams = nil
+                }
             )
+            .onDisappear {
+                // If drawer is dismissed without saving, clear pending params
+                pendingSessionParams = nil
+            }
         }
         .sheet(isPresented: $showAnalyticsDrawer) {
             FocusAnalyticsDrawer()
@@ -194,7 +241,14 @@ struct UnifiedFocusModeView: View {
     }
     
     private func refreshData() {
-        activeSession = FocusSessionService.shared.getActiveSession(modelContext: modelContext)
+        // Always refresh active session from database
+        let fetchedSession = FocusSessionService.shared.getActiveSession(modelContext: modelContext)
+        
+        // Update if session changed (nil to session, session to nil, or different session)
+        if fetchedSession?.id != activeSession?.id {
+            activeSession = fetchedSession
+        }
+        
         streakCount = FocusSessionService.shared.getStreakCount(modelContext: modelContext)
         
         if let session = activeSession,
@@ -202,6 +256,36 @@ struct UnifiedFocusModeView: View {
             cpsScore = PriorityEngine.shared.getScoreValue(for: targetId, modelContext: modelContext)
         } else {
             cpsScore = nil
+        }
+    }
+    
+    private func tryStartPendingSession() {
+        // Only start if we have pending params and no active session
+        guard let params = pendingSessionParams,
+              activeSession == nil else {
+            return
+        }
+        
+        // Start the session with the provided parameters
+        do {
+            let session = try FocusSessionService.shared.startSession(
+                objective: params.objective,
+                plannedDuration: params.plannedDuration,
+                targetObjectId: params.targetObjectId,
+                targetObjectType: params.targetObjectType,
+                modelContext: modelContext
+            )
+            // Update state immediately
+            activeSession = session
+            pendingSessionParams = nil // Clear pending params after starting
+            
+            // Force immediate refresh to ensure UI updates
+            DispatchQueue.main.async {
+                self.refreshData()
+            }
+        } catch {
+            print("Failed to start pending focus session: \(error)")
+            pendingSessionParams = nil // Clear on error too
         }
     }
     

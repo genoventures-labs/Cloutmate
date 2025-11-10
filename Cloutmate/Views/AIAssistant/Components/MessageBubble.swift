@@ -369,8 +369,8 @@ struct MessageBubble: View {
                 .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
             }
             
-            // Thinking view (collapsible) for assistant messages
-            if !isUser, let thinking = message.thinkingContent, !thinking.isEmpty {
+            // Thinking view (collapsible) for assistant messages - only show when thinking was actually enabled
+            if !isUser, message.wasThinking, let thinking = message.thinkingContent, !thinking.isEmpty {
                 ThinkingView(thinkingContent: thinking)
                     .padding(.top, 8)
             }
@@ -1002,8 +1002,6 @@ struct ModelBadge: View {
     
     private var badgeColor: Color {
         switch modelName.lowercased() {
-        case "deepseek":
-            return .kosmicBlue
         case "qwen3":
             return .kosmicPurple
         case "granite3":

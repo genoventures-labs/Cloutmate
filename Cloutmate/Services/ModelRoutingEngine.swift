@@ -30,7 +30,7 @@ actor ModelRoutingEngine {
         userStyle: TypingStyle?,
         conversationId: UUID?
     ) async -> (model: String, useThinking: Bool) {
-        // First, determine if this is casual or needs deep reasoning
+        // Determine if this is casual
         let isCasual = await CasualConversationDetector.shared.isCasual(
             input: input,
             intentCluster: intentCluster,
@@ -38,43 +38,22 @@ actor ModelRoutingEngine {
             userStyle: userStyle
         )
         
-        let needsDeepReasoning = await CasualConversationDetector.shared.requiresDeepReasoning(
-            input: input,
-            intentCluster: intentCluster,
-            messageLength: messageLength,
-            confidence: confidence
-        )
-        
-        // Check for active cooldown, but ONLY if it's appropriate for the conversation type
+        // Check for active cooldown first (model stickiness)
         for (model, remainingTurns) in modelCooldown where remainingTurns > 0 {
-            // Don't use deepseek cooldown for casual conversations
-            if model == ModelTierMap.deepReasoningModel() && (isCasual || messageLength < 80) {
-                continue // Skip deepseek cooldown for casual/short queries
-            }
-            
-            // Don't use default model cooldown for deep reasoning tasks
-            if model == ModelTierMap.defaultModel() && needsDeepReasoning {
-                continue // Skip default model cooldown for deep reasoning
-            }
-            
-            // If cooldown model matches the conversation type, use it
+            // If a model has active cooldown, use it (maintains continuity)
             let isShortQuery = messageLength < 80
-            let useThinking = ModelTierMap.supportsThinking(model) && !isCasual && !isShortQuery && !needsDeepReasoning
+            let useThinking = ModelTierMap.supportsThinking(model) && !isCasual && !isShortQuery
             return (model, useThinking)
         }
         
-        // No active cooldown or cooldown doesn't match conversation type - determine model based on conversation type
+        // No active cooldown - determine model based on conversation type
         let selectedModel: String
         let useThinking: Bool
         
         // Disable thinking for short, casual queries (< 80 chars)
         let isShortQuery = messageLength < 80
         
-        if needsDeepReasoning {
-            // Deep reasoning → DeepSeek
-            selectedModel = ModelTierMap.deepReasoningModel()
-            useThinking = true
-        } else if isCasual || isShortQuery {
+        if isCasual || isShortQuery {
             // Casual or short → Qwen3, no thinking
             selectedModel = ModelTierMap.defaultModel()
             useThinking = false

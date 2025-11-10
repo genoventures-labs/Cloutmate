@@ -1482,11 +1482,15 @@ private extension AIRecallService {
             \(conversationText)
             
             Generate 1-3 natural, conversational tags. Use simple, human words that capture the essence:
-            - Single words work best: "Helping", "Planning", "Creating", "Learning", "Organizing", "Brainstorming"
-            - Or short phrases (max 2 words): "Task Management", "Content Ideas"
+            - Single words work best: Helping, Planning, Creating, Learning, Organizing, Brainstorming
+            - Or short phrases (max 2 words): Task Management, Content Ideas
             - Think like you're describing it to a friend, not categorizing it formally
             
-            Return ONLY a comma-separated list of tags (e.g., "Helping, Planning" or "Creating"). Keep them natural and conversational.
+            Return ONLY a comma-separated list of tags (e.g., Helping, Planning or Creating). 
+            - NO quotes around tags
+            - NO periods at the end
+            - NO punctuation except spaces for 2-word phrases
+            - Keep them natural and conversational
             """
             
             // Use CoreResponseService to generate tags
@@ -1500,15 +1504,44 @@ private extension AIRecallService {
             let tags = response
                 .trimmingCharacters(in: .whitespacesAndNewlines)
                 .components(separatedBy: ",")
-                .map { tag -> String in
-                    let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // Capitalize first letter only for natural look
+                .compactMap { tag -> String? in
+                    var trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+                    
                     if trimmed.isEmpty {
-                        return ""
+                        return nil
                     }
-                    return trimmed.prefix(1).uppercased() + trimmed.dropFirst().lowercased()
+                    
+                    // Strip quotes if present
+                    trimmed = trimmed.replacingOccurrences(of: "\"", with: "")
+                    trimmed = trimmed.replacingOccurrences(of: "'", with: "")
+                    
+                    // Remove periods at the end
+                    trimmed = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+                    
+                    // Remove trailing punctuation except spaces (for 2-word phrases)
+                    trimmed = trimmed.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+                    
+                    // Validate: must be single word or max 2 words, no punctuation except spaces
+                    let words = trimmed.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+                    if words.count > 2 {
+                        return nil // Too many words
+                    }
+                    
+                    // Check for invalid punctuation (except spaces between words)
+                    let cleaned = words.joined(separator: " ")
+                    if cleaned.range(of: #"[^\w\s]"#, options: .regularExpression) != nil {
+                        return nil // Contains invalid punctuation
+                    }
+                    
+                    // Filter out tags that are too long (>20 chars)
+                    if cleaned.count > 20 {
+                        return nil
+                    }
+                    
+                    // Capitalize first letter only for natural look
+                    let capitalized = cleaned.prefix(1).uppercased() + cleaned.dropFirst().lowercased()
+                    return capitalized.isEmpty ? nil : capitalized
                 }
-                .filter { !$0.isEmpty }
                 .prefix(3) // Limit to 3 tags
             
             return Array(tags)

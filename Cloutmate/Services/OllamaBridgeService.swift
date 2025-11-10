@@ -135,10 +135,18 @@ actor OllamaBridgeService {
     private var cachedAvailableModels: [String] = [] // Cache available models
     private var lastModelFetch: Date?
     private let modelCacheTimeout: TimeInterval = 300 // 5 minutes
-    private let timeout: TimeInterval = 180.0 // Increased base timeout for complex requests
-    private let initialLoadTimeout: TimeInterval = 240.0 // Longer timeout for first request/model loading
-    private let largePromptTimeout: TimeInterval = 300.0 // 5 minutes for very large prompts (>10k chars)
-    private let hugePromptTimeout: TimeInterval = 600.0 // 10 minutes for huge prompts (>15k chars)
+    // Context-based timeouts (based on prompt length)
+    private let casualTimeout: TimeInterval = 35.0 // Casual (no thinking) - fast Qwen3 responses
+    private let analyticalTimeout: TimeInterval = 60.0 // Analytical (thinking) - multi-step thought
+    private let fallbackTimeout: TimeInterval = 75.0 // Fallback / Granite3 - safety net
+    private let initialLoadTimeout: TimeInterval = 120.0 // Longer timeout for first request/model loading
+    
+    // Context window-based timeout thresholds
+    private let lightContextTimeout: TimeInterval = 35.0 // < 2,000 chars - Light casual queries
+    private let normalContextTimeout: TimeInterval = 60.0 // 2,000–6,000 chars - Normal conversation (sweet spot)
+    private let largeContextTimeout: TimeInterval = 90.0 // 6,000–10,000 chars - Large contextual input
+    private let bigContextTimeout: TimeInterval = 120.0 // 10,000–15,000 chars - Big recall or multi-message summary
+    private let hugeContextTimeout: TimeInterval = 180.0 // 15,000+ chars - Full recall or long memory regeneration
     private var isFirstRequest: Bool = true
     private var conversationHistory: [ConversationMessage] = []
     private var schemaDocument: String = ""
@@ -939,38 +947,55 @@ Aurora:
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Calculate adaptive timeout based on prompt size and complexity:
-        // 1. First request (model loading): longest timeout
-        // 2. Huge prompts (>15k chars): 10 minutes
-        // 3. Large prompts (>10k chars): 5 minutes
-        // 4. Medium-large prompts (>8000 chars): 3 minutes
-        // 5. Complex prompts (with conversation history): 3 minutes
-        // 6. Normal requests: 3 minutes base
+        // Calculate adaptive timeout based on context window size (prompt length):
+        // 1. First request (model loading): extended timeout
+        // 2. Context window-based timeouts (primary):
+        //    - < 2,000 chars: 35s - Light casual queries
+        //    - 2,000–6,000 chars: 60s - Normal conversation (sweet spot)
+        //    - 6,000–10,000 chars: 90s - Large contextual input
+        //    - 10,000–15,000 chars: 120s - Big recall or multi-message summary
+        //    - 15,000+ chars: 180s - Full recall or long memory regeneration
         let promptLength = prompt.count
-        let isHugePrompt = promptLength > 15000
-        let isLargePrompt = promptLength > 10000
-        let isMediumLargePrompt = promptLength > 8000
-        let isComplexPrompt = prompt.contains("Conversation:") || prompt.contains("Past Conversations")
         
+        // Determine timeout based on context window size
         let effectiveTimeout: TimeInterval
         if isFirstRequest {
             effectiveTimeout = initialLoadTimeout
-        } else if isHugePrompt {
-            effectiveTimeout = hugePromptTimeout
-            print("[OllamaBridgeService] Using huge prompt timeout (600s) for prompt of \(promptLength) chars")
-        } else if isLargePrompt || (isMediumLargePrompt && isComplexPrompt) {
-            effectiveTimeout = largePromptTimeout
-            print("[OllamaBridgeService] Using large prompt timeout (300s) for prompt of \(promptLength) chars")
-        } else if isMediumLargePrompt || isComplexPrompt {
-            effectiveTimeout = 240.0 // 4 minutes for medium-large/complex
+            print("[OllamaBridgeService] Using initial load timeout (\(Int(initialLoadTimeout))s) for first request")
+        } else if promptLength >= 15000 {
+            // 15,000+ chars - Full recall or long memory regeneration
+            effectiveTimeout = hugeContextTimeout
+        } else if promptLength >= 10000 {
+            // 10,000–15,000 chars - Big recall or multi-message summary
+            effectiveTimeout = bigContextTimeout
+        } else if promptLength >= 6000 {
+            // 6,000–10,000 chars - Large contextual input
+            effectiveTimeout = largeContextTimeout
+        } else if promptLength >= 2000 {
+            // 2,000–6,000 chars - Normal conversation (sweet spot)
+            effectiveTimeout = normalContextTimeout
         } else {
-            effectiveTimeout = timeout
+            // < 2,000 chars - Light casual queries
+            effectiveTimeout = lightContextTimeout
         }
         
         urlRequest.timeoutInterval = effectiveTimeout
         
         // Log timeout decision
-        print("[OllamaBridgeService] Prompt length: \(promptLength) chars, Timeout: \(Int(effectiveTimeout))s, First request: \(isFirstRequest), Large: \(isLargePrompt), Complex: \(isComplexPrompt)")
+        let modeDescription = modelToUse == ModelTierMap.fallbackModel() ? "Fallback" : (useThinking ? "Analytical" : "Casual")
+        let contextRange: String
+        if promptLength >= 15000 {
+            contextRange = "15,000+ chars"
+        } else if promptLength >= 10000 {
+            contextRange = "10,000–15,000 chars"
+        } else if promptLength >= 6000 {
+            contextRange = "6,000–10,000 chars"
+        } else if promptLength >= 2000 {
+            contextRange = "2,000–6,000 chars"
+        } else {
+            contextRange = "< 2,000 chars"
+        }
+        print("[OllamaBridgeService] Prompt length: \(promptLength) chars (\(contextRange)), Mode: \(modeDescription), Timeout: \(Int(effectiveTimeout))s, Thinking: \(useThinking)")
         
         do {
             urlRequest.httpBody = try JSONEncoder().encode(request)
@@ -1009,14 +1034,17 @@ Aurora:
             print("[OllamaBridgeService] [\(timestamp)] Model: \(modelToUse), Thinking: \(useThinking)")
             print("[OllamaBridgeService] Request length: \(prompt.count) chars")
             print("[OllamaBridgeService] Response length: \(ollamaResponse.response.count) chars")
-            if let thinking = ollamaResponse.thinking, !thinking.isEmpty {
+            // Only log thinking length when thinking was actually requested
+            if useThinking, let thinking = ollamaResponse.thinking, !thinking.isEmpty {
                 print("[OllamaBridgeService] Thinking length: \(thinking.count) chars")
             }
             
             // Mark that we've successfully made a request
             isFirstRequest = false
             
-            return (ollamaResponse.response, ollamaResponse.thinking)
+            // Only return thinking content if we actually requested it
+            let thinkingContent = useThinking ? ollamaResponse.thinking : nil
+            return (ollamaResponse.response, thinkingContent)
         } catch let error as OllamaError {
             throw error
         } catch {
@@ -1033,22 +1061,21 @@ Aurora:
                     }
                     // Log timeout details for debugging
                     let promptLength = prompt.count
-                    let isHugePrompt = promptLength > 15000
-                    let isLargePrompt = promptLength > 10000
-                    let isMediumLargePrompt = promptLength > 8000
-                    let isComplexPrompt = prompt.contains("Conversation:") || prompt.contains("Past Conversations")
                     
+                    // Determine what timeout was actually used (same logic as above)
                     let effectiveTimeoutUsed: TimeInterval
                     if isFirstRequest {
                         effectiveTimeoutUsed = initialLoadTimeout
-                    } else if isHugePrompt {
-                        effectiveTimeoutUsed = hugePromptTimeout
-                    } else if isLargePrompt || (isMediumLargePrompt && isComplexPrompt) {
-                        effectiveTimeoutUsed = largePromptTimeout
-                    } else if isMediumLargePrompt || isComplexPrompt {
-                        effectiveTimeoutUsed = 240.0
+                    } else if promptLength >= 15000 {
+                        effectiveTimeoutUsed = hugeContextTimeout
+                    } else if promptLength >= 10000 {
+                        effectiveTimeoutUsed = bigContextTimeout
+                    } else if promptLength >= 6000 {
+                        effectiveTimeoutUsed = largeContextTimeout
+                    } else if promptLength >= 2000 {
+                        effectiveTimeoutUsed = normalContextTimeout
                     } else {
-                        effectiveTimeoutUsed = timeout
+                        effectiveTimeoutUsed = lightContextTimeout
                     }
                     
                     if isFirstRequest {
@@ -1056,14 +1083,26 @@ Aurora:
                         print("[OllamaBridgeService] Model loading can take 60-240s. Consider waiting longer or checking Ollama status.")
                     } else {
                         print("[OllamaBridgeService] Request timed out after \(Int(effectiveTimeoutUsed))s")
-                        if isHugePrompt {
-                            print("[OllamaBridgeService] HUGE prompt (\(promptLength) chars) exceeded 10-minute timeout!")
+                        let modeDescription = modelToUse == ModelTierMap.fallbackModel() ? "Fallback" : (useThinking ? "Analytical" : "Casual")
+                        let contextRange: String
+                        if promptLength >= 15000 {
+                            contextRange = "15,000+ chars"
+                        } else if promptLength >= 10000 {
+                            contextRange = "10,000–15,000 chars"
+                        } else if promptLength >= 6000 {
+                            contextRange = "6,000–10,000 chars"
+                        } else if promptLength >= 2000 {
+                            contextRange = "2,000–6,000 chars"
+                        } else {
+                            contextRange = "< 2,000 chars"
+                        }
+                        print("[OllamaBridgeService] Mode: \(modeDescription), Context: \(contextRange) (\(promptLength) chars)")
+                        if promptLength >= 15000 {
+                            print("[OllamaBridgeService] HUGE context exceeded timeout!")
                             print("[OllamaBridgeService] Consider: reducing context size, splitting requests, or using a smaller model")
-                        } else if isLargePrompt {
-                            print("[OllamaBridgeService] Large prompt (\(promptLength) chars) exceeded 5-minute timeout")
+                        } else if promptLength >= 10000 {
+                            print("[OllamaBridgeService] Large context exceeded timeout")
                             print("[OllamaBridgeService] Consider reducing context or using a faster/smaller model")
-                        } else if isMediumLargePrompt {
-                            print("[OllamaBridgeService] Medium-large prompt (\(promptLength) chars) may need more time")
                         }
                     }
                     throw OllamaError.timeout
@@ -1829,27 +1868,61 @@ You have access to git commit history to reference past updates and changes. Whe
         \(messageSample.isEmpty ? "" : "Recent messages:\n\(messageSample)\n")
         
         Generate 1-3 natural, conversational tags. Think like Aurora would - use simple, human words that capture the essence:
-        - "Helping" (for support conversations)
-        - "Planning" (for strategy/organization)
-        - "Creating" (for content/creative work)
-        - "Learning" (for exploration/discovery)
-        - "Organizing" (for task management)
-        - "Brainstorming" (for idea generation)
+        - Helping (for support conversations)
+        - Planning (for strategy/organization)
+        - Creating (for content/creative work)
+        - Learning (for exploration/discovery)
+        - Organizing (for task management)
+        - Brainstorming (for idea generation)
         - Or any other natural word that fits
         
-        Return ONLY the tags, one per line, nothing else. Keep them simple and natural - single words or short phrases (max 2 words).
+        Return ONLY the tags, one per line, nothing else. 
+        - NO quotes around tags
+        - NO periods at the end
+        - NO punctuation except spaces for 2-word phrases
+        - Keep them simple and natural - single words or short phrases (max 2 words)
+        - Example format: Helping\nPlanning\nCreating
         """
         
         let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
         
         let lines = result.response.components(separatedBy: .newlines)
         let tags = lines.compactMap { line -> String? in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            var trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("-") || trimmed.hasPrefix("•") || trimmed.hasPrefix("#") {
                 return nil
             }
+            
             // Remove any numbering or bullet points
-            let cleaned = trimmed.replacingOccurrences(of: #"^[\d\.\-\•\#\s]+"#, with: "", options: .regularExpression)
+            trimmed = trimmed.replacingOccurrences(of: #"^[\d\.\-\•\#\s]+"#, with: "", options: .regularExpression)
+            
+            // Strip quotes if present
+            trimmed = trimmed.replacingOccurrences(of: "\"", with: "")
+            trimmed = trimmed.replacingOccurrences(of: "'", with: "")
+            
+            // Remove periods at the end
+            trimmed = trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            
+            // Remove trailing punctuation except spaces (for 2-word phrases)
+            trimmed = trimmed.trimmingCharacters(in: .punctuationCharacters.union(.whitespaces))
+            
+            // Validate: must be single word or max 2 words, no punctuation except spaces
+            let words = trimmed.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+            if words.count > 2 {
+                return nil // Too many words
+            }
+            
+            // Check for invalid punctuation (except spaces between words)
+            let cleaned = words.joined(separator: " ")
+            if cleaned.range(of: #"[^\w\s]"#, options: .regularExpression) != nil {
+                return nil // Contains invalid punctuation
+            }
+            
+            // Filter out tags that are too long (>20 chars)
+            if cleaned.count > 20 {
+                return nil
+            }
+            
             // Capitalize first letter only
             let capitalized = cleaned.isEmpty ? nil : cleaned.prefix(1).uppercased() + cleaned.dropFirst().lowercased()
             return capitalized?.isEmpty == false ? capitalized : nil

@@ -50,8 +50,8 @@ struct AuroraSpotlightBubble: View {
                         .cornerRadius(12)
                 }
                 
-                // Thinking view (collapsible) for assistant messages
-                if !isUser, let thinking = message.thinkingContent, !thinking.isEmpty {
+                // Thinking view (collapsible) for assistant messages - only show when thinking was actually enabled
+                if !isUser, message.wasThinking, let thinking = message.thinkingContent, !thinking.isEmpty {
                     ThinkingView(thinkingContent: thinking)
                         .padding(.top, 4)
                 }

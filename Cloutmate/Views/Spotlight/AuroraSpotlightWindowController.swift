@@ -27,35 +27,67 @@ class AuroraSpotlightWindowController: ObservableObject {
     
     @Published var isPresented = false
     
-    private var window: NSWindow?
+    private var contentWindow: NSWindow?
+    private var backdropWindow: NSWindow?
+    private var backdropGestureRecognizer: NSClickGestureRecognizer?
+    private var isClosing = false
     
     private init() {}
     
     func show() {
-        guard window == nil else {
-            window?.makeKeyAndOrderFront(nil)
+        // Reset closing flag if needed
+        isClosing = false
+        
+        guard contentWindow == nil else {
+            contentWindow?.makeKeyAndOrderFront(nil)
+            backdropWindow?.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         
-        let panel = AuroraSpotlightPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 500),
+        // Create backdrop window (full screen, non-draggable, fixed position)
+        let screenFrame = NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1920, height: 1080)
+        let backdrop = NSWindow(
+            contentRect: screenFrame,
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
         
-        // Keep it on top - use floating level which keeps it above normal windows
+        backdrop.level = .floating
+        backdrop.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        backdrop.hidesOnDeactivate = false
+        backdrop.backgroundColor = .black.withAlphaComponent(0.45)
+        backdrop.isOpaque = false
+        // Backdrop should receive clicks (for closing), but not interfere with content panel dragging
+        backdrop.ignoresMouseEvents = false
+        backdrop.isMovable = false
+        
+        // Backdrop view - just a clickable overlay
+        let backdropView = NSView(frame: screenFrame)
+        backdropView.wantsLayer = true
+        backdropView.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.45).cgColor
+        
+        let tapGesture = NSClickGestureRecognizer(target: self, action: #selector(backdropTapped))
+        backdropView.addGestureRecognizer(tapGesture)
+        self.backdropGestureRecognizer = tapGesture // Store reference for cleanup
+        
+        backdrop.contentView = backdropView
+        
+        // Create content panel (draggable, smaller)
+        let panel = AuroraSpotlightPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        
-        // Ensure it stays on top even when other windows are activated
         panel.hidesOnDeactivate = false
-        
-        // Make it draggable
         panel.isMovableByWindowBackground = true
-        
-        panel.backgroundColor = .clear
+        // Use a dark background to match the content and prevent backdrop showing through
+        panel.backgroundColor = NSColor.black.withAlphaComponent(0.9)
         panel.hasShadow = true
         panel.isOpaque = false
         panel.acceptsMouseMovedEvents = true
@@ -64,14 +96,27 @@ class AuroraSpotlightWindowController: ObservableObject {
         // Get the main app's model container
         let container = CloutmateApp.sharedModelContainer
         
-        // Host SwiftUI view with shared context
-        let hostingView = NSHostingView(rootView: AuroraSpotlightView().modelContainer(container))
-        hostingView.frame = panel.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 600, height: 500)
+        // Get GlassColorSystem from active instance or create new one
+        let glassColorSystem = GlassColorSystem.active ?? GlassColorSystem()
+        
+        // Host SwiftUI view with shared context and environment objects (content only, no backdrop)
+        let hostingView = NSHostingView(
+            rootView: AuroraSpotlightContentView()
+                .modelContainer(container)
+                .environmentObject(glassColorSystem)
+        )
+        hostingView.frame = panel.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 600, height: 400)
         hostingView.autoresizingMask = [.width, .height]
         panel.contentView = hostingView
         panel.contentView?.wantsLayer = true
         
-        // Center relative to the main window instead of screen
+        // Add rounded corner mask to prevent backdrop showing through corners
+        if let layer = panel.contentView?.layer {
+            layer.cornerRadius = 16
+            layer.masksToBounds = true
+        }
+        
+        // Center content panel relative to the main window
         if let mainWindow = NSApp.mainWindow ?? NSApp.windows.first(where: { $0.isMainWindow }) {
             let mainFrame = mainWindow.frame
             let panelSize = panel.frame.size
@@ -79,30 +124,73 @@ class AuroraSpotlightWindowController: ObservableObject {
             let centerY = mainFrame.midY - panelSize.height / 2
             panel.setFrameOrigin(NSPoint(x: centerX, y: centerY))
         } else {
-            // Fallback to screen center if no main window
             panel.center()
         }
         
-        self.window = panel
+        self.contentWindow = panel
+        self.backdropWindow = backdrop
         isPresented = true
         
+        // Show backdrop first (so it's behind), then content on top
+        backdrop.makeKeyAndOrderFront(nil)
         panel.makeKeyAndOrderFront(nil)
+        
+        // Ensure content panel is always above backdrop (both floating, but panel ordered last)
+        panel.level = .floating
+        backdrop.level = .floating
+        
         NSApp.activate(ignoringOtherApps: true)
         
         // Ensure the panel becomes key window for keyboard input
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak panel] in
+            guard let panel = panel, panel.isVisible else { return }
             panel.makeKey()
         }
     }
     
+    @objc private func backdropTapped() {
+        close()
+    }
+    
     func close() {
-        window?.close()
-        window = nil
-        isPresented = false
+        // Prevent multiple simultaneous closes
+        guard !isClosing else { return }
+        isClosing = true
+        
+        // Ensure we're on the main thread
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.close()
+            }
+            return
+        }
+        
+        // Remove gesture recognizer before closing to prevent retain cycles
+        if let backdropView = backdropWindow?.contentView,
+           let gesture = backdropGestureRecognizer {
+            backdropView.removeGestureRecognizer(gesture)
+        }
+        backdropGestureRecognizer = nil
+        
+        // Close windows safely
+        if let window = contentWindow {
+            window.close()
+        }
+        if let window = backdropWindow {
+            window.close()
+        }
+        
+        // Clear references after a delay to ensure windows are fully closed
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.contentWindow = nil
+            self?.backdropWindow = nil
+            self?.isPresented = false
+            self?.isClosing = false
+        }
     }
     
     func toggle() {
-        if window == nil || !isPresented {
+        if contentWindow == nil || !isPresented {
             show()
         } else {
             close()

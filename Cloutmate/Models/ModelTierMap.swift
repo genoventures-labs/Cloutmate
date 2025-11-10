@@ -30,14 +30,6 @@ enum ModelTierMap {
             supportsThinking: true
         ),
         ModelTier(
-            name: "deepseek-r1:1.5b",
-            displayName: "DeepSeek",
-            capabilities: ["deep-reasoning", "analytical", "complex-logic"],
-            primaryUseCases: ["Deep Reasoning"],
-            tier: 1,
-            supportsThinking: true
-        ),
-        ModelTier(
             name: "granite3.2:2b",
             displayName: "Granite3",
             capabilities: ["fallback", "conversational", "reliable"],
@@ -77,11 +69,6 @@ enum ModelTierMap {
     /// Gets default model (qwen3:1.7b)
     static func defaultModel() -> String {
         return "qwen3:1.7b"
-    }
-    
-    /// Gets deep reasoning model
-    static func deepReasoningModel() -> String {
-        return "deepseek-r1:1.5b"
     }
     
     /// Gets fallback model

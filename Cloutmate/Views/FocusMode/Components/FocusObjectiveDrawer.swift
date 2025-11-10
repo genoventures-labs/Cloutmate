@@ -17,6 +17,10 @@ struct FocusObjectiveDrawer: View {
     @Binding var selectedDuration: TimeInterval
     @Binding var reflectAfterSession: Bool
     
+    // Optional initial values for pre-filling from pending session params
+    let initialTargetObjectId: UUID?
+    let initialTargetObjectType: String?
+    
     @State private var selectedObjectType: ObjectType = .none
     @State private var selectedTaskId: UUID?
     @State private var selectedProjectId: UUID?
@@ -44,6 +48,22 @@ struct FocusObjectiveDrawer: View {
     ]
     
     let onSave: (String, TimeInterval, UUID?, String?, Bool) -> Void
+    
+    init(
+        objective: Binding<String>,
+        selectedDuration: Binding<TimeInterval>,
+        reflectAfterSession: Binding<Bool>,
+        initialTargetObjectId: UUID? = nil,
+        initialTargetObjectType: String? = nil,
+        onSave: @escaping (String, TimeInterval, UUID?, String?, Bool) -> Void
+    ) {
+        self._objective = objective
+        self._selectedDuration = selectedDuration
+        self._reflectAfterSession = reflectAfterSession
+        self.initialTargetObjectId = initialTargetObjectId
+        self.initialTargetObjectType = initialTargetObjectType
+        self.onSave = onSave
+    }
     
     var body: some View {
         NavigationStack {

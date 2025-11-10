@@ -23,7 +23,7 @@ struct SidebarNavigationViewV2: View {
     
     // Navigation groups
     private let primaryNav: [TabIdentifier] = [.home, .tasks, .projects, .calendar, .insights]
-    private let personalNav: [TabIdentifier] = [.journal, .rituals, .posts, .areas]
+    private let personalNav: [TabIdentifier] = [.journal, .notes, .rituals, .posts, .areas]
     private let systemNav: [TabIdentifier] = [.focusMode, .archives, .aiAssistant, .settings]
     
     var body: some View {

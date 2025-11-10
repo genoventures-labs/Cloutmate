@@ -1,111 +1,69 @@
-<!-- 518b446e-4c31-4c41-96ce-ff2f5ea9383c 111d200c-8ffe-4de6-bc73-bc525cd1a338 -->
-# Aurora Local Model Routing with Thinking Support
+<!-- 518b446e-4c31-4c41-96ce-ff2f5ea9383c f9d02a85-c00e-4e82-bc7f-450e3ba1e3c8 -->
+# Fix Model Rotation and Conversation Tags
 
-## Overview
+## Issue 1: Model Rotation - Thinking Content When Not Requested
 
-Switch Aurora's core routing to use local models with intelligent thinking mode. Implement casual conversation detection, thinking support via Ollama API, visual thinking indicators, and model name badges in chat UI.
+**Problem**: Logs show thinking content being returned and stored even when `useThinking: false` is set. For example:
 
-## Model Routing Strategy
+- `Model: qwen3:1.7b, Thinking: false` but `Thinking length: 1959 chars`
+- This causes thinking UI to appear when it shouldn't
 
-### New Local Models
+**Root Cause**: In `OllamaBridgeService.makeOllamaRequest()`, we return `ollamaResponse.thinking` regardless of whether we requested it. Some models may return thinking content even when `thinking: false` is set in options.
 
-1. **qwen3:1.7b** - Main model (no thinking for casual, thinking enabled for non-casual)
-2. **deepseek-r1:1.5b** - Deep reasoning model (above casual logic)
-3. **granite3.2:2b** - Fallback model
+**Fix**:
 
-### Routing Logic
+1. In `makeOllamaRequest()` (line ~1019), only return thinking content if `useThinking` was true:
+   ```swift
+   let thinkingContent = useThinking ? ollamaResponse.thinking : nil
+   return (ollamaResponse.response, thinkingContent)
+   ```
 
-1. **Casual conversations** → `qwen3:1.7b` (no thinking)
-2. **Non-casual logic** → `qwen3:1.7b` WITH thinking enabled
-3. **Deep reasoning** → `deepseek-r1:1.5b`
-4. **Fallback** → `granite3.2:2b`
+2. Update logging (line ~1012) to only log thinking length when thinking was requested:
+   ```swift
+   if useThinking, let thinking = ollamaResponse.thinking, !thinking.isEmpty {
+       print("[OllamaBridgeService] Thinking length: \(thinking.count) chars")
+   }
+   ```
 
-## Implementation Details
+3. Ensure `generateResponseWithAppContext()` correctly passes `useThinking` flag through the call chain.
 
-### 1. Update ModelTierMap
+## Issue 2: Conversation Tags Too Literal
 
-- Replace cloud models with local models
-- Add model display names (Qwen3, DeepSeek, Granite3)
-- Update routing logic to use local models
-- Add thinking capability flag per model
+**Problem**: Tags are being extracted as literal quotes from the conversation (e.g., `"looking good!"`, `"creating a template for my content ideas."`) instead of natural tags like "Helping" or "Planning".
 
-### 2. Casual Conversation Detection
+**Root Cause**: The tag generation prompt in `OllamaBridgeService.categorizeConversation()` (line ~1824) and `AIRecallService.generateTagsWithAI()` (line ~1478) may be producing quoted responses, or the parsing is capturing quoted text incorrectly.
 
-- Detect casual vs non-casual based on:
-- Message length (< 50 chars = likely casual)
-- Question complexity (simple questions = casual)
-- Intent cluster (Empathy/Support = casual)
-- User style (high energy, casual punctuation = casual)
+**Fix**:
 
-### 3. Per-Model Cooldown/Stickiness
+1. In `OllamaBridgeService.categorizeConversation()` (line ~1843-1858):
 
-- Track model usage per conversation context in ModelRoutingEngine
-- When DeepSeek (or any model) handles a reasoning task, tag that context
-- Maintain model stickiness for next 2-3 turns after model usage
-- Prevents mid-thought model switches (e.g., DeepSeek → Qwen3 mid-reasoning)
-- Makes Aurora's "voice" feel steadier during deep dives
-- Cooldown expires after 2-3 turns or when topic significantly changes
-- Per-model tracking: each model maintains its own cooldown window
-- Add `thinking` parameter to OllamaRequest
-- Ollama API supports `options.thinking` boolean
-- Parse thinking content from response (separate from main response)
-- Store thinking content in AIMessage model
+   - Improve prompt to explicitly forbid quotes and emphasize single words
+   - Add example format: "Return tags like: Helping, Planning, Creating (no quotes, no periods, just words)"
+   - Update parsing to strip quotes if present: `cleaned.replacingOccurrences(of: "\"", with: "")`
 
-### 4. UI Updates
+2. In `AIRecallService.generateTagsWithAI()` (line ~1499-1514):
 
-#### Thinking Indicator
+   - Strip quotes from parsed tags: `trimmed.replacingOccurrences(of: "\"", with: "")`
+   - Remove periods from tags: `trimmed.replacingOccurrences(of: ".", with: "")`
+   - Filter out tags that are too long (>20 chars) or contain punctuation
 
-- Show thinking animation only when actually thinking
-- Add collapsible thinking view in MessageBubble
-- Display thinking content in expandable section
+3. Add validation to ensure tags are single words or short phrases (max 2 words, no punctuation except spaces).
 
-#### Model Badge
+## Files to Modify
 
-- Add small pill/tag at bottom of assistant messages
-- Show model display name (Qwen3, DeepSeek, Granite3, Gemini)
-- Position at bottom of message bubble
-- Subtle styling, not intrusive
+1. `Cloutmate/Services/OllamaBridgeService.swift`
 
-### 5. AIMessage Model Updates
+   - `makeOllamaRequest()` - Filter thinking content based on `useThinking` flag
+   - `categorizeConversation()` - Improve prompt and parsing to prevent literal quotes
 
-- Add `thinkingContent: String?` field
-- Add `modelUsed: String?` field (store display name)
-- Add `wasThinking: Bool` field
+2. `Cloutmate/Services/AIRecallService.swift`
 
-### 6. Routing Engine Updates
+   - `generateTagsWithAI()` - Improve parsing to strip quotes and validate tags
 
-- Update ModelRoutingEngine to use local models
-- Add casual conversation detection
-- Route based on complexity and intent
+## Testing
 
-## Files to Create/Modify
+After fixes:
 
-### Modified Files
-
-- `Cloutmate/Models/ModelTierMap.swift` - Update with local models
-- `Cloutmate/Services/ModelRoutingEngine.swift` - Add casual detection and local routing
-- `Cloutmate/Services/OllamaBridgeService.swift` - Add thinking parameter support
-- `Cloutmate/Services/HybridBridgeService.swift` - Update to use local models primarily
-- `Cloutmate/Models/AIMessage.swift` - Add thinkingContent, modelUsed, wasThinking fields
-- `Cloutmate/Views/AIAssistant/Components/MessageBubble.swift` - Add thinking view and model badge
-- `Cloutmate/Views/Spotlight/AuroraSpotlightBubble.swift` - Add thinking view and model badge
-
-### New Files
-
-- `Cloutmate/Services/CasualConversationDetector.swift` - Detect casual vs non-casual conversations
-
-## UI Components
-
-### Thinking View
-
-- Collapsible DisclosureGroup
-- Show thinking content in monospace font
-- Subtle background color
-- "Show thinking" / "Hide thinking" toggle
-
-### Model Badge
-
-- Small pill shape at bottom of message
-- Display name only (no version numbers)
-- Color-coded by model type
-- Position: bottom-right of message bubble
+- Verify thinking UI only appears when `useThinking: true`
+- Verify tags are natural words/phrases, not literal quotes from conversation
+- Check debug logs show correct thinking flag behavior

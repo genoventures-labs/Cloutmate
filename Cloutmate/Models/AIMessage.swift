@@ -49,7 +49,7 @@ final class AIMessage: Identifiable {
     
     // Thinking and model tracking
     @Attribute var thinkingContent: String? // Thinking/reasoning content from model
-    @Attribute var modelUsed: String? // Display name of model used (e.g., "Qwen3", "DeepSeek")
+    @Attribute var modelUsed: String? // Display name of model used (e.g., "Qwen3", "Granite3")
     @Attribute var wasThinking: Bool = false // Whether model was in thinking mode
     
     // Inverse relationship

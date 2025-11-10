@@ -1,7 +1,242 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-09T23:04:09.613229Z",
+  "lastUpdated": "2025-11-10T08:48:18.595963Z",
   "entries": [
+    {
+      "id": "6a0d8570-ceab-4aea-a8ac-04a44ed752db",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Aimessage",
+      "changeType": "modified",
+      "description": "Updated Aimessage",
+      "impact": "Affects Aimessage functionality",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "dbb4d52f-e67a-41df-bf18-17c4ff78f780",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Model Tier Map",
+      "changeType": "improved",
+      "description": "Represents a local model tier with its capabilities",
+      "impact": "Enhances Model Tier Map performance or features",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7b927b0b-2cd3-49a1-87ad-881461e06d64",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Airecall",
+      "changeType": "improved",
+      "description": "Focus session context for AI payload",
+      "impact": "Enhances Airecall performance or features",
+      "userFacing": true,
+      "tags": [
+        "ollama",
+        "concurrency",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6de5c83b-5305-4ccb-90f2-9ac274481574",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Model Routing Engine",
+      "changeType": "improved",
+      "description": "Selects the best model for a given input with casual detection and cooldown",
+      "impact": "Enhances Model Routing Engine performance or features",
+      "userFacing": false,
+      "tags": [
+        "concurrency",
+        "model",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7ada2e43-4f15-4ec1-a503-1d9b00efea4b",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "ollama",
+        "backend",
+        "system-prompt",
+        "concurrency",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b575df87-9369-43fa-9407-6c7d8386a3b5",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Message Bubble",
+      "changeType": "improved",
+      "description": "Normalize spacing to ensure proper rendering - fixes collapsed spaces after punctuation",
+      "impact": "Enhances Message Bubble performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "frontend",
+        "ui",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4f943908-34e7-4a36-a589-aef943a8da24",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Focus Objective Drawer",
+      "changeType": "improved",
+      "description": "Improved Focus Objective Drawer",
+      "impact": "Enhances Focus Objective Drawer performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b4ca8e8c-b5a3-463b-9fb8-b04a490dee8b",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Unified Focus Mode",
+      "changeType": "improved",
+      "description": "Improved Unified Focus Mode",
+      "impact": "Enhances Unified Focus Mode performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d0b93092-f9c0-46f9-8aed-cb9ef381a3f4",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Sidebar Navigation View V2",
+      "changeType": "improved",
+      "description": "Handle keyboard shortcuts for navigation",
+      "impact": "Enhances Sidebar Navigation View V2 performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "692cf7fe-463a-4ba4-bf26-a95e5bf61bc5",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Aurora Spotlight Bubble",
+      "changeType": "modified",
+      "description": "Updated Aurora Spotlight Bubble",
+      "impact": "Affects Aurora Spotlight Bubble functionality",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "24f28d9d-76ab-455b-8b43-a9d440d92b34",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Aurora Spotlight",
+      "changeType": "improved",
+      "description": "Improved Aurora Spotlight",
+      "impact": "Enhances Aurora Spotlight performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "129c2f02-279c-495b-b2dd-5933f3da19bf",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Aurora Spotlight Window Controller",
+      "changeType": "improved",
+      "description": "Custom NSPanel that can become a key window for keyboard input",
+      "impact": "Enhances Aurora Spotlight Window Controller performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "35de5d6b-e54d-4769-8c9d-82813884d663",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Spotlight Command Parser",
+      "changeType": "added",
+      "description": "Parse user input and determine intent type",
+      "impact": "Adds new Spotlight Command Parser capability",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "fc34baf3-deef-4bf9-b97e-a16ab582aae8",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Spotlight Result Toast",
+      "changeType": "added",
+      "description": "Added Spotlight Result Toast functionality",
+      "impact": "Adds new Spotlight Result Toast capability",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "997327bc-b700-4044-866d-680a32668a88",
+      "date": "2025-11-10T08:48:18.585657Z",
+      "version": "0.8",
+      "feature": "Spotlight Suggestions List",
+      "changeType": "added",
+      "description": "Generate suggestions based on query and context",
+      "impact": "Adds new Spotlight Suggestions List capability",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
     {
       "id": "b82f476c-2d79-4621-aa92-5655161a5d7a",
       "date": "2025-11-09T23:04:09.609194Z",
@@ -17,7 +252,7 @@
         "backend",
         "ollama"
       ],
-      "commitHash": null
+      "commitHash": "73db2bc58299cedfa71f722960102d4193967bc9"
     },
     {
       "id": "88c06151-c3c3-4e68-9d55-e6db5244d471",
