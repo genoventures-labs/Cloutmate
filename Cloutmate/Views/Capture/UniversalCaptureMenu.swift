@@ -85,8 +85,8 @@ enum CaptureOption: String, CaseIterable {
     func action() {
         switch self {
         case .inbox:
-            // Open Quick Capture for Inbox
-            QuickCaptureWindowController.shared.show()
+            // Open Quick Capture drawer
+            NotificationCenter.default.post(name: .showQuickCapture, object: nil)
         case .task:
             // Open task creation
             NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.projects)
@@ -94,8 +94,11 @@ enum CaptureOption: String, CaseIterable {
             // Open note creation
             NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.notes)
         case .post:
-            // Open composer
-            NotificationCenter.default.post(name: .openComposer, object: nil)
+            // Open calendar composer drawer
+            NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.calendar)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: .openComposer, object: CalendarComposerRequest())
+            }
         case .project:
             // Navigate to Projects and show creation
             NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.projects)

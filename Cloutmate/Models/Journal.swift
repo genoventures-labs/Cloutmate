@@ -71,6 +71,10 @@ final class Journal {
     var linkedAreaIds: [UUID] = []
     var linkedProjectIds: [UUID] = []
     
+    // Mention linking
+    var linkedEntityIds: [UUID] = [] // IDs of mentioned items
+    var linkedEntityTypes: [String] = [] // Types of mentioned items
+    
     // AI-related fields
     var aiPrompt: String?
     var aiGeneratedContent: String?
@@ -106,6 +110,8 @@ final class Journal {
         self.linkedNoteIds = linkedNoteIds
         self.linkedAreaIds = linkedAreaIds
         self.linkedProjectIds = linkedProjectIds
+        self.linkedEntityIds = []
+        self.linkedEntityTypes = []
         self.createdAt = Date()
         self.updatedAt = Date()
         self.isArchived = false

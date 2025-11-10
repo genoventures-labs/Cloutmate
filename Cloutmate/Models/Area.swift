@@ -32,6 +32,10 @@ final class Area {
     var lastReviewDate: Date?
     var stabilityScore: Double = 0.0 // Cached stability (0-100)
     
+    // Mention linking
+    var linkedEntityIds: [UUID] = [] // IDs of mentioned items
+    var linkedEntityTypes: [String] = [] // Types of mentioned items
+    
     var status: AreaStatus {
         get { AreaStatus(rawValue: statusRaw) ?? .active }
         set { statusRaw = newValue.rawValue }
@@ -57,6 +61,8 @@ final class Area {
         self.categoryIcon = categoryIcon
         self.colorAccent = colorAccent
         self.stabilityScore = 0.0
+        self.linkedEntityIds = []
+        self.linkedEntityTypes = []
     }
 }
 

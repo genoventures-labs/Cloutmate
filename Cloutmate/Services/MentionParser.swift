@@ -7,50 +7,126 @@
 
 import Foundation
 
+extension NSRange {
+    func intersects(_ other: NSRange) -> Bool {
+        return location < other.location + other.length && other.location < location + length
+    }
+}
+
 struct MentionMatch {
-    let fullText: String // e.g., "@projectname"
-    let mentionText: String // e.g., "projectname"
+    let fullText: String // e.g., "@projectname" or "@{task:uuid}"
+    let mentionText: String // e.g., "projectname" or "{task:uuid}"
     let range: NSRange
+    let structuredType: String? // e.g., "task" from @{task:uuid}
+    let structuredId: UUID? // e.g., UUID from @{task:uuid}
 }
 
 struct MentionParser {
     /// Parse @ mentions from text input
+    /// Supports both structured format (@{type:id}) and plain format (@name)
     static func parseMentions(from text: String) -> [MentionMatch] {
-        // Pattern matches @word or @web followed by optional text
-        // First, find all @mentions (simple pattern)
-        let simplePattern = "@([\\w]+)"
-        guard let regex = try? NSRegularExpression(pattern: simplePattern, options: []) else {
-            return []
+        var matches: [MentionMatch] = []
+        let nsString = text as NSString
+        
+        // First, find structured mentions: @{type:uuid}
+        let structuredPattern = "@\\{([a-zA-Z]+):([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\\}"
+        if let structuredRegex = try? NSRegularExpression(pattern: structuredPattern, options: []) {
+        let range = NSRange(location: 0, length: nsString.length)
+            let structuredMatches = structuredRegex.matches(in: text, options: [], range: range)
+        
+            for match in structuredMatches {
+                guard match.numberOfRanges >= 3 else { continue }
+                
+                let fullRange = match.range(at: 0)
+                let typeRange = match.range(at: 1)
+                let idRange = match.range(at: 2)
+                
+                guard typeRange.location != NSNotFound,
+                      idRange.location != NSNotFound,
+                      let typeString = nsString.substring(with: typeRange) as String?,
+                      let idString = nsString.substring(with: idRange) as String?,
+                      let uuid = UUID(uuidString: idString) else {
+                    continue
+                }
+                
+                let fullText = nsString.substring(with: fullRange)
+                
+                matches.append(MentionMatch(
+                    fullText: fullText,
+                    mentionText: "{\(typeString):\(idString)}",
+                    range: fullRange,
+                    structuredType: typeString,
+                    structuredId: uuid
+                ))
+            }
         }
         
-        let nsString = text as NSString
-        let range = NSRange(location: 0, length: nsString.length)
-        let matches = regex.matches(in: text, options: [], range: range)
-        
-        return matches.compactMap { match -> MentionMatch? in
-            guard match.numberOfRanges >= 2 else { return nil }
+        // Then find plain mentions: @word (but exclude structured ones we already found)
+        let plainPattern = "@([\\w]+)"
+        if let plainRegex = try? NSRegularExpression(pattern: plainPattern, options: []) {
+            let range = NSRange(location: 0, length: nsString.length)
+            let plainMatches = plainRegex.matches(in: text, options: [], range: range)
+            
+            for match in plainMatches {
+                guard match.numberOfRanges >= 2 else { continue }
             
             let fullRange = match.range(at: 0)
             let mentionRange = match.range(at: 1)
+                
+                // Skip if this range overlaps with any structured mention
+                if matches.contains(where: { $0.range.intersects(fullRange) }) {
+                    continue
+                }
             
             guard mentionRange.location != NSNotFound,
                   let mentionText = nsString.substring(with: mentionRange) as String? else {
-                return nil
+                    continue
             }
             
             let fullText = nsString.substring(with: fullRange)
             
-            return MentionMatch(
+                matches.append(MentionMatch(
                 fullText: fullText,
                 mentionText: mentionText.trimmingCharacters(in: .whitespacesAndNewlines),
-                range: fullRange
-            )
+                    range: fullRange,
+                    structuredType: nil,
+                    structuredId: nil
+                ))
         }
+        }
+        
+        // Sort by position in text
+        return matches.sorted { $0.range.location < $1.range.location }
+    }
+    
+    /// Convert a mention to structured format: @{type:id}
+    static func toStructuredFormat(type: ObjectType, id: UUID) -> String {
+        return "@{\(type.rawValue):\(id.uuidString)}"
+    }
+    
+    /// Extract type and ID from structured mention
+    static func parseStructuredMention(_ text: String) -> (type: ObjectType, id: UUID)? {
+        let pattern = "@\\{([a-zA-Z]+):([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\\}"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
+              let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.count)),
+              match.numberOfRanges >= 3 else {
+            return nil
+        }
+        
+        let nsString = text as NSString
+        guard let typeString = nsString.substring(with: match.range(at: 1)) as String?,
+              let idString = nsString.substring(with: match.range(at: 2)) as String?,
+              let type = ObjectType(rawValue: typeString),
+              let id = UUID(uuidString: idString) else {
+            return nil
+        }
+        
+        return (type: type, id: id)
     }
     
     /// Check if a mention is a web search mention
     static func isWebSearchMention(_ mention: MentionMatch) -> Bool {
-        return mention.mentionText.lowercased() == "web"
+        return mention.mentionText.lowercased() == "web" && mention.structuredType == nil
     }
     
     /// Extract search query from @web mention in text
@@ -85,6 +161,14 @@ struct MentionParser {
     
     /// Check if cursor is currently inside a mention (e.g., typing "@proj")
     static func getCurrentMention(from text: String, cursorPosition: Int) -> String? {
+        if let info = getCurrentMentionInfo(from: text, cursorPosition: cursorPosition) {
+            return info.text
+        }
+        return nil
+    }
+    
+    /// Get current mention info including range
+    static func getCurrentMentionInfo(from text: String, cursorPosition: Int) -> (text: String, range: NSRange)? {
         // Find the @ symbol before cursor
         let textBeforeCursor = String(text.prefix(cursorPosition))
         
@@ -100,8 +184,14 @@ struct MentionParser {
             // Extract mention text (everything after @ until cursor)
             let mentionText = afterAt.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // Return mention text if it's not empty
-            return mentionText.isEmpty ? nil : mentionText
+            // Calculate range (even if mentionText is empty, we still have "@")
+            let nsString = text as NSString
+            let atLocation = nsString.range(of: "@", options: .backwards, range: NSRange(location: 0, length: cursorPosition)).location
+            if atLocation != NSNotFound {
+                let range = NSRange(location: atLocation, length: cursorPosition - atLocation)
+                // Return empty string if just "@" was typed
+                return (text: mentionText, range: range)
+            }
         }
         
         return nil

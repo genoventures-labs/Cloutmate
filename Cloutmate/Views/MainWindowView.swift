@@ -71,7 +71,6 @@ struct MainWindowView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var selectedTab: TabIdentifier = .home
-    @State private var composerViewModel = ComposerViewModel()
     @State private var previousTab: TabIdentifier = .home
     @State private var isTransitioning = false
     @State private var showCommandPalette = false
@@ -81,41 +80,47 @@ struct MainWindowView: View {
     @State private var pendingDecision: InterceptDecision?
     @State private var guardMessage: String = ""
     @State private var showingReflectionPanel: Bool = false
-    @State private var showContextualCreateSheet = false
+    @State private var isContextualCreateVisible = false
     @State private var contextualCreateTab: TabIdentifier = .home
     
     // Child sheet states
-    @State private var showCreateNote = false
-    @State private var showCreateTask = false
-    @State private var showCreateProject = false
     @State private var showQuickCapture = false
     @State private var showInboxCapture = false
     @State private var showVoiceMemo = false
-    @State private var showArtifactComposer = false
-    @State private var showResourceImport = false
-    @State private var createNoteSheetNote: Note?
     
     var body: some View {
-        mainContent
-            .modifier(SheetModifiers(
-                composerViewModel: $composerViewModel,
-                selectedTab: selectedTab,
-                showContextualCreateSheet: $showContextualCreateSheet,
-                contextualCreateTab: $contextualCreateTab,
-                showCreateNote: $showCreateNote,
-                createNoteSheetNote: $createNoteSheetNote,
-                showCreateTask: $showCreateTask,
-                showCreateProject: $showCreateProject,
-                showQuickCapture: $showQuickCapture,
-                showInboxCapture: $showInboxCapture,
-                showVoiceMemo: $showVoiceMemo,
-                showArtifactComposer: $showArtifactComposer,
-                showResourceImport: $showResourceImport,
-                showCommandPalette: $showCommandPalette,
-                selectedTabBinding: $selectedTab,
-                showingReflectionPanel: $showingReflectionPanel,
-                modelContext: modelContext
-            ))
+        let hasOverlay = isContextualCreateVisible || showQuickCapture || showVoiceMemo || showInboxCapture
+        
+        ZStack {
+            mainContent
+                .opacity(hasOverlay ? 0 : 1)
+            
+            if isContextualCreateVisible {
+                ContextualCreateDrawer(
+                    isPresented: $isContextualCreateVisible,
+                    currentTab: contextualCreateTab
+                )
+                .transition(.move(edge: .trailing))
+            }
+            
+            if showQuickCapture {
+                QuickCaptureDrawer(isPresented: $showQuickCapture)
+                    .transition(.move(edge: .trailing))
+            }
+            
+            if showInboxCapture {
+                InboxCaptureDrawer(isPresented: $showInboxCapture)
+                    .transition(.move(edge: .trailing))
+            }
+            
+            if showVoiceMemo {
+                VoiceMemoDrawer(isPresented: $showVoiceMemo)
+                    .transition(.move(edge: .trailing))
+            }
+        }
+        .modifier(SheetModifiers(
+            showCommandPalette: $showCommandPalette
+        ))
             .onReceive(NotificationCenter.default.publisher(for: .switchTab)) { notification in
                 if let tab = notification.object as? TabIdentifier {
                     attemptTabSwitch(to: tab)
@@ -130,12 +135,105 @@ struct MainWindowView: View {
             }
             .onChange(of: selectedTab) { _, _ in
                 FlowTriggersService.shared.updateActivity()
+                if isContextualCreateVisible {
+                    withAnimation(GlassMotion.Easing.modalOpen) {
+                        isContextualCreateVisible = false
+                    }
+                }
+                if showQuickCapture {
+                    withAnimation(GlassMotion.Easing.modalOpen) {
+                        showQuickCapture = false
+                    }
+                }
+                if showVoiceMemo {
+                    withAnimation(GlassMotion.Easing.modalOpen) {
+                        showVoiceMemo = false
+                    }
+                }
+                if showInboxCapture {
+                    withAnimation(GlassMotion.Easing.modalOpen) {
+                        showInboxCapture = false
+                    }
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("UserActivity"))) { _ in
                 FlowTriggersService.shared.updateActivity()
             }
             .onChange(of: FlowCompanionEngine.shared.shouldShowPanel) { _, shouldShow in
                 showingReflectionPanel = shouldShow
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openContextualCreate)) { notification in
+                if let tab = notification.object as? TabIdentifier {
+                    contextualCreateTab = tab
+                } else {
+                    contextualCreateTab = selectedTab
+                }
+                
+                withAnimation(GlassMotion.Easing.modalOpen) {
+                    isContextualCreateVisible = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showVoiceMemo)) { _ in
+                withAnimation(GlassMotion.Easing.modalOpen) {
+                    showVoiceMemo = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showQuickCapture)) { _ in
+                withAnimation(GlassMotion.Easing.modalOpen) {
+                    showQuickCapture = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openInboxCapture)) { _ in
+                withAnimation(GlassMotion.Easing.modalOpen) {
+                    showInboxCapture = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showCreateNote)) { _ in
+                guard selectedTab == .notes else {
+                    attemptTabSwitch(to: .notes)
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .showCreateNote, object: nil)
+                    }
+                    return
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showCreateTask)) { notification in
+                let targetTab = TabIdentifier.tasks
+                guard selectedTab == targetTab else {
+                    attemptTabSwitch(to: targetTab)
+                    let object = notification.object
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .showCreateTask, object: object)
+                    }
+                    return
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showCreateProject)) { _ in
+                guard selectedTab == .projects else {
+                    attemptTabSwitch(to: .projects)
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .showCreateProject, object: nil)
+                    }
+                    return
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showResourceImport)) { _ in
+                guard selectedTab == .resources else {
+                    attemptTabSwitch(to: .resources)
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .showResourceImport, object: nil)
+                    }
+                    return
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .showArtifactComposer)) { _ in
+                guard selectedTab == .posts else {
+                    attemptTabSwitch(to: .posts)
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .showArtifactComposer, object: nil)
+                    }
+                    return
+                }
             }
             .overlay(guardOverlay, alignment: .center)
             .overlay(alignment: .bottomTrailing) {
@@ -389,125 +487,17 @@ struct MainWindowView: View {
 
 // MARK: - Sheet Modifiers
 struct SheetModifiers: ViewModifier {
-    @Binding var composerViewModel: ComposerViewModel
-    let selectedTab: TabIdentifier
-    @Binding var showContextualCreateSheet: Bool
-    @Binding var contextualCreateTab: TabIdentifier
-    @Binding var showCreateNote: Bool
-    @Binding var createNoteSheetNote: Note?
-    @Binding var showCreateTask: Bool
-    @Binding var showCreateProject: Bool
-    @Binding var showQuickCapture: Bool
-    @Binding var showInboxCapture: Bool
-    @Binding var showVoiceMemo: Bool
-    @Binding var showArtifactComposer: Bool
-    @Binding var showResourceImport: Bool
     @Binding var showCommandPalette: Bool
-    @Binding var selectedTabBinding: TabIdentifier
-    @Binding var showingReflectionPanel: Bool
-    let modelContext: ModelContext
     
     func body(content: Content) -> some View {
         content
-            .sheet(isPresented: $composerViewModel.isPresented) {
-                if selectedTab == .posts {
-                    ArtifactComposerView()
-                } else {
-                    ComposerWindow()
-                }
-            }
-            .sheet(isPresented: $showContextualCreateSheet) {
-                ContextualCreateSheet(currentTab: contextualCreateTab)
-            }
-            .sheet(isPresented: $showCreateNote) {
-                if let note = createNoteSheetNote {
-                    NavigationStack {
-                        NoteDetailDrawer(
-                            note: note,
-                            isPresented: $showCreateNote
-                        )
-                    }
-                }
-            }
-            .onChange(of: showCreateNote) { _, isShowing in
-                if isShowing && createNoteSheetNote == nil {
-                    let newNote = Note(title: "", markdown: "")
-                    newNote.author = .user
-                    modelContext.insert(newNote)
-                    createNoteSheetNote = newNote
-                } else if !isShowing {
-                    createNoteSheetNote = nil
-                }
-            }
-            .sheet(isPresented: $showCreateTask) {
-                CreateTaskSheet()
-            }
-            .sheet(isPresented: $showCreateProject) {
-                CreateProjectSheet()
-            }
-            .sheet(isPresented: $showQuickCapture) {
-                QuickCaptureView()
-            }
-            .sheet(isPresented: $showInboxCapture) {
-                QuickCaptureSheet()
-            }
-            .sheet(isPresented: $showVoiceMemo) {
-                VoiceMemoSheet()
-            }
-            .sheet(isPresented: $showArtifactComposer) {
-                ArtifactComposerView()
-            }
-            .sheet(isPresented: $showResourceImport) {
-                ResourceImportSheet()
-            }
             .overlay {
                 if showCommandPalette {
                     CommandPaletteView(isPresented: $showCommandPalette)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .openComposer)) { notification in
-                if selectedTab == .posts {
-                    showArtifactComposer = true
-                } else {
-                    contextualCreateTab = selectedTab
-                    showContextualCreateSheet = true
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .openContextualCreate)) { notification in
-                if let tab = notification.object as? TabIdentifier {
-                    contextualCreateTab = tab
-                    showContextualCreateSheet = true
-                } else {
-                    contextualCreateTab = selectedTab
-                    showContextualCreateSheet = true
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showCreateNote)) { _ in
-                showCreateNote = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showCreateTask)) { _ in
-                showCreateTask = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showCreateProject)) { _ in
-                showCreateProject = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showQuickCapture)) { _ in
-                showQuickCapture = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .openInboxCapture)) { _ in
-                showInboxCapture = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showVoiceMemo)) { _ in
-                showVoiceMemo = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showArtifactComposer)) { _ in
-                showArtifactComposer = true
-            }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenCommandPalette"))) { _ in
                 showCommandPalette = true
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .showResourceImport)) { _ in
-                showResourceImport = true
             }
     }
 }

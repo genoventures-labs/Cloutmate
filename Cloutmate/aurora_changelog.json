@@ -1,7 +1,899 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-10T08:48:18.595963Z",
+  "lastUpdated": "2025-11-10T23:49:49.799039Z",
   "entries": [
+    {
+      "id": "b8b3dde9-28c3-48da-960a-c413687f8c8d",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Area",
+      "changeType": "modified",
+      "description": "Updated Area",
+      "impact": "Affects Area functionality",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "01ee8b14-31f1-4990-ab45-f8f3cf03e8ec",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Calendar Composer Request",
+      "changeType": "added",
+      "description": "Added Calendar Composer Request functionality",
+      "impact": "Adds new Calendar Composer Request capability",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "925e9547-ac43-4d1a-b0a4-07af99157379",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Journal",
+      "changeType": "modified",
+      "description": "Updated Journal",
+      "impact": "Affects Journal functionality",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "9e69a2ef-bc8c-49d3-8512-bdd3a1083271",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Mention Parser",
+      "changeType": "improved",
+      "description": "Parse @ mentions from text input",
+      "impact": "Enhances Mention Parser performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7daae040-20ba-4f18-9525-9627987e0f85",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Mention",
+      "changeType": "added",
+      "description": "Parse mentions from text and return both structured and plain mentions",
+      "impact": "Adds new Mention capability",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "99ae7b9e-7021-468c-b020-1cd4d910c481",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Workspace Object Search",
+      "changeType": "improved",
+      "description": "Search all workspace objects by query string",
+      "impact": "Enhances Workspace Object Search performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bbcc2c61-f462-4db9-9c75-894cb121452b",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Converts structured execution results to conversational format",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "ui",
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6ab3283b-08eb-41fe-893e-af3fcecd41eb",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Improved Aiassistant",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "ab07b8d5-4bc1-448a-ade9-c1de9ad29f96",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Message Bubble",
+      "changeType": "improved",
+      "description": "Normalize spacing to ensure proper rendering - fixes collapsed spaces after punctuation",
+      "impact": "Enhances Message Bubble performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "ui",
+        "frontend",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b42466b9-13ce-4d24-ae15-4f9435038971",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Area Detail Drawer",
+      "changeType": "improved",
+      "description": "Improved Area Detail Drawer",
+      "impact": "Enhances Area Detail Drawer performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "0cb6a040-8fe3-47af-a700-7bdad6dda229",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Areas",
+      "changeType": "improved",
+      "description": "Improved Unified Areas",
+      "impact": "Enhances Unified Areas performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b11d65c2-dfb5-4d44-9d18-042d678d7597",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Artifact Detail Drawer",
+      "changeType": "added",
+      "description": "Added Artifact Detail Drawer functionality",
+      "impact": "Adds new Artifact Detail Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "10c3ce2f-1d81-4c39-bf94-9640ffb78649",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Calendar Day Cell V2",
+      "changeType": "modified",
+      "description": "Updated Calendar Day Cell V2",
+      "impact": "Affects Calendar Day Cell V2 functionality",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "9adae369-3c9c-4dba-8599-de6c5b511fcd",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Calendar Day Detail Drawer",
+      "changeType": "added",
+      "description": "Added Calendar Day Detail Drawer functionality",
+      "impact": "Adds new Calendar Day Detail Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6f520989-5b85-4ab4-bb3b-a5b4489d5d76",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Post Detail Drawer",
+      "changeType": "added",
+      "description": "Added Post Detail Drawer functionality",
+      "impact": "Adds new Post Detail Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "809caa38-8f8e-4295-8042-2d9cdc453d5a",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Calendar",
+      "changeType": "improved",
+      "description": "Improved Unified Calendar",
+      "impact": "Enhances Unified Calendar performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "5e28e4f1-ccf3-4432-9b7b-370e6c27e6b6",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Inbox Capture Drawer",
+      "changeType": "added",
+      "description": "Added Inbox Capture Drawer functionality",
+      "impact": "Adds new Inbox Capture Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f0ca0cf1-0814-474b-8de1-7b020b0b577d",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Quick Capture Drawer",
+      "changeType": "added",
+      "description": "Added Quick Capture Drawer functionality",
+      "impact": "Adds new Quick Capture Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "1ec2d951-b655-4993-9e2c-63ef7a4fcb7f",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Quick Capture",
+      "changeType": "improved",
+      "description": "Improved Quick Capture",
+      "impact": "Enhances Quick Capture performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "373ac35b-329b-4f76-aaaa-480fa3c114d4",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Universal Capture Menu",
+      "changeType": "improved",
+      "description": "Improved Universal Capture Menu",
+      "impact": "Enhances Universal Capture Menu performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "93c70d5d-b229-42b6-95a3-18ef32abc7b2",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Voice Memo Drawer",
+      "changeType": "added",
+      "description": "Added Voice Memo Drawer functionality",
+      "impact": "Adds new Voice Memo Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8eaa8814-98f8-4853-a441-16771e402d66",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Aurora Drawer",
+      "changeType": "added",
+      "description": "Added Aurora Drawer functionality",
+      "impact": "Adds new Aurora Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "14bddca2-079c-498f-b6fa-0d001150f05d",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Contextual Create Sheet",
+      "changeType": "improved",
+      "description": "Improved Contextual Create Sheet",
+      "impact": "Enhances Contextual Create Sheet performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d11a24e0-f25d-4cc3-aaaf-8a22cc6cde2a",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Focus Duration Sheet",
+      "changeType": "modified",
+      "description": "Updated Focus Duration Sheet",
+      "impact": "Affects Focus Duration Sheet functionality",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e51a0196-45d0-4e98-b1de-5dd79d8d5c28",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Mention Input Field",
+      "changeType": "improved",
+      "description": "Improved Mention Input Field",
+      "impact": "Enhances Mention Input Field performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "9c25220c-e9c6-48db-b32b-7065b44aa9e3",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Mention Preview Card",
+      "changeType": "added",
+      "description": "Added Mention Preview Card functionality",
+      "impact": "Adds new Mention Preview Card capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "9ca6c5fa-0c96-49f8-a9bd-30a36b39d0cf",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Mention Text Editor",
+      "changeType": "added",
+      "description": "Added Mention Text Editor functionality",
+      "impact": "Adds new Mention Text Editor capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "565f0b4c-7976-4288-be7e-3fae6fd0e34f",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Mention Text",
+      "changeType": "added",
+      "description": "Added Mention Text functionality",
+      "impact": "Adds new Mention Text capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "3926afe3-d12e-426d-bdc4-d1b2a0f41204",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Composer Detail Drawer",
+      "changeType": "added",
+      "description": "Added Composer Detail Drawer functionality",
+      "impact": "Adds new Composer Detail Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "658e2d19-fdda-4470-b996-0ef049e1707b",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Composer Window",
+      "changeType": "improved",
+      "description": "Improved Composer Window",
+      "impact": "Enhances Composer Window performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2b5f6339-ef85-49e9-a386-322c57e7bb65",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Journal Card V2",
+      "changeType": "modified",
+      "description": "Updated Journal Card V2",
+      "impact": "Affects Journal Card V2 functionality",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "9b8db504-fe06-482d-bda6-f0613cd9e8b1",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Journal Detail Drawer",
+      "changeType": "improved",
+      "description": "Improved Journal Detail Drawer",
+      "impact": "Enhances Journal Detail Drawer performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d28f8ee3-5920-48cc-9fd5-8744a719a669",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Journal Header",
+      "changeType": "modified",
+      "description": "Updated Journal Header",
+      "impact": "Affects Journal Header functionality",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "70565525-66b6-4844-872d-19943b0128b8",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Journal",
+      "changeType": "improved",
+      "description": "Improved Unified Journal",
+      "impact": "Enhances Unified Journal performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e30e8730-afe1-4f08-b74b-9a82f7517094",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Main Window",
+      "changeType": "improved",
+      "description": "Improved Main Window",
+      "impact": "Enhances Main Window performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "08c994e1-dbe1-4d55-bcb8-5420eadf2e89",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Note Card V2",
+      "changeType": "improved",
+      "description": "Improved Note Card V2",
+      "impact": "Enhances Note Card V2 performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8e9cb6ba-3f6e-4a5e-a04a-e5889b337b69",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Note Detail Drawer",
+      "changeType": "improved",
+      "description": "Improved Note Detail Drawer",
+      "impact": "Enhances Note Detail Drawer performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "61706f78-846d-45c5-867c-bd01dbc9a3be",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes Header",
+      "changeType": "improved",
+      "description": "Improved Notes Header",
+      "impact": "Enhances Notes Header performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "a9557664-d386-4d0f-a95c-154ec8660300",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes",
+      "changeType": "improved",
+      "description": "Improved Notes",
+      "impact": "Enhances Notes performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "ffc35db8-59d3-44eb-946b-1a3b70fe33ce",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes View Mode",
+      "changeType": "added",
+      "description": "Added Notes View Mode functionality",
+      "impact": "Adds new Notes View Mode capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f23001f4-316e-4b75-8ba4-b7d617aaead7",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Notes",
+      "changeType": "improved",
+      "description": "Improved Unified Notes",
+      "impact": "Enhances Unified Notes performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "25205598-858d-4dde-b8e1-9ef1fe46e0ee",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes Compact",
+      "changeType": "added",
+      "description": "Added Notes Compact functionality",
+      "impact": "Adds new Notes Compact capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "23fa6314-32bd-4932-892d-b27d1898db9e",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes Grid",
+      "changeType": "added",
+      "description": "Added Notes Grid functionality",
+      "impact": "Adds new Notes Grid capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bfcf6859-00e5-4cdd-882a-584f3df8f259",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes List",
+      "changeType": "added",
+      "description": "Added Notes List functionality",
+      "impact": "Adds new Notes List capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b01e91ce-7d56-4222-a4be-a8c99d0007a2",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Notes Table",
+      "changeType": "added",
+      "description": "Added Notes Table functionality",
+      "impact": "Adds new Notes Table capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6b4d57f8-679e-47ee-976c-0699ef4298f6",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Project Detail Drawer",
+      "changeType": "added",
+      "description": "Added Project Detail Drawer functionality",
+      "impact": "Adds new Project Detail Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "69988327-bc0a-4f18-8e1d-1bf46b80058b",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Projects",
+      "changeType": "improved",
+      "description": "Improved Unified Projects",
+      "impact": "Enhances Unified Projects performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f08ba469-597a-4ad8-8663-edda9220a7a4",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Resource Import Sheet",
+      "changeType": "improved",
+      "description": "Improved Resource Import Sheet",
+      "impact": "Enhances Resource Import Sheet performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "289b48d0-8ae9-43e2-85ec-5c98823ea960",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Resources",
+      "changeType": "improved",
+      "description": "Improved Unified Resources",
+      "impact": "Enhances Unified Resources performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "dd6d4cfb-7a3c-401e-b6a9-f794192e4531",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Rituals View V2",
+      "changeType": "improved",
+      "description": "Improved Rituals View V2",
+      "impact": "Enhances Rituals View V2 performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "13b1b319-6ca5-4ba0-b17b-0cb8d4183890",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Task Card V2",
+      "changeType": "improved",
+      "description": "Improved Task Card V2",
+      "impact": "Enhances Task Card V2 performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "594ff567-efab-4d7f-89f6-c05a4d5c3c99",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Task Detail Drawer",
+      "changeType": "added",
+      "description": "Added Task Detail Drawer functionality",
+      "impact": "Adds new Task Detail Drawer capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4d055a97-8955-45c6-8618-498448bca0ab",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Tasks Header",
+      "changeType": "modified",
+      "description": "Updated Tasks Header",
+      "impact": "Affects Tasks Header functionality",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bbc1c71a-5e63-4bb3-b784-5f84ef958294",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Task View Mode",
+      "changeType": "added",
+      "description": "Added Task View Mode functionality",
+      "impact": "Adds new Task View Mode capability",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6518affc-617a-4442-9902-2eedf38ea88c",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Tasks",
+      "changeType": "modified",
+      "description": "Updated Tasks",
+      "impact": "Affects Tasks functionality",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e240f77c-14d0-45d1-9393-b95cfed8636e",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Unified Tasks",
+      "changeType": "improved",
+      "description": "Improved Unified Tasks",
+      "impact": "Enhances Unified Tasks performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4c774995-1fda-4dff-9d08-457e12c94bd0",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Task Board",
+      "changeType": "added",
+      "description": "Added Task Board functionality",
+      "impact": "Adds new Task Board capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bef13c71-c206-4cd1-bb09-34017dde49de",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Task Gallery",
+      "changeType": "added",
+      "description": "Added Task Gallery functionality",
+      "impact": "Adds new Task Gallery capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "94d58e94-8270-432d-baad-aecca008a399",
+      "date": "2025-11-10T23:49:49.760759Z",
+      "version": "0.8",
+      "feature": "Task Timeline",
+      "changeType": "added",
+      "description": "Added Task Timeline functionality",
+      "impact": "Adds new Task Timeline capability",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
     {
       "id": "6a0d8570-ceab-4aea-a8ac-04a44ed752db",
       "date": "2025-11-10T08:48:18.585657Z",
@@ -16,7 +908,7 @@
         "data",
         "model"
       ],
-      "commitHash": null
+      "commitHash": "82bced11fa5b579d0b6c8e14686e372df0bd5591"
     },
     {
       "id": "dbb4d52f-e67a-41df-bf18-17c4ff78f780",

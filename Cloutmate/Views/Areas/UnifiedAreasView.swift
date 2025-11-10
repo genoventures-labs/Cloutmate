@@ -21,8 +21,9 @@ struct UnifiedAreasView: View {
     @State private var selectedFilter: AreaFilter = .all
     @State private var searchText = ""
     @State private var scrollOffset: CGFloat = 0
-    @State private var showCreateSheet = false
-    @State private var selectedArea: Area?
+    @State private var activeArea: Area?
+    @State private var isDrawerVisible = false
+    @State private var isCreatingArea = false
     @State private var sidebarCollapsed = false
     
     var filteredAreas: [Area] {
@@ -67,124 +68,130 @@ struct UnifiedAreasView: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar
-            if !sidebarCollapsed {
-                AreasSidebar(
-                    areas: allAreas,
-                    onAreaSelected: { area in
-                        selectedArea = area
-                    }
-                )
-                .transition(.move(edge: .leading))
-            }
-            
-            // Main Content
-            VStack(spacing: 0) {
-                // Header Zone
-                AreasHeaderView(
-                    selectedFilter: selectedFilter,
-                    searchText: $searchText,
-                    onFilterChange: { filter in
-                        selectedFilter = filter
-                    },
-                    onQuickAdd: {
-                        showCreateSheet = true
-                    },
-                    sidebarCollapsed: sidebarCollapsed,
-                    onToggleSidebar: {
-                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                            sidebarCollapsed.toggle()
+        ZStack(alignment: .topLeading) {
+            HStack(spacing: 0) {
+                if !sidebarCollapsed {
+                    AreasSidebar(
+                        areas: allAreas,
+                        onAreaSelected: { area in
+                            openDrawer(for: area)
                         }
-                    }
-                )
-                .opacity(headerOpacity)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: headerOpacity)
+                    )
+                    .transition(.move(edge: .leading))
+                }
                 
-                Divider()
-                
-                // Content Grid
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            GeometryReader { geometry in
-                                Color.clear
-                                    .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
+                VStack(spacing: 0) {
+                    AreasHeaderView(
+                        selectedFilter: selectedFilter,
+                        searchText: $searchText,
+                        onFilterChange: { filter in
+                            selectedFilter = filter
+                        },
+                        onQuickAdd: {
+                            startCreatingArea()
+                        },
+                        sidebarCollapsed: sidebarCollapsed,
+                        onToggleSidebar: {
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                                sidebarCollapsed.toggle()
                             }
-                            .frame(height: 0)
-                            
-                            if sortedAreas.isEmpty {
-                                ContentUnavailableView(
-                                    "No Areas",
-                                    systemImage: "rectangle.stack",
-                                    description: Text(filteredAreas.isEmpty && !searchText.isEmpty ? "Try a different search" : "Create your first area to get started")
-                                )
-                                .frame(maxHeight: .infinity)
-                                .padding(.top, 100)
-                            } else {
-                                LazyVGrid(
-                                    columns: [
-                                        GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)
-                                    ],
-                                    spacing: 16
-                                ) {
-                                    ForEach(sortedAreas) { area in
-                                        AreaCardV2(
-                                            area: area,
-                                            projects: allProjects,
-                                            notes: allNotes,
-                                            onTap: {
-                                                selectedArea = area
-                                            },
-                                            onEdit: {
-                                                selectedArea = area
-                                            },
-                                            onArchive: {
-                                                archiveArea(area)
-                                            },
-                                            onDelete: {
-                                                deleteArea(area)
-                                            }
-                                        )
-                                    }
+                        }
+                    )
+                    .opacity(headerOpacity)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: headerOpacity)
+                    
+                    Divider()
+                    
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
                                 }
-                                .padding(20)
+                                .frame(height: 0)
+                                
+                                if sortedAreas.isEmpty {
+                                    ContentUnavailableView(
+                                        "No Areas",
+                                        systemImage: "rectangle.stack",
+                                        description: Text(filteredAreas.isEmpty && !searchText.isEmpty ? "Try a different search" : "Create your first area to get started")
+                                    )
+                                    .frame(maxHeight: .infinity)
+                                    .padding(.top, 100)
+                                } else {
+                                    LazyVGrid(
+                                        columns: [
+                                            GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)
+                                        ],
+                                        spacing: 16
+                                    ) {
+                                        ForEach(sortedAreas) { area in
+                                            AreaCardV2(
+                                                area: area,
+                                                projects: allProjects,
+                                                notes: allNotes,
+                                                onTap: {
+                                                    openDrawer(for: area)
+                                                },
+                                                onEdit: {
+                                                    openDrawer(for: area)
+                                                },
+                                                onArchive: {
+                                                    archiveArea(area)
+                                                },
+                                                onDelete: {
+                                                    deleteArea(area)
+                                                }
+                                            )
+                                        }
+                                    }
+                                    .padding(20)
+                                }
                             }
                         }
-                    }
-                    .coordinateSpace(name: "scroll")
-                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                        scrollOffset = -value
+                        .coordinateSpace(name: "scroll")
+                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                            scrollOffset = -value
+                        }
                     }
                 }
+                .frame(maxWidth: .infinity)
+                .opacity(isDrawerVisible ? 0 : 1)
             }
-            .frame(maxWidth: .infinity)
-        }
-        .background(glassColorSystem.backgroundColor())
-        .sheet(isPresented: $showCreateSheet) {
-            AreaQuickAddSheet()
-        }
-        .sheet(item: $selectedArea) { area in
-            AreaDetailDrawer(
-                area: area,
-                projects: allProjects,
-                notes: allNotes,
-                onDismiss: {
-                    selectedArea = nil
-                },
-                onAddProject: {
-                    // TODO: Open project creation with area pre-selected
-                    selectedArea = nil
-                },
-                onAddNote: {
-                    // TODO: Open note creation with area pre-selected
-                    selectedArea = nil
-                },
-                onArchive: {
-                    archiveArea(area)
-                    selectedArea = nil
-                }
-            )
+            .background(glassColorSystem.backgroundColor())
+            
+            if let area = activeArea, isDrawerVisible {
+                AreaDetailDrawer(
+                    area: area,
+                    projects: allProjects,
+                    notes: allNotes,
+                    onDismiss: {
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                            isDrawerVisible = false
+                        }
+                    },
+                    onAddProject: {
+                        NotificationCenter.default.post(name: .openEntity, object: TabIdentifier.projects)
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                            isDrawerVisible = false
+                        }
+                    },
+                    onAddNote: {
+                        NotificationCenter.default.post(name: .openEntity, object: TabIdentifier.notes)
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                            isDrawerVisible = false
+                        }
+                    },
+                    onArchive: {
+                        archiveArea(area)
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                            isDrawerVisible = false
+                        }
+                    }
+                )
+                .transition(.move(edge: .trailing))
+            }
         }
         .onChange(of: searchText) { _, _ in
             // Invalidate stability cache when search changes
@@ -193,6 +200,24 @@ struct UnifiedAreasView: View {
         .onChange(of: selectedFilter) { _, _ in
             // Invalidate stability cache when filter changes
             AreaStabilityService.shared.invalidateAllCache()
+        }
+        .onChange(of: isDrawerVisible) { _, newValue in
+            if !newValue, let area = activeArea {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if !isDrawerVisible {
+                        cleanupIfNecessary(area)
+                        activeArea = nil
+                        isCreatingArea = false
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openAreaDetail)) { notification in
+            if let area = notification.object as? Area {
+                openDrawer(for: area)
+            } else {
+                startCreatingArea()
+            }
         }
     }
     
@@ -207,6 +232,41 @@ struct UnifiedAreasView: View {
         modelContext.delete(area)
         try? modelContext.save()
         AreaStabilityService.shared.invalidateCache(for: area.id)
+    }
+    
+    private func startCreatingArea() {
+        guard !isDrawerVisible else { return }
+        
+        let newArea = Area(title: "")
+        modelContext.insert(newArea)
+        activeArea = newArea
+        isCreatingArea = true
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
+        }
+    }
+    
+    private func openDrawer(for area: Area) {
+        guard !isSelectionMode else { return }
+        activeArea = area
+        isCreatingArea = false
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
+        }
+    }
+    
+    private func cleanupIfNecessary(_ area: Area) {
+        guard isCreatingArea else { return }
+        let trimmedTitle = area.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNotes = (area.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedTitle.isEmpty && trimmedNotes.isEmpty && area.tags.isEmpty {
+            modelContext.delete(area)
+            try? modelContext.save()
+        } else {
+            try? modelContext.save()
+        }
     }
 }
 

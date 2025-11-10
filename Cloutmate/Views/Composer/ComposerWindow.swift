@@ -20,6 +20,7 @@ struct ComposerWindow: View {
     let existingPost: CloutmateShared.Post?
     let prefilledDate: Date?
     let onSave: ((DraftConversionResult) -> Void)?
+    let onClose: (() -> Void)?
     
     @State private var caption = ""
     @State private var scheduledDate: Date?
@@ -38,11 +39,18 @@ struct ComposerWindow: View {
     @State private var isAIGenerating = false
     @State private var analyticsRefreshID = UUID()
     
-    init(draft: Draft? = nil, existingPost: CloutmateShared.Post? = nil, prefilledDate: Date? = nil, onSave: ((DraftConversionResult) -> Void)? = nil) {
+    init(
+        draft: Draft? = nil,
+        existingPost: CloutmateShared.Post? = nil,
+        prefilledDate: Date? = nil,
+        onSave: ((DraftConversionResult) -> Void)? = nil,
+        onClose: (() -> Void)? = nil
+    ) {
         self.draft = draft
         self.existingPost = existingPost
         self.prefilledDate = prefilledDate
         self.onSave = onSave
+        self.onClose = onClose
     }
     
     @State private var showMorphIn = false
@@ -201,7 +209,7 @@ struct ComposerWindow: View {
         Section {
             HStack {
                 Button("Cancel") {
-                    dismiss()
+                    close()
                 }
                 .buttonStyle(.bordered)
                 
@@ -319,6 +327,14 @@ struct ComposerWindow: View {
     
     private func triggerAnalyticsRefresh() {
         analyticsRefreshID = UUID()
+    }
+    
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
     }
     
     private func validateInput() -> Bool {

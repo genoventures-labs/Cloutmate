@@ -12,10 +12,13 @@ struct TasksHeaderView: View {
     let todayCompletionRate: String
     let currentStreak: Int
     let selectedFilter: TaskFilter
+    let selectedViewMode: TaskViewMode
     let onFilterChange: (TaskFilter) -> Void
+    let onViewModeChange: (TaskViewMode) -> Void
     let onQuickAdd: () -> Void
     
     @State private var showFilterDropdown = false
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     enum TaskFilter: String, CaseIterable {
         case all = "All"
@@ -42,6 +45,27 @@ struct TasksHeaderView: View {
             
             // Right-side actions
             HStack(spacing: 12) {
+                // View Mode Selector
+                HStack(spacing: 4) {
+                    ForEach(TaskViewMode.allCases, id: \.self) { mode in
+                        Button(action: {
+                            onViewModeChange(mode)
+                        }) {
+                            Image(systemName: mode.icon)
+                                .font(.caption)
+                                .foregroundColor(selectedViewMode == mode ? .kosmicBlue : glassColorSystem.textSecondary())
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    selectedViewMode == mode ?
+                                    Color.kosmicBlue.opacity(0.2) :
+                                    glassColorSystem.glassTint(for: .surface).opacity(0.2)
+                                )
+                                .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
                 // Filter button with dropdown
                 Menu {
                     ForEach(TaskFilter.allCases, id: \.self) { filter in
@@ -91,7 +115,9 @@ struct TasksHeaderView: View {
         todayCompletionRate: "3/5 complete",
         currentStreak: 3,
         selectedFilter: .all,
+        selectedViewMode: .list,
         onFilterChange: { _ in },
+        onViewModeChange: { _ in },
         onQuickAdd: {}
     )
     .padding()

@@ -7,6 +7,8 @@
 
 import SwiftUI
 import AppKit
+import SwiftData
+import CloutmateShared
 
 struct MessageBubble: View {
     let message: AIMessage
@@ -210,17 +212,13 @@ struct MessageBubble: View {
                                 interpretedSyntax: .full
                             )
                         ) {
-                            // Apply mention styling to markdown content
-                            let styledContent = applyMentionStyling(to: attributedContent, originalText: content, isUser: false)
-                            Text(styledContent)
+                            // Use MentionTextView for rendering with inline previews
+                            MentionRenderedTextView(text: normalizeSpacing(content))
                                 .foregroundColor(isSystemMessage ? .secondary : .primary)
                                 .textSelection(.enabled)
                                 .multilineTextAlignment(.leading)
                                 .lineSpacing(6)
                                 .lineLimit(nil)
-                                .allowsTightening(false)
-                                .minimumScaleFactor(1.0)
-                                .kerning(0) // Prevent character spacing issues
                                 .tint(.kosmicBlue)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {

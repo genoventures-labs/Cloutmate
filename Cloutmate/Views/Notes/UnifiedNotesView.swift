@@ -23,14 +23,14 @@ struct UnifiedNotesView: View {
     @State private var searchText: String = ""
     @State private var selectedFilter: NotesFilter = .all
     @State private var groupingMode: NotesGroupingMode = .byTag
-    @State private var showCreateSheet = false
-    @State private var selectedNote: Note?
-    @State private var showDrawer = false
+    @State private var selectedViewMode: NotesViewMode = .cards
+    @State private var activeNote: Note?
+    @State private var isDrawerVisible = false
+    @State private var isCreatingNote = false
     @State private var expandedGroups: Set<String> = []
     @State private var focusedNoteIndex: Int?
     @State private var isSelectionMode = false
     @State private var selectedNoteIDs: Set<UUID> = []
-    @State private var createSheetNote: Note?
     
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFocused: Bool
@@ -151,41 +151,25 @@ struct UnifiedNotesView: View {
                 headerView
                 contentView
             }
-        }
-        .sheet(isPresented: $showCreateSheet) {
-            // Create new note
-            if let note = createSheetNote {
-                NavigationStack {
-                    NoteDetailDrawer(
-                        note: note,
-                        isPresented: $showCreateSheet
-                    )
-                }
-            }
-        }
-        .onChange(of: showCreateSheet) { _, isShowing in
-            if isShowing && createSheetNote == nil {
-                // Only create note once when sheet opens
-                let newNote = Note(title: "", markdown: "")
-                newNote.author = .user
-                modelContext.insert(newNote)
-                createSheetNote = newNote
-            } else if !isShowing {
-                // Clean up when sheet closes
-                createSheetNote = nil
-            }
-        }
-        .overlay {
-            if showDrawer, let note = selectedNote {
+            .opacity(isDrawerVisible ? 0 : 1)
+            
+            if let note = activeNote, isDrawerVisible {
                 NoteDetailDrawer(
                     note: note,
-                    isPresented: $showDrawer
+                    isPresented: Binding(
+                        get: { isDrawerVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = newValue
+                            }
+                        }
+                    )
                 )
                 .transition(.move(edge: .trailing))
             }
         }
         .overlay(alignment: .bottom) {
-            if isSelectionActive {
+            if isSelectionActive && !isDrawerVisible {
                 SelectionActionBar(
                     count: visibleSelectedNoteCount,
                     itemLabel: "note",
@@ -198,11 +182,8 @@ struct UnifiedNotesView: View {
                 .padding(.bottom, 24)
             }
         }
-        .onChange(of: selectedNote) { _, newValue in
-            showDrawer = newValue != nil
-        }
         .onReceive(NotificationCenter.default.publisher(for: .showCreateNote)) { _ in
-            showCreateSheet = true
+            startCreatingNote()
         }
         .onAppear {
             setupKeyboardNavigation()
@@ -216,14 +197,23 @@ struct UnifiedNotesView: View {
         .onChange(of: groupingMode) { _, _ in
             pruneSelection()
         }
+        .onChange(of: isDrawerVisible) { _, newValue in
+            if !newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    activeNote = nil
+                    isCreatingNote = false
+                }
+            }
+        }
     }
     
     private var headerView: some View {
         NotesHeaderView(
             searchText: $searchText,
             selectedFilter: $selectedFilter,
-            showCreateSheet: $showCreateSheet,
+            onCreate: startCreatingNote,
             isSelectionMode: $isSelectionMode,
+            selectedViewMode: $selectedViewMode,
             totalNotes: totalActiveNotes,
             taggedNotes: taggedNotesCount,
             selectionCount: visibleSelectedNoteCount,
@@ -239,7 +229,78 @@ struct UnifiedNotesView: View {
         if sortedNotes.isEmpty {
             emptyState
         } else {
-            notesScrollView
+            switch selectedViewMode {
+            case .cards:
+                notesScrollView
+            case .list:
+                NotesListView(
+                    notes: sortedNotes,
+                    selectionMode: isSelectionActive,
+                    selectedNoteIDs: selectedNoteIDs,
+                    onNoteTap: { note in
+                        openDrawer(for: note)
+                    },
+                    onNoteEdit: { note in
+                        openDrawer(for: note)
+                    },
+                    onNotePin: togglePin,
+                    onNoteArchive: archiveNote,
+                    onNoteDelete: deleteNote,
+                    onNoteSendToTasks: sendNoteToTask,
+                    onSelectionToggle: toggleNoteSelection
+                )
+            case .grid:
+                NotesGridView(
+                    notes: sortedNotes,
+                    selectionMode: isSelectionActive,
+                    selectedNoteIDs: selectedNoteIDs,
+                    onNoteTap: { note in
+                        openDrawer(for: note)
+                    },
+                    onNoteEdit: { note in
+                        openDrawer(for: note)
+                    },
+                    onNotePin: togglePin,
+                    onNoteArchive: archiveNote,
+                    onNoteDelete: deleteNote,
+                    onNoteSendToTasks: sendNoteToTask,
+                    onSelectionToggle: toggleNoteSelection
+                )
+            case .table:
+                NotesTableView(
+                    notes: sortedNotes,
+                    selectionMode: isSelectionActive,
+                    selectedNoteIDs: selectedNoteIDs,
+                    onNoteTap: { note in
+                        openDrawer(for: note)
+                    },
+                    onNoteEdit: { note in
+                        openDrawer(for: note)
+                    },
+                    onNotePin: togglePin,
+                    onNoteArchive: archiveNote,
+                    onNoteDelete: deleteNote,
+                    onNoteSendToTasks: sendNoteToTask,
+                    onSelectionToggle: toggleNoteSelection
+                )
+            case .compact:
+                NotesCompactView(
+                    notes: sortedNotes,
+                    selectionMode: isSelectionActive,
+                    selectedNoteIDs: selectedNoteIDs,
+                    onNoteTap: { note in
+                        openDrawer(for: note)
+                    },
+                    onNoteEdit: { note in
+                        openDrawer(for: note)
+                    },
+                    onNotePin: togglePin,
+                    onNoteArchive: archiveNote,
+                    onNoteDelete: deleteNote,
+                    onNoteSendToTasks: sendNoteToTask,
+                    onSelectionToggle: toggleNoteSelection
+                )
+            }
         }
     }
     
@@ -397,6 +458,37 @@ struct UnifiedNotesView: View {
             clearSelection()
         } else if !filteredNotes.isEmpty {
             isSelectionMode = true
+            if isDrawerVisible {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = false
+                }
+            }
+        }
+    }
+    
+    private func startCreatingNote() {
+        guard !isDrawerVisible else { return }
+        
+        let newNote = Note(title: "", markdown: "")
+        newNote.author = .user
+        modelContext.insert(newNote)
+        
+        activeNote = newNote
+        isCreatingNote = true
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
+        }
+    }
+    
+    private func openDrawer(for note: Note) {
+        guard !isSelectionActive else { return }
+        
+        activeNote = note
+        isCreatingNote = false
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
         }
     }
     
@@ -608,15 +700,16 @@ struct UnifiedNotesView: View {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // ⌘N: Create new note
             if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "n" {
-                showCreateSheet = true
+                startCreatingNote()
                 return nil
             }
             
             // Escape: Close drawer
             if event.keyCode == 53 { // Escape key
-                if showDrawer {
-                    showDrawer = false
-                    selectedNote = nil
+                if isDrawerVisible {
+                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                        isDrawerVisible = false
+                    }
                     return nil
                 } else if isSelectionActive {
                     clearSelection()
@@ -628,8 +721,7 @@ struct UnifiedNotesView: View {
             if event.keyCode == 36 && focusedNoteIndex != nil { // Enter key
                 let notes = sortedNotes
                 if let index = focusedNoteIndex, index < notes.count {
-                    selectedNote = notes[index]
-                    showDrawer = true
+                    openDrawer(for: notes[index])
                     return nil
                 }
             }

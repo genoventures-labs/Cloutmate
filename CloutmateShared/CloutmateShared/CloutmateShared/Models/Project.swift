@@ -39,6 +39,10 @@ public final class Project {
     public var noteIds: [UUID] = []
     public var postIds: [UUID] = []
     
+    // Mention linking
+    public var linkedEntityIds: [UUID] = [] // IDs of mentioned items
+    public var linkedEntityTypes: [String] = [] // Types of mentioned items
+    
     public init(
         title: String,
         goal: String? = nil,
@@ -59,6 +63,8 @@ public final class Project {
         self.taskIds = []
         self.noteIds = []
         self.postIds = []
+        self.linkedEntityIds = []
+        self.linkedEntityTypes = []
     }
     
     public var status: ProjectStatus {

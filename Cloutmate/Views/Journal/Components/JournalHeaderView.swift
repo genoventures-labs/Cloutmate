@@ -20,10 +20,10 @@ enum JournalFilter: String, CaseIterable {
 struct JournalHeaderView: View {
     @Binding var searchText: String
     @Binding var selectedFilter: JournalFilter
-    @Binding var showCreateSheet: Bool
     @Binding var isSelectionMode: Bool
     
     let selectionCount: Int
+    let onCreate: () -> Void
     let onToggleSelection: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -76,14 +76,14 @@ struct JournalHeaderView: View {
                         }
                         .accessibilityLabel(isSelectionMode ? "Exit selection mode" : "Enter selection mode")
                         .help(isSelectionMode ? "Done Selecting" : "Select Entries")
-                        
-                        // Quick Add button
-                        GlassButton(
-                            icon: "plus",
-                            style: .iconOnly,
-                            role: .primary
-                        ) {
-                            showCreateSheet = true
+                    
+                    // Quick Add button
+                    GlassButton(
+                        icon: "plus",
+                        style: .iconOnly,
+                        role: .primary
+                    ) {
+                        onCreate()
                         }
                         .accessibilityLabel("Create new journal entry")
                     }
@@ -131,9 +131,9 @@ struct JournalHeaderView: View {
     JournalHeaderView(
         searchText: .constant(""),
         selectedFilter: .constant(.all),
-        showCreateSheet: .constant(false),
         isSelectionMode: .constant(false),
         selectionCount: 0,
+        onCreate: {},
         onToggleSelection: {}
     )
     .padding()

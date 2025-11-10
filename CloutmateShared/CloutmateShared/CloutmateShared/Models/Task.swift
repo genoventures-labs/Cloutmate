@@ -54,6 +54,8 @@ public final class Task {
     public var areaId: UUID?
     public var dependsOnIds: [UUID] = []
     public var effort: String? // small, medium, large
+    public var linkedEntityIds: [UUID] = [] // IDs of mentioned items
+    public var linkedEntityTypes: [String] = [] // Types of mentioned items
     public var createdAt: Date = Date()
     public var updatedAt: Date = Date()
     public var completedAt: Date?
@@ -77,6 +79,8 @@ public final class Task {
         self.projectId = projectId
         self.areaId = areaId
         self.effort = effort
+        self.linkedEntityIds = []
+        self.linkedEntityTypes = []
         self.createdAt = Date()
         self.updatedAt = Date()
         self.dependsOnIds = []

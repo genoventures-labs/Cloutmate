@@ -19,12 +19,18 @@ struct UnifiedTasksView: View {
     @Query private var allAreas: [Area]
     
     @State private var selectedFilter: TasksHeaderView.TaskFilter = .all
-    @State private var showCreateSheet = false
-    @State private var taskToEdit: Task?
+    @State private var selectedViewMode: TaskViewMode = .list
+    @State private var activeTask: Task?
+    @State private var isDrawerVisible = false
+    @State private var isCreatingTask = false
+    @State private var focusOverlayTask: Task?
+    @State private var focusDuration: TimeInterval = 1800
     @State private var scrollOffset: CGFloat = 0
     @State private var focusedTaskIndex: Int?
     @State private var showFocusRecap = false
     @State private var expandedSections: Set<TaskSectionType> = [.today, .nextUp, .later]
+    @State private var isSelectionMode = false
+    @State private var selectedTaskIDs: Set<UUID> = []
     
     enum TaskSectionType: String, CaseIterable {
         case today = "Today"
@@ -130,6 +136,10 @@ struct UnifiedTasksView: View {
         return streak
     }
     
+    private var isSelectionActive: Bool {
+        isSelectionMode || !selectedTaskIDs.isEmpty
+    }
+    
     var body: some View {
         ZStack(alignment: .top) {
             Color(.windowBackgroundColor)
@@ -141,9 +151,11 @@ struct UnifiedTasksView: View {
                     todayCompletionRate: todayCompletionRate,
                     currentStreak: currentStreak,
                     selectedFilter: selectedFilter,
+                    selectedViewMode: selectedViewMode,
                     onFilterChange: { selectedFilter = $0 },
+                    onViewModeChange: { selectedViewMode = $0 },
                     onQuickAdd: {
-                        NotificationCenter.default.post(name: .openContextualCreate, object: TabIdentifier.tasks)
+                        startCreatingTask()
                     }
                 )
                 .glassPanel(tier: .overlay, cornerRadius: 12)
@@ -154,93 +166,46 @@ struct UnifiedTasksView: View {
                 .offset(y: headerOffset)
                 .transition(.move(edge: .top).combined(with: .opacity))
                 
-                // Focus Recap Banner
-                if showFocusRecap {
-                    FocusRecapBanner(streak: currentStreak)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        .padding(.horizontal)
-                        .padding(.bottom, 8)
-                        .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                withAnimation(GlassMotion.Easing.spring) {
-                                    showFocusRecap = false
-                                }
-                            }
-                        }
-                }
+                Divider()
                 
-                // Task sections
-                ScrollView {
-                    ScrollViewReader { proxy in
-                        LazyVStack(spacing: 24) {
-                            ForEach(groupedSections) { section in
-                                if !section.tasks.isEmpty || section.type == .completed {
-                                    TaskSectionView(
-                                        section: section,
-                                        projects: allProjects,
-                                        areas: allAreas,
-                                        focusedTaskIndex: $focusedTaskIndex,
-                                        onToggleCollapse: {
-                                            withAnimation(GlassMotion.Easing.spring) {
-                                                if expandedSections.contains(section.type) {
-                                                    expandedSections.remove(section.type)
-                                                } else {
-                                                    expandedSections.insert(section.type)
-                                                }
-                                            }
-                                        },
-                                        onEdit: { task in
-                                            taskToEdit = task
-                                        },
-                                        onDuplicate: duplicateTask,
-                                        onArchive: { task in
-                                            task.status = .cancelled
-                                            try? modelContext.save()
-                                        },
-                                        onDelete: deleteTask
-                                    )
-                                }
-                            }
-                            
-                            // Empty state
-                            if filteredTasks.isEmpty {
-                                TasksEmptyStateView(filter: selectedFilter)
-                            }
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom, 40)
-                        .background(
-                            GeometryReader { geometry in
-                                Color.clear
-                                    .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
-                            }
-                        )
-                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                            scrollOffset = value
-                        }
-                    }
-                }
-                .coordinateSpace(name: "scroll")
+                // Content based on selected view mode
+                contentView
             }
-        }
-        .sheet(isPresented: $showCreateSheet) {
-            CreateTaskSheetWithPrefill(prefilledDate: Calendar.current.startOfDay(for: Date()))
-        }
-        .sheet(isPresented: Binding(
-            get: { taskToEdit != nil },
-            set: { if !$0 { taskToEdit = nil } }
-        )) {
-            Group {
-                if let task = taskToEdit {
-                    EditTaskSheet(task: task)
-                } else {
-                    // Fallback to prevent white box
-                    Color(.windowBackgroundColor)
-                        .frame(width: 600, height: 520)
-                        .overlay(
-                            ProgressView()
-                        )
-                }
+            .opacity(isDrawerVisible ? 0 : 1)
+            
+            if let task = activeTask, isDrawerVisible {
+                TaskDetailDrawer(
+                    task: task,
+                    isPresented: Binding(
+                        get: { isDrawerVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = newValue
+                            }
+                        }
+                    ),
+                    mode: isCreatingTask ? .create : .edit
+                )
+                .transition(.move(edge: .trailing))
+            }
+            
+            if let focusTask = focusOverlayTask {
+                FocusDurationSheet(
+                    isPresented: Binding(
+                        get: { focusOverlayTask != nil },
+                        set: { newValue in
+                            if !newValue {
+                                focusOverlayTask = nil
+                            }
+                        }
+                    ),
+                    selectedDuration: $focusDuration,
+                    itemTitle: focusTask.title,
+                    itemType: "Task",
+                    onStart: {
+                        startFocusSession(for: focusTask)
+                    }
+                )
             }
         }
         .onAppear {
@@ -252,6 +217,241 @@ struct UnifiedTasksView: View {
                 checkFocusRecap()
             }
         }
+        .onKeyPress(.leftArrow) {
+            if let currentIndex = TaskViewMode.allCases.firstIndex(of: selectedViewMode),
+               currentIndex > 0 {
+                selectedViewMode = TaskViewMode.allCases[currentIndex - 1]
+            }
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            if let currentIndex = TaskViewMode.allCases.firstIndex(of: selectedViewMode),
+               currentIndex < TaskViewMode.allCases.count - 1 {
+                selectedViewMode = TaskViewMode.allCases[currentIndex + 1]
+            }
+            return .handled
+        }
+        .onChange(of: isDrawerVisible) { _, newValue in
+            if !newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if !isDrawerVisible {
+                        activeTask = nil
+                        isCreatingTask = false
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showCreateTask)) { notification in
+            let dueDate = notification.object as? Date
+            startCreatingTask(dueDate: dueDate)
+        }
+    }
+    
+    // MARK: - Content View
+    
+    @ViewBuilder
+    private var contentView: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 0) {
+                    GeometryReader { geometry in
+                        Color.clear
+                            .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
+                    }
+                    .frame(height: 0)
+                    
+                    Group {
+                        switch selectedViewMode {
+                        case .list:
+                            listView
+                        case .board:
+                            TaskBoardView(
+                                tasks: filteredTasks,
+                                projects: allProjects,
+                                areas: allAreas,
+                                selectionMode: isSelectionMode,
+                                selectedTaskIDs: selectedTaskIDs,
+                                onSelectionToggle: { task in toggleTaskSelection(task) },
+                                onTaskSelected: { task in openDrawer(for: task) },
+                                onDuplicateTask: duplicateTask,
+                                onArchiveTask: { task in
+                                    task.status = .cancelled
+                                    try? modelContext.save()
+                                },
+                                onDeleteTask: deleteTask
+                            )
+                        case .timeline:
+                            TaskTimelineView(
+                                tasks: filteredTasks,
+                                projects: allProjects,
+                                areas: allAreas,
+                                onTaskSelected: { task in openDrawer(for: task) }
+                            )
+                        case .gallery:
+                            TaskGalleryView(
+                                tasks: filteredTasks,
+                                projects: allProjects,
+                                areas: allAreas,
+                                selectionMode: isSelectionMode,
+                                selectedTaskIDs: selectedTaskIDs,
+                                onSelectionToggle: { task in toggleTaskSelection(task) },
+                                onTaskSelected: { task in openDrawer(for: task) }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 24)
+                }
+            }
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollOffset = -value
+            }
+        }
+    }
+    
+    private var listView: some View {
+        VStack(spacing: 0) {
+            // Focus Recap Banner
+            if showFocusRecap {
+                FocusRecapBanner(streak: currentStreak)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            withAnimation(GlassMotion.Easing.spring) {
+                                showFocusRecap = false
+                            }
+                        }
+                    }
+            }
+            
+            // Task sections
+            ScrollView {
+                ScrollViewReader { proxy in
+                    LazyVStack(spacing: 24) {
+                        ForEach(groupedSections) { section in
+                            if !section.tasks.isEmpty || section.type == .completed {
+                                TaskSectionView(
+                                    section: section,
+                                    projects: allProjects,
+                                    areas: allAreas,
+                                    focusedTaskIndex: $focusedTaskIndex,
+                                    onToggleCollapse: {
+                                        withAnimation(GlassMotion.Easing.spring) {
+                                            if expandedSections.contains(section.type) {
+                                                expandedSections.remove(section.type)
+                                            } else {
+                                                expandedSections.insert(section.type)
+                                            }
+                                        }
+                                    },
+                                    onEdit: { task in
+                                        openDrawer(for: task)
+                                    },
+                                    onDuplicate: duplicateTask,
+                                    onArchive: { task in
+                                        task.status = .cancelled
+                                        try? modelContext.save()
+                                    },
+                                    onDelete: deleteTask,
+                                    onRequestFocus: { task in
+                                        requestFocusSession(for: task)
+                                    }
+                                )
+                            }
+                        }
+                        
+                        // Empty state
+                        if filteredTasks.isEmpty {
+                            TasksEmptyStateView(filter: selectedFilter)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 40)
+                }
+            }
+        }
+    }
+    
+    private func toggleTaskSelection(_ task: Task) {
+        if selectedTaskIDs.contains(task.id) {
+            selectedTaskIDs.remove(task.id)
+            if selectedTaskIDs.isEmpty {
+                isSelectionMode = false
+            }
+        } else {
+            if !isSelectionMode {
+                isSelectionMode = true
+            }
+            selectedTaskIDs.insert(task.id)
+        }
+        if isSelectionActive {
+            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                isDrawerVisible = false
+                focusOverlayTask = nil
+            }
+        }
+    }
+    
+    private func startCreatingTask(dueDate: Date? = nil) {
+        guard !isDrawerVisible else { return }
+        
+        let newTask = Task(
+            title: "",
+            notes: nil,
+            status: .todo,
+            priority: .medium,
+            dueDate: dueDate,
+            projectId: nil,
+            areaId: nil,
+            effort: nil
+        )
+        
+        modelContext.insert(newTask)
+        activeTask = newTask
+        isCreatingTask = true
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
+        }
+    }
+    
+    private func openDrawer(for task: Task) {
+        guard !isSelectionActive else { return }
+        
+        activeTask = task
+        isCreatingTask = false
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
+        }
+    }
+    
+    private func requestFocusSession(for task: Task) {
+        guard focusOverlayTask?.id != task.id else { return }
+        focusDuration = 1800
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isDrawerVisible = false
+            focusOverlayTask = task
+        }
+    }
+    
+    private func startFocusSession(for task: Task) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            focusOverlayTask = nil
+        }
+        
+        let params = PendingFocusSessionParams(
+            objective: task.title,
+            plannedDuration: focusDuration,
+            targetObjectId: task.id,
+            targetObjectType: "task"
+        )
+        
+        NotificationCenter.default.post(name: .startPendingFocusSession, object: params)
+        NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
     }
     
     private var headerOpacity: Double {
@@ -295,7 +495,7 @@ struct UnifiedTasksView: View {
             if event.modifierFlags.contains(.command) {
                 switch event.charactersIgnoringModifiers?.lowercased() {
                 case "n":
-                    showCreateSheet = true
+                    startCreatingTask()
                     return nil
                 case "\r": // Enter
                     if let index = focusedTaskIndex {
@@ -318,6 +518,12 @@ struct UnifiedTasksView: View {
                     navigateTasks(direction: 1)
                     return nil
                 case 53: // Escape
+                    if isDrawerVisible {
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                            isDrawerVisible = false
+                        }
+                        return nil
+                    }
                     focusedTaskIndex = nil
                     return nil
                 case 49: // Space
@@ -378,6 +584,7 @@ struct TaskSectionView: View {
     let onDuplicate: (Task) -> Void
     let onArchive: (Task) -> Void
     let onDelete: (Task) -> Void
+    let onRequestFocus: (Task) -> Void
     
     @State private var globalTaskIndex = 0
     
@@ -434,7 +641,8 @@ struct TaskSectionView: View {
                             onEdit: { onEdit(task) },
                             onDuplicate: { onDuplicate(task) },
                             onArchive: { onArchive(task) },
-                            onDelete: { onDelete(task) }
+                            onDelete: { onDelete(task) },
+                            onRequestFocus: { onRequestFocus(task) }
                         )
                         .id("task-\(task.id)")
                     }
@@ -555,144 +763,5 @@ struct TasksEmptyStateView: View {
             return "No tasks yet"
         }
     }
-}
-
-// MARK: - Create Task Sheet with Prefill
-
-struct CreateTaskSheetWithPrefill: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @Query private var allProjects: [CloutmateShared.Project]
-    @Query private var allAreas: [Area]
-    
-    let prefilledDate: Date
-    
-    @State private var title: String = ""
-    @State private var notes: String = ""
-    @State private var status: CloutmateShared.TaskStatus = .todo
-    @State private var priority: CloutmateShared.TaskPriority = .medium
-    @State private var hasDueDate: Bool = true
-    @State private var dueDate: Date
-    @State private var projectId: UUID?
-    @State private var areaId: UUID?
-    @State private var effort: String = ""
-    
-    init(prefilledDate: Date) {
-        self.prefilledDate = prefilledDate
-        self._dueDate = State(initialValue: prefilledDate)
-    }
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextField("Task Title *", text: $title)
-                            .textFieldStyle(.plain)
-                            .padding(12)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(8)
-                        TextField("Notes", text: $notes, axis: .vertical)
-                            .lineLimit(3...6)
-                            .textFieldStyle(.plain)
-                            .padding(12)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(8)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Status").font(.caption).foregroundColor(.secondary)
-                        Picker("Status", selection: $status) {
-                            ForEach(CloutmateShared.TaskStatus.allCases, id: \.self) { s in Text(s.displayName).tag(s) }
-                        }.pickerStyle(.segmented)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Priority").font(.caption).foregroundColor(.secondary)
-                        Picker("Priority", selection: $priority) {
-                            ForEach(CloutmateShared.TaskPriority.allCases, id: \.self) { p in Text(p.displayName).tag(p) }
-                        }.pickerStyle(.segmented)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Set Due Date", isOn: $hasDueDate)
-                        if hasDueDate {
-                            DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
-                        }
-                    }
-                    
-                    if !allProjects.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Project").font(.caption).foregroundColor(.secondary)
-                            Picker("Project", selection: $projectId) {
-                                Text("None").tag(UUID?.none)
-                                ForEach(allProjects) { p in Text(p.title).tag(p.id as UUID?) }
-                            }
-                        }
-                    }
-                    
-                    if !allAreas.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Area").font(.caption).foregroundColor(.secondary)
-                            Picker("Area", selection: $areaId) {
-                                Text("None").tag(UUID?.none)
-                                ForEach(allAreas) { a in Text(a.title).tag(a.id as UUID?) }
-                            }
-                        }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Effort").font(.caption).foregroundColor(.secondary)
-                        Picker("Effort", selection: $effort) {
-                            Text("None").tag("")
-                            Text("Small").tag("small")
-                            Text("Medium").tag("medium")
-                            Text("Large").tag("large")
-                        }
-                    }
-                }
-                .padding()
-            }
-            .background(Color(.windowBackgroundColor))
-            .navigationTitle("New Task")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") { createTask() }.disabled(title.isEmpty)
-                }
-            }
-        }
-        .frame(width: 600, height: 520)
-    }
-    
-    private func createTask() {
-        let task = CloutmateShared.Task(
-            title: title,
-            notes: notes.isEmpty ? nil : notes,
-            status: status,
-            priority: priority,
-            dueDate: hasDueDate ? dueDate : nil,
-            projectId: projectId,
-            areaId: areaId,
-            effort: effort.isEmpty ? nil : effort
-        )
-        modelContext.insert(task)
-        try? modelContext.save()
-        
-        // Haptic feedback
-        let generator = NSHapticFeedbackManager.defaultPerformer
-        generator.perform(.generic, performanceTime: .default)
-        
-        dismiss()
-    }
-}
-
-#Preview {
-    UnifiedTasksView()
-        .environmentObject(GlassColorSystem())
-        .modelContainer(for: [Task.self, Project.self, Area.self])
 }
 

@@ -24,16 +24,15 @@ struct UnifiedJournalView: View {
     @State private var searchText: String = ""
     @State private var selectedFilter: JournalFilter = .all
     @State private var groupingMode: JournalGroupingMode = .byDate
-    @State private var showCreateSheet = false
-    @State private var selectedJournal: Journal?
-    @State private var showDrawer = false
+    @State private var activeJournal: Journal?
+    @State private var isDrawerVisible = false
+    @State private var isCreatingJournal = false
+    @State private var activeTemplate: JournalTemplate?
     @State private var expandedGroups: Set<String> = []
     @State private var showTimeline = false
     @State private var focusedJournalIndex: Int?
-    @State private var createTemplate: JournalTemplate?
     @State private var isSelectionMode = false
     @State private var selectedJournalIDs: Set<UUID> = []
-    @State private var createSheetJournal: Journal?
     
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFocused: Bool
@@ -135,53 +134,26 @@ struct UnifiedJournalView: View {
                 headerView
                 contentView
             }
-        }
-        .sheet(isPresented: $showCreateSheet) {
-            // Create new journal entry
-            if let journal = createSheetJournal {
-                NavigationStack {
-                    JournalDetailDrawer(
-                        journal: journal,
-                        isPresented: $showCreateSheet,
-                        template: createTemplate
-                    )
-                }
-            }
-        }
-        .onChange(of: showCreateSheet) { _, isShowing in
-            if isShowing && createSheetJournal == nil {
-                // Only create journal once when sheet opens
-                let newJournal: Journal
-                if let template = createTemplate {
-                    newJournal = Journal(
-                        title: "",
-                        content: template.content,
-                        entryDate: Date(),
-                        entryType: .reflection
-                    )
-                } else {
-                    newJournal = Journal(title: "", content: "")
-                }
-                newJournal.author = .user
-                modelContext.insert(newJournal)
-                createSheetJournal = newJournal
-            } else if !isShowing {
-                // Clean up when sheet closes
-                createSheetJournal = nil
-                createTemplate = nil
-            }
-        }
-        .overlay {
-            if showDrawer, let journal = selectedJournal {
+            .opacity(isDrawerVisible ? 0 : 1)
+            
+            if let journal = activeJournal, isDrawerVisible {
                 JournalDetailDrawer(
                     journal: journal,
-                    isPresented: $showDrawer
+                    isPresented: Binding(
+                        get: { isDrawerVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = newValue
+                            }
+                        }
+                    ),
+                    template: isCreatingJournal ? activeTemplate : nil
                 )
                 .transition(.move(edge: .trailing))
             }
         }
         .overlay(alignment: .bottom) {
-            if isSelectionActive {
+            if isSelectionActive && !isDrawerVisible {
                 SelectionActionBar(
                     count: visibleSelectedJournalCount,
                     itemLabel: "journal",
@@ -194,16 +166,11 @@ struct UnifiedJournalView: View {
                 .padding(.bottom, 24)
             }
         }
-        .onChange(of: selectedJournal) { _, newValue in
-            showDrawer = newValue != nil
-        }
         .onReceive(NotificationCenter.default.publisher(for: .openJournalEntry)) { notification in
             if let template = notification.object as? JournalTemplate {
-                createTemplate = template
-                showCreateSheet = true
+                startCreatingJournal(template: template)
             } else if let journal = notification.object as? Journal {
-                selectedJournal = journal
-                showDrawer = true
+                openDrawer(for: journal)
             }
         }
         .onAppear {
@@ -218,13 +185,24 @@ struct UnifiedJournalView: View {
         .onChange(of: groupingMode) { _, _ in
             pruneSelection()
         }
+        .onChange(of: isDrawerVisible) { _, newValue in
+            if !newValue {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if !isDrawerVisible {
+                        activeJournal = nil
+                        activeTemplate = nil
+                        isCreatingJournal = false
+                    }
+                }
+            }
+        }
     }
     
     private var headerView: some View {
         JournalHeaderView(
             searchText: $searchText,
             selectedFilter: $selectedFilter,
-            showCreateSheet: $showCreateSheet,
+            onCreate: startCreatingJournal,
             isSelectionMode: $isSelectionMode,
             selectionCount: visibleSelectedJournalCount,
             onToggleSelection: toggleSelectionMode
@@ -268,8 +246,7 @@ struct UnifiedJournalView: View {
                                     JournalTimelineView(
                                         journals: sortedJournals,
                                         onEntryTap: { journal in
-                                            selectedJournal = journal
-                                            showDrawer = true
+                                            openDrawer(for: journal)
                                         }
                                     )
                                     .transition(.opacity.combined(with: .move(edge: .top)))
@@ -294,12 +271,10 @@ struct UnifiedJournalView: View {
                                     }
                                 },
                                 onJournalTap: { journal in
-                                    selectedJournal = journal
-                                    showDrawer = true
+                                    openDrawer(for: journal)
                                 },
                                 onJournalEdit: { journal in
-                                    selectedJournal = journal
-                                    showDrawer = true
+                                    openDrawer(for: journal)
                                 },
                                 onJournalDuplicate: { journal in
                                     duplicateJournal(journal)
@@ -340,7 +315,7 @@ struct UnifiedJournalView: View {
                 .foregroundColor(.secondary)
             
             GlassButton("Create Entry", icon: "plus", style: .pill, role: .primary) {
-                showCreateSheet = true
+                startCreatingJournal()
             }
             .padding(.top, 8)
         }
@@ -371,6 +346,11 @@ struct UnifiedJournalView: View {
         } else if !filteredJournals.isEmpty {
             isSelectionMode = true
             showTimeline = false
+            if isDrawerVisible {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = false
+                }
+            }
         }
     }
     
@@ -388,8 +368,47 @@ struct UnifiedJournalView: View {
             selectedJournalIDs.insert(journal.id)
         }
         if isSelectionActive {
-            selectedJournal = nil
-            showDrawer = false
+            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                isDrawerVisible = false
+            }
+        }
+    }
+    
+    private func startCreatingJournal(template: JournalTemplate? = nil) {
+        guard !isDrawerVisible else { return }
+        
+        let newJournal: Journal
+        if let template {
+            newJournal = Journal(
+                title: "",
+                content: template.content,
+                entryDate: Date(),
+                entryType: .reflection
+            )
+        } else {
+            newJournal = Journal(title: "", content: "")
+        }
+        newJournal.author = .user
+        modelContext.insert(newJournal)
+        
+        activeJournal = newJournal
+        activeTemplate = template
+        isCreatingJournal = true
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
+        }
+    }
+    
+    private func openDrawer(for journal: Journal) {
+        guard !isSelectionActive else { return }
+        
+        activeJournal = journal
+        activeTemplate = nil
+        isCreatingJournal = false
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
         }
     }
     
@@ -438,6 +457,11 @@ struct UnifiedJournalView: View {
             if !isSelectionMode {
                 isSelectionMode = true
                 showTimeline = false
+                if isDrawerVisible {
+                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                        isDrawerVisible = false
+                    }
+                }
             }
         }
     }
@@ -565,7 +589,7 @@ struct JournalGroupSection: View {
     let selectionMode: Bool
     let selectedJournalIDs: Set<UUID>
     let onSelectionToggle: (Journal) -> Void
-
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Section header

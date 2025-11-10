@@ -33,74 +33,69 @@ struct RitualsViewV2: View {
     @State private var ritualTimer: Timer?
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                RitualHeaderView(ritualType: ritualType)
-                    .padding(.horizontal, 28)
-                    .padding(.top, 20)
-                
-                // Smart nudge (if available)
-                if let nudge = smartNudgeService.latestNudge,
-                   nudge.trigger == .reflectionReminder {
-                    nudgeCard(nudge)
+        ZStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    RitualHeaderView(ritualType: ritualType)
                         .padding(.horizontal, 28)
-                }
-                
-                // Current ritual card
-                CurrentRitualCard(
-                    ritualType: ritualType,
-                    ritualDuration: ritualDuration,
-                    progress: steps.isEmpty ? 0 : Double(completedSteps.count) / Double(steps.count),
-                    isRitualActive: isRitualActive && ritualStartTime != nil,
-                    onStartRitual: {
-                        startRitual()
-                    },
-                    onEndEarly: {
-                        endRitualEarly()
+                        .padding(.top, 20)
+                    
+                    if let nudge = smartNudgeService.latestNudge,
+                       nudge.trigger == .reflectionReminder {
+                        nudgeCard(nudge)
+                            .padding(.horizontal, 28)
                     }
-                )
-                .padding(.horizontal, 28)
-                
-                // Ritual steps
-                if isRitualActive {
-                    RitualStepsList(
+                    
+                    CurrentRitualCard(
                         ritualType: ritualType,
-                        steps: $steps,
-                        onStepComplete: { step in
-                            handleStepComplete(step)
-                        },
-                        onStepSkip: { step in
-                            handleStepSkip(step)
-                        },
-                        onTaskPreviewTap: {
-                            showFocusGravityView = true
-                        }
+                        ritualDuration: ritualDuration,
+                        progress: steps.isEmpty ? 0 : Double(completedSteps.count) / Double(steps.count),
+                        isRitualActive: isRitualActive && ritualStartTime != nil,
+                        onStartRitual: startRitual,
+                        onEndEarly: endRitualEarly
                     )
                     .padding(.horizontal, 28)
+                    
+                    if isRitualActive {
+                        RitualStepsList(
+                            ritualType: ritualType,
+                            steps: $steps,
+                            onStepComplete: { step in handleStepComplete(step) },
+                            onStepSkip: { step in handleStepSkip(step) },
+                            onTaskPreviewTap: {
+                                withAnimation(GlassMotion.Easing.modalOpen) {
+                                    showFocusGravityView = true
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 28)
+                    }
+                    
+                    if !isRitualActive && !completedSteps.isEmpty && steps.allSatisfy({ completedSteps.contains($0.id) }) {
+                        ReflectionSummaryView(
+                            ritualType: ritualType,
+                            reflectionText: reflectionText,
+                            onJournalTap: {
+                                withAnimation(GlassMotion.Easing.modalOpen) {
+                                    showJournalView = true
+                                }
+                            }
+                        )
+                        .padding(.horizontal, 28)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
+                    
+                    RitualHistoryView(ritualType: ritualType)
+                        .padding(.horizontal, 28)
+                    
+                    Spacer(minLength: 40)
                 }
-                
-                // Reflection summary (shown after completion)
-                if !isRitualActive && !completedSteps.isEmpty && steps.allSatisfy({ completedSteps.contains($0.id) }) {
-                    ReflectionSummaryView(
-                        ritualType: ritualType,
-                        reflectionText: reflectionText,
-                        onJournalTap: {
-                            showJournalView = true
-                        }
-                    )
-                    .padding(.horizontal, 28)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
-                
-                // History & streaks
-                RitualHistoryView(ritualType: ritualType)
-                    .padding(.horizontal, 28)
-                
-                Spacer(minLength: 40)
             }
+            .background(Color(.windowBackgroundColor))
+            .opacity(drawerVisible ? 0 : 1)
+            
+            overlayDrawers
         }
-        .background(Color(.windowBackgroundColor))
         .navigationTitle("Rituals")
         .toolbar {
             ToolbarItem(placement: .automatic) {
@@ -122,14 +117,26 @@ struct RitualsViewV2: View {
             loadSteps(for: ritualType)
             await loadCurrentRitual(for: ritualType)
         }
-        .sheet(isPresented: $showJournalView) {
-            JournalView()
-        }
         .sheet(isPresented: $showFocusGravityView) {
             FocusGravityView()
         }
         .sheet(isPresented: $showInsightsView) {
             InsightsView()
+        }
+    }
+    
+    private var drawerVisible: Bool {
+        showJournalView
+    }
+    
+    @ViewBuilder
+    private var overlayDrawers: some View {
+        if showJournalView {
+            AuroraDrawer(isPresented: $showJournalView, title: "Reflect & Journal", icon: "book.closed") {
+                UnifiedJournalView()
+                    .padding(.horizontal, -24)
+            }
+            .transition(.move(edge: .trailing))
         }
     }
     

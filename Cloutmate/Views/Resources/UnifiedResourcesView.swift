@@ -18,9 +18,10 @@ struct UnifiedResourcesView: View {
     
     @State private var searchText = ""
     @State private var selectedFilter: ResourceFilter = .all
-    @State private var selectedNote: Note?
-    @State private var showDetailDrawer = false
-    @State private var showImportSheet = false
+    @State private var activeResource: Note?
+    @State private var isDetailVisible = false
+    @State private var isCreatingResource = false
+    @State private var isImportVisible = false
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -62,17 +63,16 @@ struct UnifiedResourcesView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Fixed Header
                 ResourcesHeaderView(
                     searchText: $searchText,
                     selectedFilter: $selectedFilter,
                     onQuickAdd: {
-                        showImportSheet = true
+                        startImportFlow()
                     }
                 )
                 .zIndex(10)
+                .opacity(isDetailVisible || isImportVisible ? 0 : 1)
                 
-                // Scrollable Content
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(spacing: 0) {
@@ -89,8 +89,7 @@ struct UnifiedResourcesView: View {
                                 ) {
                                     ForEach(filteredNotes) { note in
                                         ResourceCardV2(note: note) {
-                                            selectedNote = note
-                                            showDetailDrawer = true
+                                            openResource(note)
                                         }
                                         .id(note.id)
                                     }
@@ -101,37 +100,78 @@ struct UnifiedResourcesView: View {
                         }
                         .coordinateSpace(name: "scroll")
                     }
-                    .background(
-                        GeometryReader { geometry in
-                            Color.clear
-                                .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
+                }
+            }
+            
+            if let resource = activeResource, isDetailVisible {
+                ResourceDetailDrawer(
+                    note: resource,
+                    isPresented: Binding(
+                        get: { isDetailVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDetailVisible = newValue
+                            }
                         }
                     )
+                )
+                .transition(.move(edge: .trailing))
+                .zIndex(1000)
+            }
+            
+            if isImportVisible {
+                ResourceImportDrawer(
+                    isPresented: Binding(
+                        get: { isImportVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isImportVisible = newValue
+                            }
+                        }
+                    ),
+                    onComplete: { createdNote in
+                        if let createdNote {
+                            activeResource = createdNote
+                            isCreatingResource = false
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDetailVisible = true
+                            }
+                        }
+                    }
+                )
+                .zIndex(1200)
+            }
+        }
+        .onChange(of: isDetailVisible) { _, newValue in
+            if !newValue, let resource = activeResource {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if !isDetailVisible {
+                        cleanupIfNecessary(resource)
+                        activeResource = nil
+                        isCreatingResource = false
+                    }
                 }
             }
         }
-        .overlay(
-            // Detail Drawer
-            Group {
-                if showDetailDrawer, let note = selectedNote {
-                    ResourceDetailDrawer(note: note, isPresented: $showDetailDrawer)
-                        .transition(.move(edge: .trailing))
-                        .zIndex(1000)
-                }
-            }
-            .animation(reduceMotion ? nil : GlassMotion.Easing.modalOpen, value: showDetailDrawer)
-        )
-        .sheet(isPresented: $showImportSheet) {
-            ResourceImportSheet()
+        .onReceive(NotificationCenter.default.publisher(for: .showResourceImport)) { _ in
+            startImportFlow()
         }
-        .onChange(of: selectedNote) { _, newValue in
-            if newValue == nil {
-                showDetailDrawer = false
+        .onReceive(NotificationCenter.default.publisher(for: .openResourceDetail)) { notification in
+            if let note = notification.object as? Note {
+                openResource(note)
             }
         }
         .onKeyPress(.escape) {
-            if showDetailDrawer {
-                selectedNote = nil
+            if isDetailVisible {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDetailVisible = false
+                }
+                return .handled
+            }
+            if isImportVisible {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isImportVisible = false
+                }
                 return .handled
             }
             return .ignored
@@ -163,9 +203,37 @@ struct UnifiedResourcesView: View {
                 style: .standard,
                 role: .primary
             ) {
-                showImportSheet = true
+                startImportFlow()
             }
             .padding(.top, 8)
+        }
+    }
+    
+    private func startImportFlow() {
+        isCreatingResource = true
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isImportVisible = true
+        }
+    }
+    
+    private func openResource(_ note: Note) {
+        guard !isDetailVisible else { return }
+        activeResource = note
+        isCreatingResource = false
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDetailVisible = true
+        }
+    }
+    
+    private func cleanupIfNecessary(_ note: Note) {
+        guard isCreatingResource else { return }
+        let trimmedTitle = note.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedContent = note.markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedTitle.isEmpty && trimmedContent.isEmpty && note.tags.isEmpty {
+            modelContext.delete(note)
+            try? modelContext.save()
+        } else {
+            try? modelContext.save()
         }
     }
 }

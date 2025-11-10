@@ -13,13 +13,15 @@ import CloutmateShared
 
 struct NotesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \CloutmateShared.Note.updatedAt, order: .reverse) private var allNotes: [CloutmateShared.Note]
     
     @State private var searchText = ""
     @State private var selectedTags: Set<String> = []
     @State private var selectedNotes = Set<UUID>()
-    @State private var showCreateSheet = false
-    @State private var selectedNote: Note?
+    @State private var activeNote: Note?
+    @State private var isDrawerVisible = false
+    @State private var isCreatingNote = false
     
     var filteredNotes: [Note] {
         var filtered = allNotes
@@ -104,7 +106,7 @@ struct NotesView: View {
                 }
                 .contextMenu {
                     Button("Edit") {
-                        selectedNote = note
+                        openDrawer(for: note)
                     }
                     Button("Duplicate") {
                         duplicateNote(note)
@@ -164,18 +166,36 @@ struct NotesView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            searchAndFiltersSection
+        ZStack {
+            VStack(spacing: 0) {
+                searchAndFiltersSection
+                
+                if filteredNotes.isEmpty {
+                    ContentUnavailableView(
+                        allNotes.isEmpty ? "No Notes" : "No matches",
+                        systemImage: "note.text",
+                        description: Text(allNotes.isEmpty ? "Create a note to get started" : "Try a different search or filter")
+                    )
+                    .frame(maxHeight: .infinity)
+                } else {
+                    tableSection
+                }
+            }
+            .opacity(isDrawerVisible ? 0 : 1)
             
-            if filteredNotes.isEmpty {
-                ContentUnavailableView(
-                    allNotes.isEmpty ? "No Notes" : "No matches",
-                    systemImage: "note.text",
-                    description: Text(allNotes.isEmpty ? "Create a note to get started" : "Try a different search or filter")
+            if let note = activeNote, isDrawerVisible {
+                NoteDetailDrawer(
+                    note: note,
+                    isPresented: Binding(
+                        get: { isDrawerVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = newValue
+                            }
+                        }
+                    )
                 )
-                .frame(maxHeight: .infinity)
-            } else {
-                tableSection
+                .transition(.move(edge: .trailing))
             }
         }
         .background(Color(.windowBackgroundColor))
@@ -197,16 +217,51 @@ struct NotesView: View {
                 }
                 
                 Button("New Note") {
-                    showCreateSheet = true
+                    startCreatingNote()
                 }
             }
         }
-        .sheet(isPresented: $showCreateSheet) {
-            CreateNoteSheet()
+        .onChange(of: isDrawerVisible) { _, newValue in
+            if !newValue {
+                handleDrawerDismissed()
+            }
         }
-        .sheet(item: $selectedNote) { note in
-            NoteDetailSheet(note: note)
+    }
+    
+    private func startCreatingNote() {
+        let newNote = Note(title: "", markdown: "", tags: [])
+        modelContext.insert(newNote)
+        isCreatingNote = true
+        activeNote = newNote
+        presentDrawer()
+    }
+    
+    private func openDrawer(for note: Note) {
+        activeNote = note
+        isCreatingNote = false
+        presentDrawer()
+    }
+    
+    private func presentDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
         }
+    }
+    
+    private func handleDrawerDismissed() {
+        guard let note = activeNote else { return }
+        
+        if isCreatingNote {
+            let trimmedTitle = note.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmedContent = note.markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedTitle.isEmpty && trimmedContent.isEmpty {
+                modelContext.delete(note)
+            }
+        }
+        
+        try? modelContext.save()
+        activeNote = nil
+        isCreatingNote = false
     }
     
     private func duplicateNote(_ note: Note) {

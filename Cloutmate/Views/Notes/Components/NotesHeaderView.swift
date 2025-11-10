@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import AppKit
 import CloutmateShared
 
 enum NotesFilter: String, CaseIterable {
@@ -20,12 +21,13 @@ enum NotesFilter: String, CaseIterable {
 struct NotesHeaderView: View {
     @Binding var searchText: String
     @Binding var selectedFilter: NotesFilter
-    @Binding var showCreateSheet: Bool
     @Binding var isSelectionMode: Bool
+    @Binding var selectedViewMode: NotesViewMode
     
     let totalNotes: Int
     let taggedNotes: Int
     let selectionCount: Int
+    let onCreate: () -> Void
     let onToggleSelection: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -55,6 +57,9 @@ struct NotesHeaderView: View {
                     Spacer()
                     
                     HStack(spacing: 8) {
+                        // View Mode Switcher
+                        viewModeSwitcher
+                        
                         GlassButton(
                             icon: isSelectionMode || selectionCount > 0 ? "checkmark.circle.fill" : "checkmark.circle",
                             style: .iconOnly,
@@ -71,7 +76,7 @@ struct NotesHeaderView: View {
                             style: .iconOnly,
                             role: .primary
                         ) {
-                            showCreateSheet = true
+                            onCreate()
                         }
                         .accessibilityLabel("Create new note")
                     }
@@ -101,6 +106,38 @@ struct NotesHeaderView: View {
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
     
+    private var viewModeSwitcher: some View {
+        HStack(spacing: 4) {
+            viewModeButton(.cards)
+            viewModeButton(.list)
+            viewModeButton(.grid)
+            viewModeButton(.table)
+            viewModeButton(.compact)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
+        .cornerRadius(8)
+    }
+    
+    private func viewModeButton(_ mode: NotesViewMode) -> some View {
+        Button(action: {
+            selectedViewMode = mode
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+        }) {
+            Image(systemName: mode.icon)
+                .font(.caption)
+                .foregroundColor(selectedViewMode == mode ? .kosmicBlue : glassColorSystem.textSecondary())
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(selectedViewMode == mode ? Color.kosmicBlue.opacity(0.1) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(mode.displayName)
+    }
+    
     private var filterChips: [FilterChipGroup.FilterChipData] {
         NotesFilter.allCases.map { filter in
             FilterChipGroup.FilterChipData(
@@ -119,11 +156,12 @@ struct NotesHeaderView: View {
     NotesHeaderView(
         searchText: .constant(""),
         selectedFilter: .constant(.all),
-        showCreateSheet: .constant(false),
         isSelectionMode: .constant(false),
+        selectedViewMode: .constant(.cards),
         totalNotes: 128,
         taggedNotes: 14,
         selectionCount: 0,
+        onCreate: {},
         onToggleSelection: {}
     )
     .padding()

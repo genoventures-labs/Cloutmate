@@ -50,6 +50,7 @@ struct NoteDetailDrawer: View {
     }
     
     var body: some View {
+        NavigationStack {
         HStack(spacing: 0) {
             // Focus Gravity Sidebar
             RoundedRectangle(cornerRadius: 0, style: .continuous)
@@ -79,17 +80,6 @@ struct NoteDetailDrawer: View {
                     }
                     
                     Spacer()
-                    
-                    Button(action: {
-                        saveNote()
-                        isPresented = false
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.escape, modifiers: [])
                 }
                 .padding()
                 .background(.ultraThinMaterial)
@@ -102,11 +92,14 @@ struct NoteDetailDrawer: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
-                            TextEditor(text: $editingContent)
-                                .font(.body)
+                                MentionTextEditor(
+                                    text: $editingContent,
+                                    placeholder: "Write your note..."
+                                ) { ids, types in
+                                    // Update note's backlinks when mentions change
+                                    note.backlinks = ids
+                                }
                                 .frame(minHeight: 200)
-                                .scrollContentBackground(.hidden)
-                                .focused($isContentFocused)
                                 .padding(8)
                                 .background(.ultraThinMaterial)
                                 .cornerRadius(8)
@@ -204,8 +197,23 @@ struct NoteDetailDrawer: View {
                 }
             }
         }
-        .frame(width: 700, height: 600)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(glassColorSystem.backgroundColor())
+            .navigationTitle("")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        saveNote()
+                        isPresented = false
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 600, minHeight: 500)
+        .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
             editingTitle = note.title
             editingContent = note.markdown

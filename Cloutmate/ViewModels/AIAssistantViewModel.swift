@@ -486,9 +486,31 @@ final class AIAssistantViewModel {
             }
             
             // Resolve other mentions to actual objects (skip @web)
+            // Use MentionService for better resolution (handles both structured and plain mentions)
+            let resolvedMentions = MentionService.shared.resolveAllMentions(
+                from: text,
+                modelContext: modelContext
+            )
+            
+            // Add resolved mentions to linked context
+            for resolved in resolvedMentions {
+                resolvedLinkedContext.addLinkedObject(
+                    type: resolved.type,
+                    id: resolved.id,
+                    mentionText: "@\(resolved.displayName)",
+                    displayName: resolved.displayName
+                )
+            }
+            
+            // Also handle plain mentions for backward compatibility
             for mention in mentions {
                 if MentionParser.isWebSearchMention(mention) {
                     continue // Skip @web mentions
+                }
+                
+                // Skip if already resolved by MentionService
+                if resolvedMentions.contains(where: { $0.displayName.lowercased() == mention.mentionText.lowercased() }) {
+                    continue
                 }
                 
                 let results = WorkspaceObjectSearchService.shared.search(

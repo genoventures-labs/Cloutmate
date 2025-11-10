@@ -218,7 +218,7 @@ struct JournalCardV2: View {
             if selectionMode {
                 onSelectionToggle()
             } else {
-                onTap()
+            onTap()
             }
         }
         .onHover { hovering in
@@ -236,18 +236,18 @@ struct JournalCardV2: View {
         }
         .contextMenu {
             if !selectionMode {
-                Button("Edit") {
-                    onEdit()
-                }
-                Button("Duplicate") {
-                    onDuplicate()
-                }
-                Button("Export") {
-                    onExport()
-                }
-                Divider()
-                Button("Delete", role: .destructive) {
-                    onDelete()
+            Button("Edit") {
+                onEdit()
+            }
+            Button("Duplicate") {
+                onDuplicate()
+            }
+            Button("Export") {
+                onExport()
+            }
+            Divider()
+            Button("Delete", role: .destructive) {
+                onDelete()
                 }
             }
         }

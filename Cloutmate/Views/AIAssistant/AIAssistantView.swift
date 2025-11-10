@@ -54,40 +54,31 @@ struct AIAssistantView: View {
     private let usageTracker = ToolbarUsageTracker.shared
     
     var body: some View {
-        HSplitView {
-            // Conversations Sidebar
-            conversationsSidebar
-                .frame(minWidth: 250, idealWidth: 280)
+        ZStack {
+            HSplitView {
+                conversationsSidebar
+                    .frame(minWidth: 250, idealWidth: 280)
+                
+                mainChatArea
+                    .frame(minWidth: 500)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(.windowBackgroundColor))
+            .opacity(drawerVisible ? 0 : 1)
             
-            // Main Chat Area
-            mainChatArea
-                .frame(minWidth: 500)
+            overlayDrawers
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.windowBackgroundColor))
         .onAppear {
             setupVoiceService()
             setupKeyboardHandlers()
             setupNotifications()
         }
-        .sheet(isPresented: $showContextualCreateSheet) {
-            ContextualCreateSheet(currentTab: contextualCreateTab)
-        }
         .sheet(isPresented: $showAuroraPreferences) {
             AIAssistantPreferencesSheet()
-                }
+        }
         .sheet(isPresented: $showSpotlight) {
             AuroraSpotlightView()
                 .frame(width: 600, height: 500)
-        }
-        .sheet(isPresented: $showAuroraCreateSheet) {
-            if let action = createSheetAction {
-                AuroraCreateSheet(action: action) { prompt in
-                    // Send formatted prompt to Aurora
-                    viewModel.inputText = prompt
-                    sendCurrentMessage(modelContext: modelContext)
-                }
-            }
         }
         .alert("Unsaved Changes", isPresented: $showUnsavedAlert) {
             Button("Cancel", role: .cancel) {}
@@ -125,6 +116,29 @@ struct AIAssistantView: View {
             Text("Are you sure you want to delete this conversation? This action cannot be undone.")
         }
         .toast(message: $toastMessage, systemImage: "checkmark.circle.fill")
+    }
+    
+    private var drawerVisible: Bool {
+        showContextualCreateSheet || showAuroraCreateSheet
+    }
+    
+    @ViewBuilder
+    private var overlayDrawers: some View {
+        if showContextualCreateSheet {
+            ContextualCreateDrawer(isPresented: $showContextualCreateSheet, currentTab: contextualCreateTab)
+                .transition(.move(edge: .trailing))
+        }
+        
+        if showAuroraCreateSheet, let action = createSheetAction {
+            AuroraDrawer(isPresented: $showAuroraCreateSheet, title: "Create With Aurora", icon: "square.and.pencil") {
+                AuroraCreateSheet(action: action) { prompt in
+                    viewModel.inputText = prompt
+                    sendCurrentMessage(modelContext: modelContext)
+                }
+                .padding(.horizontal, -24)
+            }
+            .transition(.move(edge: .trailing))
+        }
     }
     
     private func setupNotifications() {

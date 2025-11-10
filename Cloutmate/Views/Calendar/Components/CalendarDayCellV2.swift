@@ -13,7 +13,11 @@ struct CalendarDayCellV2: View {
     let items: [CalendarItem]
     let isSelected: Bool
     let isCurrentMonth: Bool
-    var onTap: () -> Void
+    var onTap: () -> Void = {}
+    var onPostTap: ((CloutmateShared.Post) -> Void)? = nil
+    var onArtifactTap: ((CloutmateShared.Artifact) -> Void)? = nil
+    var onTaskTap: ((CloutmateShared.Task) -> Void)? = nil
+    var onCompose: (() -> Void)? = nil
     
     @State private var isHovered = false
     @State private var isPressed = false
@@ -59,7 +63,6 @@ struct CalendarDayCellV2: View {
                         isToday ? .kosmicBlue : (isCurrentMonth ? .primary : .secondary.opacity(0.4))
                     )
                 
-                // Active indicators
                 if hasItems {
                     HStack(spacing: 3) {
                         if artifactCount > 0 {
@@ -120,6 +123,11 @@ struct CalendarDayCellV2: View {
             )
         }
         .buttonStyle(.plain)
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                onCompose?()
+            }
+        )
         .onHover { hovering in
             withAnimation(GlassMotion.Easing.spring) {
                 isHovered = hovering
@@ -132,6 +140,32 @@ struct CalendarDayCellV2: View {
         }, perform: {})
         .accessibilityLabel("\(dayNumber), \(isToday ? "today" : "")")
         .accessibilityHint(isSelected ? "Selected" : "Double tap to select")
+        .contextMenu {
+            if let firstPost = items.compactMap({ item -> CloutmateShared.Post? in
+                if case .post(let post) = item { return post }
+                return nil
+            }).first {
+                Button("Open Post") {
+                    onPostTap?(firstPost)
+                }
+            }
+            if let firstTask = items.compactMap({ item -> CloutmateShared.Task? in
+                if case .task(let task) = item { return task }
+                return nil
+            }).first {
+                Button("Open Task") {
+                    onTaskTap?(firstTask)
+                }
+            }
+            if let firstArtifact = items.compactMap({ item -> CloutmateShared.Artifact? in
+                if case .artifact(let artifact) = item { return artifact }
+                return nil
+            }).first {
+                Button("Open Artifact") {
+                    onArtifactTap?(firstArtifact)
+                }
+            }
+        }
     }
 }
 
@@ -145,15 +179,17 @@ struct CalendarDayCellV2: View {
             items: [],
             isSelected: true,
             isCurrentMonth: true,
-            onTap: {}
+            onTap: {},
+            onCompose: {}
         )
         
         CalendarDayCellV2(
             date: calendar.date(byAdding: .day, value: 1, to: today)!,
-            items: [CalendarItem.task(Task(title: "Test"))],
+            items: [CalendarItem.task(CloutmateShared.Task(title: "Test"))],
             isSelected: false,
             isCurrentMonth: true,
-            onTap: {}
+            onTap: {},
+            onCompose: {}
         )
         
         CalendarDayCellV2(
@@ -161,7 +197,8 @@ struct CalendarDayCellV2: View {
             items: [],
             isSelected: false,
             isCurrentMonth: false,
-            onTap: {}
+            onTap: {},
+            onCompose: {}
         )
     }
     .padding()

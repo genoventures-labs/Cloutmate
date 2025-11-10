@@ -89,8 +89,8 @@ struct NoteCardV2: View {
                             }
                         }
                         
-                        // Preview text with fade-out
-                        Text(previewText)
+                        // Preview text with fade-out and mention rendering
+                        MentionRenderedTextView(text: previewText)
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(3)

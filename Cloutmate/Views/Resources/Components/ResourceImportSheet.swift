@@ -27,8 +27,9 @@ enum ImportMethod: String, CaseIterable {
     }
 }
 
-struct ResourceImportSheet: View {
-    @Environment(\.dismiss) private var dismiss
+struct ResourceImportDrawer: View {
+    @Binding var isPresented: Bool
+    let onComplete: (Note?) -> Void
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
@@ -172,13 +173,14 @@ struct ResourceImportSheet: View {
                 // Footer Actions
                 HStack(spacing: 12) {
                     Button("Cancel") {
-                        dismiss()
+                        isPresented = false
+                        onComplete(nil)
                     }
                     .buttonStyle(.bordered)
                     
                     Spacer()
                     
-                    Button(action: createResource) {
+                    Button(action: handleCreateResource) {
                         if isProcessing {
                             ProgressView()
                                 .scaleEffect(0.8)
@@ -222,7 +224,7 @@ struct ResourceImportSheet: View {
         }
     }
     
-    private func createResource() {
+    private func handleCreateResource() {
         isProcessing = true
         
         // Set source URL if importing from AI
@@ -249,7 +251,8 @@ struct ResourceImportSheet: View {
             await MainActor.run {
                 try? modelContext.save()
                 isProcessing = false
-                dismiss()
+                isPresented = false
+                onComplete(note)
             }
         }
     }
@@ -680,7 +683,7 @@ extension View {
 }
 
 #Preview {
-    ResourceImportSheet()
+    ResourceImportDrawer(isPresented: .constant(true), onComplete: { _ in })
         .environmentObject(GlassColorSystem())
         .modelContainer(for: Note.self)
 }

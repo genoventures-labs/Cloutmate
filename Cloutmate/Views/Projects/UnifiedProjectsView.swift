@@ -22,13 +22,79 @@ struct UnifiedProjectsView: View {
     @State private var selectedFilter: ProjectFilter = .all
     @State private var searchText = ""
     @State private var scrollOffset: CGFloat = 0
-    @State private var showCreateSheet = false
-    @State private var projectToShow: Project?
+    @State private var activeProject: Project?
+    @State private var isDrawerVisible = false
+    @State private var isCreatingProject = false
     @State private var isSelectionMode = false
     @State private var selectedProjectIDs: Set<UUID> = []
-    @State private var showFocusDurationSheet = false
+    @State private var focusOverlayProject: Project?
     @State private var focusDuration: TimeInterval = 1800 // Default 30 min
-    @State private var projectForFocus: Project?
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Color(.windowBackgroundColor)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                headerZone
+                Divider()
+                contentView
+            }
+            .opacity(isDrawerVisible ? 0 : 1)
+            
+            if let project = activeProject, isDrawerVisible {
+                ProjectDetailDrawer(
+                    project: project,
+                    isPresented: Binding(
+                        get: { isDrawerVisible },
+                        set: { newValue in
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = newValue
+                            }
+                        }
+                    ),
+                    mode: isCreatingProject ? .create : .edit
+                )
+                .transition(.move(edge: .trailing))
+            }
+            
+            if let focusProject = focusOverlayProject {
+                FocusDurationSheet(
+                    isPresented: Binding(
+                        get: { focusOverlayProject != nil },
+                        set: { newValue in
+                            if !newValue {
+                                focusOverlayProject = nil
+                            }
+                        }
+                    ),
+                    selectedDuration: $focusDuration,
+                    itemTitle: focusProject.title,
+                    itemType: "Project",
+                    onStart: {
+                        startFocusSession(for: focusProject)
+                    }
+                )
+            }
+        }
+        .onChange(of: isDrawerVisible) { _, newValue in
+            if !newValue, let project = activeProject {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    if !isDrawerVisible {
+                        cleanupIfNecessary(project)
+                        activeProject = nil
+                        isCreatingProject = false
+                    }
+                }
+            }
+        }
+        .onChange(of: selectedFilter) { _, _ in
+            pruneSelection()
+        }
+        .onChange(of: searchText) { _, _ in
+            pruneSelection()
+        }
+    }
     
     var filteredProjects: [Project] {
         var filtered = allProjects
@@ -74,7 +140,7 @@ struct UnifiedProjectsView: View {
         // Start Focus Session action (only if single project selected)
         if selectedProjects.count == 1, let project = selectedProjects.first {
             actions.append(.init(title: "Start Focus Session", icon: "timer") {
-                startFocusSessionForProject(project)
+                requestFocusSession(for: project)
             })
         }
         
@@ -105,6 +171,11 @@ struct UnifiedProjectsView: View {
             clearSelection()
         } else if !filteredProjects.isEmpty {
             isSelectionMode = true
+            if isDrawerVisible {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = false
+                }
+            }
         }
     }
     
@@ -121,7 +192,10 @@ struct UnifiedProjectsView: View {
             selectedProjectIDs.insert(project.id)
         }
         if isSelectionActive {
-            projectToShow = nil
+            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                isDrawerVisible = false
+                focusOverlayProject = nil
+            }
         }
     }
     
@@ -191,16 +265,19 @@ struct UnifiedProjectsView: View {
         }
     }
     
-    private func startFocusSessionForProject(_ project: Project) {
-        projectForFocus = project
-        showFocusDurationSheet = true
+    private func requestFocusSession(for project: Project) {
+        focusDuration = 1800
+        withAnimation(.easeInOut(duration: 0.2)) {
+            focusOverlayProject = project
+            isDrawerVisible = false
+        }
     }
     
-    private func startFocusSession() {
-        guard let project = projectForFocus else { return }
-        showFocusDurationSheet = false
+    private func startFocusSession(for project: Project) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            focusOverlayProject = nil
+        }
         
-        // Post notification with session parameters instead of starting immediately
         let params = PendingFocusSessionParams(
             objective: project.title,
             plannedDuration: focusDuration,
@@ -208,115 +285,61 @@ struct UnifiedProjectsView: View {
             targetObjectType: "project"
         )
         
-        projectForFocus = nil
         clearSelection()
-        
-        // Post session parameters first (will be stored as pending)
-        NotificationCenter.default.post(
-            name: .startPendingFocusSession,
-            object: params
-        )
-        
-        // Switch to focus mode tab (session will start after switch completes)
+        NotificationCenter.default.post(name: .startPendingFocusSession, object: params)
         NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
     }
     
     private func toggleSelectAll() {
         let allVisibleIDs = Set(filteredProjects.map(\.id))
         if selectedProjectIDs == allVisibleIDs {
-            // All selected, deselect all
             clearSelection()
         } else {
-            // Not all selected, select all visible
             selectedProjectIDs = allVisibleIDs
             if !isSelectionMode {
                 isSelectionMode = true
+                if isDrawerVisible {
+                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                        isDrawerVisible = false
+                    }
+                }
             }
         }
     }
     
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header Zone
-            headerZone
-                .opacity(headerOpacity)
-                .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: headerOpacity)
-            
-            Divider()
-            
-            // Content based on selected view mode
-            contentView
+    private func startCreatingProject() {
+        guard !isDrawerVisible else { return }
+        
+        let newProject = Project(title: "")
+        modelContext.insert(newProject)
+        activeProject = newProject
+        isCreatingProject = true
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
         }
-        .background(Color(.windowBackgroundColor))
-        .sheet(isPresented: $showCreateSheet) {
-            CreateProjectSheet()
+    }
+    
+    private func openDrawer(for project: Project) {
+        guard !isSelectionActive else { return }
+        
+        activeProject = project
+        isCreatingProject = false
+        
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = true
         }
-        .sheet(item: $projectToShow) { project in
-            ProjectDetailSheet(project: project)
-        }
-        .sheet(isPresented: $showFocusDurationSheet) {
-            if let project = projectForFocus {
-                FocusDurationSheet(
-                    selectedDuration: $focusDuration,
-                    itemTitle: project.title,
-                    itemType: "Project",
-                    onStart: {
-                        startFocusSession()
-                    }
-                )
-            }
-        }
-        .overlay(alignment: .bottom) {
-            if isSelectionActive {
-                SelectionActionBar(
-                    count: visibleSelectedProjectCount,
-                    itemLabel: "project",
-                    actions: projectSelectionActions(),
-                    onCancel: clearSelection,
-                    onSelectAll: toggleSelectAll,
-                    totalItems: filteredProjects.count
-                )
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-            }
-        }
-        .background(
-            Button("New Project") {
-                showCreateSheet = true
-            }
-            .keyboardShortcut("n", modifiers: .command)
-            .hidden()
-        )
-        .onKeyPress(.leftArrow) {
-            if let currentIndex = ProjectViewMode.allCases.firstIndex(of: selectedViewMode),
-               currentIndex > 0 {
-                selectedViewMode = ProjectViewMode.allCases[currentIndex - 1]
-                ProjectHaptics.playSelection()
-            }
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            if let currentIndex = ProjectViewMode.allCases.firstIndex(of: selectedViewMode),
-               currentIndex < ProjectViewMode.allCases.count - 1 {
-                selectedViewMode = ProjectViewMode.allCases[currentIndex + 1]
-                ProjectHaptics.playSelection()
-            }
-            return .handled
-        }
-        .accessibilityLabel("Projects view")
-        .accessibilityHint("Use arrow keys to switch between views. Press Command+N to create a new project.")
-        .onChange(of: searchText) { _, _ in
-            pruneSelection()
-        }
-        .onChange(of: selectedFilter) { _, _ in
-            pruneSelection()
-        }
-        .onChange(of: selectedViewMode) { _, newValue in
-            if newValue == .timeline {
-                clearSelection()
-            } else {
-                pruneSelection()
-            }
+    }
+    
+    private func cleanupIfNecessary(_ project: Project) {
+        guard isCreatingProject else { return }
+        let trimmedTitle = project.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedGoal = (project.goal ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedTitle.isEmpty && trimmedGoal.isEmpty && project.tags.isEmpty {
+            modelContext.delete(project)
+            try? modelContext.save()
+        } else {
+            try? modelContext.save()
         }
     }
     
@@ -410,7 +433,7 @@ struct UnifiedProjectsView: View {
             
             // Quick Create Button
             Button(action: {
-                showCreateSheet = true
+                startCreatingProject()
                 ProjectHaptics.playSelection()
             }) {
                 Image(systemName: "plus")
@@ -458,7 +481,7 @@ struct UnifiedProjectsView: View {
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
-                                    projectToShow = project
+                                    openDrawer(for: project)
                                 },
                                 onDuplicateProject: { project in duplicateProject(project) },
                                 onArchiveProject: { project in archiveProject(project) },
@@ -473,7 +496,7 @@ struct UnifiedProjectsView: View {
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
-                                    projectToShow = project
+                                    openDrawer(for: project)
                                 },
                                 onDuplicateProject: { project in duplicateProject(project) },
                                 onArchiveProject: { project in archiveProject(project) },
@@ -483,22 +506,25 @@ struct UnifiedProjectsView: View {
                             ProjectTimelineView(
                                 projects: filteredProjects,
                                 tasks: allTasks,
-                                areas: allAreas,
                                 onProjectSelected: { project in
-                                    projectToShow = project
-                                }
+                                    openDrawer(for: project)
+                                },
+                                onProjectArchived: archiveProject,
+                                onProjectDeleted: deleteProject
                             )
                         case .gallery:
                             ProjectGalleryView(
                                 projects: filteredProjects,
                                 tasks: allTasks,
-                                areas: allAreas,
                                 selectionMode: isSelectionActive,
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
-                                    projectToShow = project
-                                }
+                                    openDrawer(for: project)
+                                },
+                                onDuplicateProject: { project in duplicateProject(project) },
+                                onArchiveProject: { project in archiveProject(project) },
+                                onDeleteProject: { project in deleteProject(project) }
                             )
                         }
                     }
@@ -511,28 +537,6 @@ struct UnifiedProjectsView: View {
                 scrollOffset = -value
             }
         }
-    }
-}
-
-// MARK: - Project Detail Sheet
-
-struct ProjectDetailSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let project: Project
-    
-    var body: some View {
-        NavigationStack {
-            ProjectDetailView(project: project)
-                .navigationTitle(project.title)
-                .toolbar {
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done") {
-                            dismiss()
-                        }
-                    }
-                }
-        }
-        .frame(minWidth: 800, minHeight: 600)
     }
 }
 

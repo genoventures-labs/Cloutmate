@@ -32,7 +32,10 @@ struct CloutmateApp: App {
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Post") {
-                    NotificationCenter.default.post(name: .openComposer, object: nil)
+                    NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.calendar)
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .openComposer, object: CalendarComposerRequest())
+                    }
                 }
                 .keyboardShortcut("n", modifiers: .command)
             }

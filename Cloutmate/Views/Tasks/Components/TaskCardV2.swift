@@ -18,14 +18,13 @@ struct TaskCardV2: View {
     let onDuplicate: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
+    let onRequestFocus: (Task) -> Void
     
     @Environment(\.modelContext) private var modelContext
     @State private var isExpanded = false
     @State private var isHovered = false
     @State private var showCompletionAnimation = false
     @State private var previousStatus: TaskStatus?
-    @State private var showFocusDurationSheet = false
-    @State private var focusDuration: TimeInterval = 1800 // Default 30 min
     
     private var isDueToday: Bool {
         guard let dueDate = task.dueDate else { return false }
@@ -55,6 +54,19 @@ struct TaskCardV2: View {
         VStack(spacing: 0) {
             // Main card content
             HStack(spacing: 12) {
+                // Quick completion checkbox
+                Button(action: {
+                    completeTask()
+                }) {
+                    Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(task.status == .done ? .kosmicGreen : .secondary.opacity(0.6))
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .help(task.status == .done ? "Mark as incomplete" : "Mark as complete")
+                .allowsHitTesting(true)
+                
                 // Progress pill indicator (interactive)
                 InteractiveProgressPill(task: task)
                 
@@ -65,7 +77,8 @@ struct TaskCardV2: View {
                         Text(task.title)
                             .font(.system(.body, design: .rounded))
                             .fontWeight(.medium)
-                            .foregroundColor(.primary)
+                            .foregroundColor(task.status == .done ? .secondary : .primary)
+                            .strikethrough(task.status == .done)
                             .lineLimit(isExpanded ? nil : 2)
                         
                         Spacer()
@@ -77,9 +90,9 @@ struct TaskCardV2: View {
                     // Expanded content
                     if isExpanded {
                         VStack(alignment: .leading, spacing: 8) {
-                            // Notes
+                            // Notes with mention rendering
                             if let notes = task.notes, !notes.isEmpty {
-                                Text(notes)
+                                MentionRenderedTextView(text: notes)
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .lineLimit(nil)
@@ -159,6 +172,10 @@ struct TaskCardV2: View {
                         onEdit()
                     }
                     
+                    QuickActionButton(icon: "timer", color: .kosmicPurple) {
+                        onRequestFocus(task)
+                    }
+                    
                     QuickActionButton(icon: "archivebox.fill", color: .gray) {
                         onArchive()
                     }
@@ -188,7 +205,7 @@ struct TaskCardV2: View {
         .animation(GlassMotion.Easing.spring, value: isHovered)
         .contextMenu {
             Button("Start Focus Session") {
-                showFocusDurationSheet = true
+                onRequestFocus(task)
             }
             Divider()
             Button("Edit") {
@@ -204,14 +221,6 @@ struct TaskCardV2: View {
             Button("Delete", role: .destructive) {
                 onDelete()
             }
-        }
-        .sheet(isPresented: $showFocusDurationSheet) {
-            FocusDurationSheet(
-                selectedDuration: $focusDuration,
-                itemTitle: task.title,
-                itemType: "Task",
-                onStart: startFocusSession
-            )
         }
         .onChange(of: task.status) { oldValue, newValue in
             if newValue == .done && oldValue != .done {
@@ -249,7 +258,11 @@ struct TaskCardV2: View {
     
     private func completeTask() {
         withAnimation(GlassMotion.Easing.spring) {
-            task.status = .done
+            if task.status == .done {
+                task.status = .todo
+            } else {
+                task.status = .done
+            }
         }
         try? modelContext.save()
     }
@@ -261,27 +274,6 @@ struct TaskCardV2: View {
                 showCompletionAnimation = false
             }
         }
-    }
-    
-    private func startFocusSession() {
-        showFocusDurationSheet = false
-        
-        // Post notification with session parameters instead of starting immediately
-        let params = PendingFocusSessionParams(
-            objective: task.title,
-            plannedDuration: focusDuration,
-            targetObjectId: task.id,
-            targetObjectType: "task"
-        )
-        
-        // Post session parameters first (will be stored as pending)
-        NotificationCenter.default.post(
-            name: .startPendingFocusSession,
-            object: params
-        )
-        
-        // Switch to focus mode tab (session will start after switch completes)
-        NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
     }
 }
 
@@ -690,7 +682,8 @@ struct CompletionAnimationOverlay: View {
         onEdit: {},
         onDuplicate: {},
         onArchive: {},
-        onDelete: {}
+        onDelete: {},
+        onRequestFocus: { _ in }
     )
     .padding()
     .environmentObject(GlassColorSystem())

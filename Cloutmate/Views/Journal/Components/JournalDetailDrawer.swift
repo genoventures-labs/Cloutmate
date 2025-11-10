@@ -75,156 +75,156 @@ struct JournalDetailDrawer: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Focus Gravity Sidebar
-            RoundedRectangle(cornerRadius: 0, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            .kosmicBlue.opacity(focusGravityIntensity),
-                            .kosmicPurple.opacity(focusGravityIntensity * 0.8)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 4)
-            
-            // Main content
-            VStack(spacing: 0) {
-                // Header
+                        HStack(spacing: 0) {
+                            // Focus Gravity Sidebar
+                            RoundedRectangle(cornerRadius: 0, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            .kosmicBlue.opacity(focusGravityIntensity),
+                                            .kosmicPurple.opacity(focusGravityIntensity * 0.8)
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .frame(width: 4)
+                            
+                            // Main content
+                            VStack(spacing: 0) {
+                                // Header
                 HStack(spacing: 12) {
-                    TextField("Journal Title", text: $editingTitle)
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.bold)
-                        .textFieldStyle(.plain)
-                    
+                                    TextField("Journal Title", text: $editingTitle)
+                                        .font(.system(.title2, design: .rounded))
+                                        .fontWeight(.bold)
+                                        .textFieldStyle(.plain)
+                                    
                     if journal.author == .aurora {
                         AuroraAuthorBadge()
                     }
                     
-                    Spacer()
-                    
-                    Button(action: {
-                        saveJournal()
-                        isPresented = false
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.escape, modifiers: [])
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Entry metadata
-                        HStack(spacing: 16) {
-                            // Entry type picker
-                            Picker("Type", selection: $editingEntryType) {
-                                ForEach(JournalEntryType.allCases, id: \.self) { type in
-                                    Label(type.rawValue, systemImage: type.icon).tag(type)
+                                    Spacer()
+                                    
+                                    Button(action: {
+                                        saveJournal()
+                                            isPresented = false
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.title3)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .keyboardShortcut(.escape, modifiers: [])
                                 }
-                            }
-                            .pickerStyle(.menu)
-                            
-                            // Mood picker
-                            Picker("Mood", selection: $editingMood) {
-                                ForEach(JournalMood.allCases, id: \.self) { mood in
-                                    Text(mood.rawValue).tag(mood)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            
-                            Spacer()
-                            
-                            // Date
-                            Text(journal.entryDate, style: .date)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                        
-                        // Body editor
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Content")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            TextEditor(text: $editingContent)
-                                .font(.body)
-                                .frame(minHeight: 200)
-                                .scrollContentBackground(.hidden)
-                                .focused($isContentFocused)
-                                .padding(8)
+                                .padding()
                                 .background(.ultraThinMaterial)
-                                .cornerRadius(8)
-                                .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: isContentFocused)
-                        }
-                        .padding(.horizontal)
-                        
-                        // Sidebar components
-                        VStack(spacing: 16) {
-                            // ARTE Reflection Card
-                            if let emotionalState = emotionalState {
-                                ARTEReflectionCard(
-                                    journal: journal,
-                                    emotionalState: emotionalState,
-                                    snapshot: dailySnapshot
-                                )
-                                .padding(.horizontal)
-                            }
-                            
-                            // Mood Radar Chart
-                            MoodRadarChart(
-                                calm: calculateMoodValue(for: .calm),
-                                creative: calculateMoodValue(for: .creative),
-                                chaotic: calculateMoodValue(for: .frustrated),
-                                restless: calculateMoodValue(for: .excited)
-                            )
-                            .padding(.horizontal)
-                            
-                            // AI Summary Section
-                            JournalAISummarySection(
-                                summary: aiSummary,
-                                isGenerating: isGeneratingSummary,
-                                isExpanded: $isSummaryExpanded,
-                                onRegenerate: generateSummary
-                            )
-                            .padding(.horizontal)
-                            
-                            // Ask Aurora button
-                            Button(action: {
-                                showAuroraChat = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "sparkles")
-                                    Text("Ask Aurora")
+                                
+                                ScrollView {
+                                    VStack(alignment: .leading, spacing: 20) {
+                                        // Entry metadata
+                                        HStack(spacing: 16) {
+                                            // Entry type picker
+                                            Picker("Type", selection: $editingEntryType) {
+                                                ForEach(JournalEntryType.allCases, id: \.self) { type in
+                                                    Label(type.rawValue, systemImage: type.icon).tag(type)
+                                                }
+                                            }
+                                            .pickerStyle(.menu)
+                                            
+                                            // Mood picker
+                                            Picker("Mood", selection: $editingMood) {
+                                                ForEach(JournalMood.allCases, id: \.self) { mood in
+                                                    Text(mood.rawValue).tag(mood)
+                                                }
+                                            }
+                                            .pickerStyle(.menu)
+                                            
+                                            Spacer()
+                                            
+                                            // Date
+                                            Text(journal.entryDate, style: .date)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.horizontal)
+                                        .padding(.top, 8)
+                                        
+                                        // Body editor
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            Text("Content")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                            
+                                            TextEditor(text: $editingContent)
+                                                .font(.body)
+                                                .frame(minHeight: 200)
+                                                .scrollContentBackground(.hidden)
+                                                .focused($isContentFocused)
+                                                .padding(8)
+                                                .background(.ultraThinMaterial)
+                                                .cornerRadius(8)
+                                                .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: isContentFocused)
+                                        }
+                                        .padding(.horizontal)
+                                        
+                                        // Sidebar components
+                                        VStack(spacing: 16) {
+                                            // ARTE Reflection Card
+                                            if let emotionalState = emotionalState {
+                                                ARTEReflectionCard(
+                                                    journal: journal,
+                                                    emotionalState: emotionalState,
+                                                    snapshot: dailySnapshot
+                                                )
+                                                .padding(.horizontal)
+                                            }
+                                            
+                                            // Mood Radar Chart
+                                            MoodRadarChart(
+                                                calm: calculateMoodValue(for: .calm),
+                                                creative: calculateMoodValue(for: .creative),
+                                                chaotic: calculateMoodValue(for: .frustrated),
+                                                restless: calculateMoodValue(for: .excited)
+                                            )
+                                            .padding(.horizontal)
+                                            
+                                            // AI Summary Section
+                                            JournalAISummarySection(
+                                                summary: aiSummary,
+                                                isGenerating: isGeneratingSummary,
+                                                isExpanded: $isSummaryExpanded,
+                                                onRegenerate: generateSummary
+                                            )
+                                            .padding(.horizontal)
+                                            
+                                            // Ask Aurora button
+                                            Button(action: {
+                                                showAuroraChat = true
+                                            }) {
+                                                HStack {
+                                                    Image(systemName: "sparkles")
+                                                    Text("Ask Aurora")
+                                                }
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 12)
+                                                .background(
+                                                    LinearGradient(
+                                                        colors: [.kosmicBlue, .kosmicPurple],
+                                                        startPoint: .leading,
+                                                        endPoint: .trailing
+                                                    )
+                                                )
+                                                .foregroundColor(.white)
+                                                .cornerRadius(8)
+                                            }
+                                            .buttonStyle(.plain)
+                                            .padding(.horizontal)
+                                        }
+                                    }
+                                    .padding(.vertical)
                                 }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.kosmicBlue, .kosmicPurple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .foregroundColor(.white)
-                                .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.horizontal)
-                        }
-                    }
-                    .padding(.vertical)
-                }
             }
-        }
+                            }
         .frame(width: 700, height: 700)
         .background(glassColorSystem.backgroundColor())
         .onAppear {

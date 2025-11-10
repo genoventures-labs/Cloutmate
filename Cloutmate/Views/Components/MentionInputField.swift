@@ -10,6 +10,14 @@ import SwiftData
 import AppKit
 import UniformTypeIdentifiers
 
+// Preference key for tracking text view frame
+struct TextViewFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
 struct MentionInputField: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
@@ -23,13 +31,15 @@ struct MentionInputField: View {
     @State private var autocompleteResults: [WorkspaceObjectResult] = []
     @State private var selectedIndex = 0
     @State private var currentMention: String? = nil
+    @State private var currentMentionRange: NSRange? = nil
     @State private var searchDebounceTask: _Concurrency.Task<Void, Never>?
     
     @State private var isMultiLine = false
+    @State private var textViewRef: MentionTextView? = nil
+    @State private var cursorPosition: CGPoint = .zero
     
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            // Use NSTextView for attributed string support
+        // Use overlay approach to position autocomplete relative to text view
             MentionNSTextView(
                 text: $text,
                 isFocused: $isFocused,
@@ -47,13 +57,15 @@ struct MentionInputField: View {
                 selectedIndex: $selectedIndex,
                 onSelectAutocomplete: selectCurrentResult,
                 linkedContext: $linkedContext,
-                isEnabled: isEnabled
+            isEnabled: isEnabled,
+            textViewRef: $textViewRef,
+            modelContext: modelContext,
+            cursorPosition: $cursorPosition
             )
             .allowsHitTesting(true)
-            
-            // Autocomplete overlay
+        .overlay(alignment: .topLeading) {
+            // Autocomplete overlay - positioned below cursor
             if showAutocomplete && !autocompleteResults.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
                     MentionAutocompleteView(
                         results: autocompleteResults,
                         onSelect: { result in
@@ -62,9 +74,9 @@ struct MentionInputField: View {
                         selectedIndex: $selectedIndex
                     )
                     .frame(maxWidth: 400)
-                }
-                .padding(.top, 4)
+                .offset(x: cursorPosition.x, y: cursorPosition.y + 20)
                 .transition(.opacity.combined(with: .move(edge: .top)))
+                .allowsHitTesting(true)
             }
         }
     }
@@ -73,86 +85,250 @@ struct MentionInputField: View {
         // Cancel previous debounce task
         searchDebounceTask?.cancel()
         
-        // Check if cursor is inside a mention (simplified: check if text ends with @ or @ followed by non-space)
+        // Get cursor position from text view
+        guard let textView = textViewRef else {
+            // Fallback: try to find mention at end of text
         if let lastAtIndex = newValue.lastIndex(of: "@") {
             let afterAt = String(newValue[newValue.index(after: lastAtIndex)...])
-            
             // Check if there's a space or newline after @ (means mention ended)
             if let spaceIndex = afterAt.firstIndex(where: { $0.isWhitespace || $0.isNewline }) {
                 currentMention = nil
+                    currentMentionRange = nil
                 withAnimation {
                     showAutocomplete = false
                 }
                 return
             }
             
-            // Extract mention text (everything after @ until end)
+                // If afterAt is empty, just "@" was typed - show all objects
+                if afterAt.isEmpty {
+                    currentMention = ""
+                    let nsString = newValue as NSString
+                    let atLocation = nsString.range(of: "@", options: .backwards).location
+                    if atLocation != NSNotFound {
+                        currentMentionRange = NSRange(location: atLocation, length: 1)
+                        performSearch(query: "")
+                        withAnimation {
+                            showAutocomplete = true
+                        }
+                        return
+                    }
+                }
+                
             let mentionText = afterAt.trimmingCharacters(in: .whitespacesAndNewlines)
-            
             if !mentionText.isEmpty {
                 currentMention = mentionText
+                    // Estimate range (from last @ to end)
+                    let nsString = newValue as NSString
+                    let atLocation = nsString.range(of: "@", options: .backwards).location
+                    if atLocation != NSNotFound {
+                        currentMentionRange = NSRange(location: atLocation, length: newValue.count - atLocation)
                 
-                // Debounce search
                 searchDebounceTask = _Concurrency.Task {
-                    try? await _Concurrency.Task.sleep(nanoseconds: 200_000_000) // 200ms debounce
-                    
+                            try? await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
                     if !_Concurrency.Task.isCancelled {
                         await MainActor.run {
                             performSearch(query: mentionText)
                         }
                     }
                 }
+                        
+                        withAnimation {
+                            showAutocomplete = true
+                        }
+                        return
+                    }
+                }
+            }
+            currentMention = nil
+            currentMentionRange = nil
+            withAnimation {
+                showAutocomplete = false
+            }
+            return
+        }
+        
+        let cursorPosition = textView.selectedRange().location
+        
+        // Find mention at cursor position
+        if let mentionInfo = MentionParser.getCurrentMentionInfo(from: newValue, cursorPosition: cursorPosition) {
+            currentMention = mentionInfo.text
+            currentMentionRange = mentionInfo.range
+            
+            // Debounce search (even if mention text is empty, show all objects)
+            searchDebounceTask = _Concurrency.Task {
+                try? await _Concurrency.Task.sleep(nanoseconds: 200_000_000) // 200ms debounce
+                
+                if !_Concurrency.Task.isCancelled {
+                    await MainActor.run {
+                        performSearch(query: mentionInfo.text)
+                        // Update cursor position when showing autocomplete
+                        if let textView = textViewRef {
+                            updateCursorPosition(textView: textView)
+                        }
+                    }
+                }
+            }
+            
+            // Update cursor position immediately
+            updateCursorPosition(textView: textView)
+            
+            withAnimation {
+                showAutocomplete = true
+            }
+        } else {
+            // Check if cursor is right after "@" (no text yet)
+            let textBeforeCursor = String(newValue.prefix(cursorPosition))
+            if textBeforeCursor.hasSuffix("@") {
+                // Just typed "@" - show all objects
+                currentMention = ""
+                // Estimate range (just the "@" symbol)
+                let atLocation = textBeforeCursor.count - 1
+                currentMentionRange = NSRange(location: atLocation, length: 1)
+                
+                // Update cursor position
+                updateCursorPosition(textView: textView)
+                
+                // Show all objects immediately
+                performSearch(query: "")
                 
                 withAnimation {
                     showAutocomplete = true
                 }
             } else {
                 currentMention = nil
+                currentMentionRange = nil
                 withAnimation {
                     showAutocomplete = false
                 }
-            }
-        } else {
-            currentMention = nil
-            withAnimation {
-                showAutocomplete = false
             }
         }
     }
     
     private func performSearch(query: String) {
-        let results = WorkspaceObjectSearchService.shared.search(
+        // If query is empty (just "@"), show all objects
+        // Otherwise, search with the query
+        let results: [WorkspaceObjectResult]
+        if query.isEmpty {
+            // Show all objects when just "@" is typed
+            results = WorkspaceObjectSearchService.shared.searchAll(
+                modelContext: modelContext,
+                limit: 20
+            )
+        } else {
+            results = WorkspaceObjectSearchService.shared.search(
             query: query,
             modelContext: modelContext,
             limit: 8
         )
+        }
         
         autocompleteResults = results
         selectedIndex = 0
     }
     
+    private func updateCursorPosition(textView: MentionTextView) {
+        let selectedRange = textView.selectedRange()
+        guard selectedRange.location != NSNotFound else {
+            cursorPosition = .zero
+            return
+        }
+        
+        // Get the rect for the cursor position
+        guard let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            cursorPosition = .zero
+            return
+        }
+        
+        // Get the glyph range for the selected range
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: selectedRange, actualCharacterRange: nil)
+        
+        // Get the bounding rect for the glyphs
+        let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+        
+        // Convert to view coordinates (bottom-left of the character)
+        var point = rect.origin
+        point.y += rect.height
+        
+        // Account for text container insets
+        point.x += textView.textContainerInset.width
+        point.y += textView.textContainerInset.height
+        
+        // Store relative to text view origin
+        cursorPosition = point
+    }
+    
     private func selectResult(_ result: WorkspaceObjectResult) {
         guard let mention = currentMention else { return }
         
-        // Replace mention in text with selected object name
+        // Insert display name (user-friendly) instead of structured format
+        let displayMention = "@\(result.title)"
+        
+        // Try to use text view directly if available, otherwise fallback to text binding
+        if let textView = textViewRef, let mentionRange = currentMentionRange {
+            // Replace mention in NSTextView directly with display name
+            let nsRange = NSRange(location: mentionRange.location, length: mentionRange.length)
+            if nsRange.location + nsRange.length <= textView.string.count {
+                // Temporarily disable delegate to prevent recursive updates
+                let originalDelegate = textView.delegate
+                textView.delegate = nil
+                
+                textView.replaceCharacters(in: nsRange, with: displayMention)
+                
+                // Move cursor after the inserted mention
+                let newCursorPosition = nsRange.location + displayMention.count
+                textView.setSelectedRange(NSRange(location: newCursorPosition, length: 0))
+                
+                // Re-enable delegate
+                textView.delegate = originalDelegate
+                
+                // Get the display text and convert to structured format for storage
+                let displayText = textView.string
+                let structuredText = MentionService.shared.convertToStructuredFormat(
+                    text: displayText,
+                    modelContext: modelContext
+                )
+                
+                // Update text binding with structured format
+                text = structuredText
+                
+                // Update styling with display text
+                textView.updateAttributedText(displayText, modelContext: modelContext)
+                
+                // Manually call onTextChange to trigger mention detection
+                handleTextChange(structuredText)
+            }
+        } else {
+            // Fallback: update text binding directly
         let mentionPattern = "@\(mention)"
         if let range = text.range(of: mentionPattern, options: .caseInsensitive) {
-            text.replaceSubrange(range, with: "@\(result.title)")
+                text.replaceSubrange(range, with: displayMention)
+                // Convert to structured format
+                let structuredText = MentionService.shared.convertToStructuredFormat(
+                    text: text,
+                    modelContext: modelContext
+                )
+                text = structuredText
+                handleTextChange(structuredText)
+            }
+        }
             
             // Add to linked context
+        let structuredMention = MentionParser.toStructuredFormat(type: result.type, id: result.id)
             linkedContext.addLinkedObject(
                 type: result.type,
                 id: result.id,
-                mentionText: "@\(result.title)",
+            mentionText: structuredMention,
                 displayName: result.title
             )
-        }
         
         // Close autocomplete
         withAnimation {
             showAutocomplete = false
         }
         currentMention = nil
+        currentMentionRange = nil
         selectedIndex = 0
     }
     
@@ -177,6 +353,9 @@ struct MentionNSTextView: NSViewRepresentable {
     var onSelectAutocomplete: () -> Void
     @Binding var linkedContext: LinkedContext
     var isEnabled: Bool = true
+    @Binding var textViewRef: MentionTextView?
+    var modelContext: ModelContext
+    @Binding var cursorPosition: CGPoint
     
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -220,11 +399,16 @@ struct MentionNSTextView: NSViewRepresentable {
         textView.isSelectable = isEnabled
         textView.allowsUndo = true
         
-        // Set initial text
+        // Set initial text - convert structured format to display names for editing
         textView.linkedContext = linkedContext
         if !text.isEmpty {
-            textView.string = text
-            textView.updateAttributedText(text)
+            // Convert structured mentions to display names for editing
+            let displayText = MentionService.shared.convertToDisplayNames(
+                text: text,
+                modelContext: modelContext
+            )
+            textView.string = displayText
+            textView.updateAttributedText(displayText, modelContext: modelContext)
         }
         
         // Set up callbacks
@@ -269,6 +453,11 @@ struct MentionNSTextView: NSViewRepresentable {
         context.coordinator.textView = textView
         context.coordinator.scrollView = scrollView
         
+        // Store text view reference
+        DispatchQueue.main.async {
+            self.textViewRef = textView
+        }
+        
         // Try to make text view first responder after a short delay
         DispatchQueue.main.async {
             if self.isFocused && self.isEnabled {
@@ -283,6 +472,11 @@ struct MentionNSTextView: NSViewRepresentable {
         context.coordinator.parent = self
         guard let textView = context.coordinator.textView else { return }
         
+        // Update text view reference
+        DispatchQueue.main.async {
+            self.textViewRef = textView
+        }
+        
         // Update linked context
         textView.linkedContext = linkedContext
         
@@ -290,21 +484,25 @@ struct MentionNSTextView: NSViewRepresentable {
         // (to avoid overwriting user input while typing)
         let isCurrentlyFirstResponder = nsView.window?.firstResponder === textView
         if !isCurrentlyFirstResponder && textView.string != text {
-            // Text changed externally - update it
+            // Text changed externally - convert structured format to display names
+            let displayText = MentionService.shared.convertToDisplayNames(
+                text: text,
+                modelContext: modelContext
+            )
             let selectedRange = textView.selectedRange()
-            textView.string = text
-            textView.updateAttributedText(text)
+            textView.string = displayText
+            textView.updateAttributedText(displayText, modelContext: modelContext)
             
             // Restore cursor position or move to end
-            if selectedRange.location <= text.count {
+            if selectedRange.location <= displayText.count {
                 textView.setSelectedRange(selectedRange)
             } else {
-                textView.setSelectedRange(NSRange(location: text.count, length: 0))
+                textView.setSelectedRange(NSRange(location: displayText.count, length: 0))
             }
         } else if isCurrentlyFirstResponder {
             // While typing, only update styling for mentions, don't change the text
             // The text binding will be updated via textDidChange delegate method
-            textView.updateAttributedText(textView.string)
+            textView.updateAttributedText(textView.string, modelContext: modelContext)
         }
         
         // Ensure text view size updates properly for multi-line content
@@ -390,24 +588,65 @@ struct MentionNSTextView: NSViewRepresentable {
         
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
-            let newText = textView.string
+            let displayText = textView.string
             
-            // Update styling for mentions
+            // Convert display names back to structured format for storage
+            let structuredText = MentionService.shared.convertToStructuredFormat(
+                text: displayText,
+                modelContext: parent.modelContext
+            )
+            
+            // Update styling for mentions (using display text)
             if let mentionTextView = textView as? MentionTextView {
-                mentionTextView.updateAttributedText(newText)
+                mentionTextView.updateAttributedText(displayText, modelContext: parent.modelContext)
             }
             
-            // Update binding
-            parent.text = newText
+            // Update binding with structured format - this will trigger onChange in MentionTextEditor
+            if parent.text != structuredText {
+                parent.text = structuredText
+            }
             
-            // Call text change handler for mention detection
-            parent.onTextChange(newText)
+            // Call text change handler for mention detection (using structured format)
+            parent.onTextChange(structuredText)
+            
+            // Update cursor position asynchronously to avoid layout recursion
+            DispatchQueue.main.async {
+                self.updateCursorPosition(textView: textView)
+            }
             
             // Ensure text view resizes and scrolls to show cursor
             DispatchQueue.main.async {
                 textView.sizeToFit()
                 textView.scrollRangeToVisible(textView.selectedRange())
             }
+        }
+        
+        private func updateCursorPosition(textView: NSTextView) {
+            let selectedRange = textView.selectedRange()
+            guard selectedRange.location != NSNotFound else {
+                parent.cursorPosition = .zero
+                return
+            }
+            
+            // Get the rect for the cursor position
+            guard let layoutManager = textView.layoutManager,
+                  let textContainer = textView.textContainer else {
+                parent.cursorPosition = .zero
+                return
+            }
+            
+            // Get the glyph range for the selected range
+            let glyphRange = layoutManager.glyphRange(forCharacterRange: selectedRange, actualCharacterRange: nil)
+            
+            // Get the bounding rect for the glyphs
+            let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            
+            // Convert to view coordinates (bottom-left of the character)
+            var point = rect.origin
+            point.y += rect.height
+            
+            // Store relative to text view origin
+            parent.cursorPosition = point
         }
         
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
@@ -426,7 +665,7 @@ struct MentionNSTextView: NSViewRepresentable {
 }
 
 // Custom NSTextView with placeholder, image paste support, and mention styling
-fileprivate final class MentionTextView: NSTextView {
+final class MentionTextView: NSTextView {
     private var placeholderAttributedString: NSAttributedString?
     var onSubmit: (() -> Void)?
     var showAutocomplete: (() -> Bool)?
@@ -650,7 +889,8 @@ fileprivate final class MentionTextView: NSTextView {
     
     // MARK: - Mention Styling
     
-    func updateAttributedText(_ text: String) {
+    func updateAttributedText(_ text: String, modelContext: ModelContext) {
+        // Text is already in display format (display names, not structured)
         let attributedString = NSMutableAttributedString(string: text)
         let fullRange = NSRange(location: 0, length: text.count)
         
@@ -669,7 +909,22 @@ fileprivate final class MentionTextView: NSTextView {
             let isWebMention = MentionParser.isWebSearchMention(mention)
             
             // Check if this mention is in linkedContext (resolved) - but @web is always special
-            let isResolved = !isWebMention && linkedContext.mentionMap[mention.fullText.lowercased()] != nil
+            var isResolved = !isWebMention && linkedContext.mentionMap[mention.fullText.lowercased()] != nil
+            
+            // If not in linkedContext, try to resolve it
+            if !isResolved && !isWebMention {
+                // Try to resolve the mention
+                if let resolved = MentionService.shared.resolveMention(mention, modelContext: modelContext) {
+                    isResolved = true
+                    // Add to linked context for future reference
+                    linkedContext.addLinkedObject(
+                        type: resolved.type,
+                        id: resolved.id,
+                        mentionText: mention.fullText,
+                        displayName: resolved.displayName
+                    )
+                }
+            }
             
             // Style the mention - @web gets special cyan/teal styling
             var attributes: [NSAttributedString.Key: Any] = [

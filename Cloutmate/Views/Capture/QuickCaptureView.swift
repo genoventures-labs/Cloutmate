@@ -44,6 +44,12 @@ struct QuickCaptureView: View {
     @State private var showTemplatePicker = false
     @State private var tags: [String] = []
     
+    let onClose: (() -> Void)?
+    
+    init(onClose: (() -> Void)? = nil) {
+        self.onClose = onClose
+    }
+    
     var body: some View {
         VStack(spacing: 16) {
             // Type selector with icons
@@ -180,10 +186,19 @@ struct QuickCaptureView: View {
     }
     
     private func closeWindow() {
-        QuickCaptureWindowController.shared.close()
-        content = ""
-        attachmentURL = nil
-        selectedTemplate = nil
+        defer {
+            content = ""
+            attachmentURL = nil
+            selectedTemplate = nil
+            tags = []
+        }
+        
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+            QuickCaptureWindowController.shared.close()
+        }
     }
 }
 

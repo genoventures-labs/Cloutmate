@@ -10,10 +10,11 @@ import SwiftData
 import AppKit
 import CloutmateShared
 
-struct ContextualCreateSheet: View {
+struct ContextualCreateDrawer: View {
+    @Binding var isPresented: Bool
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     let currentTab: TabIdentifier
     
@@ -32,50 +33,91 @@ struct ContextualCreateSheet: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Text("Create")
-                            .font(.system(size: 28, weight: .bold))
-                        Text("Choose what to create")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top)
+            HStack(spacing: 0) {
+                gradientSidebar
+                
+                VStack(spacing: 0) {
+                    header
+                        .padding()
+                        .background(.ultraThinMaterial)
                     
-                    // Action buttons grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                        ForEach(actionsForTab, id: \.id) { action in
-                            CreateActionButton(
-                                action: action,
-                                isMostUsed: mostUsedActions.contains(action.type),
-                                isRecentlyCreated: recentlyCreated == action.type,
-                                onTap: {
-                                    handleAction(action)
-                                }
-                            )
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            actionGrid
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 24)
                     }
-                    .padding(.horizontal)
+                    .background(glassColorSystem.backgroundColor())
                 }
-                .padding(.vertical)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(glassColorSystem.backgroundColor())
-            .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        restoreEmotionalState()
-                        dismiss()
+                    Button {
+                        closeDrawer()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
                     }
+                    .keyboardShortcut(.escape, modifiers: [])
                 }
             }
         }
-        .frame(width: 600, height: 500)
+        .frame(minWidth: 600, minHeight: 500)
+        .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
             setupEmotionalTinting()
             loadSmartDefaults()
+        }
+        .onDisappear {
+            restoreEmotionalState()
+        }
+    }
+    
+    private var gradientSidebar: some View {
+        RoundedRectangle(cornerRadius: 0, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [glassColorSystem.emotionalAccent().opacity(0.85), glassColorSystem.emotionalAccent().opacity(0.35)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: 4)
+    }
+    
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Create")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(glassColorSystem.textPrimary())
+            Text("Choose what to create")
+                .font(.subheadline)
+                .foregroundStyle(glassColorSystem.textSecondary())
+        }
+    }
+    
+    private var actionGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+            ForEach(actionsForTab, id: \.id) { action in
+                CreateActionButton(
+                    action: action,
+                    isMostUsed: mostUsedActions.contains(action.type),
+                    isRecentlyCreated: recentlyCreated == action.type,
+                    onTap: {
+                        handleAction(action)
+                    }
+                )
+            }
+        }
+    }
+    
+    private func closeDrawer() {
+        restoreEmotionalState()
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isPresented = false
         }
     }
     
@@ -110,7 +152,6 @@ struct ContextualCreateSheet: View {
                 CreateAction(type: "New Project", icon: "folder.fill", color: .kosmicBlue)
             ]
         case .posts:
-            // Now shows artifacts instead of social media posts
             return [
                 CreateAction(type: "New Artifact", icon: "doc.text.fill", color: .kosmicBlue),
                 CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .orange)
@@ -143,24 +184,18 @@ struct ContextualCreateSheet: View {
     }
     
     private func handleAction(_ action: CreateAction) {
-        // Track usage
         CreateActionUsageTracker.shared.recordUsage(
             tab: effectiveTab,
             actionType: action.type,
             modelContext: modelContext
         )
         
-        // Haptic feedback
         let generator = NSHapticFeedbackManager.defaultPerformer
         generator.perform(.generic, performanceTime: .default)
         
-        // Dismiss parent sheet first
-        restoreEmotionalState()
-        dismiss()
+        closeDrawer()
         
-        // Post notification to show child sheet from MainWindowView
-        // Use a slight delay to ensure parent sheet is dismissed first
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
             switch action.type {
             case "New Note":
                 NotificationCenter.default.post(name: .showCreateNote, object: nil)
@@ -185,13 +220,10 @@ struct ContextualCreateSheet: View {
             case "Import Resource", "Save Link", "Capture Text":
                 NotificationCenter.default.post(name: .showResourceImport, object: nil)
             case "Routine Builder":
-                // TODO: Implement routine builder
                 NotificationCenter.default.post(name: .showCreateTask, object: nil)
             case "Reflection":
-                // Create reflection artifact
                 NotificationCenter.default.post(name: .showArtifactComposer, object: nil)
             case "Journal Entry":
-                // Create journal entry (could be a note or artifact)
                 NotificationCenter.default.post(name: .showCreateNote, object: nil)
             case "Morning Reflection":
                 NotificationCenter.default.post(name: .openJournalEntry, object: JournalTemplate.morning)
@@ -206,11 +238,9 @@ struct ContextualCreateSheet: View {
     }
     
     private func setupEmotionalTinting() {
-        // Save current state
         previousEmotionalState = glassColorSystem.emotionalState
         previousEmotionalIntensity = glassColorSystem.emotionalIntensity
         
-        // Apply contextual tinting
         let targetState = emotionalStateForTab(effectiveTab)
         glassColorSystem.updateEmotionalState(targetState, intensity: 0.7)
     }
@@ -247,6 +277,13 @@ struct ContextualCreateSheet: View {
             modelContext: modelContext
         )
     }
+}
+
+struct CreateAction {
+    let id = UUID()
+    let type: String
+    let icon: String
+    let color: Color
 }
 
 struct CreateAction {
@@ -310,8 +347,8 @@ struct CreateActionButton: View {
     }
 }
 
-struct VoiceMemoSheet: View {
-    @Environment(\.dismiss) private var dismiss
+struct VoiceMemoView: View {
+    let onClose: () -> Void
     @Environment(\.modelContext) private var modelContext
     @State private var content = ""
     @State private var isRecording = false
@@ -333,7 +370,7 @@ struct VoiceMemoSheet: View {
                 
                 HStack(spacing: 12) {
                     Button("Cancel") {
-                        dismiss()
+                        onClose()
                     }
                     .buttonStyle(.bordered)
                     
@@ -351,7 +388,7 @@ struct VoiceMemoSheet: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        dismiss()
+                        onClose()
                     }
                 }
             }
@@ -365,13 +402,29 @@ struct VoiceMemoSheet: View {
         note.author = .user
         modelContext.insert(note)
         try? modelContext.save()
-        dismiss()
+        onClose()
     }
 }
 
 #Preview {
-    ContextualCreateSheet(currentTab: .inbox)
-        .environmentObject(GlassColorSystem())
-        .modelContainer(for: [CreateActionUsage.self])
+    StatefulPreviewWrapper(true) { binding in
+        ContextualCreateDrawer(isPresented: binding, currentTab: .inbox)
+            .environmentObject(GlassColorSystem())
+            .modelContainer(for: [CreateActionUsage.self])
+    }
+}
+
+private struct StatefulPreviewWrapper<Value, Content: View>: View {
+    @State private var value: Value
+    private let content: (Binding<Value>) -> Content
+    
+    init(_ value: Value, @ViewBuilder content: @escaping (Binding<Value>) -> Content) {
+        _value = State(initialValue: value)
+        self.content = content
+    }
+    
+    var body: some View {
+        content($value)
+    }
 }
 

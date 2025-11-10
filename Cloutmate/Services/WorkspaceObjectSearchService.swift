@@ -178,6 +178,132 @@ class WorkspaceObjectSearchService {
             .map { $0 }
     }
     
+    /// Get all workspace objects (used when "@" is typed with no query)
+    func searchAll(
+        modelContext: ModelContext,
+        limit: Int = 20
+    ) -> [WorkspaceObjectResult] {
+        var results: [WorkspaceObjectResult] = []
+        
+        // Get all Projects
+        let projectDescriptor = FetchDescriptor<CloutmateShared.Project>()
+        if let projects = try? modelContext.fetch(projectDescriptor) {
+            for project in projects {
+                let subtitle = project.status.displayName + (project.goal != nil ? " · \(String(project.goal!.prefix(40)))" : "")
+                results.append(WorkspaceObjectResult(
+                    id: project.id,
+                    type: .project,
+                    title: project.title,
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Get all Tasks
+        let taskDescriptor = FetchDescriptor<CloutmateShared.Task>()
+        if let tasks = try? modelContext.fetch(taskDescriptor) {
+            for task in tasks {
+                let subtitle = task.status.displayName + " · " + task.priority.displayName
+                results.append(WorkspaceObjectResult(
+                    id: task.id,
+                    type: .task,
+                    title: task.title,
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Get all Notes
+        let noteDescriptor = FetchDescriptor<CloutmateShared.Note>()
+        if let notes = try? modelContext.fetch(noteDescriptor) {
+            for note in notes {
+                let subtitle = String(note.markdown.prefix(50))
+                results.append(WorkspaceObjectResult(
+                    id: note.id,
+                    type: .note,
+                    title: note.title,
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Get all Posts
+        let postDescriptor = FetchDescriptor<CloutmateShared.Post>()
+        if let posts = try? modelContext.fetch(postDescriptor) {
+            for post in posts {
+                let subtitle = post.postStatus.displayName
+                results.append(WorkspaceObjectResult(
+                    id: post.id,
+                    type: .post,
+                    title: post.caption.isEmpty ? "Empty Post" : String(post.caption.prefix(50)),
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Get all Reminders
+        let reminderDescriptor = FetchDescriptor<CloutmateShared.Reminder>()
+        if let reminders = try? modelContext.fetch(reminderDescriptor) {
+            for reminder in reminders {
+                let subtitle = reminder.isCompleted ? "Completed" : "Pending"
+                results.append(WorkspaceObjectResult(
+                    id: reminder.id,
+                    type: .reminder,
+                    title: reminder.title,
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Get all Inbox Items
+        let inboxDescriptor = FetchDescriptor<CloutmateShared.InboxItem>()
+        if let inboxItems = try? modelContext.fetch(inboxDescriptor) {
+            for item in inboxItems {
+                let subtitle = item.convertedAt == nil ? "Unconverted" : "Converted"
+                results.append(WorkspaceObjectResult(
+                    id: item.id,
+                    type: .inboxItem,
+                    title: String(item.content.prefix(50)),
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Get all Focus Sessions
+        let focusSessionDescriptor = FetchDescriptor<FocusSession>()
+        if let sessions = try? modelContext.fetch(focusSessionDescriptor) {
+            for session in sessions {
+                let subtitle = session.status.rawValue.capitalized + " · \(session.durationFormatted)"
+                results.append(WorkspaceObjectResult(
+                    id: session.id,
+                    type: .focusSession,
+                    title: session.objective,
+                    subtitle: subtitle,
+                    matchScore: 1.0
+                ))
+            }
+        }
+        
+        // Sort by type, then by title, and limit results
+        return results
+            .sorted { first, second in
+                // Sort by type first (alphabetically)
+                if first.type.rawValue != second.type.rawValue {
+                    return first.type.rawValue < second.type.rawValue
+                }
+                // Then by title
+                return first.title < second.title
+            }
+            .prefix(limit)
+            .map { $0 }
+    }
+    
     /// Calculate match score for text against query
     /// Returns 0.0 - 1.0, where 1.0 is exact match
     private func calculateMatchScore(text: String, query: String) -> Double {
