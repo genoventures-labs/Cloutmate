@@ -11,11 +11,12 @@ import CloutmateShared
 
 struct CampaignView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Campaign.createdAt, order: .reverse) private var campaigns: [Campaign]
     @Query private var allPosts: [CloutmateShared.Post]
     @Query private var projects: [CloutmateShared.Project]
     
-    @State private var showCreateSheet = false
+    @State private var isCreateDrawerVisible = false
     @State private var selectedCampaign: Campaign?
     
     var activeCampaigns: [Campaign] {
@@ -23,79 +24,90 @@ struct CampaignView: View {
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                HStack {
-                    Text("Campaigns")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    Spacer()
-                    GlassButton("New Campaign", icon: "plus.circle", tintColor: .kosmicBlue, action: { showCreateSheet = true })
-                }
-                .padding()
-                
-                // Active campaigns
-                if !activeCampaigns.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "flame.fill")
-                                .foregroundStyle(.orange)
-                            Text("Active Campaigns")
-                                .font(.headline)
-                        }
-                        .padding(.horizontal)
-                        
-                        ForEach(activeCampaigns) { campaign in
-                            CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
-                                .onTapGesture {
-                                    selectedCampaign = campaign
-                                }
-                                .padding(.horizontal)
-                        }
+        ZStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    HStack {
+                        Text("Campaigns")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                        Spacer()
+                        GlassButton("New Campaign", icon: "plus.circle", tintColor: .kosmicBlue, action: presentCreateDrawer)
                     }
-                }
-                
-                // All campaigns
-                if !campaigns.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "list.bullet")
-                                .foregroundStyle(Color.kosmicBlue)
-                            Text("All Campaigns")
-                                .font(.headline)
-                        }
-                        .padding(.horizontal)
-                        
-                        ForEach(campaigns) { campaign in
-                            CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
-                                .onTapGesture {
-                                    selectedCampaign = campaign
-                                }
-                                .padding(.horizontal)
-                        }
-                    }
-                }
-                
-                // Empty state
-                if campaigns.isEmpty {
-                    ContentUnavailableView(
-                        "No Campaigns",
-                        systemImage: "megaphone.fill",
-                        description: Text("Create a campaign to organize multiple posts")
-                    )
-                    .frame(height: 200)
                     .padding()
+                    
+                    // Active campaigns
+                    if !activeCampaigns.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "flame.fill")
+                                    .foregroundStyle(.orange)
+                                Text("Active Campaigns")
+                                    .font(.headline)
+                            }
+                            .padding(.horizontal)
+                            
+                            ForEach(activeCampaigns) { campaign in
+                                CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
+                                    .onTapGesture {
+                                        selectedCampaign = campaign
+                                    }
+                                    .padding(.horizontal)
+                            }
+                        }
+                    }
+                    
+                    // All campaigns
+                    if !campaigns.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "list.bullet")
+                                    .foregroundStyle(Color.kosmicBlue)
+                                Text("All Campaigns")
+                                    .font(.headline)
+                            }
+                            .padding(.horizontal)
+                            
+                            ForEach(campaigns) { campaign in
+                                CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
+                                    .onTapGesture {
+                                        selectedCampaign = campaign
+                                    }
+                                    .padding(.horizontal)
+                            }
+                        }
+                    }
+                    
+                    // Empty state
+                    if campaigns.isEmpty {
+                        ContentUnavailableView(
+                            "No Campaigns",
+                            systemImage: "megaphone.fill",
+                            description: Text("Create a campaign to organize multiple posts")
+                        )
+                        .frame(height: 200)
+                        .padding()
+                    }
                 }
             }
+            .background(Color.clear)
+            .opacity(isCreateDrawerVisible ? 0 : 1)
+            
+            if isCreateDrawerVisible {
+                CreateCampaignDrawer(isPresented: $isCreateDrawerVisible)
+                    .transition(.move(edge: .trailing))
+            }
         }
-        .background(Color.clear)
         .navigationTitle("Campaigns")
-        .sheet(isPresented: $showCreateSheet) {
-            CreateCampaignSheet()
-        }
         .sheet(item: $selectedCampaign) { campaign in
             CampaignDetailSheet(campaign: campaign, posts: allPosts, projects: projects)
+        }
+    }
+    
+    private func presentCreateDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isCreateDrawerVisible = true
         }
     }
 }
@@ -316,9 +328,10 @@ struct CampaignPostsSection: View {
     }
 }
 
-struct CreateCampaignSheet: View {
-    @Environment(\.dismiss) private var dismiss
+struct CreateCampaignDrawer: View {
+    @Binding var isPresented: Bool
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query private var projects: [Project]
     
     @State private var title = ""
@@ -362,7 +375,7 @@ struct CreateCampaignSheet: View {
             .navigationTitle("New Campaign")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { closeDrawer() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
@@ -372,7 +385,8 @@ struct CreateCampaignSheet: View {
                 }
             }
         }
-        .frame(width: 600, height: 500)
+        .frame(minWidth: 600, minHeight: 460)
+        .frame(idealWidth: 720, idealHeight: 540)
     }
     
     private func createCampaign() {
@@ -385,7 +399,13 @@ struct CreateCampaignSheet: View {
         )
         modelContext.insert(campaign)
         try? modelContext.save()
-        dismiss()
+        closeDrawer()
+    }
+    
+    private func closeDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isPresented = false
+        }
     }
 }
 

@@ -19,7 +19,7 @@ struct ArtifactsViewV2: View {
     @State private var selectedFilter: ArtifactFilter = .all
     @State private var searchText = ""
     @State private var scrollOffset: CGFloat = 0
-    @State private var showCreateSheet = false
+    @State private var isCreateDrawerVisible = false
     @State private var selectedArtifact: Artifact?
     @State private var showDetailDrawer = false
     
@@ -51,72 +51,77 @@ struct ArtifactsViewV2: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Main content
-            VStack(spacing: 0) {
-                // Header Zone
-                headerZone
-                    .opacity(headerOpacity)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: headerOpacity)
-                
-                Divider()
-                
-                // Content
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            GeometryReader { geometry in
-                                Color.clear
-                                    .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
-                            }
-                            .frame(height: 0)
-                            
-                            if filteredArtifacts.isEmpty {
-                                ContentUnavailableView(
-                                    "No Artifacts",
-                                    systemImage: "doc.text",
-                                    description: Text(searchText.isEmpty ? "Create your first artifact to get started" : "No artifacts match your search")
-                                )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .padding(.top, 100)
-                            } else {
-                                LazyVGrid(columns: [
-                                    GridItem(.adaptive(minimum: 320), spacing: 16)
-                                ], spacing: 16) {
-                                    ForEach(filteredArtifacts) { artifact in
-                                        ArtifactCardV2(
-                                            artifact: artifact,
-                                            onTap: {
-                                                selectedArtifact = artifact
-                                                showDetailDrawer = true
-                                            }
-                                        )
-                                    }
+        ZStack {
+            HStack(spacing: 0) {
+                // Main content
+                VStack(spacing: 0) {
+                    // Header Zone
+                    headerZone
+                        .opacity(headerOpacity)
+                        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: headerOpacity)
+                    
+                    Divider()
+                    
+                    // Content
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                GeometryReader { geometry in
+                                    Color.clear
+                                        .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
                                 }
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 24)
+                                .frame(height: 0)
+                                
+                                if filteredArtifacts.isEmpty {
+                                    ContentUnavailableView(
+                                        "No Artifacts",
+                                        systemImage: "doc.text",
+                                        description: Text(searchText.isEmpty ? "Create your first artifact to get started" : "No artifacts match your search")
+                                    )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .padding(.top, 100)
+                                } else {
+                                    LazyVGrid(columns: [
+                                        GridItem(.adaptive(minimum: 320), spacing: 16)
+                                    ], spacing: 16) {
+                                        ForEach(filteredArtifacts) { artifact in
+                                            ArtifactCardV2(
+                                                artifact: artifact,
+                                                onTap: {
+                                                    selectedArtifact = artifact
+                                                    showDetailDrawer = true
+                                                }
+                                            )
+                                        }
+                                    }
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 24)
+                                }
                             }
                         }
-                    }
-                    .coordinateSpace(name: "scroll")
-                    .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                        scrollOffset = -value
+                        .coordinateSpace(name: "scroll")
+                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                            scrollOffset = -value
+                        }
                     }
                 }
+                
+                // Sidebar
+                ArtifactSidebar(
+                    artifacts: allArtifacts,
+                    filteredArtifacts: filteredArtifacts,
+                    onFilterChanged: { filter in
+                        selectedFilter = filter
+                    }
+                )
             }
+            .background(Color(.windowBackgroundColor))
+            .opacity(isCreateDrawerVisible ? 0 : 1)
             
-            // Sidebar
-            ArtifactSidebar(
-                artifacts: allArtifacts,
-                filteredArtifacts: filteredArtifacts,
-                onFilterChanged: { filter in
-                    selectedFilter = filter
-                }
-            )
-        }
-        .background(Color(.windowBackgroundColor))
-        .sheet(isPresented: $showCreateSheet) {
-            ArtifactQuickAddSheet()
+            if isCreateDrawerVisible {
+                ArtifactQuickAddDrawer(isPresented: $isCreateDrawerVisible)
+                    .transition(.move(edge: .trailing))
+            }
         }
         .sheet(isPresented: $showDetailDrawer) {
             if let artifact = selectedArtifact {
@@ -125,7 +130,7 @@ struct ArtifactsViewV2: View {
         }
         .background(
             Button("New Artifact") {
-                showCreateSheet = true
+                presentCreateDrawer()
             }
             .keyboardShortcut("n", modifiers: .command)
             .hidden()
@@ -205,7 +210,7 @@ struct ArtifactsViewV2: View {
             
             // Quick Create Button
             Button(action: {
-                showCreateSheet = true
+                presentCreateDrawer()
             }) {
                 Image(systemName: "plus")
                     .font(.caption)
@@ -226,6 +231,12 @@ struct ArtifactsViewV2: View {
             }
             .ignoresSafeArea(edges: .top)
         )
+    }
+    
+    private func presentCreateDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isCreateDrawerVisible = true
+        }
     }
 }
 

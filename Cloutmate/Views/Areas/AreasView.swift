@@ -12,6 +12,7 @@ import CloutmateShared
 struct AreasView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Area.updatedAt, order: .reverse) private var allAreas: [Area]
     @Query private var allProjects: [CloutmateShared.Project]
     
@@ -19,7 +20,7 @@ struct AreasView: View {
     @State private var selectedTags: Set<String> = []
     @State private var hasCadenceFilter: Bool?
     @State private var selectedAreas = Set<UUID>()
-    @State private var showCreateSheet = false
+    @State private var isCreateDrawerVisible = false
     @State private var selectedArea: Area?
     @State private var showArchiveConfirmation = false
     
@@ -194,10 +195,18 @@ struct AreasView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            searchAndFiltersSection
+        ZStack {
+            VStack(spacing: 0) {
+                searchAndFiltersSection
+                
+                tableSection
+            }
+            .opacity(isCreateDrawerVisible ? 0 : 1)
             
-            tableSection
+            if isCreateDrawerVisible {
+                CreateAreaDrawer(isPresented: $isCreateDrawerVisible)
+                    .transition(.move(edge: .trailing))
+            }
         }
         .background(Color(.windowBackgroundColor))
         .navigationTitle("Areas")
@@ -215,12 +224,9 @@ struct AreasView: View {
                 }
                 
                 Button("New Area") {
-                    showCreateSheet = true
+                    presentCreateDrawer()
                 }
             }
-        }
-        .sheet(isPresented: $showCreateSheet) {
-            CreateAreaSheet()
         }
         .sheet(item: $selectedArea) { area in
             AreaDetailSheet(area: area)
@@ -248,6 +254,12 @@ struct AreasView: View {
         selectedAreas.removeAll()
         try? modelContext.save()
     }
+    
+    private func presentCreateDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isCreateDrawerVisible = true
+        }
+    }
 }
 
 struct AreaDetailSheet: View {
@@ -268,9 +280,10 @@ struct AreaDetailSheet: View {
     }
 }
 
-struct CreateAreaSheet: View {
-    @Environment(\.dismiss) private var dismiss
+struct CreateAreaDrawer: View {
+    @Binding var isPresented: Bool
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var title = ""
     @State private var notes = ""
     @State private var tags = ""
@@ -324,7 +337,7 @@ struct CreateAreaSheet: View {
             .navigationTitle("New Area")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                    Button("Cancel") { closeDrawer() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
@@ -334,7 +347,8 @@ struct CreateAreaSheet: View {
                 }
             }
         }
-        .frame(width: 600, height: 400)
+        .frame(minWidth: 600, minHeight: 420)
+        .frame(idealWidth: 720, idealHeight: 520)
     }
     
     private func createArea() {
@@ -350,7 +364,13 @@ struct CreateAreaSheet: View {
         
         modelContext.insert(area)
         try? modelContext.save()
-        dismiss()
+        closeDrawer()
+    }
+    
+    private func closeDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isPresented = false
+        }
     }
 }
 
