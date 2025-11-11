@@ -8,7 +8,7 @@
 
 ## Overview
 
-Aurora is now fully aware of her complete architecture spanning 9 major development phases plus extensions. Her system prompts have been comprehensively updated across all OllamaBridgeService functions to reflect accurate capabilities, including:
+Aurora is now fully aware of her complete architecture spanning 9 major development phases plus extensions. Her system prompts are built using a modular, versioned system (`AuroraSystemPromptBuilder`) that tracks cognitive configurations and links them to git commits. Her system prompts have been comprehensively updated across all OllamaBridgeService functions to reflect accurate capabilities, including:
 
 - **Phase 1-5:** Recall, Emotional Continuity, CPS, Focus Mode, Narrative Engine, Cross-Conversation Memory
 - **Phase 5++:** Intent Cluster Prediction for conversation pattern analysis
@@ -20,7 +20,7 @@ Aurora is now fully aware of her complete architecture spanning 9 major developm
 - **Phase 9 Extensions:** Temporal Intelligence (Adaptive Scheduling, Calendar Sync, Context Guard, Momentum Tracking)
 - **Phase 10:** Flow Companion (Floating Reflection Bubble) - Contextual reflection prompts
 
-All phases are fully implemented and documented in Aurora's system prompts.
+All phases are fully implemented and documented in Aurora's system prompts. The prompt system uses modular sections that are versioned and cached, allowing Aurora to track her cognitive configuration evolution over time.
 
 ---
 
@@ -975,10 +975,12 @@ Aurora receives formatted sections:
 **Updated:** ✅ Includes all phases through Phase 9 (including Intent Cluster Prediction, ARTE, Rituals, Predictive Cognition, Temporal Intelligence)
 
 ### 2. Main AI Assistant (`generateResponseWithAppContext()`)
-**Location:** `OllamaBridgeService.swift`  
+**Location:** `OllamaBridgeService.swift` → `AuroraSystemPromptBuilder.swift`  
 **Use Case:** Primary assistant responses with full context  
 **Knowledge Level:** Complete architecture with behavioral instructions  
-**Updated:** ✅ Complete Phase 1-9 documentation with all behavioral guidelines, including Phase 5++ (Intent Cluster Prediction), Phase 7 (ARTE), Phase 8 (Rituals), Phase 9 (Predictive Cognition), and Temporal Intelligence extensions
+**Updated:** ✅ Complete Phase 1-9 documentation with all behavioral guidelines, including Phase 5++ (Intent Cluster Prediction), Phase 7 (ARTE), Phase 8 (Rituals), Phase 9 (Predictive Cognition), and Temporal Intelligence extensions  
+**Implementation:** Uses modular prompt builder with versioned sections cached in `aurora_prompt_versions.json`  
+**Versioning:** Prompt versions are automatically tracked and linked to git commits for evolution mapping
 
 ### 3. Execution Intent Detection (`detectExecutionIntent()`)
 **Location:** `OllamaBridgeService.swift`  

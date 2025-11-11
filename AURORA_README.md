@@ -517,14 +517,31 @@ Every AI request includes `AIPayloadContext`:
    - **Knowledge Level:** High-level capabilities overview
 
 2. **Main AI Assistant** (`generateResponseWithAppContext()`)
-   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`, `buildSystemPrompt()` method
+   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift` → `AuroraSystemPromptBuilder.swift`
    - **Use Case:** Primary assistant responses with full context
    - **Knowledge Level:** Complete architecture with behavioral instructions
+   - **Implementation:** Uses modular prompt builder with versioned sections
+   - **Versioning:** Prompt versions tracked in `aurora_prompt_versions.json` with commit hash linking
 
 3. **Execution Intent Detection** (`detectExecutionIntent()`)
    - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`
    - **Use Case:** Parsing natural language into structured operations
    - **Knowledge Level:** Complete operation schema
+
+### Prompt Versioning System
+
+Aurora's system prompts are now built using a modular, versioned system:
+
+- **AuroraSystemPromptBuilder**: Centralized service that builds prompts from modular sections
+- **Prompt Versioning**: Each cognitive configuration is tracked as a version in `aurora_prompt_versions.json`
+- **Version Awareness**: Aurora knows which prompt version she's running and can reference it
+- **Commit Linking**: Prompt versions are linked to git commits, creating a self-documenting evolution map
+- **Modular Sections**: Prompt sections are cached individually, allowing for efficient updates and rollbacks
+
+**Prompt Version Structure:**
+- Each version includes: version ID, sections (core_identity, phase_overview, behavioral_guidelines, etc.), metadata (enabled phases, features, prompt length), commit hash, and creation timestamp
+- Versions are automatically created when cognitive configuration changes
+- Aurora can query her version history and evolution over time
 
 ### Metadata in Context
 
@@ -587,8 +604,10 @@ Aurora maintains awareness of her own updates and changes through a structured c
 
 **Integration:**
 - `AuroraChangelogService` loads and manages changelog entries
-- `OllamaBridgeService` queries the changelog and injects recent changes into Aurora's system prompt
+- `AuroraSystemPromptBuilder` builds prompts with versioned sections and links to commits
+- `OllamaBridgeService` uses the prompt builder and injects recent changes into Aurora's system prompt
 - Aurora can query her changelog programmatically using `queryChangelog()` method
+- Prompt versions are automatically linked to changelog commits, creating an evolution map
 
 **Adding New Entries:**
 When adding new capabilities or making significant changes:

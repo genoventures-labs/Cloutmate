@@ -1,7 +1,107 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-11T21:53:40.696660Z",
+  "lastUpdated": "2025-11-11T23:27:11.462052Z",
   "entries": [
+    {
+      "id": "ee388a18-6378-45af-8c09-a4ac99c6b151",
+      "date": "2025-11-11T23:27:11.459926Z",
+      "version": "0.8",
+      "feature": "Aurora Prompt Version",
+      "changeType": "added",
+      "description": "Added Aurora Prompt Version functionality",
+      "impact": "Adds new Aurora Prompt Version capability",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "56ca5aea-11a5-49ad-99a3-e7ff52a87bdb",
+      "date": "2025-11-11T23:27:11.459926Z",
+      "version": "0.8",
+      "feature": "Aurora System Prompt Builder",
+      "changeType": "added",
+      "description": "Added Aurora System Prompt Builder functionality",
+      "impact": "Adds new Aurora System Prompt Builder capability",
+      "userFacing": true,
+      "tags": [
+        "system-prompt",
+        "concurrency",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "ba27a992-89d6-46b8-9944-f501dd029aa4",
+      "date": "2025-11-11T23:27:11.459926Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "system-prompt",
+        "service",
+        "backend",
+        "ollama"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8a9615c0-e67f-4687-a63b-68c42fe6ad16",
+      "date": "2025-11-11T23:27:02.098847Z",
+      "version": "0.8",
+      "feature": "Aurora Prompt Version",
+      "changeType": "added",
+      "description": "Added Aurora Prompt Version functionality",
+      "impact": "Adds new Aurora Prompt Version capability",
+      "userFacing": false,
+      "tags": [
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "4bb5966a-c4cc-4978-ab46-03006ce5f6d4",
+      "date": "2025-11-11T23:27:02.098847Z",
+      "version": "0.8",
+      "feature": "Aurora System Prompt Builder",
+      "changeType": "added",
+      "description": "Added Aurora System Prompt Builder functionality",
+      "impact": "Adds new Aurora System Prompt Builder capability",
+      "userFacing": true,
+      "tags": [
+        "backend",
+        "service",
+        "system-prompt",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "c744d88a-e979-4ee1-aea4-fc56d97afa07",
+      "date": "2025-11-11T23:27:02.098847Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "backend",
+        "concurrency",
+        "service",
+        "ollama",
+        "system-prompt"
+      ],
+      "commitHash": null
+    },
     {
       "id": "85d65e05-8e58-451e-9c03-1948a577602f",
       "date": "2025-11-11T21:53:40.678355Z",
@@ -15,7 +115,7 @@
         "model",
         "data"
       ],
-      "commitHash": null
+      "commitHash": "92dd50de29690898f7ad6376881e4b0289b9a2d1"
     },
     {
       "id": "6e2caee1-2be7-4fd9-a9d1-4350a47224b3",

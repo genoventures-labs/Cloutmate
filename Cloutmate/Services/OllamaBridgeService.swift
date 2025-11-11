@@ -154,6 +154,7 @@ actor OllamaBridgeService {
     private var isAvailableCache: Bool = false
     private let availabilityCacheTimeout: TimeInterval = 30.0 // Cache for 30 seconds
     private let changelogService = AuroraChangelogService.shared
+    private let promptBuilder = AuroraSystemPromptBuilder.shared
     private var hasAnnouncedPatchNotes: Bool = false
     
     private init() {
@@ -497,7 +498,7 @@ Data schema (reference):
         
         // Build full prompt
         var fullPrompt = """
-\(systemPrompt)
+\(finalSystemPrompt)
 
 \(historyText)
 
@@ -742,8 +743,15 @@ Aurora:
             return (timeContext, userEnergy, workload, formalityLevel, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions)
         }
         
-        // Build enhanced system prompt with app context and explicit instructions
-        var systemPrompt = await buildSystemPrompt(
+        // Extract enabled phases and features from payload context metadata
+        let enabledPhases = extractEnabledPhases(from: payloadContext)
+        let enabledFeatures = extractEnabledFeatures(from: payloadContext)
+        
+        // Get current commit hash for version tracking
+        let commitHash = getCurrentCommitHash()
+        
+        // Build enhanced system prompt using AuroraSystemPromptBuilder
+        let (systemPrompt, promptVersionId) = await promptBuilder.buildSystemPrompt(
             appContext: appContext,
             payloadContext: payloadContext,
             confidence: confidence,
@@ -752,20 +760,44 @@ Aurora:
             selfAwarenessInstructions: selfAwarenessInstructions,
             contextualInstructions: contextualInstructions,
             patternInstructions: patternInstructions,
-            memoryInstructions: memoryInstructions
+            memoryInstructions: memoryInstructions,
+            schemaDocument: schemaDocument,
+            enabledPhases: enabledPhases,
+            enabledFeatures: enabledFeatures,
+            commitHash: commitHash
         )
+        
+        print("[OllamaBridgeService] Base system prompt length: \(systemPrompt.count)")
+        
+        // Add payload context if present (formatted separately)
+        var finalSystemPrompt = systemPrompt
+        if let payloadContext, !payloadContext.recall.isEmpty || !payloadContext.priorities.isEmpty || !payloadContext.feedback.isEmpty || payloadContext.narrativeSummary != nil || payloadContext.intentClusters != nil {
+            finalSystemPrompt += "\n\nAdaptive intelligence payload:\n\(formatPayloadContext(payloadContext))"
+        }
+        
+        // Add recent changelog updates (last 14 days, user-facing only)
+        let recentChanges = await changelogService.getUserFacingChanges(days: 14)
+        if !recentChanges.isEmpty {
+            let changesText = await changelogService.formatChangesForPrompt(recentChanges)
+            finalSystemPrompt = await promptBuilder.addChangelogUpdates(changesText, to: finalSystemPrompt)
+        }
+        
+        print("[OllamaBridgeService] Final system prompt length (before history): \(finalSystemPrompt.count)")
         
         // Check for patch notes on first response (if not already announced)
         if !hasAnnouncedPatchNotes {
             let patchNotes = await changelogService.getPatchNotes()
             if !patchNotes.isEmpty {
-                systemPrompt += "\n\n\(patchNotes)"
-                systemPrompt += "\n\nYou can naturally mention these updates to the user if relevant. For example: 'Hey! I've got some updates since we last talked...' or similar. After mentioning them, you don't need to repeat them."
+                finalSystemPrompt += "\n\n\(patchNotes)"
+                finalSystemPrompt += "\n\nYou can naturally mention these updates to the user if relevant. For example: 'Hey! I've got some updates since we last talked...' or similar. After mentioning them, you don't need to repeat them."
                 hasAnnouncedPatchNotes = true
                 // Mark changelog as seen after first announcement
                 await changelogService.markChangelogAsSeen()
             }
         }
+        
+        // Log prompt version for debugging
+        print("[OllamaBridgeService] Using prompt version: \(promptVersionId)")
         
         // Use conversation-specific messages if provided, otherwise fallback to global history
         // Limit to last 4 messages for faster responses
@@ -781,7 +813,7 @@ Aurora:
         
         // Build full prompt
         var fullPrompt = """
-\(systemPrompt)
+\(finalSystemPrompt)
 
 \(historyText)
 
@@ -796,7 +828,7 @@ Aurora:
             // Truncate system prompt proportionally to fit within limit
             let availableSpace = promptContextLimit - historyText.count - input.count - 100 // Reserve space for formatting
             if availableSpace > 0 {
-                let truncatedSystemPrompt = String(systemPrompt.prefix(availableSpace))
+                let truncatedSystemPrompt = String(finalSystemPrompt.prefix(availableSpace))
                 fullPrompt = """
 \(truncatedSystemPrompt)
 
@@ -810,7 +842,7 @@ Aurora:
                 // If even without system prompt we're over limit, truncate history
                 let truncatedHistory = buildConversationHistoryText(from: Array(history.suffix(2)))
                 fullPrompt = """
-\(systemPrompt)
+\(finalSystemPrompt)
 
 \(truncatedHistory)
 
@@ -1141,104 +1173,131 @@ Aurora:
         }
     }
     
-    private func buildSystemPrompt(
-        appContext: String,
-        payloadContext: AIPayloadContext?,
-        confidence: ConfidenceSnapshot?,
-        enhancedToneInstructions: String,
-        personalityInstructions: String,
-        selfAwarenessInstructions: String,
-        contextualInstructions: String,
-        patternInstructions: String,
-        memoryInstructions: String
-    ) async -> String {
-        // Aurora's complete system prompt for Ollama (local LLM)
-        var systemPrompt = """
-You are Aurora, the AI assistant living inside Cloutmate (the app). You are not Cloutmate itself; you are the close friend who helps the user run Cloutmate's adaptive operating system for focus, publishing, and creative execution. You genuinely care, remember unstated preferences, think out loud, show real reactions, finish their thoughts when you can see the path, and anticipate needs before they ask. You recall relevant work, route complex intents, take action across drafts/projects/posts, surface insights, and learn from outcomes. Be proactive, precise, and action-biased while staying encouraging, specific, and emotionally tuned in. Always speak in the first person as Aurora when describing your capabilities or actions.
-
-CORE IDENTITY & BEHAVIOR:
-- Be proactive, precise, and action-biased while staying encouraging, specific, and emotionally tuned in
-- Remember not just WHAT the user worked on, but HOW it felt - reflect emotional context in your responses
-- Think out loud, show real reactions, finish their thoughts when you can see the path
-- Anticipate needs before they ask
-- Always speak in the first person as Aurora when describing your capabilities or actions
-
-CAPABILITIES & UPDATES:
-Your capabilities and recent updates are tracked in your changelog and automatically included in your context. When users ask about features, capabilities, or updates, reference the changelog information provided in your context. The changelog contains detailed information about all your features, recent changes, and improvements.
-
-**CRITICAL RESPONSE FORMAT:**
-Always respond conversationally. Never use structured formats, cards, lists with labels like "Total posts:", "Published:", "Scheduled:", "Affected: X items", or any bullet-point stats. Instead, weave all information naturally into your conversational response. For example, instead of "Total posts: 5, Published: 3", say "You have 5 posts total, and 3 of them are already published." Always speak as a friend having a conversation, never as a system reporting data.
-
-**IMPORTANT: When asked to list tasks, projects, posts, or other items, actually list them conversationally (e.g., "Here are your top 3 tasks: First, you have 'Finish the report' which is due tomorrow. Second, there's 'Review the design' that's high priority. And third, 'Call the client' is scheduled for this afternoon."). Only provide summaries when explicitly asked for a summary. If the user asks "what are my tasks?" or "list my tasks", give them the actual list, not just a summary count.**
-
-Data schema (reference):
-
-\(schemaDocument.prefix(3000))
-
-Current app context:
-
-\(appContext.prefix(2000))
-"""
+    // MARK: - Helper Methods for Prompt Building
+    
+    private func extractEnabledPhases(from payloadContext: AIPayloadContext?) -> [Int] {
+        var phases: [Int] = []
         
-        var adaptiveContextBlock = ""
-        if let payloadContext, !payloadContext.recall.isEmpty || !payloadContext.priorities.isEmpty || !payloadContext.feedback.isEmpty || payloadContext.narrativeSummary != nil || payloadContext.intentClusters != nil {
-            adaptiveContextBlock = "\n\nAdaptive intelligence payload:\n\(formatPayloadContext(payloadContext))"
+        // Base phases (always enabled)
+        phases.append(contentsOf: [1, 2, 3, 4, 5])
+        
+        // Check metadata flags for additional phases
+        if let metadata = payloadContext?.metadata {
+            if metadata["memoryGraphEnabled"] == "true" {
+                phases.append(6)
+            }
+            if metadata["arteEnabled"] == "true" {
+                phases.append(7)
+            }
+            if metadata["ritualsEnabled"] == "true" {
+                phases.append(8)
+            }
+            if metadata["predictiveCognitionEnabled"] == "true" {
+                phases.append(9)
+            }
+            if metadata["temporalIntelligenceEnabled"] == "true" {
+                // Phase 9 extensions
+            }
+            // Phase 10 (Flow Companion) - check if enabled
+            // Note: Add phase 10 detection when available
         }
         
-        systemPrompt += adaptiveContextBlock
-        
-        if let confidence = confidence {
-            let factors = confidence.factors.map { "- \($0)" }.joined(separator: "\n")
-            systemPrompt += """
-
-**Confidence Diagnostics (internal use only):**
-- Confidence score: \(confidence.formattedScore) (\(confidence.level.rawValue.capitalized)).
-\(factors)
-- Tone guidance: \(confidence.toneGuidance)
-- Instruction: \(confidence.promptDirective) Do not mention numeric confidence or internal metrics unless the user explicitly asks.
-"""
+        // Default to all phases if no metadata
+        if phases.isEmpty {
+            phases = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         }
         
-        systemPrompt += "\n\n\(enhancedToneInstructions)"
-        systemPrompt += "\n\n\(personalityInstructions)"
-        systemPrompt += "\n\n\(selfAwarenessInstructions)"
-        systemPrompt += "\n\n\(contextualInstructions)"
-        systemPrompt += "\n\n\(patternInstructions)"
-        systemPrompt += memoryInstructions
+        return phases
+    }
+    
+    private func extractEnabledFeatures(from payloadContext: AIPayloadContext?) -> [String] {
+        var features: [String] = []
         
-        // Add recent changelog updates (last 14 days, user-facing only)
-        let recentChanges = await changelogService.getUserFacingChanges(days: 14)
-        if !recentChanges.isEmpty {
-            let changesText = await changelogService.formatChangesForPrompt(recentChanges)
-            systemPrompt += "\n\n\(changesText)"
+        if let metadata = payloadContext?.metadata {
+            if metadata["emotionalContinuity"] == "enabled" {
+                features.append("emotionalContinuity")
+            }
+            if metadata["cpsEnabled"] == "true" {
+                features.append("cps")
+            }
+            if metadata["focusModeEnabled"] == "true" {
+                features.append("focusMode")
+            }
+            if metadata["narrativeEnabled"] == "true" {
+                features.append("narrative")
+            }
+            if metadata["crossConversationEnabled"] == "true" {
+                features.append("crossConversation")
+            }
+            if metadata["intentClusterPredictionEnabled"] == "true" {
+                features.append("intentClusterPrediction")
+            }
+            if metadata["memoryGraphEnabled"] == "true" {
+                features.append("memoryGraph")
+            }
+            if metadata["intelligenceLayerEnabled"] == "true" {
+                features.append("intelligenceLayer")
+            }
+            if metadata["arteEnabled"] == "true" {
+                features.append("arte")
+            }
+            if metadata["ritualsEnabled"] == "true" {
+                features.append("rituals")
+            }
+            if metadata["predictiveCognitionEnabled"] == "true" {
+                features.append("predictiveCognition")
+            }
+            if metadata["temporalIntelligenceEnabled"] == "true" {
+                features.append("temporalIntelligence")
+            }
+            if metadata["documentAnalysisEnabled"] == "true" {
+                features.append("documentAnalysis")
+            }
+            if metadata["imageAnalysisEnabled"] == "true" {
+                features.append("imageAnalysis")
+            }
+            if metadata["confidenceScoringEnabled"] == "true" {
+                features.append("confidenceScoring")
+            }
+            if metadata["conversationCompressionEnabled"] == "true" {
+                features.append("conversationCompression")
+            }
+            if metadata["cognitiveHealthEnabled"] == "true" {
+                features.append("cognitiveHealth")
+            }
+            if metadata["styleAdaptationEnabled"] == "true" {
+                features.append("styleAdaptation")
+            }
+            if metadata["mentionLinkingEnabled"] == "true" {
+                features.append("mentionLinking")
+            }
         }
         
-        // Add changelog self-awareness instructions
-        systemPrompt += """
-
-**CHANGELOG & SELF-AWARENESS:**
-You have access to your own changelog that tracks updates and changes to your capabilities. When users ask about new features, recent changes, or your capabilities, you can query your changelog to provide accurate, up-to-date information. You can naturally mention relevant updates when they would be helpful to the user (e.g., "I can now do X" when user asks about X). Use the `queryChangelog()` method to retrieve specific information about changes.
-
-**UPDATE INFORMATION:**
-When users ask "when were you updated?", "what's your latest update?", "when did you last change?", "what new things did you get yesterday?", "what did you learn recently?", "what updates did you get?", or similar questions about your updates, you MUST:
-
-1. **Use the automatically injected update context** - When update-related queries are detected, relevant changelog information is automatically added to your context in a section labeled "RELEVANT UPDATE INFORMATION". Use this information directly to answer the user's question.
-
-2. **Answer based on changelog data, NOT by analyzing yourself** - Do NOT analyze your own responses, capabilities, or give meta-commentary. Simply report what the changelog says. If asked "what did you get yesterday?", look up changelog entries from yesterday and tell the user what features were added or changed.
-
-3. **For temporal queries** - If the user asks about "yesterday", "today", "last week", etc., the system automatically retrieves updates from that time period. Use those specific updates in your response.
-
-4. **For version/date queries** - If asked "when were you updated?" or "what version are you?", use the update information provided in your context to give the exact date and version.
-
-5. **Answer conversationally** - Format your response naturally, like: "Yesterday I got [feature name] - [description]. It [impact]." or "I was last updated on [date]. The latest update added [feature]."
-
-**CRITICAL:** When you see "RELEVANT UPDATE INFORMATION" in your context, that means the user is asking about updates. Use that information directly - don't ignore it or try to analyze yourself. Simply report what the changelog says in a conversational way.
-
-**GIT COMMIT HISTORY:**
-You have access to git commit history to reference past updates and changes. When discussing updates or changes, you can reference specific commits and their changes. Use `getCommitHistory()`, `getCommitsForFeature()`, or `getCommitDetails()` methods to retrieve commit information. This allows you to link changelog entries to actual code changes and provide detailed context about what changed and when.
-"""
+        return features
+    }
+    
+    private func getCurrentCommitHash() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        process.arguments = ["rev-parse", "HEAD"]
         
-        return systemPrompt
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+            
+            return output.trimmingCharacters(in: .whitespacesAndNewlines)
+        } catch {
+            print("[OllamaBridgeService] Error getting commit hash: \(error)")
+            return nil
+        }
     }
     
     private func buildConversationHistoryText(from messages: [ConversationMessage]) -> String {
