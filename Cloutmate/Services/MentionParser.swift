@@ -22,6 +22,12 @@ struct MentionMatch {
 }
 
 struct MentionParser {
+    static let mentionTerminator = "\u{200B}" // zero-width space used as mention boundary
+    static let mentionTerminatorCharacter: Character = "\u{200B}"
+    
+    static func stripTerminators(from text: String) -> String {
+        text.replacingOccurrences(of: mentionTerminator, with: "")
+    }
     /// Parse @ mentions from text input
     /// Supports both structured format (@{type:id}) and plain format (@name)
     static func parseMentions(from text: String) -> [MentionMatch] {
@@ -61,38 +67,73 @@ struct MentionParser {
             }
         }
         
-        // Then find plain mentions: @word (but exclude structured ones we already found)
-        let plainPattern = "@([\\w]+)"
+        // Then find plain mentions: @word or @multi word phrase (but exclude structured ones we already found)
+        // Match @ followed by characters (including spaces) until we hit a newline, another @, or end of string
+        // The pattern matches everything after @ except @ and newline characters
+        let plainPattern = "@([^@\\n]+)"
         if let plainRegex = try? NSRegularExpression(pattern: plainPattern, options: []) {
             let range = NSRange(location: 0, length: nsString.length)
             let plainMatches = plainRegex.matches(in: text, options: [], range: range)
             
             for match in plainMatches {
                 guard match.numberOfRanges >= 2 else { continue }
-            
-            let fullRange = match.range(at: 0)
-            let mentionRange = match.range(at: 1)
+                
+                let fullRange = match.range(at: 0)
+                var mentionRange = match.range(at: 1)
                 
                 // Skip if this range overlaps with any structured mention
                 if matches.contains(where: { $0.range.intersects(fullRange) }) {
                     continue
                 }
-            
-            guard mentionRange.location != NSNotFound,
-                  let mentionText = nsString.substring(with: mentionRange) as String? else {
+                
+                guard mentionRange.location != NSNotFound,
+                      mentionRange.length > 0 else {
                     continue
-            }
-            
-            let fullText = nsString.substring(with: fullRange)
-            
+                }
+                
+                var highlightRange = fullRange
+                var mentionSubstringRange = mentionRange
+                
+                // Adjust range if mention terminator is present
+                let rawFullText = nsString.substring(with: fullRange)
+                var fullText = rawFullText
+                if let terminatorIndex = fullText.firstIndex(of: mentionTerminatorCharacter) {
+                    fullText = String(fullText[..<terminatorIndex])
+                    let adjustedLength = (fullText as NSString).length
+                    // Ensure range length remains valid (at least 1 for the "@")
+                    let clampedLength = max(1, adjustedLength)
+                    highlightRange = NSRange(location: fullRange.location, length: clampedLength)
+                    mentionSubstringRange = NSRange(location: highlightRange.location + 1, length: max(highlightRange.length - 1, 0))
+                }
+                
+                if highlightRange.length <= 1 {
+                    continue
+                }
+                
+                var mentionText = mentionSubstringRange.length > 0 ? nsString.substring(with: mentionSubstringRange) : ""
+                
+                // Strip terminator characters from mention text
+                mentionText = stripTerminators(from: mentionText)
+                
+                // Trim trailing whitespace from mention text
+                let trimmedMentionText = mentionText.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Skip if mention text is empty or only whitespace
+                if trimmedMentionText.isEmpty {
+                    continue
+                }
+                
+                // Build full text without terminator
+                fullText = stripTerminators(from: fullText)
+                
                 matches.append(MentionMatch(
-                fullText: fullText,
-                mentionText: mentionText.trimmingCharacters(in: .whitespacesAndNewlines),
-                    range: fullRange,
+                    fullText: fullText,
+                    mentionText: trimmedMentionText,
+                    range: highlightRange,
                     structuredType: nil,
                     structuredId: nil
                 ))
-        }
+            }
         }
         
         // Sort by position in text
@@ -174,22 +215,30 @@ struct MentionParser {
         
         // Find the last @ symbol
         if let atIndex = textBeforeCursor.lastIndex(of: "@") {
-            let afterAt = String(textBeforeCursor[textBeforeCursor.index(after: atIndex)...])
+            var afterAt = String(textBeforeCursor[textBeforeCursor.index(after: atIndex)...])
             
-            // Check if there's a space or newline after @ (means mention ended)
-            if let spaceIndex = afterAt.firstIndex(where: { $0.isWhitespace || $0.isNewline }) {
-                return nil // Mention already ended
+            if let terminatorIndex = afterAt.firstIndex(of: mentionTerminatorCharacter) {
+                afterAt = String(afterAt[..<terminatorIndex])
             }
             
-            // Extract mention text (everything after @ until cursor)
+            // Check if there's a newline after @ (means mention ended)
+            // Allow spaces within mentions for multi-word phrases
+            if let newlineIndex = afterAt.firstIndex(where: { $0.isNewline }) {
+                return nil // Mention ended at newline
+            }
+            
+            // Extract mention text (everything after @ until cursor, including spaces)
+            // Preserve internal spaces for multi-word mentions like "@Focus Gravity Redo"
+            // Only trim leading/trailing whitespace
             let mentionText = afterAt.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            // Calculate range (even if mentionText is empty, we still have "@")
+            // Calculate range (from @ to cursor position)
             let nsString = text as NSString
             let atLocation = nsString.range(of: "@", options: .backwards, range: NSRange(location: 0, length: cursorPosition)).location
             if atLocation != NSNotFound {
+                // Range includes @ symbol and all text up to cursor
                 let range = NSRange(location: atLocation, length: cursorPosition - atLocation)
-                // Return empty string if just "@" was typed
+                // Return mention text (without @) and range (including @)
                 return (text: mentionText, range: range)
             }
         }

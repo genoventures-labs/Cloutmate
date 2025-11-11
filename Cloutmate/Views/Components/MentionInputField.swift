@@ -25,6 +25,9 @@ struct MentionInputField: View {
     var onSubmit: () -> Void
     @Binding var linkedContext: LinkedContext
     var isEnabled: Bool = true
+    var excludeObjectId: UUID? = nil // ID of object to exclude from autocomplete
+    var excludeObjectType: ObjectType? = nil // Type of object to exclude
+    var onLinkingStateChanged: ((Bool) -> Void)? = nil // Callback for typing state
     
     @Environment(\.modelContext) private var modelContext
     @State private var showAutocomplete = false
@@ -37,6 +40,9 @@ struct MentionInputField: View {
     @State private var isMultiLine = false
     @State private var textViewRef: MentionTextView? = nil
     @State private var cursorPosition: CGPoint = .zero
+    @State private var activeTabFilter: ObjectType? = nil // Track active tab filter
+    @State private var isLinkingConfirmed = false // Track if link was just confirmed
+    @State private var isCurrentLinkingState = false // Track linking state for callbacks
     
     var body: some View {
         // Use overlay approach to position autocomplete relative to text view
@@ -64,20 +70,44 @@ struct MentionInputField: View {
             )
             .allowsHitTesting(true)
         .overlay(alignment: .topLeading) {
-            // Autocomplete overlay - positioned below cursor
+            // Autocomplete overlay - positioned below the cursor, outside the editing line
             if showAutocomplete && !autocompleteResults.isEmpty {
-                    MentionAutocompleteView(
-                        results: autocompleteResults,
-                        onSelect: { result in
-                            selectResult(result)
-                        },
-                        selectedIndex: $selectedIndex
-                    )
-                    .frame(maxWidth: 400)
-                .offset(x: cursorPosition.x, y: cursorPosition.y + 20)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .allowsHitTesting(true)
+                VStack(alignment: .leading, spacing: 0) {
+                    Color.clear
+                        .frame(height: cursorPosition.y + 24)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            MentionAutocompleteView(
+                                results: autocompleteResults,
+                                onSelect: { result in
+                                    selectResult(result)
+                                },
+                                selectedIndex: $selectedIndex,
+                                tabFilter: activeTabFilter
+                            )
+                            .frame(maxWidth: 400)
+                            .onChange(of: selectedIndex) { _, newIndex in
+                                // Scroll to selected item
+                                withAnimation {
+                                    proxy.scrollTo(newIndex, anchor: .center)
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 300)
+                        .offset(x: cursorPosition.x)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .allowsHitTesting(true)
+                        .zIndex(1000) // Ensure it's above other content
+                    }
+                }
             }
+        }
+    }
+    
+    private func updateLinkingState(_ linking: Bool) {
+        if isCurrentLinkingState != linking {
+            isCurrentLinkingState = linking
+            onLinkingStateChanged?(linking)
         }
     }
     
@@ -97,6 +127,7 @@ struct MentionInputField: View {
                 withAnimation {
                     showAutocomplete = false
                 }
+                updateLinkingState(false)
                 return
             }
             
@@ -111,6 +142,7 @@ struct MentionInputField: View {
                         withAnimation {
                             showAutocomplete = true
                         }
+                        updateLinkingState(true)
                         return
                     }
                 }
@@ -136,6 +168,7 @@ struct MentionInputField: View {
                         withAnimation {
                             showAutocomplete = true
                         }
+                    updateLinkingState(true)
                         return
                     }
                 }
@@ -145,15 +178,159 @@ struct MentionInputField: View {
             withAnimation {
                 showAutocomplete = false
             }
+        updateLinkingState(false)
             return
         }
         
-        let cursorPosition = textView.selectedRange().location
+        let cursorLocation = textView.selectedRange().location
         
-        // Find mention at cursor position
-        if let mentionInfo = MentionParser.getCurrentMentionInfo(from: newValue, cursorPosition: cursorPosition) {
+        // Don't show autocomplete if we just confirmed a link
+        guard !isLinkingConfirmed else {
+            currentMention = nil
+            currentMentionRange = nil
+            showAutocomplete = false
+            updateLinkingState(false)
+            return
+        }
+        
+        // Check if cursor is immediately after a structured mention - if so, don't show autocomplete
+        // Also check if cursor is after a resolved mention (display name format)
+        let textBeforeCursor = String(newValue.prefix(cursorLocation))
+        
+        // Parse mentions before cursor once (used in multiple places)
+        let allMentionsBeforeCursor = MentionParser.parseMentions(from: textBeforeCursor)
+        
+        if cursorLocation > 0 {
+            // Check if we're right after a structured mention pattern (@{type:id})
+            if textBeforeCursor.hasSuffix("}") {
+                // Might be end of structured mention - check if there's a @{ before it
+                if let lastAtIndex = textBeforeCursor.lastIndex(of: "@"),
+                   lastAtIndex < textBeforeCursor.endIndex {
+                    let afterAt = textBeforeCursor[textBeforeCursor.index(after: lastAtIndex)...]
+                    if afterAt.hasPrefix("{") && afterAt.contains(":") {
+                        // Cursor is right after a structured mention - don't show autocomplete
+                        currentMention = nil
+                        currentMentionRange = nil
+                        showAutocomplete = false
+                        return
+                    }
+                }
+            }
+            
+            // Before checking for new mentions, verify we're not after a resolved mention
+            // Check if there's a resolved mention that ends before or at cursor position
+            for mention in allMentionsBeforeCursor.reversed() {
+                let resolvedMentionEnd = mention.range.location + mention.range.length
+                
+                // If cursor is after this mention
+                if cursorLocation > resolvedMentionEnd {
+                    // Check if this mention is resolved (either structured or can be resolved)
+                    var isResolved = mention.structuredType != nil
+                    
+                    if !isResolved {
+                        // Check linkedContext first
+                        isResolved = linkedContext.mentionMap[mention.fullText.lowercased()] != nil
+                        
+                        // Also try to resolve it via MentionService
+                        if !isResolved {
+                            if let resolved = MentionService.shared.resolveMention(mention, modelContext: modelContext) {
+                                isResolved = true
+                                // Add to linked context for future reference
+                                linkedContext.addLinkedObject(
+                                    type: resolved.type,
+                                    id: resolved.id,
+                                    mentionText: mention.fullText,
+                                    displayName: resolved.displayName
+                                )
+                            }
+                        }
+                    }
+                    
+                    if isResolved {
+                        // There's a resolved mention before cursor - don't treat subsequent text as mention
+                        // Check if there's a space or newline after the mention (normal text follows)
+                        if resolvedMentionEnd < textBeforeCursor.count {
+                            let charAfterMention = textBeforeCursor[textBeforeCursor.index(textBeforeCursor.startIndex, offsetBy: resolvedMentionEnd)]
+                            // If there's a space or we're at the end, it's normal text
+                            if charAfterMention.isWhitespace || cursorLocation == textBeforeCursor.count {
+                                currentMention = nil
+                                currentMentionRange = nil
+                                showAutocomplete = false
+                                updateLinkingState(false)
+                                return
+                            }
+                        } else {
+                            // Mention ends exactly at cursor - normal text mode
+                            currentMention = nil
+                            currentMentionRange = nil
+                            showAutocomplete = false
+                            updateLinkingState(false)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Find mention at cursor position (only if cursor is INSIDE a mention, not after)
+        if let mentionInfo = MentionParser.getCurrentMentionInfo(from: newValue, cursorPosition: cursorLocation) {
+            // Double-check that cursor is actually inside the mention, not after it
+            let foundMentionEnd = mentionInfo.range.location + mentionInfo.range.length
+        if cursorLocation > foundMentionEnd {
+                // Cursor is after the mention - don't treat as active mention
+                currentMention = nil
+                currentMentionRange = nil
+                showAutocomplete = false
+                updateLinkingState(false)
+                return
+            }
+            
+            // CRITICAL CHECK: If the mention found includes text after a resolved mention, stop detection
+            // This prevents "@Focus Gravity Redo can i type" from being treated as one mention
+            // Example: "@Focus Gravity Redo can i type" - if "@Focus Gravity Redo" is resolved,
+            // then "can i type" should be normal text, not part of the mention
+            
+            let foundMentionStart = mentionInfo.range.location
+            
+            // Parse mentions before cursor to check for resolved ones (reuse if already parsed)
+            let mentionsToCheck = allMentionsBeforeCursor
+            
+            // Check if there's a resolved mention that ends within this mention range
+            for resolvedMention in mentionsToCheck {
+                // Check if this mention is resolved
+                var isResolved = resolvedMention.structuredType != nil
+                
+                if !isResolved {
+                    // Check linkedContext
+                    isResolved = linkedContext.mentionMap[resolvedMention.fullText.lowercased()] != nil
+                    
+                    // Also try to resolve it via MentionService
+                    if !isResolved {
+                        if let _ = MentionService.shared.resolveMention(resolvedMention, modelContext: modelContext) {
+                            isResolved = true
+                        }
+                    }
+                }
+                
+                if isResolved {
+                    let resolvedMentionEndPos = resolvedMention.range.location + resolvedMention.range.length
+                    
+                    // If resolved mention ends within the found mention range AND cursor is after it
+                    if resolvedMentionEndPos >= foundMentionStart && resolvedMentionEndPos < foundMentionEnd && cursorLocation > resolvedMentionEndPos {
+                        // The found mention includes text after a resolved mention
+                        // This means we're typing normal text after a resolved mention, not a new mention
+                        currentMention = nil
+                        currentMentionRange = nil
+                        showAutocomplete = false
+                        updateLinkingState(false)
+                        return
+                    }
+                }
+            }
+            
             currentMention = mentionInfo.text
             currentMentionRange = mentionInfo.range
+            updateLinkingState(true)
             
             // Debounce search (even if mention text is empty, show all objects)
             searchDebounceTask = _Concurrency.Task {
@@ -161,10 +338,12 @@ struct MentionInputField: View {
                 
                 if !_Concurrency.Task.isCancelled {
                     await MainActor.run {
+                        // Double-check we're still not in confirmation state
+                        guard !self.isLinkingConfirmed else { return }
                         performSearch(query: mentionInfo.text)
                         // Update cursor position when showing autocomplete
-                        if let textView = textViewRef {
-                            updateCursorPosition(textView: textView)
+                        if let textView = self.textViewRef {
+                            self.updateCursorPosition(textView: textView)
                         }
                     }
                 }
@@ -176,9 +355,9 @@ struct MentionInputField: View {
             withAnimation {
                 showAutocomplete = true
             }
+            updateLinkingState(true)
         } else {
             // Check if cursor is right after "@" (no text yet)
-            let textBeforeCursor = String(newValue.prefix(cursorPosition))
             if textBeforeCursor.hasSuffix("@") {
                 // Just typed "@" - show all objects
                 currentMention = ""
@@ -195,35 +374,95 @@ struct MentionInputField: View {
                 withAnimation {
                     showAutocomplete = true
                 }
+                updateLinkingState(true)
             } else {
+                // Check if space was just typed after a mention (hide autocomplete)
+                if cursorLocation > 0 {
+                    let charBeforeCursor = String(newValue[newValue.index(newValue.startIndex, offsetBy: cursorLocation - 1)])
+                    if charBeforeCursor == " " && showAutocomplete {
+                        // Space was typed - check if there was a mention immediately before it
+                        let textBeforeSpace = String(newValue.prefix(cursorLocation - 1))
+                        
+                        // Check for structured mentions (@{type:id}) at the end
+                        if textBeforeSpace.hasSuffix("}") {
+                            // Might be end of structured mention - check if there's a @ before it
+                            if let lastAtIndex = textBeforeSpace.lastIndex(of: "@"),
+                               lastAtIndex < textBeforeSpace.endIndex {
+                                let afterAt = textBeforeSpace[textBeforeSpace.index(after: lastAtIndex)...]
+                                if afterAt.hasPrefix("{") {
+                                    // Structured mention ends right before space - hide autocomplete
+                                    withAnimation {
+                                        showAutocomplete = false
+                                    }
+                                    currentMention = nil
+                                    currentMentionRange = nil
+                                    updateLinkingState(false)
+                                    return
+                                }
+                            }
+                        }
+                        
+                        // Check for plain mentions at the end
+                        let mentions = MentionParser.parseMentions(from: textBeforeSpace)
+                        if let lastMention = mentions.last,
+                           lastMention.range.location + lastMention.range.length == textBeforeSpace.count {
+                            // Plain mention ends right before space - hide autocomplete
+                            withAnimation {
+                                showAutocomplete = false
+                            }
+                            currentMention = nil
+                            currentMentionRange = nil
+                            updateLinkingState(false)
+                            return
+                        }
+                    }
+                }
+                
+                // If autocomplete is showing but we're not in a mention context, hide it
+                if showAutocomplete {
+                    // Only hide if we're not actively typing a mention
+                    if currentMention == nil && currentMentionRange == nil {
+                        withAnimation {
+                            showAutocomplete = false
+                        }
+                        updateLinkingState(false)
+                    }
+                }
+                
                 currentMention = nil
                 currentMentionRange = nil
-                withAnimation {
-                    showAutocomplete = false
-                }
+                updateLinkingState(false)
             }
         }
     }
     
     private func performSearch(query: String) {
-        // If query is empty (just "@"), show all objects
-        // Otherwise, search with the query
-        let results: [WorkspaceObjectResult]
-        if query.isEmpty {
-            // Show all objects when just "@" is typed
-            results = WorkspaceObjectSearchService.shared.searchAll(
-                modelContext: modelContext,
-                limit: 20
-            )
-        } else {
-            results = WorkspaceObjectSearchService.shared.search(
+        // Check for tab filter in query (e.g., "@tasks", "@projects")
+        let (results, tabFilter) = WorkspaceObjectSearchService.shared.searchWithTabFilter(
             query: query,
             modelContext: modelContext,
-            limit: 8
+            limit: 20
         )
+        
+        // Update active tab filter
+        activeTabFilter = tabFilter
+        
+        // Filter out the current object being edited
+        var filteredResults = results
+        if let excludeId = excludeObjectId, let excludeType = excludeObjectType {
+            filteredResults = results.filter { result in
+                !(result.id == excludeId && result.type == excludeType)
+            }
         }
         
-        autocompleteResults = results
+        var seenIds = Set<UUID>()
+        autocompleteResults = filteredResults.filter { result in
+            if seenIds.contains(result.id) {
+                return false
+            }
+            seenIds.insert(result.id)
+            return true
+        }
         selectedIndex = 0
     }
     
@@ -263,7 +502,7 @@ struct MentionInputField: View {
         guard let mention = currentMention else { return }
         
         // Insert display name (user-friendly) instead of structured format
-        let displayMention = "@\(result.title)"
+        let displayMention = "@\(result.title)\(MentionParser.mentionTerminator)"
         
         // Try to use text view directly if available, otherwise fallback to text binding
         if let textView = textViewRef, let mentionRange = currentMentionRange {
@@ -293,16 +532,21 @@ struct MentionInputField: View {
                 // Update text binding with structured format
                 text = structuredText
                 
-                // Update styling with display text
+                // Update styling with display text (this will properly style the mention and clear styling for subsequent text)
                 textView.updateAttributedText(displayText, modelContext: modelContext)
                 
-                // Manually call onTextChange to trigger mention detection
-                handleTextChange(structuredText)
+                // Force update cursor position to ensure we're outside the mention
+                DispatchQueue.main.async {
+                    self.updateCursorPosition(textView: textView)
+                }
+                
+                // Don't call handleTextChange here - it will be called by textDidChange delegate
+                // This prevents re-opening autocomplete after linking
             }
         } else {
             // Fallback: update text binding directly
         let mentionPattern = "@\(mention)"
-        if let range = text.range(of: mentionPattern, options: .caseInsensitive) {
+                if let range = text.range(of: mentionPattern, options: .caseInsensitive) {
                 text.replaceSubrange(range, with: displayMention)
                 // Convert to structured format
                 let structuredText = MentionService.shared.convertToStructuredFormat(
@@ -323,13 +567,20 @@ struct MentionInputField: View {
                 displayName: result.title
             )
         
-        // Close autocomplete
-        withAnimation {
-            showAutocomplete = false
-        }
+        // Mark link as confirmed and close autocomplete IMMEDIATELY
+        // This prevents any further mention detection from re-opening it
+        isLinkingConfirmed = true
+        showAutocomplete = false
         currentMention = nil
         currentMentionRange = nil
         selectedIndex = 0
+        activeTabFilter = nil
+        updateLinkingState(false)
+        
+        // Reset confirmation flag after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.isLinkingConfirmed = false
+        }
     }
     
     private func selectCurrentResult() {
@@ -607,6 +858,7 @@ struct MentionNSTextView: NSViewRepresentable {
             }
             
             // Call text change handler for mention detection (using structured format)
+            // But only if we're not in a confirmation state (just linked something)
             parent.onTextChange(structuredText)
             
             // Update cursor position asynchronously to avoid layout recursion
@@ -722,21 +974,19 @@ final class MentionTextView: NSTextView {
         
         // Handle Return key
         if event.keyCode == 36 { // Return key
-            if event.modifierFlags.contains(.shift) {
-                // Shift+Enter: insert newline
-                super.insertNewline(nil)
-                // Ensure cursor is visible after inserting newline
-                DispatchQueue.main.async {
-                    self.scrollRangeToVisible(self.selectedRange())
-                }
-            } else {
-                // Enter without Shift: submit or select autocomplete
-                if let showAutocomplete = showAutocomplete, showAutocomplete(),
-                   let autocompleteResults = autocompleteResults, !autocompleteResults().isEmpty {
-                    onSelectAutocomplete?()
-                } else {
-                    onSubmit?()
-                }
+            // Check if autocomplete is showing - if so, select it
+            if let showAutocomplete = showAutocomplete, showAutocomplete(),
+               let autocompleteResults = autocompleteResults, !autocompleteResults().isEmpty {
+                // Autocomplete is showing - select current item
+                onSelectAutocomplete?()
+                return // Don't insert newline
+            }
+            
+            // No autocomplete - normal Enter behavior: insert newline
+            super.insertNewline(nil)
+            // Ensure cursor is visible after inserting newline
+            DispatchQueue.main.async {
+                self.scrollRangeToVisible(self.selectedRange())
             }
             return // Don't call super for Return key
         } else if event.keyCode == 53 { // Escape key
@@ -969,6 +1219,12 @@ final class MentionTextView: NSTextView {
         
         // Update text storage
         textStorage?.setAttributedString(attributedString)
+        
+        // Reset typing attributes so new text uses default styling
+        typingAttributes = [
+            .font: NSFont.systemFont(ofSize: NSFont.systemFontSize(for: .regular)),
+            .foregroundColor: NSColor.labelColor
+        ]
     }
 }
 

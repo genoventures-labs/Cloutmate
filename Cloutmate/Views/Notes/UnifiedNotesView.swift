@@ -211,12 +211,12 @@ struct UnifiedNotesView: View {
         NotesHeaderView(
             searchText: $searchText,
             selectedFilter: $selectedFilter,
-            onCreate: startCreatingNote,
             isSelectionMode: $isSelectionMode,
             selectedViewMode: $selectedViewMode,
             totalNotes: totalActiveNotes,
             taggedNotes: taggedNotesCount,
             selectionCount: visibleSelectedNoteCount,
+            onCreate: startCreatingNote,
             onToggleSelection: toggleSelectionMode
         )
         .padding(.horizontal, 20)
@@ -326,12 +326,10 @@ struct UnifiedNotesView: View {
                                 }
                             },
                             onNoteTap: { note in
-                                selectedNote = note
-                                showDrawer = true
+                                openDrawer(for: note)
                             },
                             onNoteEdit: { note in
-                                selectedNote = note
-                                showDrawer = true
+                                openDrawer(for: note)
                             },
                             onNotePin: { note in
                                 togglePin(note)
@@ -403,12 +401,10 @@ struct UnifiedNotesView: View {
                             toggleNoteSelection(note)
                         },
                         onTap: {
-                            selectedNote = note
-                            showDrawer = true
+                            openDrawer(for: note)
                         },
                         onEdit: {
-                            selectedNote = note
-                            showDrawer = true
+                            openDrawer(for: note)
                         },
                         onPin: {
                             togglePin(note)
@@ -445,7 +441,7 @@ struct UnifiedNotesView: View {
                 .foregroundColor(.secondary)
             
             GlassButton("Create Note", icon: "plus", style: .pill, role: .primary) {
-                showCreateSheet = true
+                startCreatingNote()
             }
             .padding(.top, 8)
         }
@@ -506,8 +502,11 @@ struct UnifiedNotesView: View {
         }
         // Prevent drawer from staying open when selecting
         if isSelectionActive {
-            selectedNote = nil
-            showDrawer = false
+            if isDrawerVisible {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = false
+                }
+            }
         }
     }
     

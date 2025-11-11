@@ -1,5 +1,5 @@
 //
-//  InboxCaptureDrawer.swift
+//  InboxQuickCaptureDrawer.swift
 //  Cloutmate
 //
 //  Drawer presentation for inbox capture
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct InboxCaptureDrawer: View {
+struct InboxQuickCaptureDrawer: View {
     @Binding var isPresented: Bool
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -18,8 +18,7 @@ struct InboxCaptureDrawer: View {
             HStack(spacing: 0) {
                 gradientSidebar
                 
-                QuickCaptureSheet()
-                    .environment(\.dismiss, DismissAction { closeDrawer() })
+                QuickCaptureView(onClose: closeDrawer)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(glassColorSystem.backgroundColor())
             }

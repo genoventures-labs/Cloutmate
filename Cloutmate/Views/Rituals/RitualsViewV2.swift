@@ -34,64 +34,64 @@ struct RitualsViewV2: View {
     
     var body: some View {
         ZStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    RitualHeaderView(ritualType: ritualType)
+        ScrollView {
+            VStack(spacing: 24) {
+                RitualHeaderView(ritualType: ritualType)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 20)
+                
+                if let nudge = smartNudgeService.latestNudge,
+                   nudge.trigger == .reflectionReminder {
+                    nudgeCard(nudge)
                         .padding(.horizontal, 28)
-                        .padding(.top, 20)
-                    
-                    if let nudge = smartNudgeService.latestNudge,
-                       nudge.trigger == .reflectionReminder {
-                        nudgeCard(nudge)
-                            .padding(.horizontal, 28)
-                    }
-                    
-                    CurrentRitualCard(
-                        ritualType: ritualType,
-                        ritualDuration: ritualDuration,
-                        progress: steps.isEmpty ? 0 : Double(completedSteps.count) / Double(steps.count),
-                        isRitualActive: isRitualActive && ritualStartTime != nil,
+                }
+                
+                CurrentRitualCard(
+                    ritualType: ritualType,
+                    ritualDuration: ritualDuration,
+                    progress: steps.isEmpty ? 0 : Double(completedSteps.count) / Double(steps.count),
+                    isRitualActive: isRitualActive && ritualStartTime != nil,
                         onStartRitual: startRitual,
                         onEndEarly: endRitualEarly
-                    )
-                    .padding(.horizontal, 28)
-                    
-                    if isRitualActive {
-                        RitualStepsList(
-                            ritualType: ritualType,
-                            steps: $steps,
+                )
+                .padding(.horizontal, 28)
+                
+                if isRitualActive {
+                    RitualStepsList(
+                        ritualType: ritualType,
+                        steps: $steps,
                             onStepComplete: { step in handleStepComplete(step) },
                             onStepSkip: { step in handleStepSkip(step) },
-                            onTaskPreviewTap: {
+                        onTaskPreviewTap: {
                                 withAnimation(GlassMotion.Easing.modalOpen) {
-                                    showFocusGravityView = true
+                            showFocusGravityView = true
                                 }
-                            }
-                        )
-                        .padding(.horizontal, 28)
-                    }
-                    
-                    if !isRitualActive && !completedSteps.isEmpty && steps.allSatisfy({ completedSteps.contains($0.id) }) {
-                        ReflectionSummaryView(
-                            ritualType: ritualType,
-                            reflectionText: reflectionText,
-                            onJournalTap: {
-                                withAnimation(GlassMotion.Easing.modalOpen) {
-                                    showJournalView = true
-                                }
-                            }
-                        )
-                        .padding(.horizontal, 28)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-                    
-                    RitualHistoryView(ritualType: ritualType)
-                        .padding(.horizontal, 28)
-                    
-                    Spacer(minLength: 40)
+                        }
+                    )
+                    .padding(.horizontal, 28)
                 }
+                
+                if !isRitualActive && !completedSteps.isEmpty && steps.allSatisfy({ completedSteps.contains($0.id) }) {
+                    ReflectionSummaryView(
+                        ritualType: ritualType,
+                        reflectionText: reflectionText,
+                        onJournalTap: {
+                                withAnimation(GlassMotion.Easing.modalOpen) {
+                            showJournalView = true
+                                }
+                        }
+                    )
+                    .padding(.horizontal, 28)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+                
+                RitualHistoryView(ritualType: ritualType)
+                    .padding(.horizontal, 28)
+                
+                Spacer(minLength: 40)
             }
-            .background(Color(.windowBackgroundColor))
+        }
+        .background(Color(.windowBackgroundColor))
             .opacity(drawerVisible ? 0 : 1)
             
             overlayDrawers

@@ -187,9 +187,9 @@ struct QuickCaptureView: View {
     
     private func closeWindow() {
         defer {
-            content = ""
-            attachmentURL = nil
-            selectedTemplate = nil
+        content = ""
+        attachmentURL = nil
+        selectedTemplate = nil
             tags = []
         }
         

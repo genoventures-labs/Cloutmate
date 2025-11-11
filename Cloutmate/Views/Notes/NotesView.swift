@@ -98,8 +98,11 @@ struct NotesView: View {
                         .lineLimit(1)
                     
                     if !note.markdown.isEmpty {
-                        Text(note.markdown.prefix(100))
-                            .font(.caption)
+                        MentionRenderedTextView(
+                            text: note.markdown,
+                            textFont: .caption,
+                            mentionFont: .caption
+                        )
                             .foregroundColor(.secondary)
                             .lineLimit(2)
                     }
@@ -167,18 +170,18 @@ struct NotesView: View {
     
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                searchAndFiltersSection
-                
-                if filteredNotes.isEmpty {
-                    ContentUnavailableView(
-                        allNotes.isEmpty ? "No Notes" : "No matches",
-                        systemImage: "note.text",
-                        description: Text(allNotes.isEmpty ? "Create a note to get started" : "Try a different search or filter")
-                    )
-                    .frame(maxHeight: .infinity)
-                } else {
-                    tableSection
+        VStack(spacing: 0) {
+            searchAndFiltersSection
+            
+            if filteredNotes.isEmpty {
+                ContentUnavailableView(
+                    allNotes.isEmpty ? "No Notes" : "No matches",
+                    systemImage: "note.text",
+                    description: Text(allNotes.isEmpty ? "Create a note to get started" : "Try a different search or filter")
+                )
+                .frame(maxHeight: .infinity)
+            } else {
+                tableSection
                 }
             }
             .opacity(isDrawerVisible ? 0 : 1)
@@ -224,9 +227,9 @@ struct NotesView: View {
         .onChange(of: isDrawerVisible) { _, newValue in
             if !newValue {
                 handleDrawerDismissed()
+                }
             }
         }
-    }
     
     private func startCreatingNote() {
         let newNote = Note(title: "", markdown: "", tags: [])
@@ -240,7 +243,7 @@ struct NotesView: View {
         activeNote = note
         isCreatingNote = false
         presentDrawer()
-    }
+        }
     
     private func presentDrawer() {
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
@@ -256,7 +259,7 @@ struct NotesView: View {
             let trimmedContent = note.markdown.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmedTitle.isEmpty && trimmedContent.isEmpty {
                 modelContext.delete(note)
-            }
+        }
         }
         
         try? modelContext.save()

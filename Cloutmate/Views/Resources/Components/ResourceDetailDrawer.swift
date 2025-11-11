@@ -252,10 +252,12 @@ struct ResourcePreviewSection: View {
             
             if !note.markdown.isEmpty {
                 ScrollView {
-                    Text(note.markdown)
-                        .font(.system(.body, design: .rounded))
+                    MentionRenderedTextView(
+                        text: note.markdown,
+                        textFont: .system(.body, design: .rounded),
+                        mentionFont: .system(.body, design: .rounded)
+                    )
                         .foregroundColor(.primary)
-                        .lineSpacing(6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 18)
@@ -326,7 +328,8 @@ struct TagsEditorSection: View {
             
             // Existing Tags
             if !note.tags.isEmpty {
-                FlowLayout(spacing: 10) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
                     ForEach(note.tags, id: \.self) { tag in
                         HStack(spacing: 6) {
                             Text(tag)
@@ -349,6 +352,7 @@ struct TagsEditorSection: View {
                     }
                 }
                 .padding(.top, 4)
+                }
             }
             
             // Add Tag

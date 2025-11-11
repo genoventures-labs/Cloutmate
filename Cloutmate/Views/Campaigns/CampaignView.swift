@@ -25,73 +25,73 @@ struct CampaignView: View {
     
     var body: some View {
         ZStack {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Header
-                    HStack {
-                        Text("Campaigns")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                        Spacer()
+        ScrollView {
+            VStack(spacing: 24) {
+                // Header
+                HStack {
+                    Text("Campaigns")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    Spacer()
                         GlassButton("New Campaign", icon: "plus.circle", tintColor: .kosmicBlue, action: presentCreateDrawer)
-                    }
-                    .padding()
-                    
-                    // Active campaigns
-                    if !activeCampaigns.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "flame.fill")
-                                    .foregroundStyle(.orange)
-                                Text("Active Campaigns")
-                                    .font(.headline)
-                            }
-                            .padding(.horizontal)
-                            
-                            ForEach(activeCampaigns) { campaign in
-                                CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
-                                    .onTapGesture {
-                                        selectedCampaign = campaign
-                                    }
-                                    .padding(.horizontal)
-                            }
+                }
+                .padding()
+                
+                // Active campaigns
+                if !activeCampaigns.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "flame.fill")
+                                .foregroundStyle(.orange)
+                            Text("Active Campaigns")
+                                .font(.headline)
                         }
-                    }
-                    
-                    // All campaigns
-                    if !campaigns.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "list.bullet")
-                                    .foregroundStyle(Color.kosmicBlue)
-                                Text("All Campaigns")
-                                    .font(.headline)
-                            }
-                            .padding(.horizontal)
-                            
-                            ForEach(campaigns) { campaign in
-                                CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
-                                    .onTapGesture {
-                                        selectedCampaign = campaign
-                                    }
-                                    .padding(.horizontal)
-                            }
+                        .padding(.horizontal)
+                        
+                        ForEach(activeCampaigns) { campaign in
+                            CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
+                                .onTapGesture {
+                                    selectedCampaign = campaign
+                                }
+                                .padding(.horizontal)
                         }
-                    }
-                    
-                    // Empty state
-                    if campaigns.isEmpty {
-                        ContentUnavailableView(
-                            "No Campaigns",
-                            systemImage: "megaphone.fill",
-                            description: Text("Create a campaign to organize multiple posts")
-                        )
-                        .frame(height: 200)
-                        .padding()
                     }
                 }
+                
+                // All campaigns
+                if !campaigns.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "list.bullet")
+                                .foregroundStyle(Color.kosmicBlue)
+                            Text("All Campaigns")
+                                .font(.headline)
+                        }
+                        .padding(.horizontal)
+                        
+                        ForEach(campaigns) { campaign in
+                            CampaignCard(campaign: campaign, posts: allPosts, projects: projects)
+                                .onTapGesture {
+                                    selectedCampaign = campaign
+                                }
+                                .padding(.horizontal)
+                        }
+                    }
+                }
+                
+                // Empty state
+                if campaigns.isEmpty {
+                    ContentUnavailableView(
+                        "No Campaigns",
+                        systemImage: "megaphone.fill",
+                        description: Text("Create a campaign to organize multiple posts")
+                    )
+                    .frame(height: 200)
+                    .padding()
+                }
             }
-            .background(Color.clear)
+        }
+        .background(Color.clear)
             .opacity(isCreateDrawerVisible ? 0 : 1)
             
             if isCreateDrawerVisible {

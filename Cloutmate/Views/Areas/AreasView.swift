@@ -196,10 +196,10 @@ struct AreasView: View {
     
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                searchAndFiltersSection
-                
-                tableSection
+        VStack(spacing: 0) {
+            searchAndFiltersSection
+            
+            tableSection
             }
             .opacity(isCreateDrawerVisible ? 0 : 1)
             

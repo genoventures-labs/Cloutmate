@@ -55,15 +55,15 @@ struct AIAssistantView: View {
     
     var body: some View {
         ZStack {
-            HSplitView {
-                conversationsSidebar
-                    .frame(minWidth: 250, idealWidth: 280)
-                
-                mainChatArea
-                    .frame(minWidth: 500)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.windowBackgroundColor))
+        HSplitView {
+            conversationsSidebar
+                .frame(minWidth: 250, idealWidth: 280)
+            
+            mainChatArea
+                .frame(minWidth: 500)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.windowBackgroundColor))
             .opacity(drawerVisible ? 0 : 1)
             
             overlayDrawers
@@ -75,7 +75,7 @@ struct AIAssistantView: View {
         }
         .sheet(isPresented: $showAuroraPreferences) {
             AIAssistantPreferencesSheet()
-        }
+                }
         .sheet(isPresented: $showSpotlight) {
             AuroraSpotlightView()
                 .frame(width: 600, height: 500)

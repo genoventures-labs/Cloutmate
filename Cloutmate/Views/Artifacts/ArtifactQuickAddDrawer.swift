@@ -25,7 +25,7 @@ struct ArtifactQuickAddDrawer: View {
     var body: some View {
         NavigationStack {
             HStack(spacing: 0) {
-                VStack(spacing: 0) {
+        VStack(spacing: 0) {
                     header
                     
                     Divider()
@@ -58,7 +58,7 @@ struct ArtifactQuickAddDrawer: View {
                     .keyboardShortcut(.escape, modifiers: [])
                 }
             }
-        }
+                }
         .frame(minWidth: 640, minHeight: 520)
         .frame(idealWidth: 780, idealHeight: 560)
         .onAppear {
@@ -74,77 +74,77 @@ struct ArtifactQuickAddDrawer: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(glassColorSystem.textPrimary())
             Spacer()
-        }
+            }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)
-        .background(GlassPanel(tier: .overlay, cornerRadius: 0) { EmptyView() })
+            .background(GlassPanel(tier: .overlay, cornerRadius: 0) { EmptyView() })
     }
-    
+            
     private var formatSelector: some View {
-        Picker("Format", selection: $selectedFormat) {
-            ForEach(OutputFormat.allCases, id: \.self) { format in
-                Text(format.displayName).tag(format)
-            }
-        }
-        .pickerStyle(.segmented)
+                Picker("Format", selection: $selectedFormat) {
+                    ForEach(OutputFormat.allCases, id: \.self) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                .pickerStyle(.segmented)
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
-        .background(glassColorSystem.backgroundColor())
+            .background(glassColorSystem.backgroundColor())
     }
     
     private var formContent: some View {
         VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Title")
-                    .font(.caption)
-                    .foregroundColor(glassColorSystem.textSecondary())
-                    .textCase(.uppercase)
-                
-                TextField("Enter title...", text: $title)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16, weight: .medium))
-                    .padding(12)
-                    .background(
-                        GlassPanel(tier: .contentCard, cornerRadius: 8) {
-                            EmptyView()
-                        }
-                    )
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Content")
-                    .font(.caption)
-                    .foregroundColor(glassColorSystem.textSecondary())
-                    .textCase(.uppercase)
-                
-                TextEditor(text: $content)
-                    .font(.body)
-                    .scrollContentBackground(.hidden)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Title")
+                            .font(.caption)
+                            .foregroundColor(glassColorSystem.textSecondary())
+                            .textCase(.uppercase)
+                        
+                        TextField("Enter title...", text: $title)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 16, weight: .medium))
+                            .padding(12)
+                            .background(
+                                GlassPanel(tier: .contentCard, cornerRadius: 8) {
+                                    EmptyView()
+                                }
+                            )
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Content")
+                            .font(.caption)
+                            .foregroundColor(glassColorSystem.textSecondary())
+                            .textCase(.uppercase)
+                        
+                        TextEditor(text: $content)
+                            .font(.body)
+                            .scrollContentBackground(.hidden)
                     .frame(minHeight: 320)
-                    .padding(12)
-                    .background(
-                        GlassPanel(tier: .contentCard, cornerRadius: 8) {
-                            EmptyView()
-                        }
-                    )
-                    .focused($isFocused)
-            }
-        }
+                            .padding(12)
+                            .background(
+                                GlassPanel(tier: .contentCard, cornerRadius: 8) {
+                                    EmptyView()
+                                }
+                            )
+                            .focused($isFocused)
+                    }
+                }
         .padding(.horizontal, 24)
         .padding(.vertical, 24)
-    }
-    
-    private var footer: some View {
-        HStack {
-            Spacer()
-            Button("Create") {
-                createArtifact()
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            
+    private var footer: some View {
+            HStack {
+                Spacer()
+                Button("Create") {
+                    createArtifact()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
                       content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        }
+            }
         .padding(.horizontal, 24)
         .padding(.vertical, 18)
         .background(glassColorSystem.backgroundColor())

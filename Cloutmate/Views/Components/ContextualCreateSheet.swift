@@ -41,8 +41,8 @@ struct ContextualCreateDrawer: View {
                         .padding()
                         .background(.ultraThinMaterial)
                     
-                    ScrollView {
-                        VStack(spacing: 20) {
+            ScrollView {
+                VStack(spacing: 20) {
                             actionGrid
                         }
                         .padding(.horizontal, 24)
@@ -100,22 +100,22 @@ struct ContextualCreateDrawer: View {
     }
     
     private var actionGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-            ForEach(actionsForTab, id: \.id) { action in
-                CreateActionButton(
-                    action: action,
-                    isMostUsed: mostUsedActions.contains(action.type),
-                    isRecentlyCreated: recentlyCreated == action.type,
-                    onTap: {
-                        handleAction(action)
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                        ForEach(actionsForTab, id: \.id) { action in
+                            CreateActionButton(
+                                action: action,
+                                isMostUsed: mostUsedActions.contains(action.type),
+                                isRecentlyCreated: recentlyCreated == action.type,
+                                onTap: {
+                                    handleAction(action)
+                                }
+                            )
+                        }
                     }
-                )
-            }
-        }
     }
     
     private func closeDrawer() {
-        restoreEmotionalState()
+                        restoreEmotionalState()
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
             isPresented = false
         }
@@ -286,13 +286,6 @@ struct CreateAction {
     let color: Color
 }
 
-struct CreateAction {
-    let id = UUID()
-    let type: String
-    let icon: String
-    let color: Color
-}
-
 struct CreateActionButton: View {
     let action: CreateAction
     let isMostUsed: Bool
@@ -409,9 +402,9 @@ struct VoiceMemoView: View {
 #Preview {
     StatefulPreviewWrapper(true) { binding in
         ContextualCreateDrawer(isPresented: binding, currentTab: .inbox)
-            .environmentObject(GlassColorSystem())
-            .modelContainer(for: [CreateActionUsage.self])
-    }
+        .environmentObject(GlassColorSystem())
+        .modelContainer(for: [CreateActionUsage.self])
+}
 }
 
 private struct StatefulPreviewWrapper<Value, Content: View>: View {

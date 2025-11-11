@@ -63,7 +63,7 @@ struct UnifiedCalendarView: View {
             }
             
             if let artifact = activeArtifact, artifactDrawerVisible {
-                ArtifactDetailDrawer(
+                CalendarArtifactDetailDrawer(
                     artifact: artifact,
                     isPresented: Binding(
                         get: { artifactDrawerVisible },
@@ -147,33 +147,33 @@ struct UnifiedCalendarView: View {
     }
     
     private var calendarHeader: some View {
-        VStack(spacing: 16) {
-            CalendarViewToggle(isWeeklyView: $isWeeklyView)
-                .padding(.horizontal)
-                .padding(.top)
+                VStack(spacing: 16) {
+                    CalendarViewToggle(isWeeklyView: $isWeeklyView)
+                        .padding(.horizontal)
+                        .padding(.top)
         }
     }
-    
+                    
     private var calendarContent: some View {
         Group {
-            if isWeeklyView {
-                UnifiedWeeklyCalendarView(
-                    posts: posts,
-                    artifacts: artifacts,
-                    tasks: tasks,
-                    selectedDate: $selectedDate,
+                    if isWeeklyView {
+                        UnifiedWeeklyCalendarView(
+                            posts: posts,
+                            artifacts: artifacts,
+                            tasks: tasks,
+                            selectedDate: $selectedDate,
                     onOpenDay: openDayDrawer,
                     onOpenPost: openPostDrawer,
                     onOpenArtifact: openArtifactDrawer,
                     onOpenTask: openTaskDrawer,
                     onCompose: launchComposer
                 )
-            } else {
-                UnifiedMonthlyCalendarView(
-                    posts: posts,
-                    artifacts: artifacts,
-                    tasks: tasks,
-                    selectedDate: $selectedDate,
+                    } else {
+                        UnifiedMonthlyCalendarView(
+                            posts: posts,
+                            artifacts: artifacts,
+                            tasks: tasks,
+                            selectedDate: $selectedDate,
                     onOpenDay: openDayDrawer,
                     onOpenPost: openPostDrawer,
                     onOpenArtifact: openArtifactDrawer,
@@ -224,14 +224,14 @@ struct UnifiedCalendarView: View {
         }
         
         return CalendarComposerRequest()
-    }
+        }
     
-    private func handleDayItemSelection(_ item: CalendarDayDetailDrawer.Item) {
+    private func handleDayItemSelection(_ kind: CalendarDayDetailDrawer.Item.Kind) {
         withAnimation(calendarAnimation) {
             dayDrawerVisible = false
         }
         
-        switch item {
+        switch kind {
         case .post(let post):
             openPostDrawer(for: post)
         case .artifact(let artifact):
@@ -472,7 +472,7 @@ struct UnifiedMonthlyCalendarView: View {
                                 isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                                 isCurrentMonth: calendar.component(.month, from: date) == calendar.component(.month, from: currentMonth),
                                 onTap: {
-                                    selectedDate = date
+                                        selectedDate = date
                                     onOpenDay(date)
                                 },
                                 onPostTap: onOpenPost,

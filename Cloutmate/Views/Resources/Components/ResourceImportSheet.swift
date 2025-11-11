@@ -612,7 +612,8 @@ struct TagsInputSection: View {
             
             // Existing Tags
             if !tags.isEmpty {
-                FlowLayout(spacing: 8) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
                     ForEach(tags, id: \.self) { tag in
                         HStack(spacing: 4) {
                             Text(tag)
@@ -632,6 +633,7 @@ struct TagsInputSection: View {
                                 .fill(Color.kosmicPurple.opacity(0.15))
                         )
                         .foregroundColor(.kosmicPurple)
+                        }
                     }
                 }
             }

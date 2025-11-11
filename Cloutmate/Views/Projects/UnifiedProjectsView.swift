@@ -506,25 +506,22 @@ struct UnifiedProjectsView: View {
                             ProjectTimelineView(
                                 projects: filteredProjects,
                                 tasks: allTasks,
+                                areas: allAreas,
                                 onProjectSelected: { project in
                                     openDrawer(for: project)
-                                },
-                                onProjectArchived: archiveProject,
-                                onProjectDeleted: deleteProject
+                                }
                             )
                         case .gallery:
                             ProjectGalleryView(
                                 projects: filteredProjects,
                                 tasks: allTasks,
+                                areas: allAreas,
                                 selectionMode: isSelectionActive,
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
                                 onProjectSelected: { project in
                                     openDrawer(for: project)
-                                },
-                                onDuplicateProject: { project in duplicateProject(project) },
-                                onArchiveProject: { project in archiveProject(project) },
-                                onDeleteProject: { project in deleteProject(project) }
+                                }
                             )
                         }
                     }

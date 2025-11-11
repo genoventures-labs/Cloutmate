@@ -13,6 +13,7 @@ import CloutmateShared
 
 struct UnifiedTasksView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query(sort: \CloutmateShared.Task.updatedAt, order: .reverse) private var allTasks: [CloutmateShared.Task]
     @Query private var allProjects: [CloutmateShared.Project]
@@ -590,7 +591,13 @@ struct TaskSectionView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Section header
+            sectionHeader
+            sectionDivider
+            taskCardsSection
+        }
+    }
+    
+    private var sectionHeader: some View {
             Button(action: onToggleCollapse) {
                 HStack {
                     Text(section.type.rawValue)
@@ -618,22 +625,33 @@ struct TaskSectionView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.plain)
+    }
             
-            // Divider
+    private var sectionDivider: some View {
             Rectangle()
                 .fill(Color.secondary.opacity(0.2))
                 .frame(height: 1)
                 .padding(.bottom, 4)
+    }
             
-            // Task cards
+    @ViewBuilder
+    private var taskCardsSection: some View {
             if !section.isCollapsed {
                 LazyVStack(spacing: 12) {
                     ForEach(Array(section.tasks.enumerated()), id: \.element.id) { index, task in
+                    taskCard(for: task, at: index)
+                }
+            }
+            .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+    
+    private func taskCard(for task: Task, at index: Int) -> some View {
                         let project = projects.first(where: { $0.id == task.projectId })
                         let area = areas.first(where: { $0.id == task.areaId })
                         let metrics = TaskFocusMetrics.defaultMetrics(for: task)
                         
-                        TaskCardV2(
+        return TaskCardV2(
                             task: task,
                             project: project,
                             area: area,
@@ -642,14 +660,9 @@ struct TaskSectionView: View {
                             onDuplicate: { onDuplicate(task) },
                             onArchive: { onArchive(task) },
                             onDelete: { onDelete(task) },
-                            onRequestFocus: { onRequestFocus(task) }
+            onRequestFocus: { taskParam in onRequestFocus(taskParam) }
                         )
                         .id("task-\(task.id)")
-                    }
-                }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-        }
     }
 }
 

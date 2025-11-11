@@ -12,11 +12,105 @@ struct MentionAutocompleteView: View {
     let results: [WorkspaceObjectResult]
     let onSelect: (WorkspaceObjectResult) -> Void
     @Binding var selectedIndex: Int
+    var tabFilter: ObjectType? = nil // Optional tab filter to show header
+    @Environment(\.modelContext) private var modelContext
+    @State private var collapsedSections: Set<ObjectType> = []
     
     var body: some View {
         if !results.isEmpty {
             VStack(spacing: 0) {
+                // Show tab header if filtered
+                if let filter = tabFilter {
+                    HStack {
+                        Image(systemName: filter.icon)
+                            .foregroundColor(.kosmicBlue)
+                            .font(.caption)
+                        Text(WorkspaceObjectSearchService.shared.tabName(for: filter))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(Color.gray.opacity(0.1))
+                    
+                    Divider()
+                }
+                
+                // Group results by type if no tab filter
+                if tabFilter == nil {
+                    let grouped = Dictionary(grouping: results) { $0.type }
+                    let sortedTypes = grouped.keys.sorted { $0.rawValue < $1.rawValue }
+                    
+                    ForEach(sortedTypes, id: \.self) { type in
+                        if let typeResults = grouped[type], !typeResults.isEmpty {
+                            let isCollapsed = collapsedSections.contains(type)
+                            
+                            Button {
+                                if isCollapsed {
+                                    collapsedSections.remove(type)
+                                } else {
+                                    collapsedSections.insert(type)
+                                }
+                            } label: {
+                                HStack {
+                                    Image(systemName: type.icon)
+                                        .foregroundColor(.kosmicBlue)
+                                        .font(.caption)
+                                    Text(WorkspaceObjectSearchService.shared.tabName(for: type))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.primary)
+                                    Spacer()
+                                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.gray.opacity(0.1))
+                            }
+                            .buttonStyle(.plain)
+                            
+                            if !isCollapsed {
+                                Divider()
+                                
+                                // Items for this type
+                                ForEach(Array(typeResults.enumerated()), id: \.element.id) { index, result in
+                                    let globalIndex = results.firstIndex(where: { $0.id == result.id }) ?? index
+                                    autocompleteItem(result: result, index: globalIndex)
+                                    
+                                    if globalIndex < results.count - 1 {
+                                        Divider()
+                                            .padding(.horizontal, 12)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Single tab - show items directly
                 ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                        autocompleteItem(result: result, index: index)
+                        
+                        if index < results.count - 1 {
+                            Divider()
+                                .padding(.horizontal, 12)
+                        }
+                    }
+                }
+            }
+            .background(.regularMaterial)
+            .cornerRadius(12)
+            .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 4)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+            )
+        }
+    }
+    
+    @ViewBuilder
+    private func autocompleteItem(result: WorkspaceObjectResult, index: Int) -> some View {
                     Button(action: {
                         onSelect(result)
                     }) {
@@ -32,7 +126,7 @@ struct MentionAutocompleteView: View {
                                     .foregroundColor(.primary)
                                     .lineLimit(1)
                                 
-                                Text(result.subtitle)
+                    Text(cleanSubtitle(result.subtitle))
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                                     .lineLimit(1)
@@ -55,21 +149,29 @@ struct MentionAutocompleteView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    
-                    if index < results.count - 1 {
-                        Divider()
-                            .padding(.horizontal, 12)
-                    }
-                }
+        .id(index) // Add ID for ScrollViewReader
+        .onHover { hovering in
+            if hovering {
+                selectedIndex = index
             }
-            .background(.regularMaterial)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 4)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
-            )
         }
+    }
+    
+    private func cleanSubtitle(_ subtitle: String) -> String {
+        // Convert any structured mentions in subtitle to display names
+        var display = MentionService.shared.convertToDisplayNames(
+            text: subtitle,
+            modelContext: modelContext
+        )
+        display = MentionParser.stripTerminators(from: display)
+        
+        // Remove lingering structured patterns and extra whitespace
+        let structuredPattern = #"@\{[^}]+\}"#
+        display = display.replacingOccurrences(of: structuredPattern, with: "", options: .regularExpression)
+        display = display.replacingOccurrences(of: "  ", with: " ")
+        display = display.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        return display.isEmpty ? "No description available" : display
     }
 }
 

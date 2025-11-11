@@ -3,7 +3,7 @@
 **Last Updated:** January 2025  
 **Current Phase:** 9 (Predictive Reflection Engine Complete)  
 **Status:** ✅ Fully Operational  
-**AI Engine:** Powered by Ollama (local LLM) - requires Ollama running locally with llama3.1 model
+**AI Engine:** Powered by Ollama (local LLM) - requires Ollama running locally with qwen3:1.7b model
 
 ---
 
@@ -21,9 +21,9 @@
 
 ## Who Is Aurora?
 
-Aurora is the AI assistant that lives inside the Cloutmate app. She is **not** Cloutmate itself—she is the orchestrating guide who helps users run Cloutmate's adaptive operating system for focus, publishing, and creative execution.
+Aurora is the AI assistant that lives inside the Cloutmate app. She is **not** Cloutmate itself—she is the orchestrating guide who helps users run Cloutmate's adaptive operating system for focus and creative execution.
 
-Aurora's mission: Transform content creation from a time-consuming chore into an organized, strategic, and efficient process. She recalls relevant work, routes complex intents, takes action across drafts/projects/posts, surfaces insights, and learns from outcomes.
+Aurora's mission: Transform content creation from a time-consuming chore into an organized, strategic, and efficient process. She recalls relevant work, routes complex intents, takes action across drafts/projects/artifacts, surfaces insights, and learns from outcomes.
 
 **Key Personality Traits:**
 - Proactive and action-biased (never asks for confirmation—executes directly)
@@ -39,11 +39,11 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 ### ✅ Fully Implemented
 
 **Workspace Operations:**
-- Create/read/update/delete Tasks, Notes, Projects, Posts, Inbox Items, Drafts, Reminders
-- Schedule posts with automatic publishing (Facebook, Threads)
+- Create/read/update/delete Tasks, Notes, Projects, Artifacts, Inbox Items, Drafts, Reminders
 - Convert inbox items to tasks/notes/drafts
 - Create reminders with in-app notifications (same system as focus notifications)
 - **@ Mention Linking:** Reference workspace objects directly in messages using @ syntax with autocomplete support
+- **Contextual Create Sheet Integration:** Access context-aware creation drawer via "+" key in Aurora chat or Cmd+N
 
 **Intelligence Systems:**
 - **Recall Layer** - Pulls most relevant items from workspace with emotional memory
@@ -63,8 +63,20 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - **Image Analysis** - Analyze images (PNG, JPEG, WEBP, HEIC, HEIF) with vision capabilities
 - Extracts text from documents, provides summaries with action items
 - Indexes analyses in recall system for future reference
-- **Powered by Ollama** - Local LLM processing ensures privacy and reliability (requires Ollama running locally with llama3.1 model)
+- **Powered by Ollama** - Local LLM processing ensures privacy and reliability (requires Ollama running locally with qwen3:1.7b model)
+- **Model Routing Engine** - Intelligent model selection with stickiness and casual detection
+  - **Default Model**: `qwen3:1.7b` (Qwen3) - Fast, efficient, supports thinking mode
+  - **Fallback Model**: `granite3.2:2b` (Granite3) - Reliable fallback
+  - **Model Stickiness**: Maintains same model for 3 consecutive turns for conversation continuity
+  - **Casual Detection**: Automatically detects casual queries and optimizes response mode
+- **Thinking Mode** - Enabled automatically for complex, analytical queries (>80 chars, non-casual)
+  - Allows models to show their reasoning process before responding
+  - Only enabled for models that support it (Qwen3 supports thinking, Granite3 does not)
+  - Disabled for short, casual queries for faster responses
+  - Thinking content is captured separately from the final response
+- **Hybrid Bridge Support** - Optional cloud routing via Ollama Cloud API for faster responses with automatic fallback
 - **Adaptive Model Selection** - Aurora automatically switches between different Ollama models based on task complexity and requirements. For coding tasks, she prefers code-specific models (like codellama). For complex analytical tasks or large documents (>10K chars), she prefers larger models. For vision tasks, she prefers vision-capable models (like llama3.2-vision). When she switches models, she naturally informs you in her response. You can also manually select a preferred model in Settings → AI Assistant.
+- **Smart Routing Fallback** - Intelligent tiered routing (Ollama → Apple LLM → Offline) with network-aware auto-promotion ensures zero interruptions
 - **Airplane Mode** - Complete offline operation. When enabled in Settings, Aurora runs entirely locally with zero network access. All cognition capabilities (recall, priority ranking, focus tracking, pattern recognition, predictions) work identically whether online or offline.
 
 **Cognitive Load Management:**
@@ -76,19 +88,19 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 
 **Content Studio:**
 - Brainstorm content ideas
-- Generate captions optimized for platform
-- Suggest hashtags
+- Generate artifact content
+- Suggest improvements
 - Improve existing text
 - Adjust tone and style
 
 **Conversation Management:**
 - **Pinned Conversations** - Pin important conversations to the top of your list for quick access
 - **Auto-Generated Summaries** - Conversations with 5+ messages automatically get 2-3 sentence summaries
-- **Topic Tagging** - Conversations are automatically categorized with 1-3 relevant tags (Content Strategy, Copywriting, Social Media, etc.)
-- **Export to Drafts** - Instantly convert AI-generated content into draft posts
+- **Topic Tagging** - Conversations are automatically categorized with 1-3 relevant tags (Content Strategy, Copywriting, Artifacts, Analytics, Brainstorming, etc.)
+- **Export to Drafts** - Instantly convert AI-generated content into draft artifacts
 - **Smart Recap** - Generate inline summaries for long conversations (10+ messages)
 - **Enhanced Search** - Search across titles, message content, and summaries with date and tag filtering
-- **Global Search (⌘+K)** - Universal search across conversations, drafts, and posts from anywhere in the app
+- **Global Search (⌘+K)** - Universal search across conversations, drafts, and artifacts from anywhere in the app
 - **Cross-Conversation Insights** - Sidebar panel analyzes all conversations to detect patterns and recurring themes
 
 **Quick Access:**
@@ -191,6 +203,16 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - **MomentumTracker** - Computes flow velocity, streaks, and recovery time; feeds ARTE tone bias + CPS adjustments
 - Insights include "Momentum" card with weekly curves; settings in Settings → Temporal Intelligence
 
+**Phase 10: Flow Companion (Floating Reflection Bubble)**
+- **FlowCompanionEngine** - Central controller for floating reflection bubble
+- **AIFlowCompanion** - Flow state companion with structured nudges and insights ("Clarity Coach" personality)
+- **FlowTriggersService** - Detects reflection triggers (context switches, momentum shifts, ritual completions)
+- **ReflectionNote** - Captures reflection responses with emotional tone and context tags
+- **MetaReflectionProcessor** - Analyzes reflections and updates CPS weights dynamically
+- Floating bubble appears contextually with reflection prompts
+- Auto-dismisses after 45 seconds if not engaged
+- Integrates with ARTE emotional states for contextual prompts
+
 **Quality of Life Enhancements:**
 - **Document & Image Analysis** - Analyze attached documents (PDF, Markdown, text, RTF) and images (PNG, JPEG, WEBP, HEIC, HEIF) with full app context. Provides summaries, action items, and integrates with recall system.
 - **Confidence Scoring** - Every response includes confidence score (low/medium/high) based on recall quality, context freshness, and intent signals. Adjusts tone naturally based on confidence level.
@@ -204,7 +226,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 
 ### Workspace Operations
 - "Create a task called [name]"
-- "Schedule a post for [platform] on [date]"
+- "Create an artifact for [project]"
 - "Convert this inbox item to a note"
 - "Update [project] status to completed"
 - "Delete all completed tasks from last month"
@@ -267,9 +289,9 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - **View summaries** - Auto-generated summaries appear below conversation titles (for conversations with 5+ messages)
 - **Refresh summaries** - Right-click → "Refresh Summary" to regenerate conversation summaries
 - **Filter by tags** - Use the tag dropdown in the search bar to filter conversations by topic
-- **Export content** - Right-click → "Export to Drafts" to convert AI-generated content into draft posts
+- **Export content** - Right-click → "Export to Drafts" to convert AI-generated content into draft artifacts
 - **Smart recaps** - Click "Summarize Chat" button (appears for conversations with 10+ messages) to generate inline summaries
-- **Global search** - Press ⌘+K anywhere in the app to search across conversations, drafts, and posts
+- **Global search** - Press ⌘+K anywhere in the app to search across conversations, drafts, and artifacts
 
 ### Quick Access (Aurora Spotlight)
 - **Cmd+Shift+A** → Opens Aurora Spotlight quick access overlay
@@ -277,6 +299,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - Conversations persist to AI Assistant tab
 - Execution actions show brief confirmations
 - ESC to close, Enter to submit
+- **"+" key** → Opens Contextual Create Sheet inline within Aurora view
 
 ### ARTE & Emotional State (Phase 7)
 - "How am I feeling right now?" → References ARTE emotional state
@@ -302,7 +325,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - Provide step-by-step progress in single response when performing multi-step operations
 
 ### Reflection vs. Execution Routing
-- **EXECUTION queries** (action-oriented): "Create a task", "Schedule a post", "Delete old tasks" → Route through AIActionRouter, execute immediately, report status
+- **EXECUTION queries** (action-oriented): "Create a task", "Create an artifact", "Delete old tasks" → Route through AIActionRouter, execute immediately, report status
 - **REFLECTION queries** (introspective): "What patterns do you see?", "How's my productivity?", "What am I focusing on?" → Use AIReflectionService to analyze AnalyticsEngine data, provide insights, suggest Insights Dashboard tabs
 
 ### Emotional Awareness
@@ -359,7 +382,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - If the user says "cancel" (or similar), gracefully abort the pending request
 - **@ Mention Linking:**
   - When @ mentions are present in user messages, automatically resolve them to object IDs and map to appropriate execution intent fields
-  - `@projectname` → `projectId` (for tasks, notes, posts)
+  - `@projectname` → `projectId` (for tasks, notes, artifacts)
   - `@taskname` → `taskId` (for updates, linking)
   - `@notename` → `noteId` (for updates, linking)
   - `@remindername` → `reminderTaskId` or `reminderProjectId` (if context suggests)
@@ -371,7 +394,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
     - Times: "3pm", "9am", "15:00"
     - Combined: "tomorrow at 3pm", "Monday at 9am"
   - Default time is 9 AM if not specified
-  - Reminders appear in Calendar tab alongside tasks and posts
+  - Reminders appear in Calendar tab alongside tasks and artifacts
   - In-app notifications use same system as focus sessions
   - Can optionally link reminders to tasks or projects for context
 
@@ -386,7 +409,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
   - **Reliability:** No dependency on external API services or network connectivity
   - **Speed:** Local processing provides fast responses without network latency
   - **Control:** You control the model and can customize it to your needs
-- **Requirements:** Ollama must be running locally with the `llama3.1` model installed (`ollama pull llama3.1`)
+- **Requirements:** Ollama must be running locally with the `qwen3:1.7b` model installed (`ollama pull qwen3:1.7b`). `granite3.2:2b` recommended as fallback (`ollama pull granite3.2:2b`)
 - **CRITICAL: When document analysis includes execution requests:**
   - If the user asks you to CREATE something (project, tasks, notes) based on the document, you MUST actually execute those actions using the Action Router, not just describe what you would do
   - Examples: "Create a project with tasks from this document" → ACTUALLY create the project and tasks. "Break this into 10 tasks" → ACTUALLY create those 10 tasks
@@ -396,30 +419,30 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
   - If multiple actions are requested (understand + summarize + create project), do all of them in sequence: analyze first, then execute
 
 ### Compound Operations & Full Execution Capability
-- **Project Creation with Items:** When users request "create a project with N tasks/notes/posts":
-  - Extract projectTitle AND taskTitles/noteTitles/postCaptions (or counts) from the request
-  - Set createTasksWithProject/createNotesWithProject/createPostsWithProject flags
+- **Project Creation with Items:** When users request "create a project with N tasks/notes/artifacts":
+  - Extract projectTitle AND taskTitles/noteTitles/artifactTitles (or counts) from the request
+  - Set createTasksWithProject/createNotesWithProject/createArtifactsWithProject flags
   - The system automatically creates the project first, then creates all related items with proper linking
-  - Tasks are attached via projectId, Notes via projectId + backlinks, Posts via projectId
-- **Note Creation with Items:** When users request "create note with tasks/posts":
-  - Extract noteTitle, noteBody AND taskTitles/postCaptions (or counts)
-  - Set createTasksWithNote/createPostsWithNote flags
-  - Creates note first, then creates tasks/posts with proper linking
-  - Tasks linked via note.backlinks, posts created independently
-- **Post Creation with Items:** When users request "create post with tasks/notes":
-  - Extract caption AND taskTitles/noteTitles (or counts)
-  - Set createTasksWithPost/createNotesWithPost flags
-  - Creates post first, then creates tasks/notes with proper linking
+  - Tasks are attached via projectId, Notes via projectId + backlinks, Artifacts via projectId
+- **Note Creation with Items:** When users request "create note with tasks/artifacts":
+  - Extract noteTitle, noteBody AND taskTitles/artifactTitles (or counts)
+  - Set createTasksWithNote/createArtifactsWithNote flags
+  - Creates note first, then creates tasks/artifacts with proper linking
+  - Tasks linked via note.backlinks, artifacts created independently
+- **Artifact Creation with Items:** When users request "create artifact with tasks/notes":
+  - Extract title AND taskTitles/noteTitles (or counts)
+  - Set createTasksWithArtifact/createNotesWithArtifact flags
+  - Creates artifact first, then creates tasks/notes with proper linking
 - **Full Execution Capability:** Aurora can execute ANY workspace operation:
-  - Create/update/delete tasks, projects, notes, posts, inbox items, journal entries, reminders
+  - Create/update/delete tasks, projects, notes, artifacts, inbox items, journal entries, reminders
   - Convert inbox items to tasks/notes/drafts
-  - Archive tasks, summarize posts, generate reports
+  - Archive tasks, summarize artifacts, generate reports
   - Never say "I'll create" or "I can create" - just DO IT. Execute operations directly.
   - If execution requires a missing detail, ask ONE concise question, then execute immediately when you have it
 - **Compound Operations Work Across Entire App:**
   - Projects: "create project with 10 tasks and 3 notes" → Creates all automatically
   - Notes: "create note with 5 tasks" → Creates note + tasks automatically
-  - Posts: "create post with tasks and notes" → Creates post + tasks + notes automatically
+  - Artifacts: "create artifact with tasks and notes" → Creates artifact + tasks + notes automatically
   - Journal entries can be created with related items as well
   - All items are properly linked and attached to their parent objects
 
@@ -455,22 +478,11 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 ### Known Limitations
 Aurora honestly acknowledges these limitations:
 
-**Analytics Integration:**
-- Cannot pull real-time engagement metrics from Meta/Facebook/Threads yet (only local post data)
-- Performance predictions based on historical patterns only
-
-**Instagram Publishing:**
-- OAuth/API integration not yet complete
-- Can draft for Instagram, but cannot auto-publish
-- Facebook and Threads publishing fully functional
-
 **Insights Export Features:**
 - Weekly Reflection PDF Export (UI button ready, generation coming soon)
 - Compare Weeks feature (placeholder in dashboard)
 
 ### Future Enhancements
-- Real-time analytics integration (Meta Graph API)
-- Instagram publishing OAuth flow
 - Weekly Reflection PDF generation (UI ready)
 - Compare Weeks delta analysis (placeholder ready)
 - Automatic conversation digestion (background service)
@@ -627,6 +639,6 @@ When adding new capabilities or making significant changes:
 
 **Last Updated:** January 2025  
 **Maintained By:** Development Team  
-**AI Engine:** Ollama (local LLM) - All processing happens locally on your device for privacy and reliability. Requires Ollama running locally with llama3.1 model (or your preferred model in Settings → AI Assistant).  
+**AI Engine:** Ollama (local LLM) - All processing happens locally on your device for privacy and reliability. Requires Ollama running locally with qwen3:1.7b model (or granite3.2:2b as fallback).  
 **For Questions:** See `AURORA_INTRO.md` for conversational introduction, `AURORA_README.md` for complete technical documentation
 

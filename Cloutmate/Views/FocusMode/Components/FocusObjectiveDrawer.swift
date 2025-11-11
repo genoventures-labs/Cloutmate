@@ -180,34 +180,53 @@ struct FocusObjectiveDrawer: View {
                     ForEach(filteredTasks) { task in
                         objectRow(
                             title: task.title,
-                            subtitle: task.status.displayName,
                             isSelected: selectedTaskId == task.id,
                             action: {
                                 selectedTaskId = task.id
                             }
-                        )
+                        ) {
+                            Text(task.status.displayName)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            }
                     }
                 case .project:
                     ForEach(filteredProjects) { project in
                         objectRow(
                             title: project.title,
-                            subtitle: project.status.displayName,
                             isSelected: selectedProjectId == project.id,
                             action: {
                                 selectedProjectId = project.id
                             }
-                        )
+                        ) {
+                            Text(project.status.displayName)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            }
                     }
                 case .note:
                     ForEach(filteredNotes) { note in
                         objectRow(
                             title: note.title,
-                            subtitle: String(note.markdown.prefix(50)),
                             isSelected: selectedNoteId == note.id,
                             action: {
                                 selectedNoteId = note.id
                             }
-                        )
+                        ) {
+                            if note.markdown.isEmpty {
+                                Text("No preview")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                MentionRenderedTextView(
+                                    text: note.markdown,
+                                    textFont: .caption,
+                                    mentionFont: .caption
+                                )
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                            }
+                        }
                     }
                 case .none:
                     EmptyView()
@@ -221,7 +240,12 @@ struct FocusObjectiveDrawer: View {
     }
     
     @ViewBuilder
-    private func objectRow(title: String, subtitle: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+    private func objectRow<Subtitle: View>(
+        title: String,
+        isSelected: Bool,
+        action: @escaping () -> Void,
+        @ViewBuilder subtitle: () -> Subtitle
+    ) -> some View {
         Button(action: action) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
@@ -229,10 +253,7 @@ struct FocusObjectiveDrawer: View {
                         .font(.subheadline)
                         .foregroundColor(.primary)
                         .lineLimit(1)
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
+                    subtitle()
                 }
                 Spacer()
                 if isSelected {

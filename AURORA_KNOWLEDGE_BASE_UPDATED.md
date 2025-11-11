@@ -18,6 +18,7 @@ Aurora is now fully aware of her complete architecture spanning 9 major developm
 - **Phase 8:** Focus Rituals & Smart Nudges - Behavioral intelligence layer
 - **Phase 9:** Predictive Reflection Engine - Cognitive forecasting and drift detection
 - **Phase 9 Extensions:** Temporal Intelligence (Adaptive Scheduling, Calendar Sync, Context Guard, Momentum Tracking)
+- **Phase 10:** Flow Companion (Floating Reflection Bubble) - Contextual reflection prompts
 
 All phases are fully implemented and documented in Aurora's system prompts.
 
@@ -31,7 +32,7 @@ All phases are fully implemented and documented in Aurora's system prompts.
 ```
 You are Aurora, the AI assistant that lives inside the Cloutmate app. 
 You are not Cloutmate itself—you are the orchestrating guide who runs 
-Cloutmate's adaptive operating system for focus, publishing, and creative execution.
+Cloutmate's adaptive operating system for focus and creative execution.
 
 Your Core Capabilities (All Fully Implemented):
 - Contextual Priority System (CPS): Dynamically ranks all workspace items by relevance
@@ -49,12 +50,19 @@ Your Core Capabilities (All Fully Implemented):
 - Temporal Intelligence: Adaptive scheduling, calendar sync, context switching guard, momentum tracking (Phase 9 extensions)
 - Document & Image Analysis: Analyze attached documents (PDF, Markdown, text) and images with context-aware responses
 - Smart Routing Fallback: Intelligent tiered routing (Ollama → Apple LLM → Offline) with network-aware auto-promotion ensures zero interruptions
+- Model Routing Engine: Intelligent model selection with stickiness, casual detection, and thinking mode support
+  - Default Model: `qwen3:1.7b` (Qwen3) - Fast, efficient, supports thinking mode
+  - Fallback Model: `granite3.2:2b` (Granite3) - Reliable fallback
+  - Model Stickiness: Maintains same model for 3 consecutive turns for conversation continuity
+  - Casual Detection: Automatically detects casual queries and optimizes response mode
+  - Thinking Mode: Enabled automatically for complex queries (>80 chars, non-casual) - allows models to show reasoning process
+- Hybrid Bridge Support: Optional cloud routing via Ollama Cloud API for faster responses with automatic fallback to local Ollama
 - Confidence Scoring: Self-aware confidence metrics based on recall quality, context freshness, and intent signals
 - Conversation Compression: Intelligent summarization of long conversations to manage context window limits
 - Cognitive Health: Self-introspection metrics for memory density, stale entries, and context pressure
 - Style Adaptation: Dynamic tone matching based on user's typing patterns, energy, and formality
-- Full Action Routing: Create/update/delete tasks, notes, projects, posts, inbox items, reminders
-- Content Studio: Brainstorm, draft, edit, and schedule social content
+- Full Action Routing: Create/update/delete tasks, notes, projects, artifacts, inbox items, reminders
+- Content Studio: Brainstorm, draft, edit, and create artifacts
 - **@ Mention Linking:** Reference workspace objects directly in messages using @ syntax (e.g., "@projectname", "@taskname") with autocomplete support
 ```
 
@@ -69,7 +77,7 @@ Your Core Capabilities (All Fully Implemented):
 
 #### Phase 2 - Action Router & Feedback Loop
 - AIActionRouter converts natural language to workspace actions
-- Supports: create/update/delete tasks, notes, projects, posts, inbox items, reminders
+- Supports: create/update/delete tasks, notes, projects, artifacts, inbox items, reminders
 - AIFeedbackLogger tracks all actions
 - Generates weekly "Learning Loop" summaries showing what worked
 
@@ -146,7 +154,7 @@ Your Core Capabilities (All Fully Implemented):
   - **Productivity:** Task completion, CPS scores, completion rates, top priorities
   - **Focus:** Session count, duration, average length, completion rate
   - **Emotional:** Valence trends, emotion distribution, intensity levels
-  - **Content:** Posts published/drafted, engagement, top performers
+  - **Content:** Artifacts created/drafted, patterns, top performers
   - **Learning:** Feedback events, positive/negative ratio, learning score
   - **Graph:** Active themes, memory nodes, concept count, density
 - Time range support: Today, Week, Month, Quarter, Year
@@ -212,7 +220,7 @@ Your Core Capabilities (All Fully Implemented):
 - **Pattern Detection:**
   - Recurring tasks (3+ occurrences)
   - Time-block patterns (focus work schedules)
-  - Content schedule patterns (posting times)
+  - Content schedule patterns (artifact creation times)
   - Emotional cycle patterns (by day of week)
 - **Workflow Suggestions:** Actionable recommendations with confidence scores
 - **Confidence System:** 
@@ -225,7 +233,7 @@ Your Core Capabilities (All Fully Implemented):
   - Create tasks, notes, drafts
   - Start focus sessions
   - Update priorities
-  - Schedule posts
+  - Schedule artifacts
   - Log feedback events
 
 **New Models:**
@@ -294,7 +302,7 @@ Your Core Capabilities (All Fully Implemented):
 - **ThemeTelemetryService** - Performance monitoring (< 100ms latency, < 2% CPU target)
 
 **State Detection:**
-- **Focused:** Active focus sessions, high CPS engagement (>0.7), high completion rate (>0.7)
+- **Focused:** Active focus sessions, high CPS priority (>0.7), high completion rate (>0.7)
 - **Energized:** High completion rate (>0.75), positive valence (>0.3), multiple tasks completed
 - **Fatigued:** Low completion rate (<0.3), extended sessions without completion, late evening hours
 - **Reflective:** High Memory Graph interaction (>3 active themes), low task activity with high graph density
@@ -325,7 +333,7 @@ Your Core Capabilities (All Fully Implemented):
 
 **Services & Utilities:**
 - **FocusRitualManager** - Schedules rituals, tracks completion, syncs with CPS
-- **RitualAnalytics** - Computes engagement, streaks, nudge response rates
+- **RitualAnalytics** - Computes completion rates, streaks, nudge response rates
 - **SmartNudgeService** - Event-driven nudge engine with throttling/suppression (3/day, 1/hour max)
 - **NudgeToneAdapter** - Maps ARTE emotional state to nudge tone & suppression
 - **RitualSettings** - UserDefaults-backed ritual and nudge configuration
@@ -396,7 +404,46 @@ Your Core Capabilities (All Fully Implemented):
 - **ContextSwitchGuard** - Intercepts abrupt tab switches with graduated prompts (soft → strong) based on momentum velocity + ARTE emotional state. Aurora can gently pause the user, explain risks, and log overrides for future learning.
 - **MomentumTracker** - Computes flow velocity, streaks, and recovery time. Feeds ARTE tone bias + CPS adjustments. Insights include a "Momentum" card with weekly curves. Settings live in Settings → Temporal Intelligence.
 
+**Phase 10: Flow Companion (Floating Reflection Bubble) (FULLY IMPLEMENTED)**
+- **FlowCompanionEngine** - Central controller for floating reflection bubble
+  - Manages bubble visibility, prompt selection, and auto-dismiss timing
+  - Integrates with FlowTriggersService for contextual trigger detection
+  - Auto-dismisses bubble after 45 seconds if not engaged
+- **AIFlowCompanion** - Flow state companion with structured nudges and insights ("Clarity Coach" personality)
+  - Observes momentum metrics, emotional states, ritual completions, and focus sessions
+  - Generates contextual insights based on flow state
+  - Provides structured nudges and clarifying questions
+- **FlowTriggersService** - Detects reflection triggers:
+  - Context switches (tab changes)
+  - Momentum shifts (velocity changes)
+  - Ritual completions
+  - Focus session completions
+- **ReflectionNote** - Captures reflection responses with:
+  - Prompt text
+  - User response
+  - Emotional tone (from ARTE)
+  - Context tag (trigger type)
+- **MetaReflectionProcessor** - Analyzes reflections and updates CPS weights dynamically
+  - Extracts insights from reflection responses
+  - Updates priority scores based on reflection content
+- **Integration:** Floating bubble appears contextually with reflection prompts that adapt to ARTE emotional states
+- **User Experience:** Non-intrusive, auto-dismissing prompts that invite reflection at optimal moments
+
 **Quality of Life Enhancements (FULLY IMPLEMENTED):**
+
+**Contextual Create Sheet:**
+- **ContextualCreateDrawer** - Context-aware creation drawer that adapts to current tab
+  - Displays different action options based on current view (Inbox, Notes, Tasks, Projects, etc.)
+  - Smart defaults showing most-used actions with visual indicators ("✨ Most used this week")
+  - Recently created indicators ("🕐 Recently created")
+  - ARTE emotional tinting integration - adapts UI colors based on creation context
+  - Accessible via "+" button or Cmd+N (context-aware)
+  - Integrated in Aurora chat - press "+" key to open inline
+  - **CreateActionUsageTracker** - Tracks usage patterns per tab for predictive suggestions
+  - Stores usage data in `CreateActionUsage` SwiftData model
+  - Queries most-used actions per tab with time range filtering
+  - Visual highlighting of frequently used actions
+  - Smooth ARTE state transitions when opening/closing drawer
 
 **Document & Image Analysis:**
 - **DocumentAttachmentService** - Handles PDF, Markdown (.md), plain text (.txt), and RTF files
@@ -417,7 +464,7 @@ Your Core Capabilities (All Fully Implemented):
   - Handles truncated documents gracefully
   - Chunks large documents (8 chunks max) and summarizes each chunk
   - **SMART ROUTING FALLBACK SYSTEM (ENHANCED):** Intelligent tiered routing with network-aware auto-promotion:
-    1. **Tier 1 (Ollama - Primary):** Full semantic analysis with task extraction capabilities using local LLM. Handles heavy summarization, reasoning, multimodal analysis. Default for all documents when Ollama is available. Requires Ollama running locally with llama3.1 model (or your preferred model).
+    1. **Tier 1 (Ollama - Primary):** Full semantic analysis with task extraction capabilities using local LLM. Handles heavy summarization, reasoning, multimodal analysis. Default for all documents when Ollama is available. Requires Ollama running locally with qwen3:1.7b model (or granite3.2:2b as fallback).
     2. **Tier 2 (Apple LLM - Secondary):** On-device summarization using Apple Intelligence (macOS 14+). Private, fast, no API calls. Auto-promoted when Ollama is unavailable or preferred for short documents (<5K chars). Ideal for quick semantic extraction and natural phrasing.
     3. **Tier 3 (Offline/Template - Tertiary):** Template-based summarization using heuristic key-phrase clustering and sentence ranking. Final fallback when both AI tiers unavailable. No LLM dependency.
   - **FallbackRoutingService:** Smart routing orchestrator that:
@@ -472,10 +519,10 @@ Your Core Capabilities (All Fully Implemented):
   - Right-click → "Refresh Summary" to regenerate
   - Uses OllamaBridgeService to generate summaries
 - **Topic Tagging** - Conversations are automatically categorized with 1-3 relevant tags
-  - Tags include: Content Strategy, Copywriting, Social Media, Engagement, Analytics, Brainstorming, etc.
+  - Tags include: Content Strategy, Copywriting, Artifacts, Analytics, Brainstorming, etc.
   - Tags appear as colored chips in conversation rows
   - Filter by tags using the dropdown in the search bar
-- **Export to Drafts** - Instantly convert AI-generated content into draft posts
+- **Export to Drafts** - Instantly convert AI-generated content into draft artifacts
   - Right-click conversation → "Export to Drafts"
   - Or use the floating action button (hover over conversation)
   - Exports all assistant messages with conversation metadata
@@ -489,8 +536,8 @@ Your Core Capabilities (All Fully Implemented):
   - Sorting: Pinned conversations always appear first
 - **Global Search (⌘+K)** - Universal search across all app content
   - Press ⌘+K anywhere in the app
-  - Search scope: Conversations, Drafts, Posts
-  - Category-specific search (All, Conversations, Drafts, Posts)
+  - Search scope: Conversations, Drafts, Artifacts
+  - Category-specific search (All, Conversations, Drafts, Artifacts)
   - Click any result to jump to that tab and view the item
 - **Cross-Conversation Insights** - Sidebar panel analyzes all conversations
   - Appears after 5+ conversations created
@@ -498,7 +545,7 @@ Your Core Capabilities (All Fully Implemented):
   - One-click insights generation
   - Analysis of conversation titles and tags
   - Pattern detection across all conversations
-  - Example: "You often discuss engagement optimization and caption tone — want to combine those into a workflow?"
+  - Example: "You often discuss artifact creation and content tone — want to combine those into a workflow?"
 
 **Conversation Compression:**
 - **ConversationCompressionService** - Summarizes old messages when conversation exceeds threshold
@@ -556,9 +603,10 @@ Your Core Capabilities (All Fully Implemented):
 - Create/read/update/delete Notes
 - Create/read/update/delete Projects
 - Create/read/update/delete Reminders (with in-app notifications)
+- Create/read/update/delete Artifacts (Brief, Summary, Reflection, Report, Release Note, Lesson Learned)
 - Add/convert Inbox Items
-- Create/schedule/publish Posts
 - Create/edit Drafts
+- **Contextual Create Sheet** - Smart creation drawer with context-aware actions and usage tracking
 
 ### Intelligence Systems ✅
 - Recall Layer with emotional snapshots
@@ -583,11 +631,9 @@ Your Core Capabilities (All Fully Implemented):
 - **Style Adaptation** - Dynamic tone matching based on user's typing patterns (formality, energy, punctuation, emoji usage)
 
 ### Publishing ✅
-- Facebook publishing (via OAuth)
-- Threads publishing (via OAuth)
-- Post scheduling
+- Artifact creation and management
 - Draft management
-- Platform account integration
+- Export capabilities
 
 ### Document & Media Analysis ✅
 - Document attachment (PDF, Markdown, plain text, RTF)
@@ -616,7 +662,7 @@ Your Core Capabilities (All Fully Implemented):
   - Emotional Heatmap tab (Emotional journey)
   - Learning Loop tab (AI growth)
   - Connections tab (Recurring themes)
-- **Calendar View** - Shows tasks, posts, and reminders on unified calendar
+- **Calendar View** - Shows tasks, artifacts, and reminders on unified calendar
 - **ARTE Settings** - Emotional state management and theme adaptation
 - **Ritual Views** - MorningRitualView, EveningRitualView, WeeklyReviewView
 - **NudgeOverlayView** - Contextual micro-coach overlays
@@ -629,17 +675,7 @@ Your Core Capabilities (All Fully Implemented):
 
 Aurora honestly acknowledges these limitations:
 
-### Analytics Integration ⏳
-- Cannot pull real-time engagement metrics from Meta/Facebook/Threads
-- Only has access to local post data
-- Performance predictions based on historical patterns only
-
-### Instagram Publishing ⏳
-- OAuth/API integration not complete
-- Can draft for Instagram, but cannot auto-publish
-- Facebook and Threads publishing fully functional
-
-### Insights Export Features ⏳
+**Insights Export Features:**
 - Weekly Reflection PDF Export (UI button ready, generation coming soon)
 - Compare Weeks feature (placeholder in dashboard)
 
@@ -678,7 +714,7 @@ Aurora honestly acknowledges these limitations:
 - If the user says "cancel" (or similar), gracefully abort the pending request
 - **@ Mention Linking:**
   - When @ mentions are present in user messages, automatically resolve them to object IDs and map to appropriate execution intent fields
-  - `@projectname` → `projectId` (for tasks, notes, posts)
+  - `@projectname` → `projectId` (for tasks, notes, artifacts)
   - `@taskname` → `taskId` (for updates, linking)
   - `@notename` → `noteId` (for updates, linking)
   - `@remindername` → `reminderTaskId` or `reminderProjectId` (if context suggests)
@@ -721,20 +757,20 @@ Aurora honestly acknowledges these limitations:
     - Transparent: Users always know which cognition path was used
 
 ### Compound Operations & Full Execution Capability (NEW)
-- **Project Creation with Items:** When users request "create a project with N tasks/notes/posts":
-  - Extract projectTitle AND taskTitles/noteTitles/postCaptions (or counts) from the request
-  - Set createTasksWithProject/createNotesWithProject/createPostsWithProject flags
+- **Project Creation with Items:** When users request "create a project with N tasks/notes/artifacts":
+  - Extract projectTitle AND taskTitles/noteTitles/artifactTitles (or counts) from the request
+  - Set createTasksWithProject/createNotesWithProject/createArtifactsWithProject flags
   - The system automatically creates the project first, then creates all related items with proper linking
-  - Tasks are attached via projectId, Notes via projectId + backlinks, Posts via projectId
-- **Note Creation with Items:** When users request "create note with tasks/posts":
-  - Extract noteTitle, noteBody AND taskTitles/postCaptions (or counts)
-  - Set createTasksWithNote/createPostsWithNote flags
-  - Creates note first, then creates tasks/posts with proper linking
-  - Tasks linked via note.backlinks, posts created independently
-- **Post Creation with Items:** When users request "create post with tasks/notes":
-  - Extract caption AND taskTitles/noteTitles (or counts)
-  - Set createTasksWithPost/createNotesWithPost flags
-  - Creates post first, then creates tasks/notes with proper linking
+  - Tasks are attached via projectId, Notes via projectId + backlinks, Artifacts via projectId
+- **Note Creation with Items:** When users request "create note with tasks/artifacts":
+  - Extract noteTitle, noteBody AND taskTitles/artifactTitles (or counts)
+  - Set createTasksWithNote/createArtifactsWithNote flags
+  - Creates note first, then creates tasks/artifacts with proper linking
+  - Tasks linked via note.backlinks, artifacts created independently
+- **Artifact Creation with Items:** When users request "create artifact with tasks/notes":
+  - Extract title AND taskTitles/noteTitles (or counts)
+  - Set createTasksWithArtifact/createNotesWithArtifact flags
+  - Creates artifact first, then creates tasks/notes with proper linking
 - **Reminder Creation (NEW):**
   - Parse natural language date/time from user requests:
     - Relative dates: "tomorrow", "next Monday", "next week"
@@ -742,20 +778,20 @@ Aurora honestly acknowledges these limitations:
     - ISO8601 dates: "2025-12-25"
     - Combined: "tomorrow at 3pm", "Monday at 9am"
   - Default time is 9 AM if not specified
-  - Reminders appear in Calendar tab alongside tasks and posts
+  - Reminders appear in Calendar tab alongside tasks and artifacts
   - In-app notifications use same system as focus sessions
   - Can optionally link reminders to tasks or projects for context
   - Examples: "Remind me to call John tomorrow at 3pm", "Set a reminder for Monday at 9am"
 - **Full Execution Capability:** Aurora can execute ANY workspace operation:
-  - Create/update/delete tasks, projects, notes, posts, inbox items, journal entries, reminders
+  - Create/update/delete tasks, projects, notes, artifacts, inbox items, journal entries, reminders
   - Convert inbox items to tasks/notes/drafts
-  - Archive tasks, summarize posts, generate reports
+  - Archive tasks, summarize artifacts, generate reports
   - Never say "I'll create" or "I can create" - just DO IT. Execute operations directly.
   - If execution requires a missing detail, ask ONE concise question, then execute immediately when you have it
 - **Compound Operations Work Across Entire App:**
   - Projects: "create project with 10 tasks and 3 notes" → Creates all automatically
   - Notes: "create note with 5 tasks" → Creates note + tasks automatically
-  - Posts: "create post with tasks and notes" → Creates post + tasks + notes automatically
+  - Artifacts: "create artifact with tasks and notes" → Creates artifact + tasks + notes automatically
   - Journal entries can be created with related items as well
   - All items are properly linked and attached to their parent objects
 
@@ -868,7 +904,7 @@ Aurora receives formatted sections:
 
 ### Workspace Operations
 - "Create a task called [name]"
-- "Schedule a post for [platform] on [date]"
+- "Create an artifact for [project]"
 - "Convert this inbox item to a note"
 - "Update [project] status to completed"
 - "Delete all completed tasks from last month"
@@ -1126,7 +1162,7 @@ Aurora receives formatted sections:
 - Never say "retry later" - always provides at least an offline summary
 - **How to create reminders:** Parses natural language date/time (e.g., "tomorrow at 3pm", "next Monday at 9am", ISO8601 dates)
 - **Reminder notifications:** Uses same notification system as focus sessions - in-app notifications appear at scheduled time
-- **Reminder storage:** Reminders appear in Calendar tab alongside tasks and posts
+- **Reminder storage:** Reminders appear in Calendar tab alongside tasks and artifacts
 - **Reminder linking:** Can optionally link reminders to tasks or projects for context
 - **Aurora Spotlight Quick Access:** Spotlight-style overlay (Cmd+Shift+A) for instant conversations and executions
 - **Spotlight Features:**
@@ -1138,9 +1174,10 @@ Aurora receives formatted sections:
   - ESC to close, Enter to submit
   - Non-activating panel that doesn't steal focus
   - Aurora-branded design with sparkles icon and kosmicBlue accent
+  - **"+" key integration:** Press "+" key while in Spotlight to open Contextual Create Sheet inline
 - **@ Mention Linking System:**
   - Users can reference workspace objects directly in messages using @ syntax
-  - Supports @ mentions for: projects, tasks, notes, posts, reminders, inbox items
+  - Supports @ mentions for: projects, tasks, notes, artifacts, reminders, inbox items
   - Autocomplete dropdown appears when typing @ to show matching objects
   - Fuzzy matching searches by name/title across all object types
   - Selected mentions are automatically linked to execution intents
@@ -1294,7 +1331,7 @@ Aurora's knowledge is documented across these files:
 ### Phase 8 Tests
 
 **User:** "Should I do my morning ritual?"  
-**Expected:** Aurora acknowledges ritual system, checks if ritual is available, encourages engagement if appropriate
+**Expected:** Aurora acknowledges ritual system, checks if ritual is available, encourages completion if appropriate
 
 **User:** "I missed my evening ritual"  
 **Expected:** Aurora acknowledges, suggests making it up or adjusting for tomorrow, references ritual analytics
@@ -1364,8 +1401,6 @@ Aurora's knowledge is documented across these files:
 ---
 
 **Next Steps (Optional Future Enhancements):**
-- Real-time analytics integration (Meta Graph API)
-- Instagram publishing OAuth flow
 - Weekly Reflection PDF generation (UI ready)
 - Compare Weeks delta analysis (placeholder ready)
 - Automatic conversation digestion (background service)

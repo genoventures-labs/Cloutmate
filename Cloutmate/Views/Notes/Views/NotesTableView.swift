@@ -60,10 +60,21 @@ struct NotesTableView: View {
             }
             
             TableColumn("Preview") { note in
-                Text(note.markdown.isEmpty ? "—" : String(note.markdown.prefix(60)))
+                Group {
+                    if note.markdown.isEmpty {
+                        Text("—")
                     .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        MentionRenderedTextView(
+                            text: note.markdown,
+                            textFont: .caption,
+                            mentionFont: .caption
+                        )
                     .foregroundColor(.secondary)
                     .lineLimit(1)
+                    }
+                }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if selectionMode {

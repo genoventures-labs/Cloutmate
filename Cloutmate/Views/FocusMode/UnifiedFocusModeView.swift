@@ -125,23 +125,8 @@ struct UnifiedFocusModeView: View {
                 // Pre-fill the drawer with the pending session params
                 objective = params.objective
                 selectedDuration = params.plannedDuration
-                // Open the drawer so user can confirm or cancel
-                showObjectiveDrawer = true
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .currentTabUpdated)) { notification in
-            // When tab switches to Focus Mode, if there are pending params, open drawer
-            if let tab = notification.object as? TabIdentifier,
-               tab == .focusMode,
-               pendingSessionParams != nil {
-                // Don't auto-start, just open drawer if not already open
-                if !showObjectiveDrawer {
-                    if let params = pendingSessionParams {
-                        objective = params.objective
-                        selectedDuration = params.plannedDuration
-                        showObjectiveDrawer = true
-                    }
-                }
+                // Only open drawer if we're already on the Focus Mode tab
+                // Don't auto-open when switching tabs - let user manually start
             }
         }
         .sheet(isPresented: $showObjectiveDrawer) {

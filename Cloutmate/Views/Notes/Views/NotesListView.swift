@@ -89,8 +89,11 @@ struct NoteListRow: View {
                 }
                 
                 if !note.markdown.isEmpty {
-                    Text(note.markdown)
-                        .font(.caption)
+                    MentionRenderedTextView(
+                        text: note.markdown,
+                        textFont: .caption,
+                        mentionFont: .caption
+                    )
                         .foregroundColor(.secondary)
                         .lineLimit(1)
                 }

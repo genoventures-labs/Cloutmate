@@ -77,7 +77,7 @@ private struct FocusDurationPanel: View {
                     .font(.headline)
                 
                 Picker("Duration", selection: $selectedDuration) {
-                    ForEach(durations, id: \.(1)) { label, value in
+                    ForEach(durations, id: \.1) { label, value in
                         Text(label).tag(value)
                     }
                 }

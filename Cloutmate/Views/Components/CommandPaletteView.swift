@@ -180,15 +180,24 @@ struct CommandPaletteView: View {
                 note.markdown.lowercased().contains(query) ||
                 note.tags.contains(where: { $0.lowercased().contains(query) })
             }.prefix(5).map { note in
-                SearchResult(
+                let displayMarkdown = MentionParser.stripTerminators(
+                    from: MentionService.shared.convertToDisplayNames(
+                        text: note.markdown,
+                        modelContext: modelContext
+                    )
+                )
+                let subtitleText = displayMarkdown.isEmpty ? "No content" : String(displayMarkdown.prefix(50))
+                return SearchResult(
                     id: note.id.uuidString,
                     title: note.title,
-                    subtitle: String(note.markdown.prefix(50)),
+                    subtitle: subtitleText,
                     category: .notes,
                     entity: note
                 )
             }
-            results.append(contentsOf: noteResults)
+            for result in noteResults {
+                results.append(result)
+            }
         }
         
         // Search Inbox Items

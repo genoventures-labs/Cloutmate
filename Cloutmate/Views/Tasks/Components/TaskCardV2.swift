@@ -92,8 +92,11 @@ struct TaskCardV2: View {
                         VStack(alignment: .leading, spacing: 8) {
                             // Notes with mention rendering
                             if let notes = task.notes, !notes.isEmpty {
-                                MentionRenderedTextView(text: notes)
-                                    .font(.caption)
+                                MentionRenderedTextView(
+                                    text: notes,
+                                    textFont: .caption,
+                                    mentionFont: .caption
+                                )
                                     .foregroundColor(.secondary)
                                     .lineLimit(nil)
                             }

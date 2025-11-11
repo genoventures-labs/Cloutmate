@@ -93,8 +93,11 @@ struct NoteGridCard: View {
                             }
                         }
                         
-                        Text(previewText)
-                            .font(.caption)
+                        MentionRenderedTextView(
+                            text: previewText,
+                            textFont: .caption,
+                            mentionFont: .caption
+                        )
                             .foregroundColor(.secondary)
                             .lineLimit(4)
                     }

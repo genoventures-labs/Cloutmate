@@ -155,7 +155,9 @@ struct TaskDetailDrawer: View {
                         task.updatedAt = Date()
                     }
                 ),
-                placeholder: "Add notes..."
+                placeholder: "Add notes...",
+                excludeObjectId: mode == .edit ? task.id : nil,
+                excludeObjectType: mode == .edit ? .task : nil
             ) { ids, types in
                 task.linkedEntityIds = ids
                 task.linkedEntityTypes = types
@@ -313,8 +315,44 @@ struct TaskDetailDrawer: View {
             }
             
             if let energyRequirement {
-                EnergyRequirementIndicator(energyRequirement: energyRequirement)
+                HStack(spacing: 8) {
+                    Image(systemName: energyIcon(for: energyRequirement))
+                        .foregroundColor(energyColor(for: energyRequirement))
+                    Text(energyRequirement.displayName)
+                        .font(.subheadline)
+                        .foregroundColor(glassColorSystem.textSecondary())
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(energyColor(for: energyRequirement).opacity(0.1))
+                .cornerRadius(8)
             }
+        }
+    }
+    
+    private func energyIcon(for energy: EnergyRequirement) -> String {
+        switch energy {
+        case .deep:
+            return "brain.head.profile"
+        case .shallow:
+            return "bolt.fill"
+        case .creative:
+            return "sparkles"
+        case .admin:
+            return "doc.text"
+        }
+    }
+    
+    private func energyColor(for energy: EnergyRequirement) -> Color {
+        switch energy {
+        case .deep:
+            return .kosmicPurple
+        case .shallow:
+            return .kosmicBlue
+        case .creative:
+            return .orange
+        case .admin:
+            return .kosmicGreen
         }
     }
     

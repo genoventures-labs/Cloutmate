@@ -94,7 +94,9 @@ struct NoteDetailDrawer: View {
                             
                                 MentionTextEditor(
                                     text: $editingContent,
-                                    placeholder: "Write your note..."
+                                    placeholder: "Write your note...",
+                                    excludeObjectId: note.id,
+                                    excludeObjectType: .note
                                 ) { ids, types in
                                     // Update note's backlinks when mentions change
                                     note.backlinks = ids

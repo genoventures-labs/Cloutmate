@@ -202,9 +202,9 @@ struct UnifiedJournalView: View {
         JournalHeaderView(
             searchText: $searchText,
             selectedFilter: $selectedFilter,
-            onCreate: startCreatingJournal,
             isSelectionMode: $isSelectionMode,
             selectionCount: visibleSelectedJournalCount,
+            onCreate: { startCreatingJournal() },
             onToggleSelection: toggleSelectionMode
         )
         .padding(.horizontal, 20)
@@ -527,15 +527,16 @@ struct UnifiedJournalView: View {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             // ⌘N: Create new entry
             if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "n" {
-                showCreateSheet = true
+                startCreatingJournal()
                 return nil
             }
             
             // Escape: Close drawer
             if event.keyCode == 53 { // Escape key
-                if showDrawer {
-                    showDrawer = false
-                    selectedJournal = nil
+                if isDrawerVisible {
+                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                        isDrawerVisible = false
+                    }
                     return nil
                 }
             }
@@ -544,8 +545,7 @@ struct UnifiedJournalView: View {
             if event.keyCode == 36 && focusedJournalIndex != nil { // Enter key
                 let journals = sortedJournals
                 if let index = focusedJournalIndex, index < journals.count {
-                    selectedJournal = journals[index]
-                    showDrawer = true
+                    openDrawer(for: journals[index])
                     return nil
                 }
             }

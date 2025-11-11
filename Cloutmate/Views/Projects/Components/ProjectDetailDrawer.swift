@@ -153,7 +153,9 @@ struct ProjectDetailDrawer: View {
                         project.updatedAt = Date()
                     }
                 ),
-                placeholder: "Describe the project..."
+                placeholder: "Describe the project...",
+                excludeObjectId: mode == .edit ? project.id : nil,
+                excludeObjectType: mode == .edit ? .project : nil
             ) { ids, types in
                 project.linkedEntityIds = ids
                 project.linkedEntityTypes = types
@@ -276,8 +278,44 @@ struct ProjectDetailDrawer: View {
             }
             
             if let energyRequirement {
-                EnergyRequirementIndicator(energyRequirement: energyRequirement)
+                HStack(spacing: 8) {
+                    Image(systemName: energyIcon(for: energyRequirement))
+                        .foregroundColor(energyColor(for: energyRequirement))
+                    Text(energyRequirement.displayName)
+                        .font(.subheadline)
+                        .foregroundColor(glassColorSystem.textSecondary())
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(energyColor(for: energyRequirement).opacity(0.1))
+                .cornerRadius(8)
             }
+        }
+    }
+    
+    private func energyIcon(for energy: EnergyRequirement) -> String {
+        switch energy {
+        case .deep:
+            return "brain.head.profile"
+        case .shallow:
+            return "bolt.fill"
+        case .creative:
+            return "sparkles"
+        case .admin:
+            return "doc.text"
+        }
+    }
+    
+    private func energyColor(for energy: EnergyRequirement) -> Color {
+        switch energy {
+        case .deep:
+            return .kosmicPurple
+        case .shallow:
+            return .kosmicBlue
+        case .creative:
+            return .orange
+        case .admin:
+            return .kosmicGreen
         }
     }
     

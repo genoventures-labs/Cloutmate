@@ -84,7 +84,11 @@ class WorkspaceObjectSearchService {
                 var score = calculateMatchScore(text: note.title.lowercased(), query: lowerQuery)
                 score = max(score, calculateMatchScore(text: note.markdown.lowercased(), query: lowerQuery) * 0.6)
                 if score > 0 {
-                    let subtitle = String(note.markdown.prefix(50))
+                    var subtitle = String(note.markdown.prefix(50))
+                    subtitle = cleanDescription(subtitle)
+                    if subtitle.isEmpty {
+                        subtitle = "No description available"
+                    }
                     results.append(WorkspaceObjectResult(
                         id: note.id,
                         type: .note,
@@ -178,10 +182,80 @@ class WorkspaceObjectSearchService {
             .map { $0 }
     }
     
+    /// Get tab name for ObjectType
+    func tabName(for type: ObjectType) -> String {
+        switch type {
+        case .task: return "Tasks"
+        case .project: return "Projects"
+        case .note: return "Notes"
+        case .post: return "Posts"
+        case .reminder: return "Reminders"
+        case .inboxItem: return "Inbox"
+        case .focusSession: return "Focus Sessions"
+        }
+    }
+    
+    /// Parse query for tab filter (e.g., "@tasks" -> .task, "@tasks my" -> .task with query "my")
+    func parseTabFilter(from query: String) -> ObjectType? {
+        let lowerQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check exact matches first
+        switch lowerQuery {
+        case "tasks", "task": return .task
+        case "projects", "project": return .project
+        case "notes", "note": return .note
+        case "posts", "post": return .post
+        case "reminders", "reminder": return .reminder
+        case "inbox", "inboxitems", "inboxitem": return .inboxItem
+        case "focus", "focussessions", "focussession": return .focusSession
+        default: break
+        }
+        
+        // Check if query starts with a tab filter (e.g., "tasks my task" -> .task with query "my task")
+        let components = lowerQuery.components(separatedBy: .whitespaces)
+        if let firstComponent = components.first {
+            switch firstComponent {
+            case "tasks", "task": return .task
+            case "projects", "project": return .project
+            case "notes", "note": return .note
+            case "posts", "post": return .post
+            case "reminders", "reminder": return .reminder
+            case "inbox", "inboxitems", "inboxitem": return .inboxItem
+            case "focus", "focussessions", "focussession": return .focusSession
+            default: return nil
+            }
+        }
+        
+        return nil
+    }
+    
+    /// Extract search query after tab filter (e.g., "tasks my task" -> "my task")
+    func extractSearchQuery(from query: String, tabFilter: ObjectType) -> String {
+        let lowerQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let components = lowerQuery.components(separatedBy: .whitespaces)
+        
+        // If first component matches the tab filter, return the rest
+        if let firstComponent = components.first,
+           (tabFilter == .task && (firstComponent == "tasks" || firstComponent == "task")) ||
+           (tabFilter == .project && (firstComponent == "projects" || firstComponent == "project")) ||
+           (tabFilter == .note && (firstComponent == "notes" || firstComponent == "note")) ||
+           (tabFilter == .post && (firstComponent == "posts" || firstComponent == "post")) ||
+           (tabFilter == .reminder && (firstComponent == "reminders" || firstComponent == "reminder")) ||
+           (tabFilter == .inboxItem && (firstComponent == "inbox" || firstComponent == "inboxitems" || firstComponent == "inboxitem")) ||
+           (tabFilter == .focusSession && (firstComponent == "focus" || firstComponent == "focussessions" || firstComponent == "focussession")) {
+            return components.dropFirst().joined(separator: " ")
+        }
+        
+        // If exact match, return empty (show all of that type)
+        return ""
+    }
+    
     /// Get all workspace objects (used when "@" is typed with no query)
+    /// Optionally filter by tab type
     func searchAll(
         modelContext: ModelContext,
-        limit: Int = 20
+        limit: Int = 20,
+        filterByTab: ObjectType? = nil
     ) -> [WorkspaceObjectResult] {
         var results: [WorkspaceObjectResult] = []
         
@@ -219,7 +293,11 @@ class WorkspaceObjectSearchService {
         let noteDescriptor = FetchDescriptor<CloutmateShared.Note>()
         if let notes = try? modelContext.fetch(noteDescriptor) {
             for note in notes {
-                let subtitle = String(note.markdown.prefix(50))
+                var subtitle = String(note.markdown.prefix(50))
+                subtitle = cleanDescription(subtitle)
+                if subtitle.isEmpty {
+                    subtitle = "No description available"
+                }
                 results.append(WorkspaceObjectResult(
                     id: note.id,
                     type: .note,
@@ -290,8 +368,14 @@ class WorkspaceObjectSearchService {
             }
         }
         
+        // Filter by tab if specified
+        var filteredResults = results
+        if let filterTab = filterByTab {
+            filteredResults = results.filter { $0.type == filterTab }
+        }
+        
         // Sort by type, then by title, and limit results
-        return results
+        return filteredResults
             .sorted { first, second in
                 // Sort by type first (alphabetically)
                 if first.type.rawValue != second.type.rawValue {
@@ -302,6 +386,70 @@ class WorkspaceObjectSearchService {
             }
             .prefix(limit)
             .map { $0 }
+    }
+    
+    /// Search with tab filtering support
+    func searchWithTabFilter(
+        query: String,
+        modelContext: ModelContext,
+        limit: Int = 20
+    ) -> (results: [WorkspaceObjectResult], tabFilter: ObjectType?) {
+        let tabFilter = parseTabFilter(from: query)
+        
+        if let filter = tabFilter {
+            // Extract search query after tab filter
+            let searchQuery = extractSearchQuery(from: query, tabFilter: filter)
+            
+            if searchQuery.isEmpty {
+                // Return all items of this type
+                return (searchAll(modelContext: modelContext, limit: limit, filterByTab: filter), filter)
+            } else {
+                // Search within this tab type
+                let allOfType = searchAll(modelContext: modelContext, limit: 1000, filterByTab: filter)
+                // Filter by search query
+                let filtered = allOfType.filter { result in
+                    result.title.lowercased().contains(searchQuery.lowercased()) ||
+                    result.subtitle.lowercased().contains(searchQuery.lowercased())
+                }
+                return (Array(filtered.prefix(limit)), filter)
+            }
+        } else if query.isEmpty {
+            // No filter, no query - show all
+            return (searchAll(modelContext: modelContext, limit: limit), nil)
+        } else {
+            // Regular search
+            return (search(query: query, modelContext: modelContext, limit: limit), nil)
+        }
+    }
+    
+    /// Clean description text by removing JSON blobs, taskID patterns, etc.
+    private func cleanDescription(_ text: String) -> String {
+        var cleaned = text
+        
+        // Remove JSON-like patterns: { "key": "value" } or {"key":"value"}
+        let jsonPattern = #"\{[^{}]*\}"#
+        cleaned = cleaned.replacingOccurrences(of: jsonPattern, with: "", options: .regularExpression)
+        
+        // Remove taskID patterns: taskID{...} or taskID {...}
+        let taskIdPattern = #"taskID\s*\{[^}]*\}"#
+        cleaned = cleaned.replacingOccurrences(of: taskIdPattern, with: "", options: .regularExpression)
+        
+        // Remove UUID patterns
+        let uuidPattern = #"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"#
+        cleaned = cleaned.replacingOccurrences(of: uuidPattern, with: "", options: .regularExpression)
+        
+        // Remove structured mention patterns: @{type:id}
+        let mentionPattern = #"@\{[^}]+\}"#
+        cleaned = cleaned.replacingOccurrences(of: mentionPattern, with: "", options: .regularExpression)
+        
+        // Remove mention terminators
+        cleaned = MentionParser.stripTerminators(from: cleaned)
+        
+        // Clean up extra spaces
+        cleaned = cleaned.replacingOccurrences(of: "  ", with: " ")
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        return cleaned
     }
     
     /// Calculate match score for text against query
@@ -365,8 +513,10 @@ class WorkspaceObjectSearchService {
                 predicate: #Predicate { $0.id == id }
             )
             if let note = try? modelContext.fetch(descriptor).first {
-                let subtitle = String(note.markdown.prefix(50))
-                return (title: note.title, subtitle: subtitle)
+                var subtitle = String(note.markdown.prefix(50))
+                // Clean JSON/taskID blobs
+                subtitle = cleanDescription(subtitle)
+                return (title: note.title, subtitle: subtitle.isEmpty ? "No description available" : subtitle)
             }
         case .post:
             let descriptor = FetchDescriptor<CloutmateShared.Post>(

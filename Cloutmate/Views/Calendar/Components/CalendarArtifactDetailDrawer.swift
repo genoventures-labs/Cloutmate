@@ -1,5 +1,5 @@
 //
-//  ArtifactDetailDrawer.swift
+//  CalendarArtifactDetailDrawer.swift
 //  Cloutmate
 //
 //  Drawer presentation for calendar artifact previews
@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 import CloutmateShared
 
-struct ArtifactDetailDrawer: View {
+struct CalendarArtifactDetailDrawer: View {
     @Bindable var artifact: CloutmateShared.Artifact
     @Binding var isPresented: Bool
     
@@ -86,8 +86,8 @@ struct ArtifactDetailDrawer: View {
                     .foregroundColor(glassColorSystem.textPrimary())
                     .lineLimit(2)
                 
-                if let channel = artifact.channel {
-                    Text(channel)
+                if let publishedAt = artifact.publishedAt {
+                    Text("Published")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -104,16 +104,16 @@ struct ArtifactDetailDrawer: View {
                 .foregroundColor(glassColorSystem.textPrimary())
             
             VStack(alignment: .leading, spacing: 6) {
-                if let createdAt = artifact.createdAt {
-                    LabeledContent("Captured", value: createdAt.formatted(date: .abbreviated, time: .shortened))
-                }
+                LabeledContent("Captured", value: artifact.createdAt.formatted(date: .abbreviated, time: .shortened))
+                
                 if let publishedAt = artifact.publishedAt {
                     LabeledContent("Published", value: publishedAt.formatted(date: .abbreviated, time: .shortened))
                 }
-                if let tags = artifact.tags, !tags.isEmpty {
+                
+                if !artifact.tags.isEmpty {
                     LabeledContent("Tags") {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 90), spacing: 8)], spacing: 8) {
-                            ForEach(tags, id: \.self) { tag in
+                            ForEach(artifact.tags, id: \.self) { tag in
                                 Text(tag)
                                     .font(.caption)
                                     .padding(.horizontal, 10)
@@ -137,12 +137,16 @@ struct ArtifactDetailDrawer: View {
                 .font(.headline)
                 .foregroundColor(glassColorSystem.textPrimary())
             
-            if let summary = artifact.summary, !summary.isEmpty {
+            if !artifact.content.isEmpty {
+                Text(artifact.content)
+                    .font(.body)
+                    .foregroundColor(glassColorSystem.textSecondary())
+            } else if let summary = artifact.sentimentSummary, !summary.isEmpty {
                 Text(summary)
                     .font(.body)
                     .foregroundColor(glassColorSystem.textSecondary())
             } else {
-                Text("No summary available")
+                Text("No content available")
                     .font(.body)
                     .foregroundColor(.secondary)
             }
@@ -151,23 +155,21 @@ struct ArtifactDetailDrawer: View {
     
     private var timelineSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Activity Timeline")
+            Text("Status")
                 .font(.headline)
                 .foregroundColor(glassColorSystem.textPrimary())
             
-            if let timeline = artifact.timelineEntries, !timeline.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    ForEach(timeline, id: \.self) { entry in
-                        Text("• \(entry)")
-                            .font(.subheadline)
-                            .foregroundColor(glassColorSystem.textSecondary())
+                LabeledContent("State", value: artifact.artifactState.displayName)
+                
+                if let archivedAt = artifact.archivedAt {
+                    LabeledContent("Archived", value: archivedAt.formatted(date: .abbreviated, time: .shortened))
                     }
-                }
-            } else {
-                Text("No timeline entries yet")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                
+                LabeledContent("Last Updated", value: artifact.updatedAt.formatted(date: .abbreviated, time: .shortened))
             }
+            .font(.subheadline)
+            .foregroundColor(glassColorSystem.textSecondary())
         }
     }
     
@@ -189,7 +191,7 @@ struct ArtifactDetailDrawer: View {
     }
     
     private func archiveArtifact() {
-        artifact.isArchived = true
+        artifact.archivedAt = Date()
         artifact.updatedAt = Date()
         try? modelContext.save()
         closeDrawer()

@@ -178,6 +178,7 @@ struct ProjectListCard: View {
         }
         .sheet(isPresented: $showFocusDurationSheet) {
             FocusDurationSheet(
+                isPresented: $showFocusDurationSheet,
                 selectedDuration: $focusDuration,
                 itemTitle: project.title,
                 itemType: "Project",
@@ -607,6 +608,17 @@ struct InteractiveProjectStatusPicker: View {
     @Bindable var project: Project
     @Environment(\.modelContext) private var modelContext
     
+    private func statusColor(for status: ProjectStatus) -> Color {
+        switch status {
+        case .active:
+            return .kosmicBlue
+        case .paused:
+            return .orange
+        case .completed:
+            return .kosmicGreen
+        }
+    }
+    
     var body: some View {
         Menu {
             ForEach(ProjectStatus.allCases, id: \.self) { status in
@@ -619,11 +631,11 @@ struct InteractiveProjectStatusPicker: View {
                 }) {
                     HStack {
                         Circle()
-                            .fill(status.color.opacity(0.2))
+                            .fill(statusColor(for: status).opacity(0.2))
                             .frame(width: 12, height: 12)
                             .overlay(
                                 Circle()
-                                    .fill(status.color)
+                                    .fill(statusColor(for: status))
                                     .frame(width: 6, height: 6)
                             )
                         Text(status.displayName)
@@ -636,11 +648,11 @@ struct InteractiveProjectStatusPicker: View {
         } label: {
             HStack(spacing: 6) {
                 Circle()
-                    .fill(project.status.color.opacity(0.2))
+                    .fill(statusColor(for: project.status).opacity(0.2))
                     .frame(width: 12, height: 12)
                     .overlay(
                         Circle()
-                            .fill(project.status.color)
+                            .fill(statusColor(for: project.status))
                             .frame(width: 6, height: 6)
                     )
                 Text(project.status.displayName)

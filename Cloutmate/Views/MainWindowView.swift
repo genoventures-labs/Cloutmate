@@ -92,7 +92,7 @@ struct MainWindowView: View {
         let hasOverlay = isContextualCreateVisible || showQuickCapture || showVoiceMemo || showInboxCapture
         
         ZStack {
-            mainContent
+        mainContent
                 .opacity(hasOverlay ? 0 : 1)
             
             if isContextualCreateVisible {
@@ -109,7 +109,7 @@ struct MainWindowView: View {
             }
             
             if showInboxCapture {
-                InboxCaptureDrawer(isPresented: $showInboxCapture)
+                InboxQuickCaptureDrawer(isPresented: $showInboxCapture)
                     .transition(.move(edge: .trailing))
             }
             
@@ -118,9 +118,9 @@ struct MainWindowView: View {
                     .transition(.move(edge: .trailing))
             }
         }
-        .modifier(SheetModifiers(
+            .modifier(SheetModifiers(
             showCommandPalette: $showCommandPalette
-        ))
+            ))
             .onReceive(NotificationCenter.default.publisher(for: .switchTab)) { notification in
                 if let tab = notification.object as? TabIdentifier {
                     attemptTabSwitch(to: tab)

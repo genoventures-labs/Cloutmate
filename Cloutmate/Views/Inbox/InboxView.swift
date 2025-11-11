@@ -52,71 +52,71 @@ struct InboxView: View {
         let hasOverlay = selectedDrawerItem != nil || isQuickCaptureVisible
         
         ZStack {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    InboxHeaderView(
-                        searchText: $searchText,
-                        selectedFilter: $selectedFilter,
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                InboxHeaderView(
+                    searchText: $searchText,
+                    selectedFilter: $selectedFilter,
                         onQuickAdd: presentQuickCapture
+                )
+                
+                if filteredItems.isEmpty {
+                    ContentUnavailableView(
+                        inboxItems.isEmpty ? "Inbox is empty" : "No matches",
+                        systemImage: "tray",
+                        description: Text(inboxItems.isEmpty ? "Capture new items to get started" : "Try a different search or filter")
                     )
-                    
-                    if filteredItems.isEmpty {
-                        ContentUnavailableView(
-                            inboxItems.isEmpty ? "Inbox is empty" : "No matches",
-                            systemImage: "tray",
-                            description: Text(inboxItems.isEmpty ? "Capture new items to get started" : "Try a different search or filter")
-                        )
-                        .frame(maxHeight: .infinity)
-                        .padding(.top, 40)
-                    } else {
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)
-                            ],
-                            spacing: 16
-                        ) {
-                            ForEach(filteredItems) { item in
-                                InboxCardV2(
-                                    item: item,
-                                    onTap: {
-                                        selectedDrawerItem = item
-                                    },
-                                    onConvertToTask: {
-                                        convertItemToTask(item)
-                                    },
-                                    onConvertToNote: {
-                                        convertItemToNote(item)
-                                    },
-                                    onConvertToDraft: {
-                                        convertItemToDraft(item)
-                                    },
-                                    onConvertToProject: {
-                                        convertItemToProject(item)
-                                    },
-                                    onArchive: {
-                                        archiveItem(item)
-                                    },
-                                    onPin: {
-                                        toggleFlag(item)
-                                    },
-                                    onDelete: {
-                                        deleteItem(item)
-                                    }
-                                )
-                            }
+                    .frame(maxHeight: .infinity)
+                    .padding(.top, 40)
+                } else {
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)
+                        ],
+                        spacing: 16
+                    ) {
+                        ForEach(filteredItems) { item in
+                            InboxCardV2(
+                                item: item,
+                                onTap: {
+                                    selectedDrawerItem = item
+                                },
+                                onConvertToTask: {
+                                    convertItemToTask(item)
+                                },
+                                onConvertToNote: {
+                                    convertItemToNote(item)
+                                },
+                                onConvertToDraft: {
+                                    convertItemToDraft(item)
+                                },
+                                onConvertToProject: {
+                                    convertItemToProject(item)
+                                },
+                                onArchive: {
+                                    archiveItem(item)
+                                },
+                                onPin: {
+                                    toggleFlag(item)
+                                },
+                                onDelete: {
+                                    deleteItem(item)
+                                }
+                            )
                         }
-                        .padding(20)
                     }
+                    .padding(20)
                 }
             }
+        }
             .background(Color.clear)
             .opacity(hasOverlay ? 0 : 1)
             
-            if let item = selectedDrawerItem {
-                InboxCaptureDrawer(item: item, isPresented: Binding(
-                    get: { selectedDrawerItem != nil },
-                    set: { if !$0 { selectedDrawerItem = nil } }
-                ))
+                if let item = selectedDrawerItem {
+                    InboxCaptureDrawer(item: item, isPresented: Binding(
+                        get: { selectedDrawerItem != nil },
+                        set: { if !$0 { selectedDrawerItem = nil } }
+                    ))
                 .transition(.move(edge: .trailing))
             }
             

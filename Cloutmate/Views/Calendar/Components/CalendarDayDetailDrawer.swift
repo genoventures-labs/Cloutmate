@@ -163,14 +163,14 @@ extension CalendarDayDetailDrawer.Item {
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .short
         let timestamp = artifact.publishedAt ?? artifact.createdAt
-        let subtitle = timestamp.map { dateFormatter.string(from: $0) } ?? "No timestamp"
+        let subtitle = dateFormatter.string(from: timestamp)
         return CalendarDayDetailDrawer.Item(
             kind: .artifact(artifact),
             title: artifact.title.isEmpty ? "Untitled Artifact" : artifact.title,
             subtitle: subtitle,
             icon: "sparkles",
             accent: .kosmicPurple,
-            timestamp: timestamp
+            timestamp: artifact.publishedAt ?? Optional(artifact.createdAt)
         )
     }
     

@@ -110,7 +110,7 @@ final class MentionService {
             }
         }
         
-        return result
+        return MentionParser.stripTerminators(from: result)
     }
     
     /// Convert structured mentions to display names in text
@@ -133,15 +133,24 @@ final class MentionService {
             
             // Resolve to get display name
             if let resolved = resolveById(id: id, type: objectType, modelContext: modelContext) {
-                let displayName = "@\(resolved.displayName)"
-                let range = NSRange(
-                    location: mention.range.location + offset,
-                    length: mention.range.length
-                )
+                let displayName = "@\(resolved.displayName)\(MentionParser.mentionTerminator)"
+                let resultCount = result.utf16.count
+                let rangeLocation = mention.range.location + offset
                 
-                if let swiftRange = Range(range, in: result) {
-                    result.replaceSubrange(swiftRange, with: displayName)
-                    offset += displayName.count - mention.range.length
+                // Ensure range location is within bounds
+                if rangeLocation < 0 || rangeLocation >= resultCount {
+                    continue
+                }
+                
+                let availableLength = resultCount - rangeLocation
+                let rangeLength = max(0, min(mention.range.length, availableLength))
+                
+                if rangeLength >= 1 {
+                    let range = NSRange(location: rangeLocation, length: rangeLength)
+                    if let swiftRange = Range(range, in: result) {
+                        result.replaceSubrange(swiftRange, with: displayName)
+                        offset += displayName.count - rangeLength
+                    }
                 }
             }
         }
@@ -194,12 +203,30 @@ final class MentionService {
         _ name: String,
         modelContext: ModelContext
     ) -> ResolvedMention? {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return nil }
+        
         let results = WorkspaceObjectSearchService.shared.search(
-            query: name,
+            query: trimmedName,
             modelContext: modelContext,
-            limit: 1
+            limit: 10 // Get more results to find best match
         )
         
+        // Prefer exact matches for multi-word mentions
+        // First try exact match (case-insensitive)
+        if let exactMatch = results.first(where: { 
+            $0.title.lowercased() == trimmedName.lowercased() 
+        }) {
+            return ResolvedMention(
+                id: exactMatch.id,
+                type: exactMatch.type,
+                title: exactMatch.title,
+                subtitle: exactMatch.subtitle,
+                displayName: exactMatch.displayName
+            )
+        }
+        
+        // Fall back to best match score
         guard let first = results.first else { return nil }
         
         return ResolvedMention(

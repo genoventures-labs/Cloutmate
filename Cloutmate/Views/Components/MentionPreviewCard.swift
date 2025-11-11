@@ -218,7 +218,7 @@ struct MentionDetailPopover: View {
                     }
                     
                     if !note.markdown.isEmpty {
-                        Text(String(note.markdown.prefix(100)))
+                        Text(cleanPreview(note.markdown))
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(3)
@@ -230,6 +230,19 @@ struct MentionDetailPopover: View {
                 }
             }
         }
+    }
+    
+    private func cleanPreview(_ text: String) -> String {
+        var cleaned = MentionService.shared.convertToDisplayNames(
+            text: text,
+            modelContext: modelContext
+        )
+        cleaned = MentionParser.stripTerminators(from: cleaned)
+        let structuredPattern = #"@\{[^}]+\}"#
+        cleaned = cleaned.replacingOccurrences(of: structuredPattern, with: "", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: "  ", with: " ")
+        cleaned = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "No description available" : String(cleaned.prefix(100))
     }
     
     private var postContent: some View {

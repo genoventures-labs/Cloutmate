@@ -15,6 +15,7 @@ struct PostDetailDrawer: View {
     let onEdit: (CloutmateShared.Post) -> Void
     
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
     
@@ -141,8 +142,8 @@ struct PostDetailDrawer: View {
                         .foregroundColor(glassColorSystem.textPrimary())
                     
                     HStack(spacing: 16) {
-                        Label(scheduledDate, style: .date)
-                        Label(scheduledDate, style: .time)
+                        Text(scheduledDate, style: .date)
+                        Text(scheduledDate, style: .time)
                             .foregroundColor(.secondary)
                     }
                     .font(.body)
@@ -166,8 +167,8 @@ struct PostDetailDrawer: View {
                         .foregroundColor(glassColorSystem.textPrimary())
                     
                     HStack(spacing: 16) {
-                        Label(publishedDate, style: .date)
-                        Label(publishedDate, style: .time)
+                        Text(publishedDate, style: .date)
+                        Text(publishedDate, style: .time)
                             .foregroundColor(.secondary)
                     }
                     .font(.body)

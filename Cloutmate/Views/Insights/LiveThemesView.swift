@@ -155,7 +155,17 @@ private struct ConceptCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Header
+            headerSection
+            scoreBreakdownSection
+            contextTagsSection
+            emotionalToneSection
+        }
+        .padding()
+        .background(cardBackground)
+        .overlay(cardOverlay)
+    }
+    
+    private var headerSection: some View {
             HStack {
                 // Alive indicator
                 Text(concept.isAlive ? "🔥" : "💤")
@@ -166,7 +176,7 @@ private struct ConceptCard: View {
                         .font(.title3)
                         .fontWeight(.semibold)
                     
-                    Text("\(concept.mentionCount) mentions across \(Set(concept.contextTypes).count) contexts")
+                Text("\(concept.mentionCount) mentions across \(contextCount) contexts")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -183,9 +193,14 @@ private struct ConceptCard: View {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
+        }
+    }
+    
+    private var contextCount: Int {
+        Set(concept.contextTypes).count
             }
             
-            // Score Breakdown
+    private var scoreBreakdownSection: some View {
             HStack(spacing: 16) {
                 ScoreComponent(
                     label: "Recency",
@@ -210,10 +225,12 @@ private struct ConceptCard: View {
                     score: concept.usageScore,
                     color: .kosmicPurple
                 )
+        }
             }
             
-            // Context Tags
-            FlowLayout(spacing: 8) {
+    private var contextTagsSection: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
                 ForEach(Array(Set(concept.contextTypes)), id: \.self) { context in
                     Text(context.capitalized)
                         .font(.caption)
@@ -222,8 +239,11 @@ private struct ConceptCard: View {
                         .background(Capsule().fill(Color.accentColor.opacity(0.2)))
                 }
             }
+                }
+            }
             
-            // Emotional Tone
+    @ViewBuilder
+    private var emotionalToneSection: some View {
             if abs(concept.emotionalValence) > 0.1 {
                 HStack {
                     Text(emotionalIndicator)
@@ -235,15 +255,18 @@ private struct ConceptCard: View {
                 }
             }
         }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill((concept.isAlive ? Color.accentColor : Color.secondary).opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke((concept.isAlive ? Color.accentColor : Color.secondary).opacity(concept.isAlive ? 0.3 : 0.1), lineWidth: 1)
-        )
+    
+    private var cardBackground: some View {
+        let backgroundColor = concept.isAlive ? Color.accentColor : Color.secondary
+        return RoundedRectangle(cornerRadius: 12)
+            .fill(backgroundColor.opacity(0.05))
+    }
+    
+    private var cardOverlay: some View {
+        let strokeColor = concept.isAlive ? Color.accentColor : Color.secondary
+        let strokeOpacity = concept.isAlive ? 0.3 : 0.1
+        return RoundedRectangle(cornerRadius: 12)
+            .stroke(strokeColor.opacity(strokeOpacity), lineWidth: 1)
     }
     
     private var relevanceColor: Color {
