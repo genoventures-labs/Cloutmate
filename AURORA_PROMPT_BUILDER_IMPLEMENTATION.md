@@ -54,7 +54,8 @@ Successfully implemented a modular, versioned system prompt builder for Aurora t
 - Each version tracks:
   - Enabled phases (1-10)
   - Enabled features (arte, predictiveCognition, etc.)
-  - Prompt length
+  - Prompt length (base, before payload/changelog)
+  - Final prompt length (after payload/changelog)
   - Section count
   - Git commit hash
   - Creation timestamp

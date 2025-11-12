@@ -176,6 +176,7 @@ enum RecallObjectType: String, Codable, Sendable {
     case project
     case post
     case note
+    case artifact
     case draft
     case inbox
     case image
@@ -189,6 +190,7 @@ enum RecallObjectType: String, Codable, Sendable {
         case .project: return "Project"
         case .post: return "Post"
         case .note: return "Note"
+        case .artifact: return "Artifact"
         case .draft: return "Draft"
         case .inbox: return "Inbox"
         case .image: return "Image"
@@ -627,7 +629,7 @@ final class AIRecallService {
         case .reflective:
             // Prefer journal entries, notes, and reflections
             return entries.filter { entry in
-                entry.objectType == "document" || entry.objectType == "note"
+                entry.objectType == "document" || entry.objectType == "note" || entry.objectType == "artifact"
             }
         case .operational:
             // Prefer tasks, projects, and actionable items
@@ -637,7 +639,7 @@ final class AIRecallService {
         case .creative:
             // Prefer notes, drafts, and posts for cross-pollination
             return entries.filter { entry in
-                entry.objectType == "note" || entry.objectType == "draft" || entry.objectType == "post"
+                entry.objectType == "note" || entry.objectType == "draft" || entry.objectType == "post" || entry.objectType == "artifact"
             }
         }
     }
@@ -1206,6 +1208,44 @@ extension Note: RecallTrackable {
             values.append(source.lowercased())
         }
         values.append(type.rawValue.lowercased())
+        return values
+    }
+}
+
+extension Artifact: RecallTrackable {
+    var recallObjectId: UUID { id }
+    var recallObjectType: RecallObjectType { .artifact }
+    var recallTitle: String {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+        return format.displayName
+    }
+    var recallDetail: String {
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedContent.isEmpty {
+            return String(trimmedContent.prefix(400))
+        }
+        return "Artifact (\(format.displayName))"
+    }
+    var recallUpdatedAt: Date { updatedAt }
+    var recallImportance: Double {
+        switch artifactState {
+        case .idea: return 0.3
+        case .draft: return 0.5
+        case .final: return 0.7
+        case .published: return 0.8
+        case .archived: return 0.2
+        }
+    }
+    var recallKeywords: [String] {
+        var values = tags.map { $0.lowercased() }
+        values.append(format.rawValue.lowercased())
+        values.append(artifactState.rawValue.lowercased())
+        if let projectId {
+            values.append(projectId.uuidString)
+        }
         return values
     }
 }

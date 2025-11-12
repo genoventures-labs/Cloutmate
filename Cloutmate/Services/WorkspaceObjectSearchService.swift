@@ -189,6 +189,7 @@ class WorkspaceObjectSearchService {
         case .project: return "Projects"
         case .note: return "Notes"
         case .post: return "Posts"
+        case .artifact: return "Artifacts"
         case .reminder: return "Reminders"
         case .inboxItem: return "Inbox"
         case .focusSession: return "Focus Sessions"
@@ -205,6 +206,7 @@ class WorkspaceObjectSearchService {
         case "projects", "project": return .project
         case "notes", "note": return .note
         case "posts", "post": return .post
+        case "artifacts", "artifact": return .artifact
         case "reminders", "reminder": return .reminder
         case "inbox", "inboxitems", "inboxitem": return .inboxItem
         case "focus", "focussessions", "focussession": return .focusSession
@@ -219,6 +221,7 @@ class WorkspaceObjectSearchService {
             case "projects", "project": return .project
             case "notes", "note": return .note
             case "posts", "post": return .post
+            case "artifacts", "artifact": return .artifact
             case "reminders", "reminder": return .reminder
             case "inbox", "inboxitems", "inboxitem": return .inboxItem
             case "focus", "focussessions", "focussession": return .focusSession
@@ -240,6 +243,7 @@ class WorkspaceObjectSearchService {
            (tabFilter == .project && (firstComponent == "projects" || firstComponent == "project")) ||
            (tabFilter == .note && (firstComponent == "notes" || firstComponent == "note")) ||
            (tabFilter == .post && (firstComponent == "posts" || firstComponent == "post")) ||
+           (tabFilter == .artifact && (firstComponent == "artifacts" || firstComponent == "artifact")) ||
            (tabFilter == .reminder && (firstComponent == "reminders" || firstComponent == "reminder")) ||
            (tabFilter == .inboxItem && (firstComponent == "inbox" || firstComponent == "inboxitems" || firstComponent == "inboxitem")) ||
            (tabFilter == .focusSession && (firstComponent == "focus" || firstComponent == "focussessions" || firstComponent == "focussession")) {
@@ -422,6 +426,13 @@ class WorkspaceObjectSearchService {
         }
     }
     
+    private func fetchProject(by id: UUID, context: ModelContext) -> CloutmateShared.Project? {
+        let descriptor = FetchDescriptor<CloutmateShared.Project>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? context.fetch(descriptor).first
+    }
+    
     /// Clean description text by removing JSON blobs, taskID patterns, etc.
     private func cleanDescription(_ text: String) -> String {
         var cleaned = text
@@ -525,6 +536,20 @@ class WorkspaceObjectSearchService {
             if let post = try? modelContext.fetch(descriptor).first {
                 let subtitle = post.postStatus.displayName
                 return (title: post.caption.isEmpty ? "Empty Post" : String(post.caption.prefix(50)), subtitle: subtitle)
+            }
+        case .artifact:
+            let descriptor = FetchDescriptor<CloutmateShared.Artifact>(
+                predicate: #Predicate { $0.id == id }
+            )
+            if let artifact = try? modelContext.fetch(descriptor).first {
+                var subtitle = artifact.format.displayName
+                if let projectId = artifact.projectId {
+                    subtitle += " · Linked to project"
+                    if let project = fetchProject(by: projectId, context: modelContext) {
+                        subtitle += " \(project.title)"
+                    }
+                }
+                return (title: artifact.title.isEmpty ? artifact.format.displayName : artifact.title, subtitle: subtitle)
             }
         case .reminder:
             let descriptor = FetchDescriptor<CloutmateShared.Reminder>(

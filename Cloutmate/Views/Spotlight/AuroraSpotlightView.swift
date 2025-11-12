@@ -550,7 +550,7 @@ extension ExecutionIntent {
             let request = TaskCreationRequest(
                 title: title,
                 notes: taskNotes,
-                dueDate: taskDueDate.flatMap { parseISODate($0) },
+                dueDate: DateParsing.parse(taskDueDate),
                 status: mapTaskStatus(taskStatus) ?? .todo,
                 priority: mapTaskPriority(taskPriority) ?? .medium,
                 projectId: taskProjectId.flatMap(UUID.init(uuidString:)),
@@ -578,7 +578,7 @@ extension ExecutionIntent {
                 title: title,
                 goal: projectGoal,
                 status: mapProjectStatus(projectStatus) ?? .active,
-                dueDate: projectDueDate.flatMap { parseISODate($0) },
+                dueDate: DateParsing.parse(projectDueDate),
                 areaId: projectAreaId.flatMap(UUID.init(uuidString:)),
                 tags: []
             )
@@ -602,11 +602,22 @@ extension ExecutionIntent {
     }
     
     private func mapTaskPriority(_ priority: String?) -> CloutmateShared.TaskPriority? {
-        guard let priority = priority else { return nil }
-        switch priority.lowercased() {
+        guard let priority = priority?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        let cleaned = priority
+            .replacingOccurrences(of: "priority", with: "")
+            .replacingOccurrences(of: "priroty", with: "")
+            .replacingOccurrences(of: "set to", with: "")
+            .replacingOccurrences(of: "set for", with: "")
+            .replacingOccurrences(of: "set", with: "")
+            .replacingOccurrences(of: "to", with: "")
+            .replacingOccurrences(of: "with a", with: "")
+            .replacingOccurrences(of: "with", with: "")
+            .replacingOccurrences(of: "at", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        switch cleaned {
         case "low": return .low
-        case "medium", "normal": return .medium
-        case "high": return .high
+        case "medium", "normal", "med": return .medium
+        case "high", "urgent", "hi": return .high
         default: return nil
         }
     }
@@ -622,9 +633,7 @@ extension ExecutionIntent {
     }
     
     private func parseISODate(_ dateString: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: dateString) ?? formatter.date(from: dateString + "Z")
+        DateParsing.parse(dateString)
     }
 }
 

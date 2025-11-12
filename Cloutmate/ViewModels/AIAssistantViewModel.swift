@@ -131,6 +131,7 @@ final class AIAssistantViewModel {
         case taskTitle
         case projectTitle
         case noteTitle
+        case artifactTitle
         case postCaption
         case inboxContent
         case reminderTitle
@@ -1213,8 +1214,7 @@ final class AIAssistantViewModel {
         if intent.operation == .createProject && (
             intent.createTasksWithProject == true || intent.createNotesWithProject == true || intent.createPostsWithProject == true ||
             intent.taskTitles != nil || intent.taskCount != nil ||
-            intent.noteTitles != nil || intent.noteCount != nil ||
-            intent.postCaptions != nil || intent.postCount != nil
+            intent.noteTitles != nil || intent.noteCount != nil
         ) {
             await executeCompoundProjectCreation(intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
             return
@@ -1248,70 +1248,11 @@ final class AIAssistantViewModel {
         
         // For updateTask, try to find task ID from conversation if missing
         if intent.operation == .updateTask && intent.taskId == nil {
-            // Try to find the most recently created task from conversation messages
             if let lastTask = findLastCreatedTask(from: messages, modelContext: modelContext) {
-                // Create a new intent with the task ID (ExecutionIntent has let properties, so we need to create a new instance)
-                intent = ExecutionIntent(
-                    operation: intent.operation,
-                    criteria: intent.criteria,
-                    daysAgo: intent.daysAgo,
-                    postFilter: intent.postFilter,
-                    filterValue: intent.filterValue,
-                    reportType: intent.reportType,
-                    daysAhead: intent.daysAhead,
-                    caption: intent.caption,
-                    scheduledDate: intent.scheduledDate,
-                    tags: intent.tags,
-                    notes: intent.notes,
-                    createDraft: intent.createDraft,
-                    draftId: intent.draftId,
-                    taskId: lastTask.id.uuidString,
-                    taskTitle: intent.taskTitle,
-                    taskTitles: intent.taskTitles,
-                    taskNotes: intent.taskNotes,
-                    taskDueDate: intent.taskDueDate,
-                    taskStatus: intent.taskStatus,
-                    taskPriority: intent.taskPriority,
-                    taskProjectId: intent.taskProjectId,
-                    taskAreaId: intent.taskAreaId,
-                    noteId: intent.noteId,
-                    noteTitle: intent.noteTitle,
-                    noteTitles: intent.noteTitles,
-                    noteBody: intent.noteBody,
-                    noteTags: intent.noteTags,
-                    inboxItemId: intent.inboxItemId,
-                    inboxContent: intent.inboxContent,
-                    inboxType: intent.inboxType,
-                    conversionTarget: intent.conversionTarget,
-                    projectId: intent.projectId,
-                    projectTitle: intent.projectTitle,
-                    projectGoal: intent.projectGoal,
-                    projectStatus: intent.projectStatus,
-                    projectDueDate: intent.projectDueDate,
-                    projectAreaId: intent.projectAreaId,
-                    postId: intent.postId,
-                    postCaptions: intent.postCaptions,
-                    publishNotes: intent.publishNotes,
-                    conversationId: intent.conversationId,
-                    searchQuery: intent.searchQuery,
-                    createTasksWithProject: intent.createTasksWithProject,
-                    createNotesWithProject: intent.createNotesWithProject,
-                    createPostsWithProject: intent.createPostsWithProject,
-                    createTasksWithNote: intent.createTasksWithNote,
-                    createPostsWithNote: intent.createPostsWithNote,
-                    createTasksWithPost: intent.createTasksWithPost,
-                    createNotesWithPost: intent.createNotesWithPost,
-                    taskCount: intent.taskCount,
-                    noteCount: intent.noteCount,
-                    postCount: intent.postCount,
-                    reminderTitle: intent.reminderTitle,
-                    reminderNotes: intent.reminderNotes,
-                    reminderDate: intent.reminderDate,
-                    reminderTime: intent.reminderTime,
-                    reminderTaskId: intent.reminderTaskId,
-                    reminderProjectId: intent.reminderProjectId,
-                    linkedContext: intent.linkedContext
-                )
+                intent.taskId = lastTask.id.uuidString
+                if intent.taskProjectId == nil {
+                    intent.taskProjectId = lastTask.projectId?.uuidString
+                }
             }
         }
         
@@ -2488,6 +2429,12 @@ final class AIAssistantViewModel {
                 prompts.append(PendingField(key: .reminderDate, prompt: "When should I remind you? (e.g., 'tomorrow at 3pm', 'Monday at 9am')"))
             }
             return prompts
+        case .createArtifact:
+            var prompts: [PendingField] = []
+            if isEmpty(intent.artifactTitle) {
+                prompts.append(PendingField(key: .artifactTitle, prompt: "What should I call the artifact?"))
+            }
+            return prompts
         default:
             return []
         }
@@ -2618,6 +2565,26 @@ final class AIAssistantViewModel {
                 projectId: projectId
             )
             return .createReminder(request)
+        case .createArtifact:
+            guard let title = pending.collectedFields[.artifactTitle] ?? trimmed(pending.intent.artifactTitle), !title.isEmpty else {
+                return nil
+            }
+            let format = mapOutputFormat(pending.intent.artifactFormat)
+            let state = mapArtifactState(pending.intent.artifactState)
+            let projectId = pending.intent.artifactProjectId.flatMap(UUID.init(uuidString:))
+            let areaId = pending.intent.artifactAreaId.flatMap(UUID.init(uuidString:))
+            let notes = pending.intent.artifactNotes ?? pending.intent.notes
+            let request = ArtifactCreationRequest(
+                title: title,
+                content: pending.intent.artifactContent ?? pending.intent.notes,
+                format: format,
+                state: state,
+                tags: pending.intent.artifactTags ?? [],
+                projectId: projectId,
+                areaId: areaId,
+                auroraNotes: notes
+            )
+            return .createArtifact(request)
         default:
             return nil
         }
@@ -2862,14 +2829,7 @@ final class AIAssistantViewModel {
     }
     
     private func parseISODate(_ raw: String?) -> Date? {
-        guard let raw else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: raw) {
-            return date
-        }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: raw)
+        DateParsing.parse(raw)
     }
     
     private func mapTaskStatus(_ raw: String?) -> CloutmateShared.TaskStatus? {
@@ -2884,11 +2844,22 @@ final class AIAssistantViewModel {
     }
     
     private func mapTaskPriority(_ raw: String?) -> CloutmateShared.TaskPriority? {
-        guard let raw = raw?.lowercased() else { return nil }
-        switch raw {
+        guard let raw = raw?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        let cleaned = raw
+            .replacingOccurrences(of: "priority", with: "")
+            .replacingOccurrences(of: "priroty", with: "")
+            .replacingOccurrences(of: "set to", with: "")
+            .replacingOccurrences(of: "set for", with: "")
+            .replacingOccurrences(of: "set", with: "")
+            .replacingOccurrences(of: "to", with: "")
+            .replacingOccurrences(of: "with a", with: "")
+            .replacingOccurrences(of: "with", with: "")
+            .replacingOccurrences(of: "at", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        switch cleaned {
         case "low": return .low
-        case "medium", "normal": return .medium
-        case "high": return .high
+        case "medium", "normal", "med": return .medium
+        case "high", "urgent", "hi": return .high
         default: return nil
         }
     }
@@ -2902,7 +2873,24 @@ final class AIAssistantViewModel {
         default: return nil
         }
     }
-
+    
+    private func mapOutputFormat(_ raw: String?) -> OutputFormat {
+        guard let raw = raw?.lowercased() else { return .brief }
+        return OutputFormat(rawValue: raw) ?? .brief
+    }
+    
+    private func mapArtifactState(_ raw: String?) -> ArtifactState {
+        guard let raw = raw?.lowercased() else { return .draft }
+        switch raw {
+        case "idea": return .idea
+        case "draft": return .draft
+        case "final": return .final
+        case "published": return .published
+        case "archived": return .archived
+        default: return .draft
+        }
+    }
+    
     // MARK: - Style Adaptation Helpers
 
     private func fetchOrCreatePreferences(modelContext: ModelContext) -> UserPreferences {
@@ -3616,5 +3604,233 @@ final class AIAssistantViewModel {
             image: lastMessage.image,
             document: lastMessage.document
         )
+    }
+
+    private func executeCompoundArtifactCreation(
+        intent: ExecutionIntent,
+        modelContext: ModelContext,
+        isFirstMessage: Bool
+    ) async {
+        guard let rawTitle = intent.artifactTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !rawTitle.isEmpty else {
+            await sendAssistantPrompt("I need an artifact title to create this. What should I call it?", modelContext: modelContext)
+            return
+        }
+        let artifactFormat = mapOutputFormat(intent.artifactFormat)
+        let artifactState = mapArtifactState(intent.artifactState)
+        let projectId = intent.artifactProjectId.flatMap(UUID.init(uuidString:))
+        let areaId = intent.artifactAreaId.flatMap(UUID.init(uuidString:))
+        let creationRequest = ArtifactCreationRequest(
+            title: rawTitle,
+            content: intent.artifactContent ?? intent.notes,
+            format: artifactFormat,
+            state: artifactState,
+            tags: intent.artifactTags ?? [],
+            projectId: projectId,
+            areaId: areaId,
+            auroraNotes: intent.artifactNotes ?? intent.notes
+        )
+        do {
+            let artifactAction = AIIntentAction.createArtifact(creationRequest)
+            let artifactResult = try await actionRouter.route(artifactAction, modelContext: modelContext)
+            guard let artifactId = artifactResult.affectedObjectIDs.first else {
+                throw ExecutionError.executionFailed("Artifact ID missing from result")
+            }
+            let artifactFetch = FetchDescriptor<CloutmateShared.Artifact>(
+                predicate: #Predicate { $0.id == artifactId }
+            )
+            guard let artifact = try? modelContext.fetch(artifactFetch).first else {
+                throw ExecutionError.executionFailed("Unable to load created artifact")
+            }
+            var createdTasks: [UUID] = []
+            var taskDetails: [String] = []
+            if intent.createTasksWithArtifact == true || intent.taskTitles != nil || intent.taskCount != nil {
+                var taskTitles: [String] = []
+                if let providedTitles = intent.taskTitles, !providedTitles.isEmpty {
+                    taskTitles = providedTitles
+                } else if let taskCount = intent.taskCount, taskCount > 0 {
+                    let generationPrompt = """
+                        Generate \(taskCount) actionable task titles that support the artifact "\(rawTitle)".
+                        Return ONLY a JSON array of task titles.
+                        """
+                    do {
+                        let response = try await coreResponseService.generateResponse(for: generationPrompt)
+                        let cleaned = response
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .replacingOccurrences(of: "```json", with: "")
+                            .replacingOccurrences(of: "```", with: "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let data = cleaned.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: data) as? [String] {
+                            taskTitles = json
+                        } else {
+                            taskTitles = (1...taskCount).map { "Task \($0) for artifact \(rawTitle)" }
+                        }
+                    } catch {
+                        taskTitles = (1...taskCount).map { "Task \($0) for artifact \(rawTitle)" }
+                    }
+                }
+                let taskStatus = mapTaskStatus(intent.taskStatus) ?? .todo
+                let taskPriority = mapTaskPriority(intent.taskPriority) ?? .medium
+                let taskDueDate = parseISODate(intent.taskDueDate ?? "")
+                let taskAreaId = intent.taskAreaId.flatMap(UUID.init(uuidString:))
+                for (index, taskTitle) in taskTitles.enumerated() {
+                    let request = TaskCreationRequest(
+                        title: taskTitle,
+                        notes: intent.taskNotes ?? "Linked to artifact: \(rawTitle)",
+                        dueDate: taskDueDate,
+                        status: taskStatus,
+                        priority: taskPriority,
+                        projectId: projectId,
+                        areaId: taskAreaId
+                    )
+                    let action = AIIntentAction.createTask(request)
+                    do {
+                        let taskResult = try await actionRouter.route(action, modelContext: modelContext)
+                        createdTasks.append(contentsOf: taskResult.affectedObjectIDs)
+                        taskDetails.append("\(index + 1). \(taskTitle)")
+                    } catch {
+                        print("Failed to create task '\(taskTitle)': \(error)")
+                    }
+                }
+            }
+            var createdNotes: [UUID] = []
+            var noteDetails: [String] = []
+            if intent.createNotesWithArtifact == true || intent.noteTitles != nil || intent.noteCount != nil {
+                var noteTitles: [String] = []
+                if let providedTitles = intent.noteTitles, !providedTitles.isEmpty {
+                    noteTitles = providedTitles
+                } else if let noteCount = intent.noteCount, noteCount > 0 {
+                    let generationPrompt = """
+                        Generate \(noteCount) note titles that capture context or summaries for the artifact "\(rawTitle)".
+                        Return ONLY a JSON array of note titles.
+                        """
+                    do {
+                        let response = try await coreResponseService.generateResponse(for: generationPrompt)
+                        let cleaned = response
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                            .replacingOccurrences(of: "```json", with: "")
+                            .replacingOccurrences(of: "```", with: "")
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        if let data = cleaned.data(using: .utf8),
+                           let json = try? JSONSerialization.jsonObject(with: data) as? [String] {
+                            noteTitles = json
+                        } else {
+                            noteTitles = (1...noteCount).map { "Note \($0) for artifact \(rawTitle)" }
+                        }
+                    } catch {
+                        noteTitles = (1...noteCount).map { "Note \($0) for artifact \(rawTitle)" }
+                    }
+                }
+                let noteTags = intent.noteTags ?? []
+                for (index, noteTitle) in noteTitles.enumerated() {
+                    let noteRequest = NoteMutationRequest(
+                        noteId: nil,
+                        title: noteTitle,
+                        body: intent.noteBody ?? "Linked to artifact: \(rawTitle)",
+                        tags: noteTags
+                    )
+                    let noteAction = AIIntentAction.createNote(noteRequest)
+                    do {
+                        let result = try await actionRouter.route(noteAction, modelContext: modelContext)
+                        createdNotes.append(contentsOf: result.affectedObjectIDs)
+                        noteDetails.append("\(index + 1). \(noteTitle)")
+                    } catch {
+                        print("Failed to create note '\(noteTitle)': \(error)")
+                    }
+                }
+            }
+            if !createdTasks.isEmpty {
+                let descriptor = FetchDescriptor<CloutmateShared.Task>(
+                    predicate: #Predicate { createdTasks.contains($0.id) }
+                )
+                if let tasks = try? modelContext.fetch(descriptor) {
+                    for task in tasks {
+                        if !task.linkedEntityIds.contains(artifactId) {
+                            task.linkedEntityIds.append(artifactId)
+                            task.linkedEntityTypes.append("artifact")
+                            task.updatedAt = Date()
+                        }
+                    }
+                }
+            }
+            if !createdNotes.isEmpty {
+                let descriptor = FetchDescriptor<CloutmateShared.Note>(
+                    predicate: #Predicate { createdNotes.contains($0.id) }
+                )
+                if let notes = try? modelContext.fetch(descriptor) {
+                    for note in notes {
+                        if !note.backlinks.contains(artifactId) {
+                            note.backlinks.append(artifactId)
+                            note.updatedAt = Date()
+                        }
+                    }
+                }
+            }
+            var linkedIds = artifact.linkedEntityIds
+            var linkedTypes = artifact.linkedEntityTypes
+            if !createdTasks.isEmpty {
+                linkedIds.append(contentsOf: createdTasks)
+                linkedTypes.append(contentsOf: Array(repeating: "task", count: createdTasks.count))
+            }
+            if !createdNotes.isEmpty {
+                linkedIds.append(contentsOf: createdNotes)
+                linkedTypes.append(contentsOf: Array(repeating: "note", count: createdNotes.count))
+            }
+            var mapping: [UUID: String] = [:]
+            for (index, id) in linkedIds.enumerated() {
+                let type = index < linkedTypes.count ? linkedTypes[index] : "unknown"
+                if mapping[id] == nil {
+                    mapping[id] = type
+                }
+            }
+            artifact.linkedEntityIds = Array(mapping.keys)
+            artifact.linkedEntityTypes = artifact.linkedEntityIds.compactMap { mapping[$0] }
+            artifact.updatedAt = Date()
+            try? modelContext.save()
+            let totalItems = createdTasks.count + createdNotes.count
+            var markdown = "✅ **Artifact created"
+            if totalItems > 0 {
+                markdown += " with \(totalItems) item\(totalItems == 1 ? "" : "s")"
+            }
+            markdown += "**\n\n**Artifact:** \(rawTitle)\nFormat: \(artifactFormat.displayName)\nState: \(artifactState.displayName)"
+            if !taskDetails.isEmpty {
+                markdown += "\n\n**Tasks created (\(createdTasks.count)):**\n"
+                markdown += taskDetails.joined(separator: "\n")
+            }
+            if !noteDetails.isEmpty {
+                markdown += "\n\n**Notes created (\(createdNotes.count)):**\n"
+                markdown += noteDetails.joined(separator: "\n")
+            }
+            let attributed = convertMarkdownToAttributedString(markdown)
+            let assistantMessage = AIMessage(role: "assistant", content: attributed)
+            await MainActor.run {
+                modelContext.insert(assistantMessage)
+                messages.append(assistantMessage)
+                currentConversation?.messages?.append(assistantMessage)
+                isLoading = false
+                do {
+                    try modelContext.save()
+                } catch {
+                    print("Failed to save artifact compound response: \(error)")
+                }
+            }
+            if isFirstMessage, let conversation = currentConversation {
+                await generateAndSetTitle(from: "Create Artifact: \(rawTitle)", conversation: conversation, modelContext: modelContext)
+            }
+        } catch {
+            let errorMessage = AIMessage(
+                role: "assistant",
+                content: "❌ Failed to create artifact: \(error.localizedDescription)"
+            )
+            await MainActor.run {
+                modelContext.insert(errorMessage)
+                messages.append(errorMessage)
+                currentConversation?.messages?.append(errorMessage)
+                self.errorMessage = error.localizedDescription
+                isLoading = false
+                try? modelContext.save()
+            }
+        }
     }
 }

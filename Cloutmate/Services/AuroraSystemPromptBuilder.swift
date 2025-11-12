@@ -463,6 +463,35 @@ CHANGELOG & VERSION AWARENESS:
         return combined
     }
     
+    func recordFinalPromptLength(_ length: Int, for versionId: String) async {
+        guard var versions = versions,
+              let existingVersion = versions.versions[versionId] else { return }
+        
+        let previousMetadata = existingVersion.metadata
+        let updatedMetadata = PromptVersionMetadata(
+            phase: previousMetadata.phase,
+            enabledPhases: previousMetadata.enabledPhases,
+            enabledFeatures: previousMetadata.enabledFeatures,
+            promptLength: previousMetadata.promptLength,
+            sectionCount: previousMetadata.sectionCount,
+            description: previousMetadata.description,
+            finalPromptLength: length
+        )
+        
+        let updatedVersion = PromptVersion(
+            versionId: existingVersion.versionId,
+            sections: existingVersion.sections,
+            metadata: updatedMetadata,
+            commitHash: existingVersion.commitHash,
+            createdAt: existingVersion.createdAt
+        )
+        
+        versions.versions[versionId] = updatedVersion
+        versions.lastUpdated = ISO8601DateFormatter().string(from: Date())
+        self.versions = versions
+        saveVersions()
+    }
+    
     // MARK: - Prompt Assembly
     
     private func assemblePrompt(from sections: [String: PromptSection]) -> String {
@@ -575,7 +604,8 @@ CHANGELOG & VERSION AWARENESS:
             enabledFeatures: enabledFeatures,
             promptLength: promptLength,
             sectionCount: sections.count,
-            description: "Prompt version with phases \(enabledPhases.sorted().map { "\($0)" }.joined(separator: ", "))"
+            description: "Prompt version with phases \(enabledPhases.sorted().map { "\($0)" }.joined(separator: ", "))",
+            finalPromptLength: nil
         )
         
         let version = PromptVersion(

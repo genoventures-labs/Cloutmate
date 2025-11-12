@@ -62,6 +62,8 @@ struct MentionPreviewCard: View {
             tab = .projects
         case .note:
             tab = .notes
+        case .artifact:
+            tab = .posts
         case .post:
             tab = .posts
         case .reminder:
@@ -135,6 +137,8 @@ struct MentionDetailPopover: View {
             projectContent
         case .note:
             noteContent
+        case .artifact:
+            artifactContent
         case .post:
             postContent
         case .reminder:
@@ -315,6 +319,8 @@ struct MentionDetailPopover: View {
             tab = .projects
         case .note:
             tab = .notes
+        case .artifact:
+            tab = .posts
         case .post:
             tab = .posts
         case .reminder:
@@ -345,6 +351,13 @@ struct MentionDetailPopover: View {
     
     private func fetchProject() -> CloutmateShared.Project? {
         let id = mention.id
+        let descriptor = FetchDescriptor<CloutmateShared.Project>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+    
+    private func fetchProject(by id: UUID) -> CloutmateShared.Project? {
         let descriptor = FetchDescriptor<CloutmateShared.Project>(
             predicate: #Predicate { $0.id == id }
         )
@@ -397,6 +410,103 @@ struct MentionDetailPopover: View {
         case .inProgress: return .kosmicBlue
         case .done: return .green
         case .cancelled: return .red
+        }
+    }
+    
+    private var summaryText: String {
+        switch mention.type {
+        case .task:
+            return fetchTask()?.notes ?? ""
+        case .project:
+            return fetchProject()?.goal ?? ""
+        case .note:
+            return fetchNote()?.markdown ?? ""
+        case .artifact:
+            return fetchArtifact()?.content ?? ""
+        case .post:
+            return fetchPost()?.caption ?? ""
+        case .reminder:
+            return fetchReminder()?.notes ?? ""
+        case .inboxItem:
+            return fetchInboxItem()?.content ?? ""
+        case .focusSession:
+            return fetchFocusSession()?.objective ?? ""
+        }
+    }
+    
+    private func fetchArtifact() -> CloutmateShared.Artifact? {
+        let id = mention.id
+        let descriptor = FetchDescriptor<CloutmateShared.Artifact>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+    
+    @ViewBuilder
+    private var artifactContent: some View {
+        if let artifact = fetchArtifact() {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    StatusBadge(status: artifact.artifactState.displayName, color: artifactStatusColor(artifact.artifactState))
+                    Label(artifact.format.displayName, systemImage: "doc.richtext")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Text(cleanArtifactDescription(artifact.content))
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+                if let projectId = artifact.projectId,
+                   let project = fetchProject(by: projectId) {
+                    Label(project.title, systemImage: "folder.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                if !artifact.tags.isEmpty {
+                    tagWrapLayout(for: artifact.tags)
+                }
+            }
+        } else {
+            Text("Cannot load artifact details")
+                .foregroundStyle(.secondary)
+        }
+    }
+    
+    private func artifactStatusColor(_ state: ArtifactState) -> Color {
+        switch state {
+        case .idea: return .orange
+        case .draft: return .kosmicBlue
+        case .final: return .green
+        case .published: return .purple
+        case .archived: return .gray
+        }
+    }
+    
+    private func cleanArtifactDescription(_ text: String) -> String {
+        let cleaned = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+            .split(separator: " ")
+            .map(String.init)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return "No description available" }
+        return String(cleaned.prefix(200))
+    }
+    
+    private func tagWrapLayout(for tags: [String]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(tags.prefix(8), id: \.self) { tag in
+                    Text("#\(tag)")
+                        .font(.caption2)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.gray.opacity(0.15))
+                        .cornerRadius(4)
+                }
+            }
+            .padding(.vertical, 4)
         }
     }
 }

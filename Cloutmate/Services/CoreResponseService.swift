@@ -316,6 +316,7 @@ enum ExecutionOperation: String, Codable {
     case generateReport
     case predictScheduling
     case createPost
+    case publishPost
     case createTask
     case updateTask
     case deleteTask
@@ -327,7 +328,11 @@ enum ExecutionOperation: String, Codable {
     case createProject
     case updateProject
     case deleteProject
-    case publishPost
+    case duplicateProject
+    case createArtifact
+    case updateArtifact
+    case deleteArtifact
+    case convertTaskToNote
     case digestConversation
     case digestAllConversations
     case searchConversations
@@ -335,65 +340,79 @@ enum ExecutionOperation: String, Codable {
 }
 
 struct ExecutionIntent: Codable {
-    let operation: ExecutionOperation
-    let criteria: String?
-    let daysAgo: Int?
-    let postFilter: String?
-    let filterValue: String?
-    let reportType: String?
-    let daysAhead: Int?
-    let caption: String?
-    let scheduledDate: String?
-    let tags: [String]?
-    let notes: String?
-    let createDraft: Bool?
-    let draftId: String?
-    let taskId: String?
-    let taskTitle: String?
-    let taskTitles: [String]?
-    let taskNotes: String?
-    let taskDueDate: String?
-    let taskStatus: String?
-    let taskPriority: String?
-    let taskProjectId: String?
-    let taskAreaId: String?
-    let noteId: String?
-    let noteTitle: String?
-    let noteTitles: [String]?
-    let noteBody: String?
-    let noteTags: [String]?
-    let inboxItemId: String?
-    let inboxContent: String?
-    let inboxType: String?
-    let conversionTarget: String?
-    let projectId: String?
-    let projectTitle: String?
-    let projectGoal: String?
-    let projectStatus: String?
-    let projectDueDate: String?
-    let projectAreaId: String?
-    let postId: String?
-    let postCaptions: [String]?
-    let publishNotes: String?
-    let conversationId: String?
-    let searchQuery: String?
-    let createTasksWithProject: Bool?
-    let createNotesWithProject: Bool?
-    let createPostsWithProject: Bool?
-    let createTasksWithNote: Bool?
-    let createPostsWithNote: Bool?
-    let createTasksWithPost: Bool?
-    let createNotesWithPost: Bool?
-    let taskCount: Int?
-    let noteCount: Int?
-    let postCount: Int?
-    let reminderTitle: String?
-    let reminderNotes: String?
-    let reminderDate: String?
-    let reminderTime: String?
-    let reminderTaskId: String?
-    let reminderProjectId: String?
-    let linkedContext: LinkedContext?
+    var operation: ExecutionOperation
+    var criteria: String?
+    var daysAgo: Int?
+    var postFilter: String?
+    var filterValue: String?
+    var reportType: String?
+    var daysAhead: Int?
+    var caption: String?
+    var scheduledDate: String?
+    var tags: [String]?
+    var notes: String?
+    var createDraft: Bool?
+    var draftId: String?
+    var taskId: String?
+    var taskTitle: String?
+    var taskTitles: [String]?
+    var taskNotes: String?
+    var taskDueDate: String?
+    var taskStatus: String?
+    var taskPriority: String?
+    var taskProjectId: String?
+    var taskAreaId: String?
+    var noteId: String?
+    var noteTitle: String?
+    var noteTitles: [String]?
+    var noteBody: String?
+    var noteTags: [String]?
+    var inboxItemId: String?
+    var inboxContent: String?
+    var inboxType: String?
+    var conversionTarget: String?
+    var projectId: String?
+    var projectTitle: String?
+    var projectGoal: String?
+    var projectStatus: String?
+    var projectDueDate: String?
+    var projectAreaId: String?
+    var postId: String?
+    var postCaptions: [String]?
+    var publishNotes: String?
+    var conversationId: String?
+    var searchQuery: String?
+    var createTasksWithProject: Bool?
+    var createNotesWithProject: Bool?
+    var createPostsWithProject: Bool?
+    var createTasksWithNote: Bool?
+    var createPostsWithNote: Bool?
+    var createTasksWithPost: Bool?
+    var createNotesWithPost: Bool?
+    var taskCount: Int?
+    var noteCount: Int?
+    var postCount: Int?
+    var reminderTitle: String?
+    var reminderNotes: String?
+    var reminderDate: String?
+    var reminderTime: String?
+    var reminderTaskId: String?
+    var reminderProjectId: String?
+    var artifactId: String?
+    var artifactTitle: String?
+    var artifactContent: String?
+    var artifactFormat: String?
+    var artifactState: String?
+    var artifactTags: [String]?
+    var artifactProjectId: String?
+    var artifactAreaId: String?
+    var artifactNotes: String?
+    var createTasksWithArtifact: Bool?
+    var createNotesWithArtifact: Bool?
+    var duplicateProjectTitle: String?
+    var duplicateIncludeTasks: Bool?
+    var convertDeleteOriginal: Bool?
+    var linkedContext: LinkedContext?
 }
 
 enum ReflectionIntent: String, Codable {

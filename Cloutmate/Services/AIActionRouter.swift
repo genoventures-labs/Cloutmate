@@ -38,6 +38,11 @@ enum AIIntentAction {
     case digestAllConversations
     case searchConversations(query: String)
     case createReminder(ReminderCreationRequest)
+    case createArtifact(ArtifactCreationRequest)
+    case updateArtifact(ArtifactUpdateRequest)
+    case deleteArtifact(UUID)
+    case convertTaskToNote(ConvertTaskToNoteRequest)
+    case duplicateProject(ProjectDuplicationRequest)
     
     var displayName: String {
         switch self {
@@ -68,6 +73,11 @@ enum AIIntentAction {
         case .digestAllConversations: return "Digest All Conversations"
         case .searchConversations: return "Search Conversations"
         case .createReminder: return "Create Reminder"
+        case .createArtifact: return "Create Artifact"
+        case .updateArtifact: return "Update Artifact"
+        case .deleteArtifact: return "Delete Artifact"
+        case .convertTaskToNote: return "Convert Task to Note"
+        case .duplicateProject: return "Duplicate Project"
         }
     }
     
@@ -190,6 +200,49 @@ enum AIIntentAction {
                 data["projectId"] = projectId.uuidString
             }
             return data
+        case .createArtifact(let request):
+            var data: [String: String] = [
+                "title": request.title,
+                "format": request.format.rawValue,
+                "state": request.state.rawValue
+            ]
+            if let projectId = request.projectId {
+                data["projectId"] = projectId.uuidString
+            }
+            if let areaId = request.areaId {
+                data["areaId"] = areaId.uuidString
+            }
+            if !request.tags.isEmpty {
+                data["tags"] = request.tags.joined(separator: ",")
+            }
+            return data
+        case .updateArtifact(let request):
+            var data: [String: String] = ["artifactId": request.artifactId.uuidString]
+            if let title = request.title { data["title"] = title }
+            if let format = request.format { data["format"] = format.rawValue }
+            if let state = request.state { data["state"] = state.rawValue }
+            if let projectId = request.projectId { data["projectId"] = projectId.uuidString }
+            if let areaId = request.areaId { data["areaId"] = areaId.uuidString }
+            if let tags = request.tags, !tags.isEmpty { data["tags"] = tags.joined(separator: ",") }
+            return data
+        case .deleteArtifact(let artifactId):
+            return ["artifactId": artifactId.uuidString]
+        case .convertTaskToNote(let request):
+            var data: [String: String] = ["taskId": request.taskId.uuidString]
+            if let title = request.noteTitle { data["noteTitle"] = title }
+            data["deleteOriginal"] = request.deleteOriginal ? "true" : "false"
+            if let projectId = request.projectId {
+                data["projectId"] = projectId.uuidString
+            }
+            if !request.noteTags.isEmpty {
+                data["noteTags"] = request.noteTags.joined(separator: ",")
+            }
+            return data
+        case .duplicateProject(let request):
+            var data: [String: String] = ["sourceProjectId": request.projectId.uuidString]
+            if let newTitle = request.newTitle { data["newTitle"] = newTitle }
+            data["includeTasks"] = request.includeTasks ? "true" : "false"
+            return data
         }
     }
 }
@@ -284,6 +337,44 @@ struct ReminderCreationRequest {
     let reminderDate: Date
     let taskId: UUID?
     let projectId: UUID?
+}
+
+struct ArtifactCreationRequest {
+    let title: String
+    let content: String?
+    let format: CloutmateShared.OutputFormat
+    let state: CloutmateShared.ArtifactState
+    let tags: [String]
+    let projectId: UUID?
+    let areaId: UUID?
+    let auroraNotes: String?
+}
+
+struct ArtifactUpdateRequest {
+    let artifactId: UUID
+    let title: String?
+    let content: String?
+    let format: CloutmateShared.OutputFormat?
+    let state: CloutmateShared.ArtifactState?
+    let tags: [String]?
+    let projectId: UUID?
+    let areaId: UUID?
+    let auroraNotes: String?
+}
+
+struct ConvertTaskToNoteRequest {
+    let taskId: UUID
+    let noteTitle: String?
+    let noteBody: String?
+    let noteTags: [String]
+    let deleteOriginal: Bool
+    let projectId: UUID?
+}
+
+struct ProjectDuplicationRequest {
+    let projectId: UUID
+    let newTitle: String?
+    let includeTasks: Bool
 }
 
 struct AIActionResult {
@@ -942,6 +1033,218 @@ final class AIActionRouter {
                 affectedObjectIDs: [reminder.id],
                 metadata: action.metadata
             )
+        case let .createArtifact(request):
+            let artifact = CloutmateShared.Artifact(
+                title: request.title,
+                content: request.content ?? "",
+                mediaURLs: [],
+                outputFormat: request.format,
+                state: request.state,
+                tags: request.tags,
+                projectId: request.projectId,
+                areaId: request.areaId,
+                auroraNotes: request.auroraNotes
+            )
+            artifact.ensureTitle()
+            modelContext.insert(artifact)
+            try? modelContext.save()
+            AIRecallService.shared.registerCreated(artifact, modelContext: modelContext)
+            let detailLines = [
+                "Title: \(artifact.title)",
+                "Format: \(artifact.format.displayName)",
+                "State: \(artifact.artifactState.displayName)"
+            ]
+            return AIActionResult(
+                title: action.displayName,
+                message: "Artifact created",
+                markdown: "✅ **Artifact created**\n\n\(detailLines.joined(separator: "\n"))",
+                details: detailLines,
+                itemsAffected: 1,
+                affectedObjectIDs: [artifact.id],
+                metadata: action.metadata
+            )
+        case let .updateArtifact(request):
+            guard let artifact = fetchArtifact(by: request.artifactId, context: modelContext) else {
+                throw ExecutionError.notFound("Artifact not found")
+            }
+            var changes: [String] = []
+            if let title = request.title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, title != artifact.title {
+                artifact.title = title
+                changes.append("title")
+            }
+            if let content = request.content, content != artifact.content {
+                artifact.content = content
+                changes.append("content")
+            }
+            if let format = request.format, format != artifact.format {
+                artifact.format = format
+                changes.append("format")
+            }
+            if let state = request.state, state != artifact.artifactState {
+                artifact.artifactState = state
+                changes.append("state")
+            }
+            if let tags = request.tags {
+                artifact.tags = tags
+                changes.append("tags")
+            }
+            if let projectId = request.projectId {
+                artifact.projectId = projectId
+                changes.append("project")
+            }
+            if let areaId = request.areaId {
+                artifact.areaId = areaId
+                changes.append("area")
+            }
+            if let notes = request.auroraNotes {
+                artifact.auroraNotes = notes
+                changes.append("notes")
+            }
+            artifact.updatedAt = Date()
+            try? modelContext.save()
+            AIRecallService.shared.registerUpdated(artifact, modelContext: modelContext)
+            let changeSummary = changes.isEmpty ? "No fields changed" : "Updated: \(changes.joined(separator: ", "))"
+            let detailLines = [
+                "Title: \(artifact.title)",
+                "Format: \(artifact.format.displayName)",
+                "State: \(artifact.artifactState.displayName)",
+                changeSummary
+            ]
+            return AIActionResult(
+                title: action.displayName,
+                message: "Artifact updated",
+                markdown: "✅ **Artifact updated**\n\n\(detailLines.joined(separator: "\n"))",
+                details: detailLines,
+                itemsAffected: 1,
+                affectedObjectIDs: [artifact.id],
+                metadata: action.metadata
+            )
+        case let .deleteArtifact(artifactId):
+            guard let artifact = fetchArtifact(by: artifactId, context: modelContext) else {
+                throw ExecutionError.notFound("Artifact not found")
+            }
+            let detailLines = [
+                "Title: \(artifact.title)",
+                "Format: \(artifact.format.displayName)",
+                "State: \(artifact.artifactState.displayName)"
+            ]
+            modelContext.delete(artifact)
+            try? modelContext.save()
+            AIRecallService.shared.removeObjects(withIDs: [artifactId], modelContext: modelContext)
+            return AIActionResult(
+                title: action.displayName,
+                message: "Artifact deleted",
+                markdown: "🗑️ **Artifact deleted**\n\n\(detailLines.joined(separator: "\n"))",
+                details: detailLines,
+                itemsAffected: 1,
+                affectedObjectIDs: [artifactId],
+                metadata: action.metadata
+            )
+        case let .convertTaskToNote(request):
+            guard let task = fetchTask(by: request.taskId, context: modelContext) else {
+                throw ExecutionError.notFound("Task not found")
+            }
+            let computedTitle = request.noteTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let noteTitle = (computedTitle?.isEmpty == false ? computedTitle! : task.title)
+            let noteBody = request.noteBody ?? task.notes ?? ""
+            let note = CloutmateShared.Note(
+                title: noteTitle.isEmpty ? "Converted Task" : noteTitle,
+                markdown: noteBody,
+                tags: request.noteTags,
+                projectId: request.projectId ?? task.projectId,
+                areaId: task.areaId
+            )
+            note.author = .aurora
+            note.backlinks.append(task.id)
+            modelContext.insert(note)
+            try? modelContext.save()
+            AIRecallService.shared.registerCreated(note, modelContext: modelContext)
+            var details: [String] = [
+                "Task: \(task.title)",
+                "Note: \(note.title)"
+            ]
+            if request.deleteOriginal {
+                modelContext.delete(task)
+                try? modelContext.save()
+                AIRecallService.shared.removeObjects(withIDs: [request.taskId], modelContext: modelContext)
+                details.append("Original task deleted")
+            } else {
+                task.status = .done
+                task.updatedAt = Date()
+                try? modelContext.save()
+                AIRecallService.shared.registerUpdated(task, modelContext: modelContext)
+                details.append("Original task marked as done")
+            }
+            return AIActionResult(
+                title: action.displayName,
+                message: "Task converted to note",
+                markdown: "✅ **Task converted to note**\n\n\(details.joined(separator: "\n"))",
+                details: details,
+                itemsAffected: 1,
+                affectedObjectIDs: [note.id],
+                metadata: action.metadata
+            )
+        case let .duplicateProject(request):
+            guard let sourceProject = fetchProject(by: request.projectId, context: modelContext) else {
+                throw ExecutionError.notFound("Project not found")
+            }
+            let proposedTitle = request.newTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let duplicateTitle = (proposedTitle?.isEmpty == false ? proposedTitle! : "\(sourceProject.title) Copy")
+            let duplicate = PARAProject(
+                title: duplicateTitle,
+                goal: sourceProject.goal,
+                status: sourceProject.status,
+                dueDate: sourceProject.dueDate,
+                areaId: sourceProject.areaId,
+                tags: sourceProject.tags
+            )
+            modelContext.insert(duplicate)
+            try? modelContext.save()
+            AIRecallService.shared.registerCreated(duplicate, modelContext: modelContext)
+            var duplicatedTaskIds: [UUID] = []
+            var taskSummaries: [String] = []
+            if request.includeTasks {
+                let sourceProjectId = sourceProject.id
+                let descriptor = FetchDescriptor<PARATask>(
+                    predicate: #Predicate { task in
+                        task.projectId == sourceProjectId
+                    }
+                )
+                if let tasks = try? modelContext.fetch(descriptor) {
+                    for task in tasks {
+                        let newTask = PARATask(
+                            title: task.title,
+                            notes: task.notes,
+                            status: task.status,
+                            priority: task.priority,
+                            dueDate: task.dueDate,
+                            projectId: duplicate.id,
+                            areaId: task.areaId
+                        )
+                        newTask.linkedEntityIds = task.linkedEntityIds
+                        newTask.linkedEntityTypes = task.linkedEntityTypes
+                        modelContext.insert(newTask)
+                        try? modelContext.save()
+                        AIRecallService.shared.registerCreated(newTask, modelContext: modelContext)
+                        duplicatedTaskIds.append(newTask.id)
+                        taskSummaries.append(newTask.title)
+                    }
+                }
+            }
+            let detailLines = [
+                "Source project: \(sourceProject.title)",
+                "New project: \(duplicate.title)",
+                "Tasks duplicated: \(duplicatedTaskIds.count)"
+            ] + (taskSummaries.isEmpty ? [] : ["Tasks:\n" + taskSummaries.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n")])
+            return AIActionResult(
+                title: action.displayName,
+                message: "Project duplicated",
+                markdown: "✅ **Project duplicated**\n\n\(detailLines.joined(separator: "\n"))",
+                details: detailLines,
+                itemsAffected: 1 + duplicatedTaskIds.count,
+                affectedObjectIDs: [duplicate.id] + duplicatedTaskIds,
+                metadata: action.metadata
+            )
         }
     }
 }
@@ -1172,6 +1475,63 @@ extension AIIntentAction {
                 projectId: projectId
             )
             self = .createReminder(request)
+        case .createArtifact:
+            guard let rawTitle = executionIntent.artifactTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !rawTitle.isEmpty else { return nil }
+            let request = ArtifactCreationRequest(
+                title: rawTitle,
+                content: executionIntent.artifactContent ?? executionIntent.notes,
+                format: mapOutputFormat(executionIntent.artifactFormat),
+                state: mapArtifactState(executionIntent.artifactState),
+                tags: executionIntent.artifactTags ?? [],
+                projectId: executionIntent.artifactProjectId.flatMap(UUID.init(uuidString:)),
+                areaId: executionIntent.artifactAreaId.flatMap(UUID.init(uuidString:)),
+                auroraNotes: executionIntent.artifactNotes ?? executionIntent.notes
+            )
+            self = .createArtifact(request)
+        case .updateArtifact:
+            guard let artifactIdString = executionIntent.artifactId,
+                  let artifactId = UUID(uuidString: artifactIdString) else { return nil }
+            let request = ArtifactUpdateRequest(
+                artifactId: artifactId,
+                title: executionIntent.artifactTitle,
+                content: executionIntent.artifactContent ?? executionIntent.notes,
+                format: executionIntent.artifactFormat.map { mapOutputFormat($0) },
+                state: executionIntent.artifactState.map { mapArtifactState($0) },
+                tags: executionIntent.artifactTags,
+                projectId: executionIntent.artifactProjectId.flatMap(UUID.init(uuidString:)),
+                areaId: executionIntent.artifactAreaId.flatMap(UUID.init(uuidString:)),
+                auroraNotes: executionIntent.artifactNotes ?? executionIntent.notes
+            )
+            self = .updateArtifact(request)
+        case .deleteArtifact:
+            guard let artifactIdString = executionIntent.artifactId,
+                  let artifactId = UUID(uuidString: artifactIdString) else { return nil }
+            self = .deleteArtifact(artifactId)
+        case .convertTaskToNote:
+            guard let taskIdString = executionIntent.taskId,
+                  let taskId = UUID(uuidString: taskIdString) else { return nil }
+            let linkedProjectId = executionIntent.projectId.flatMap({ UUID(uuidString: $0) }) ??
+                executionIntent.taskProjectId.flatMap({ UUID(uuidString: $0) }) ??
+                executionIntent.artifactProjectId.flatMap({ UUID(uuidString: $0) })
+            let request = ConvertTaskToNoteRequest(
+                taskId: taskId,
+                noteTitle: executionIntent.noteTitle,
+                noteBody: executionIntent.noteBody ?? executionIntent.taskNotes ?? executionIntent.notes,
+                noteTags: executionIntent.noteTags ?? [],
+                deleteOriginal: executionIntent.convertDeleteOriginal ?? true,
+                projectId: linkedProjectId
+            )
+            self = .convertTaskToNote(request)
+        case .duplicateProject:
+            guard let projectIdString = executionIntent.projectId,
+                  let projectId = UUID(uuidString: projectIdString) else { return nil }
+            let request = ProjectDuplicationRequest(
+                projectId: projectId,
+                newTitle: executionIntent.duplicateProjectTitle ?? executionIntent.projectTitle,
+                includeTasks: executionIntent.duplicateIncludeTasks ?? true
+            )
+            self = .duplicateProject(request)
         }
     }
     
@@ -1234,6 +1594,14 @@ private func fetchInboxItem(by id: UUID, context: ModelContext) -> PARAInboxItem
 
 private func fetchProject(by id: UUID, context: ModelContext) -> PARAProject? {
     var descriptor = FetchDescriptor<PARAProject>(
+        predicate: #Predicate { $0.id == id }
+    )
+    descriptor.fetchLimit = 1
+    return try? context.fetch(descriptor).first
+}
+
+private func fetchArtifact(by id: UUID, context: ModelContext) -> CloutmateShared.Artifact? {
+    var descriptor = FetchDescriptor<CloutmateShared.Artifact>(
         predicate: #Predicate { $0.id == id }
     )
     descriptor.fetchLimit = 1
@@ -1343,14 +1711,25 @@ private func mapProjectStatus(_ raw: String?) -> CloutmateShared.ProjectStatus? 
     }
 }
 
-private func parseISODate(_ raw: String) -> Date? {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    if let date = formatter.date(from: raw) {
-        return date
+private func mapOutputFormat(_ raw: String?) -> CloutmateShared.OutputFormat {
+    guard let raw = raw?.lowercased() else { return .brief }
+    return CloutmateShared.OutputFormat(rawValue: raw) ?? .brief
+}
+
+private func mapArtifactState(_ raw: String?) -> CloutmateShared.ArtifactState {
+    guard let raw = raw?.lowercased() else { return .draft }
+    switch raw {
+    case "idea": return .idea
+    case "draft": return .draft
+    case "final": return .final
+    case "published": return .published
+    case "archived": return .archived
+    default: return .draft
     }
-    formatter.formatOptions = [.withInternetDateTime]
-    return formatter.date(from: raw)
+}
+
+private func parseISODate(_ raw: String) -> Date? {
+    DateParsing.parse(raw)
 }
 
 private func formattedDateTime(_ date: Date) -> String {

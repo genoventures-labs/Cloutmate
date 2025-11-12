@@ -12,6 +12,7 @@ enum ObjectType: String, Codable {
     case project
     case task
     case note
+    case artifact
     case post
     case reminder
     case inboxItem
@@ -22,6 +23,7 @@ enum ObjectType: String, Codable {
         case .project: return "folder.fill"
         case .task: return "checkmark.circle"
         case .note: return "doc.text.fill"
+        case .artifact: return "doc.richtext"
         case .post: return "square.and.pencil"
         case .reminder: return "bell.fill"
         case .inboxItem: return "tray.fill"
@@ -34,6 +36,7 @@ struct LinkedContext: Codable {
     var linkedProjects: [UUID] = []
     var linkedTasks: [UUID] = []
     var linkedNotes: [UUID] = []
+    var linkedArtifacts: [UUID] = []
     var linkedPosts: [UUID] = []
     var linkedReminders: [UUID] = []
     var linkedInboxItems: [UUID] = []
@@ -48,6 +51,7 @@ struct LinkedContext: Codable {
         case linkedProjects
         case linkedTasks
         case linkedNotes
+        case linkedArtifacts
         case linkedPosts
         case linkedReminders
         case linkedInboxItems
@@ -70,6 +74,10 @@ struct LinkedContext: Codable {
         case .note:
             if !linkedNotes.contains(id) {
                 linkedNotes.append(id)
+            }
+        case .artifact:
+            if !linkedArtifacts.contains(id) {
+                linkedArtifacts.append(id)
             }
         case .post:
             if !linkedPosts.contains(id) {
@@ -105,6 +113,7 @@ struct LinkedContext: Codable {
         linkedProjects.removeAll()
         linkedTasks.removeAll()
         linkedNotes.removeAll()
+        linkedArtifacts.removeAll()
         linkedPosts.removeAll()
         linkedReminders.removeAll()
         linkedInboxItems.removeAll()
@@ -117,6 +126,7 @@ struct LinkedContext: Codable {
         return linkedProjects.isEmpty &&
                linkedTasks.isEmpty &&
                linkedNotes.isEmpty &&
+               linkedArtifacts.isEmpty &&
                linkedPosts.isEmpty &&
                linkedReminders.isEmpty &&
                linkedInboxItems.isEmpty &&

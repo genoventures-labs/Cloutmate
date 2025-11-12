@@ -34,12 +34,12 @@ struct PromptVersion: Codable, Sendable {
     let commitHash: String? // Git commit hash when this version was created
     let createdAt: String // ISO 8601 timestamp
     
-    init(versionId: String, sections: [String: PromptSection], metadata: PromptVersionMetadata, commitHash: String? = nil) {
+    init(versionId: String, sections: [String: PromptSection], metadata: PromptVersionMetadata, commitHash: String? = nil, createdAt: String? = nil) {
         self.versionId = versionId
         self.sections = sections
         self.metadata = metadata
         self.commitHash = commitHash
-        self.createdAt = ISO8601DateFormatter().string(from: Date())
+        self.createdAt = createdAt ?? ISO8601DateFormatter().string(from: Date())
     }
 }
 
@@ -49,15 +49,25 @@ struct PromptVersionMetadata: Codable, Sendable {
     let phase: Int // Current phase (1-10)
     let enabledPhases: [Int] // List of enabled phases
     let enabledFeatures: [String] // Feature flags (arteEnabled, predictiveCognitionEnabled, etc.)
-    let promptLength: Int // Total prompt length in characters
+    let promptLength: Int // Base prompt length (before payload/changelog additions)
+    let finalPromptLength: Int? // Final prompt length (after payload/changelog additions)
     let sectionCount: Int // Number of sections
     let description: String // Human-readable description of this version
     
-    init(phase: Int, enabledPhases: [Int], enabledFeatures: [String], promptLength: Int, sectionCount: Int, description: String) {
+    init(
+        phase: Int,
+        enabledPhases: [Int],
+        enabledFeatures: [String],
+        promptLength: Int,
+        sectionCount: Int,
+        description: String,
+        finalPromptLength: Int? = nil
+    ) {
         self.phase = phase
         self.enabledPhases = enabledPhases
         self.enabledFeatures = enabledFeatures
         self.promptLength = promptLength
+        self.finalPromptLength = finalPromptLength
         self.sectionCount = sectionCount
         self.description = description
     }

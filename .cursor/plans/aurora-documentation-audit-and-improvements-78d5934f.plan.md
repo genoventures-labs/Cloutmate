@@ -1,4 +1,4 @@
-<!-- 78d5934f-4f7b-40db-b5a5-b544d014d652 65ae7754-f15f-40a6-887c-de75657765bc -->
+<!-- 78d5934f-4f7b-40db-b5a5-b544d014d652 fa033a93-56da-46ca-b295-47b9e90cd98f -->
 # Aurora Documentation Audit and System Prompt Improvements
 
 ## Analysis Summary
@@ -159,6 +159,53 @@ The documentation lists extensive natural language commands Aurora understands, 
 - Organizes by category (action, reflection, emotional, predictive)
 - Ensures consistency across all instruction sources
 
+### Priority 6: Action Capability Audit
+
+**Objective:** Ensure Aurora’s documented execution abilities (creating, updating, linking, and deleting workspace objects) are fully supported and functional at runtime.
+
+**Scope:**
+
+- Validate creation and linkage of projects, tasks, notes, artifacts, and reminders
+- Confirm compound operations (e.g., “create project with 3 tasks”) execute properly
+- Verify conversion and cleanup actions route through `AIActionRouter` correctly
+- Confirm conversational confirmations and logging consistency
+
+#### Execution Layer Audit Checklist
+
+**Core Object Creation**
+
+- `createProject`, `createTask`, `createNote`, `createArtifact`, `createReminder` — persistence verified
+
+**Compound Operations**
+
+- "create project with 3 tasks"
+- "create note with 2 tasks"
+- "create artifact for @project"
+
+**Conversion & Update Intents**
+
+- "convert task to note", "duplicate project", "rename"
+
+**Deletion & Cleanup**
+
+- "delete project", "clear completed tasks", cascading delete verification
+
+**Routing & Logging**
+
+- Intent detection accuracy in `AIActionRouter`
+- Unsupported intents log diagnostics (not silent fails)
+- Confirmations conversational, not structured
+
+#### Gap Severity Matrix
+
+| Severity | Definition | Examples | Action |
+| --- | --- | --- | --- |
+| **P1 – Critical** | Missing/broken core object creation flow | `createProject` missing | Fix immediately |
+| **P2 – High** | Partial linkage or incomplete persistence | Task not attached to project | Fix within sprint |
+| **P3 – Moderate** | Compound or conversion action incomplete | "create note with tasks" | Patch next update |
+| **P4 – Low** | Cosmetic or UX-level issues | Missing conversational confirmation | Fix opportunistically |
+| **P5 – Informational** | Logging/analytics improvement only | Changelog lacks commit ref | Optional update |
+
 ## Implementation Plan
 
 ### Step 1: Audit Current Prompt Content
@@ -249,15 +296,3 @@ The documentation lists extensive natural language commands Aurora understands, 
 4. **Documentation Drift:** Prompt and docs may drift apart over time
 
 - **Mitigation:** Generate prompt sections from documentation, automated testing
-
-### To-dos
-
-- [ ] Audit current system prompt content in buildSystemPrompt() and document exactly what is included vs. what documentation claims
-- [ ] Design enhanced prompt structure with modular sections for phase documentation, behavioral guidelines, and natural language examples
-- [ ] Create AuroraSystemPromptBuilder.swift service to centralize prompt construction with phase-aware sections
-- [ ] Add comprehensive phase documentation sections (Phases 1-10) to system prompt with behavioral guidelines
-- [ ] Add behavioral guidelines section covering action-first approach, reflection vs execution, intent clusters, ARTE awareness, predictive cognition
-- [ ] Add natural language command examples section to help Aurora understand user intent patterns
-- [ ] Update AURORA_README.md and AURORA_KNOWLEDGE_BASE_UPDATED.md to accurately reflect prompt content vs. documentation reality
-- [ ] Test enhanced prompt length to ensure it fits within context window limits (<7000 chars base)
-- [ ] Test that Aurora follows behavioral guidelines (action-first, reflection routing, intent clusters, etc.)

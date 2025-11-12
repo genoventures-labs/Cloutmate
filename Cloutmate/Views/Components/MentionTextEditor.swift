@@ -174,6 +174,8 @@ struct MentionTextEditor: View {
             tab = .projects
         case .note:
             tab = .notes
+        case .artifact:
+            tab = .posts
         case .post:
             tab = .posts
         case .reminder:

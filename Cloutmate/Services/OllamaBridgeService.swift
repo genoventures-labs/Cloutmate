@@ -498,7 +498,7 @@ Data schema (reference):
         
         // Build full prompt
         var fullPrompt = """
-\(finalSystemPrompt)
+\(systemPrompt)
 
 \(historyText)
 
@@ -782,8 +782,6 @@ Aurora:
             finalSystemPrompt = await promptBuilder.addChangelogUpdates(changesText, to: finalSystemPrompt)
         }
         
-        print("[OllamaBridgeService] Final system prompt length (before history): \(finalSystemPrompt.count)")
-        
         // Check for patch notes on first response (if not already announced)
         if !hasAnnouncedPatchNotes {
             let patchNotes = await changelogService.getPatchNotes()
@@ -795,6 +793,9 @@ Aurora:
                 await changelogService.markChangelogAsSeen()
             }
         }
+        
+        print("[OllamaBridgeService] Final system prompt length (before history): \(finalSystemPrompt.count)")
+        await promptBuilder.recordFinalPromptLength(finalSystemPrompt.count, for: promptVersionId)
         
         // Log prompt version for debugging
         print("[OllamaBridgeService] Using prompt version: \(promptVersionId)")
@@ -1562,19 +1563,27 @@ Aurora:
           * Can combine multiple: "create project with 5 tasks and 3 notes" → set multiple flags)
         - update_project: Update project fields (title, goal, status, due date, area)
         - delete_project: Delete a project
+        - duplicate_project: Duplicate an existing project (optionally copying its tasks)
         - create_note: Create a note (NOTE: Supports compound operations:
           * "create note with tasks" → set createTasksWithNote=true, extract taskTitles or taskCount
           * "create note with posts" → set createPostsWithNote=true, extract postCaptions or postCount)
         - create_post: Create a post (NOTE: Supports compound operations:
           * "create post with tasks" → set createTasksWithPost=true, extract taskTitles or taskCount
           * "create post with notes" → set createNotesWithPost=true, extract noteTitles or noteCount)
+        - create_artifact: Create an artifact (NOTE: Supports compound operations:
+          * "create artifact with tasks" → set createTasksWithArtifact=true, extract taskTitles or taskCount
+          * "create artifact with notes" → set createNotesWithArtifact=true, extract noteTitles or noteCount
+          * Can combine multiple payloads if requested)
+        - update_artifact: Update artifact fields (title, content, format, state, tags, project/area, notes)
+        - delete_artifact: Delete an artifact
+        - convert_task_to_note: Convert an existing task into a note (optionally delete the original task)
         - digest_conversation: Analyze a conversation and add it to cross-conversation memory
         - digest_all_conversations: Process all conversations for cross-conversation memory
         - search_conversations: Search past conversations by keyword
         - create_reminder: Create a reminder with a notification at a specific date/time
         
         Return ONLY JSON with these keys:
-        - operation: one of "archiveTasks", "summarizePosts", "generateReport", "predictScheduling", "createPost", "publishPost", "createTask", "updateTask", "deleteTask", "createNote", "updateNote", "deleteNote", "addInboxItem", "convertInboxItem", "createProject", "updateProject", "deleteProject", "digestConversation", "digestAllConversations", "searchConversations", "createReminder"
+        - operation: one of "archiveTasks", "summarizePosts", "generateReport", "predictScheduling", "createPost", "publishPost", "createTask", "updateTask", "deleteTask", "createNote", "updateNote", "deleteNote", "addInboxItem", "convertInboxItem", "createProject", "updateProject", "deleteProject", "duplicateProject", "createArtifact", "updateArtifact", "deleteArtifact", "convertTaskToNote", "digestConversation", "digestAllConversations", "searchConversations", "createReminder"
         - criteria: for archive_tasks, one of "all", "completed", "olderThan"
         - daysAgo: for olderThan criteria, number of days
         - postFilter: for summarize_posts, one of "all", "published", "scheduled", "byPlatform", "byTag"
@@ -1613,6 +1622,8 @@ Aurora:
         - conversionTarget: for convert_inbox_item, target type ("task", "note", "draft", "post")
         - projectId: for update_project/delete_project, the project identifier
         - projectTitle, projectGoal, projectStatus ("active", "paused", "completed"), projectDueDate (ISO8601), projectAreaId: fields for project creation/update
+        - duplicateProjectTitle: optional new project title when duplicating
+        - duplicateIncludeTasks: boolean flag (default true) indicating whether to copy existing project tasks when duplicating
         - publishNotes: optional string describing publishing context/outcome
         - conversationId: for digest_conversation, the UUID of the conversation to analyze
         - searchQuery: for search_conversations, the search term/keyword
@@ -1622,6 +1633,16 @@ Aurora:
         - reminderTime: time string (e.g., "3:00 PM", "15:00", "9am") - if not provided, defaults to 9 AM
         - reminderTaskId: optional UUID of task to link reminder to
         - reminderProjectId: optional UUID of project to link reminder to
+        - artifactTitle: for create_artifact/update_artifact, the artifact title
+        - artifactContent: primary content/body of the artifact
+        - artifactFormat: artifact output format ("brief", "summary", "reflection", "report", "releaseNote", "lessonLearned")
+        - artifactState: artifact state ("idea", "draft", "final", "published", "archived")
+        - artifactTags: array of tags for the artifact
+        - artifactProjectId, artifactAreaId: IDs to associate artifacts with a project/area
+        - artifactId: for update/delete artifact, the artifact identifier
+        - artifactNotes: optional notes to store in auroraNotes field
+        - createTasksWithArtifact / createNotesWithArtifact: booleans indicating compound artifact creation of tasks/notes
+        - convertDeleteOriginal: for convert_task_to_note, true if the original task should be deleted after conversion (default true)
         
         If the message is NOT an execution request, return: {"operation": "none"}
         
@@ -2482,76 +2503,44 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
     // MARK: - Helper Methods
     
     private func mergeLinkedContext(_ intent: ExecutionIntent, linkedContext: LinkedContext) -> ExecutionIntent {
-        // Create a new intent with merged values based on operation type
-        switch intent.operation {
+        var merged = intent
+        switch merged.operation {
         case .createTask, .updateTask:
-            let projectId = linkedContext.linkedProjects.first?.uuidString ?? intent.taskProjectId
-            let taskId = intent.operation == .updateTask ? (linkedContext.linkedTasks.first?.uuidString ?? intent.taskId) : intent.taskId
-            
-            return ExecutionIntent(
-                operation: intent.operation,
-                criteria: intent.criteria,
-                daysAgo: intent.daysAgo,
-                postFilter: intent.postFilter,
-                filterValue: intent.filterValue,
-                reportType: intent.reportType,
-                daysAhead: intent.daysAhead,
-                caption: intent.caption,
-                scheduledDate: intent.scheduledDate,
-                tags: intent.tags,
-                notes: intent.notes,
-                createDraft: intent.createDraft,
-                draftId: intent.draftId,
-                taskId: taskId,
-                taskTitle: intent.taskTitle,
-                taskTitles: intent.taskTitles,
-                taskNotes: intent.taskNotes,
-                taskDueDate: intent.taskDueDate,
-                taskStatus: intent.taskStatus,
-                taskPriority: intent.taskPriority,
-                taskProjectId: projectId,
-                taskAreaId: intent.taskAreaId,
-                noteId: intent.noteId,
-                noteTitle: intent.noteTitle,
-                noteTitles: intent.noteTitles,
-                noteBody: intent.noteBody,
-                noteTags: intent.noteTags,
-                inboxItemId: intent.inboxItemId,
-                inboxContent: intent.inboxContent,
-                inboxType: intent.inboxType,
-                conversionTarget: intent.conversionTarget,
-                projectId: intent.projectId,
-                projectTitle: intent.projectTitle,
-                projectGoal: intent.projectGoal,
-                projectStatus: intent.projectStatus,
-                projectDueDate: intent.projectDueDate,
-                projectAreaId: intent.projectAreaId,
-                postId: intent.postId,
-                postCaptions: intent.postCaptions,
-                publishNotes: intent.publishNotes,
-                conversationId: intent.conversationId,
-                searchQuery: intent.searchQuery,
-                createTasksWithProject: intent.createTasksWithProject,
-                createNotesWithProject: intent.createNotesWithProject,
-                createPostsWithProject: intent.createPostsWithProject,
-                createTasksWithNote: intent.createTasksWithNote,
-                createPostsWithNote: intent.createPostsWithNote,
-                createTasksWithPost: intent.createTasksWithPost,
-                createNotesWithPost: intent.createNotesWithPost,
-                taskCount: intent.taskCount,
-                noteCount: intent.noteCount,
-                postCount: intent.postCount,
-                reminderTitle: intent.reminderTitle,
-                reminderNotes: intent.reminderNotes,
-                reminderDate: intent.reminderDate,
-                reminderTime: intent.reminderTime,
-                reminderTaskId: intent.reminderTaskId ?? linkedContext.linkedTasks.first?.uuidString,
-                reminderProjectId: intent.reminderProjectId ?? linkedContext.linkedProjects.first?.uuidString,
-                linkedContext: linkedContext
-            )
+            if merged.taskProjectId == nil, let projectId = linkedContext.linkedProjects.first {
+                merged.taskProjectId = projectId.uuidString
+            }
+            if merged.taskId == nil, merged.operation == .updateTask, let taskId = linkedContext.linkedTasks.first {
+                merged.taskId = taskId.uuidString
+            }
+        case .createProject, .updateProject, .duplicateProject:
+            if merged.projectId == nil, let projectId = linkedContext.linkedProjects.first {
+                merged.projectId = projectId.uuidString
+            }
+        case .createNote, .updateNote:
+            if merged.noteId == nil, merged.operation == .updateNote, let noteId = linkedContext.linkedNotes.first {
+                merged.noteId = noteId.uuidString
+            }
+        case .createArtifact, .updateArtifact:
+            if merged.artifactProjectId == nil, let projectId = linkedContext.linkedProjects.first {
+                merged.artifactProjectId = projectId.uuidString
+            }
+            if merged.operation == .updateArtifact, merged.artifactId == nil, let artifactId = linkedContext.linkedArtifacts.first {
+                merged.artifactId = artifactId.uuidString
+            }
+        case .convertTaskToNote:
+            if merged.taskId == nil, let taskId = linkedContext.linkedTasks.first {
+                merged.taskId = taskId.uuidString
+            }
+            if merged.projectId == nil, let projectId = linkedContext.linkedProjects.first {
+                merged.projectId = projectId.uuidString
+            }
         default:
-            return intent
+            break
         }
+        if merged.linkedContext == nil {
+            merged.linkedContext = linkedContext
+        }
+        return merged
     }
     
     private func buildToolPrompt(for tool: AITool, input: String, context: String) async -> String {

@@ -539,7 +539,7 @@ Aurora's system prompts are now built using a modular, versioned system:
 - **Modular Sections**: Prompt sections are cached individually, allowing for efficient updates and rollbacks
 
 **Prompt Version Structure:**
-- Each version includes: version ID, sections (core_identity, phase_overview, behavioral_guidelines, etc.), metadata (enabled phases, features, prompt length), commit hash, and creation timestamp
+- Each version includes: version ID, sections (core_identity, phase_overview, behavioral_guidelines, etc.), metadata (enabled phases, features, base prompt length, final prompt length), commit hash, and creation timestamp
 - Versions are automatically created when cognitive configuration changes
 - Aurora can query her version history and evolution over time
 
