@@ -17,6 +17,7 @@ struct UnifiedArchivesView: View {
     @Query private var notes: [CloutmateShared.Note]
     @Query private var artifacts: [CloutmateShared.Artifact]
     @Query private var drafts: [Draft]
+    @Query private var reflections: [ArchiveReflection]
     
     @State private var searchText = ""
     @State private var selectedFilter: ArchiveFilter = .all
@@ -68,6 +69,26 @@ struct UnifiedArchivesView: View {
         if !searchText.isEmpty {
             items = items.filter { item in
                 item.title.localizedCaseInsensitiveContains(searchText)
+            }
+        }
+        
+        // Apply date range filter
+        if let interval = dateInterval(for: selectedDateRange) {
+            items = items.filter { item in
+                guard let archived = item.archivedAt ?? item.getCreatedAt() else { return false }
+                return interval.contains(archived)
+            }
+        }
+        
+        // Apply tone filter
+        if let tone = selectedToneFilter {
+            let reflectionsById = Dictionary(uniqueKeysWithValues: reflections.map { ($0.entityId, $0) })
+            items = items.filter { item in
+                guard let snapshot = reflectionsById[item.id]?.arteToneSnapshot,
+                      let state = EmotionalState(rawValue: snapshot) else {
+                    return false
+                }
+                return state == tone
             }
         }
         
@@ -189,6 +210,26 @@ struct UnifiedArchivesView: View {
             modelContext.delete(draft)
         }
         try? modelContext.save()
+    }
+    
+    private func dateInterval(for filter: ArchivesSidebar.DateRangeFilter) -> DateInterval? {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        
+        switch filter {
+        case .thisWeek:
+            guard let start = calendar.date(byAdding: .day, value: -6, to: startOfToday) else { return nil }
+            return DateInterval(start: start, end: now)
+        case .thisMonth:
+            guard let start = calendar.date(byAdding: .day, value: -29, to: startOfToday) else { return nil }
+            return DateInterval(start: start, end: now)
+        case .thisYear:
+            guard let start = calendar.date(byAdding: .day, value: -364, to: startOfToday) else { return nil }
+            return DateInterval(start: start, end: now)
+        case .allTime:
+            return nil
+        }
     }
 }
 

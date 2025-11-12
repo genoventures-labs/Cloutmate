@@ -16,7 +16,8 @@ struct ProjectGalleryView: View {
     let selectionMode: Bool
     let selectedProjectIDs: Set<UUID>
     let onSelectionToggle: (Project) -> Void
-    let onProjectSelected: (Project) -> Void
+    let onProjectDetail: (Project) -> Void
+    let onProjectEdit: (Project) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -41,8 +42,11 @@ struct ProjectGalleryView: View {
                         selectionMode: selectionMode,
                         isSelected: selectedProjectIDs.contains(project.id),
                         onSelectionToggle: { onSelectionToggle(project) },
-                        onTap: {
-                            onProjectSelected(project)
+                        onOpenDetail: {
+                            onProjectDetail(project)
+                        },
+                        onEdit: {
+                            onProjectEdit(project)
                         }
                     )
                 }
@@ -76,7 +80,8 @@ struct ProjectGalleryCard: View {
     let selectionMode: Bool
     let isSelected: Bool
     let onSelectionToggle: () -> Void
-    let onTap: () -> Void
+    let onOpenDetail: () -> Void
+    let onEdit: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -179,22 +184,19 @@ struct ProjectGalleryCard: View {
         .onTapGesture {
             if selectionMode {
                 onSelectionToggle()
+            }
+        }
+        .onTapGesture(count: 2) {
+            if selectionMode {
+                onSelectionToggle()
             } else {
-                onTap()
+                onOpenDetail()
             }
         }
         .contextMenu {
             if !selectionMode {
-                Button("Open") {
-                    onTap()
-                }
-                Button("Edit") {
-                    // Edit action
-                }
-                Divider()
-                Button("Archive") {
-                    // Archive action
-                }
+                Button("Open") { onOpenDetail() }
+                Button("Edit") { onEdit() }
             }
         }
         .onChange(of: selectionMode) { _, newValue in

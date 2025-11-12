@@ -45,6 +45,7 @@ struct AIAssistantView: View {
     @State private var showSpotlight = false
     @State private var showAuroraCreateSheet = false
     @State private var createSheetAction: ToolbarAction?
+    @State private var chatScrollProxy: ScrollViewProxy?
     
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -52,6 +53,7 @@ struct AIAssistantView: View {
     private let voiceService = VoiceTranscriptionService.shared
     private let tintManager = ArteTintManager.shared
     private let usageTracker = ToolbarUsageTracker.shared
+    private let chatBottomAnchor = "legacy-ai-chat-bottom-anchor"
     
     var body: some View {
         ZStack {
@@ -234,9 +236,9 @@ struct AIAssistantView: View {
                         .frame(maxHeight: .infinity)
                     } else {
                         ForEach(filteredConversations) { conversation in
-                            ConversationRow(
+                                ConversationRow(
                                 conversation: conversation,
-                                isSelected: viewModel.selectedConversation?.id == conversation.id,
+                                isSelected: viewModel.currentConversation?.id == conversation.id,
                                 onTap: {
                                     handleConversationTap(conversation)
                                 },
@@ -279,6 +281,7 @@ struct AIAssistantView: View {
     }
     
     private func handleConversationTap(_ conversation: AIConversation) {
+        viewModel.isScrolledToBottom = true
         let loaded = viewModel.loadConversation(conversation, modelContext: modelContext)
         
         if !loaded {
@@ -315,87 +318,123 @@ struct AIAssistantView: View {
             ZStack(alignment: .bottomTrailing) {
                 ScrollViewReader { proxy in
                     GeometryReader { geometry in
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            if viewModel.messages.isEmpty {
-                                welcomeView
-                            } else {
-                                ForEach(viewModel.messages) { message in
-                                    MessageBubble(
-                                        message: message,
-                                        onEdit: { editedMessage, newContent in
-                                            viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
-                                        },
-                                            onCopy: { _ in }
-                                    )
-                                    .id(message.id)
+                        ScrollView {
+                            VStack(spacing: 8) {
+                                if viewModel.messages.isEmpty {
+                                    welcomeView
+                                } else {
+                                    ForEach(viewModel.messages) { message in
+                                        MessageBubble(
+                                            message: message,
+                                            onEdit: { editedMessage, newContent in
+                                                viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
+                                            },
+                                            onCopy: { _ in },
+                                            onResend: { assistantMessage in
+                                                viewModel.resendAssistantMessage(assistantMessage, modelContext: modelContext)
+                                            },
+                                        canResend: viewModel.canResendPayload(for: message)
+                                        )
+                                        .id(message.id)
                                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                                    }
                                 }
+                                
+                                if viewModel.isLoading {
+                                    ThinkingIndicator(
+                                        activity: viewModel.displayedActivity,
+                                        sourceModel: viewModel.currentSourceModel,
+                                        statusMessage: viewModel.currentStatus
+                                    )
+                                    .padding()
+                                } else if !viewModel.messages.isEmpty {
+                                    IdleIndicator()
+                                        .padding(.top, 8)
+                                }
+                                
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id(chatBottomAnchor)
+                                    .background(
+                                        GeometryReader { bottomGeo in
+                                            Color.clear.preference(
+                                                key: ChatScrollOffsetPreferenceKey.self,
+                                                value: bottomGeo.frame(in: .named("chatScroll")).minY
+                                            )
+                                        }
+                                    )
                             }
-                            
-                            if viewModel.isLoading {
-                                ThinkingIndicator(
-                                    activity: viewModel.displayedActivity,
-                                    sourceModel: viewModel.currentSourceModel
-                                )
-                                .padding()
-                            } else if !viewModel.messages.isEmpty {
-                                IdleIndicator()
-                                    .padding(.top, 8)
-                            }
-                        }
-                        .padding(.vertical, 16)
+                            .padding(.vertical, 16)
                             .padding(.bottom, 60)
                             .background(
                                 GeometryReader { scrollGeometry in
                                     Color.clear.preference(
                                         key: ScrollOffsetPreferenceKey.self,
-                                        value: scrollGeometry.frame(in: .named("scroll")).minY
+                                        value: scrollGeometry.frame(in: .named("chatScroll")).minY
                                     )
                                 }
                             )
                         }
-                        .coordinateSpace(name: "scroll")
+                        .coordinateSpace(name: "chatScroll")
+                        .onAppear {
+                            chatScrollProxy = proxy
+                            if viewModel.isScrolledToBottom {
+                                scrollToBottom(animated: false)
+                            }
+                        }
                         .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
                             let offset = -value
                             scrollOffset = offset
                             withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
                                 headerOpacity = max(0.0, min(1.0, 1.0 - offset / 100.0))
                             }
-                    }
-                    .onChange(of: viewModel.messages.count) { _, _ in
-                        if let lastMessage = viewModel.messages.last {
-                                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                                proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                                }
+                        }
+                        .onPreferenceChange(ChatScrollOffsetPreferenceKey.self) { bottomOffset in
+                            let containerHeight = geometry.size.height
+                            let isAtBottom = bottomOffset <= containerHeight + 32
+                            if viewModel.isScrolledToBottom != isAtBottom {
+                                viewModel.isScrolledToBottom = isAtBottom
                             }
+                        }
+                        .onChange(of: viewModel.messages.count) { _, _ in
+                            if viewModel.isScrolledToBottom {
+                                scrollToBottom(animated: true)
+                            }
+                        }
+                        .onChange(of: viewModel.currentConversation?.id) { _, _ in
+                            scrollToBottom(animated: false)
                         }
                     }
                 }
                 
-                // Floating Summarize Chat Button
-                if viewModel.messages.count >= 10 {
-                    Button(action: {
- 		_Concurrency.Task {
-                            await viewModel.generateChatSummary()
+                VStack(alignment: .trailing, spacing: 16) {
+                    if viewModel.messages.count >= 10 {
+                        Button(action: {
+                            _Concurrency.Task {
+                                await viewModel.generateChatSummary()
+                            }
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.text.magnifyingglass")
+                                Text("Summarize Chat")
+                            }
+                            .font(.subheadline)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(.ultraThinMaterial)
+                            .foregroundColor(.primary)
+                            .cornerRadius(20)
+                            .shadow(color: .black.opacity(0.2), radius: 10)
                         }
-                    }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "doc.text.magnifyingglass")
-                            Text("Summarize Chat")
-                        }
-                        .font(.subheadline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(.ultraThinMaterial)
-                        .foregroundColor(.primary)
-                        .cornerRadius(20)
-                        .shadow(color: .black.opacity(0.2), radius: 10)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 80)
+                    
+                    ScrollToBottomButton(isVisible: !viewModel.isScrolledToBottom) {
+                        scrollToBottom(animated: true)
+                    }
                 }
+                .padding(.trailing, 16)
+                .padding(.bottom, 80)
             }
             
             Divider()
@@ -443,6 +482,9 @@ struct AIAssistantView: View {
                 pendingDocumentAttachment: viewModel.pendingDocumentAttachment,
                 lastConfidenceScore: viewModel.messages.last(where: { $0.role == "assistant" })?.confidenceScore,
                 canRetry: viewModel.canRetry,
+                onResendLastAssistant: viewModel.canResendLastAssistant ? {
+                    viewModel.resendLastAssistant(modelContext: modelContext)
+                } : nil,
                 onSend: {
                     sendCurrentMessage(modelContext: modelContext)
                 },
@@ -487,6 +529,13 @@ struct AIAssistantView: View {
     
     struct ScrollOffsetPreferenceKey: PreferenceKey {
         static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+            value = nextValue()
+        }
+    }
+    
+    private struct ChatScrollOffsetPreferenceKey: PreferenceKey {
+        static var defaultValue: CGFloat = .zero
         static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
             value = nextValue()
         }
@@ -680,6 +729,21 @@ struct AIAssistantView: View {
                 }
             }
         }
+    }
+
+    private func scrollToBottom(animated: Bool = true) {
+        guard let proxy = chatScrollProxy else { return }
+        let action = {
+            proxy.scrollTo(chatBottomAnchor, anchor: .bottom)
+        }
+        if animated {
+            withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                action()
+            }
+        } else {
+            action()
+        }
+        viewModel.isScrolledToBottom = true
     }
 
     @MainActor

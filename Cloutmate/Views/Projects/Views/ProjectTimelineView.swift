@@ -19,10 +19,10 @@ struct ProjectTimelineView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
-    @State private var scrollOffset: CGFloat = 0
+    @State private var hoveredProjectID: UUID?
     @State private var selectedProject: Project?
     
-    var dateRange: (start: Date, end: Date) {
+    private var dateRange: (start: Date, end: Date) {
         let allDates = projects.compactMap { $0.dueDate } + projects.map { $0.createdAt }
         guard let minDate = allDates.min(), let maxDate = allDates.max() else {
             let now = Date()
@@ -31,53 +31,137 @@ struct ProjectTimelineView: View {
         return (minDate, maxDate)
     }
     
+    private var positionedProjects: [PositionedProject] {
+        let sorted = projects.sorted { ($0.dueDate ?? $0.createdAt) < ($1.dueDate ?? $1.createdAt) }
+        let calendar = Calendar.current
+        var counts: [Date: Int] = [:]
+        sorted.forEach { project in
+            let bucket = calendar.startOfDay(for: project.dueDate ?? project.createdAt)
+            counts[bucket, default: 0] += 1
+        }
+        var laneAssignments: [Date: Int] = [:]
+        
+        return sorted.map { project in
+            let bucket = calendar.startOfDay(for: project.dueDate ?? project.createdAt)
+            let laneIndex = laneAssignments[bucket, default: 0]
+            laneAssignments[bucket] = laneIndex + 1
+            let laneCount = counts[bucket] ?? 1
+            return PositionedProject(project: project, laneIndex: laneIndex, laneCount: laneCount)
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
-            if projects.isEmpty {
+            if positionedProjects.isEmpty {
                 emptyState
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     GeometryReader { geometry in
-                        ZStack(alignment: .topLeading) {
-                            // Background Wave
-                            if !reduceMotion {
-                                FocusGravityWave(
-                                    metrics: calculateOverallMetrics(),
-                                    width: max(geometry.size.width, 1000),
-                                    height: 200
-                                )
-                                .opacity(0.3)
-                                .offset(y: 100)
-                            }
-                            
-                            // Timeline Baseline
-                            timelineBaseline(width: max(geometry.size.width, 1000))
-                                .offset(y: 100)
-                            
-                            // Project Milestones
-                            ForEach(Array(projects.sorted(by: { ($0.dueDate ?? $0.createdAt) < ($1.dueDate ?? $1.createdAt) }).enumerated()), id: \.element.id) { index, project in
-                                TimelineMilestone(
-                                    project: project,
-                                    tasks: tasks.filter { $0.projectId == project.id },
-                                    dateRange: dateRange,
-                                    timelineWidth: max(geometry.size.width, 1000),
-                                    onTap: {
-                                        selectedProject = project
-                                        onProjectSelected(project)
-                                    }
-                                )
-                            }
-                        }
-                        .frame(width: max(geometry.size.width, 1000))
-                        .padding(.horizontal, 40)
+                        let trackWidth = max(geometry.size.width, TimelineLayout.minTrackWidth)
+                        timelineContent(trackWidth: trackWidth)
+                            .frame(width: trackWidth, height: TimelineLayout.trackHeight)
                     }
-                    .frame(height: 300)
+                    .frame(height: TimelineLayout.trackHeight)
                 }
+                .scrollIndicators(.hidden)
             }
         }
         .sheet(item: $selectedProject) { project in
             ProjectSnapshotDrawer(project: project)
         }
+    }
+    
+    @ViewBuilder
+    private func timelineContent(trackWidth: CGFloat) -> some View {
+        ZStack(alignment: .topLeading) {
+            timelineBackdrop(width: trackWidth)
+            if !reduceMotion {
+                FocusGravityWave(
+                    metrics: calculateOverallMetrics(),
+                    width: trackWidth,
+                    height: TimelineLayout.trackHeight * 0.65
+                )
+                .opacity(0.28)
+                .offset(y: TimelineLayout.baselineY - (TimelineLayout.trackHeight * 0.45))
+            }
+            
+            timelineBaseline(width: trackWidth)
+            
+            ForEach(positionedProjects) { positioned in
+                TimelineMilestone(
+                    project: positioned.project,
+                    taskCount: tasks.filter { $0.projectId == positioned.project.id }.count,
+                    dateRange: dateRange,
+                    timelineWidth: trackWidth,
+                    laneIndex: positioned.laneIndex,
+                    laneCount: positioned.laneCount,
+                    isActive: hoveredProjectID == positioned.project.id,
+                    reduceMotion: reduceMotion,
+                    modelContext: modelContext,
+                    onTap: {
+                        selectedProject = positioned.project
+                        onProjectSelected(positioned.project)
+                    },
+                    onHoverChanged: { hovering in
+                        hoveredProjectID = hovering ? positioned.project.id : nil
+                    }
+                )
+                .zIndex(hoveredProjectID == positioned.project.id ? 3 : 1)
+            }
+        }
+    }
+
+    private func timelineBackdrop(width: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: 28, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.08),
+                        Color.white.opacity(0.03)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.18),
+                                Color.white.opacity(0.05)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(color: .black.opacity(0.08), radius: 20, y: 18)
+            .frame(
+                width: width - (TimelineLayout.horizontalPadding * 1.2),
+                height: TimelineLayout.connectionHeight + 128
+            )
+            .offset(
+                x: TimelineLayout.horizontalPadding * 0.6,
+                y: TimelineLayout.baselineY - (TimelineLayout.connectionHeight / 2) - 40
+            )
+            .allowsHitTesting(false)
+    }
+    
+    private func timelineBaseline(width: CGFloat) -> some View {
+        Path { path in
+            path.move(to: CGPoint(x: TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY))
+            path.addLine(to: CGPoint(x: width - TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY))
+        }
+        .stroke(
+            LinearGradient(
+                colors: [.kosmicBlue.opacity(0.9), .kosmicPurple.opacity(0.9)],
+                startPoint: .leading,
+                endPoint: .trailing
+            ),
+            style: StrokeStyle(lineWidth: 2, lineCap: .round)
+        )
     }
     
     private var emptyState: some View {
@@ -94,18 +178,6 @@ struct ProjectTimelineView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 60)
-    }
-    
-    private func timelineBaseline(width: CGFloat) -> some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [.kosmicBlue, .kosmicPurple],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .frame(width: width, height: 2)
     }
     
     private func calculateOverallMetrics() -> ProjectFocusMetrics {
@@ -137,104 +209,222 @@ struct ProjectTimelineView: View {
             weeklyTrend: []
         )
     }
+    
+    private struct PositionedProject: Identifiable {
+        let project: Project
+        let laneIndex: Int
+        let laneCount: Int
+        
+        var id: UUID { project.id }
+    }
 }
 
 // MARK: - Timeline Milestone
 
-struct TimelineMilestone: View {
+private struct TimelineMilestone: View {
     let project: Project
-    let tasks: [Task]
+    let taskCount: Int
     let dateRange: (start: Date, end: Date)
     let timelineWidth: CGFloat
+    let laneIndex: Int
+    let laneCount: Int
+    let isActive: Bool
+    let reduceMotion: Bool
+    let modelContext: ModelContext
     let onTap: () -> Void
+    let onHoverChanged: (Bool) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @Environment(\.modelContext) private var modelContext
     @State private var isHovered = false
     @State private var focusMetrics: ProjectFocusMetrics?
     
-    var position: CGFloat {
-        let projectDate = project.dueDate ?? project.createdAt
+    private var projectDate: Date {
+        project.dueDate ?? project.createdAt
+    }
+    
+    private var xPosition: CGFloat {
         let totalDuration = dateRange.end.timeIntervalSince(dateRange.start)
-        guard totalDuration > 0 else { return 0 }
+        guard totalDuration > 0 else {
+            return TimelineLayout.horizontalPadding
+        }
         let offsetFromStart = projectDate.timeIntervalSince(dateRange.start)
         let ratio = CGFloat(offsetFromStart / totalDuration)
-        return min(max(ratio * timelineWidth, 0), timelineWidth - 16)
+        let availableWidth = timelineWidth - (TimelineLayout.horizontalPadding * 2)
+        let basePosition = TimelineLayout.horizontalPadding + ratio * availableWidth
+        
+        if laneCount == 1 {
+            return basePosition
+        } else {
+            let totalSpread = CGFloat(laneCount - 1) * TimelineLayout.duplicateSpacing
+            let centeredOffset = CGFloat(laneIndex) * TimelineLayout.duplicateSpacing - totalSpread / 2
+            return min(max(basePosition + centeredOffset, TimelineLayout.horizontalPadding), timelineWidth - TimelineLayout.horizontalPadding)
+        }
+    }
+    
+    private var nodeScale: CGFloat {
+        guard !reduceMotion else { return 1 }
+        return isActive || isHovered ? TimelineLayout.activeNodeScale : 1
     }
     
     var body: some View {
-        VStack(spacing: 8) {
-            // Milestone Dot
+        let isShowingDetails = isHovered || isActive
+        let collapsedWidth: CGFloat = 108
+        
+        VStack(spacing: 0) {
+            if isShowingDetails {
+                detailCard
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .top)),
+                            removal: .opacity
+                        )
+                    )
+                    .padding(.bottom, 18)
+            }
+            
+            Rectangle()
+                .fill(Color.kosmicBlue.opacity(isShowingDetails ? 0.45 : 0.28))
+                .frame(width: 2.5, height: TimelineLayout.connectionHeight + 8)
+                .overlay(
+                    Rectangle()
+                        .fill(Color.white.opacity(0.42))
+                        .frame(width: 1, height: TimelineLayout.connectionHeight + 8)
+                )
+                .opacity(isShowingDetails ? 1 : 0.7)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: isShowingDetails)
+                .padding(.bottom, 16)
+            
             ZStack {
                 Circle()
                     .fill(
-                        LinearGradient(
+                        RadialGradient(
                             colors: [
-                                .kosmicBlue.opacity(0.8),
-                                .kosmicPurple.opacity(0.8)
+                                Color.kosmicBlue.opacity(isShowingDetails ? 0.85 : 0.6),
+                                Color.kosmicPurple.opacity(isShowingDetails ? 0.3 : 0.12),
+                                Color.kosmicPurple.opacity(0.06)
                             ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: isShowingDetails ? 32 : 24
+                        )
+                    )
+                    .frame(width: TimelineLayout.nodeBaseSize + 14, height: TimelineLayout.nodeBaseSize + 14)
+                    .blur(radius: reduceMotion ? 0 : 8)
+                    .opacity(reduceMotion ? 0.1 : 0.45)
+                
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.kosmicBlue, .kosmicPurple],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 16, height: 16)
+                    .frame(width: TimelineLayout.nodeBaseSize, height: TimelineLayout.nodeBaseSize)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.82), lineWidth: isShowingDetails ? 2.6 : 1.6)
+                    )
+                    .shadow(color: Color.kosmicPurple.opacity(isShowingDetails ? 0.55 : 0.28), radius: isShowingDetails ? 14 : 8, y: isShowingDetails ? 7 : 3)
                 
                 if let metrics = focusMetrics {
                     Circle()
-                        .stroke(
-                            LinearGradient(
+                        .strokeBorder(
+                            AngularGradient(
                                 colors: [
-                                    .kosmicBlue.opacity(metrics.cognitiveFocus),
-                                    .kosmicPurple.opacity(metrics.creativeFlow),
-                                    .kosmicGreen.opacity(metrics.completionEnergy)
+                                    Color.kosmicBlue.opacity(metrics.cognitiveFocus),
+                                    Color.kosmicPurple.opacity(metrics.creativeFlow),
+                                    Color.kosmicGreen.opacity(metrics.completionEnergy)
                                 ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
+                                center: .center
                             ),
-                            lineWidth: 2
+                            lineWidth: 3
                         )
-                        .frame(width: 24, height: 24)
+                        .frame(width: TimelineLayout.nodeBaseSize + 12, height: TimelineLayout.nodeBaseSize + 12)
+                        .blur(radius: reduceMotion ? 0 : 0.5)
                 }
             }
-            .shadow(color: .kosmicBlue.opacity(0.5), radius: 4)
-            .scaleEffect(isHovered ? 1.3 : 1.0)
-            .animation(.spring(duration: 0.3), value: isHovered)
-            
-            // Project Title (shown on hover)
-            if isHovered {
-                VStack(spacing: 4) {
-                    Text(project.title)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(glassColorSystem.textPrimary())
-                        .lineLimit(1)
-                    
-                    if let dueDate = project.dueDate {
-                        Text(dueDate, format: .dateTime.month().day())
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    GlassPanel(tier: .overlay, cornerRadius: 6) {
-                        EmptyView()
-                    }
-                )
-                .transition(.opacity.combined(with: .scale))
-            }
+            .scaleEffect(nodeScale, anchor: .center)
+            .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: nodeScale)
         }
-        .position(x: position, y: 100)
+        .frame(width: isShowingDetails ? TimelineLayout.infoCardWidth : collapsedWidth)
+        .position(x: xPosition, y: TimelineLayout.baselineY)
+        .onTapGesture { onTap() }
         .onHover { hovering in
-            isHovered = hovering
+            if isHovered != hovering {
+                isHovered = hovering
+                onHoverChanged(hovering)
+            }
         }
-        .onTapGesture {
-            onTap()
-        }
+        .contentShape(Rectangle())
+        .zIndex(isShowingDetails ? 3 : 1)
         .task {
             focusMetrics = ProjectFocusGravityService.shared.focusMetrics(for: project, modelContext: modelContext)
         }
+    }
+    
+    private var detailCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(project.title)
+                .font(.system(.callout, design: .rounded))
+                .fontWeight(.semibold)
+                .lineLimit(2)
+            
+            if let dueDate = project.dueDate {
+                Label {
+                    Text(dueDate.formatted(date: .abbreviated, time: .omitted))
+                } icon: {
+                    Image(systemName: "calendar")
+                        .imageScale(.small)
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
+            } else {
+                Text("No due date")
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.7))
+            }
+            
+            HStack(spacing: 8) {
+                if taskCount > 0 {
+                    Label("\(taskCount) Task\(taskCount == 1 ? "" : "s")", systemImage: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.secondary.opacity(0.9))
+                }
+                
+                if let metrics = focusMetrics {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.kosmicBlue.opacity(metrics.cognitiveFocus),
+                                    Color.kosmicPurple.opacity(metrics.creativeFlow)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: 56, height: 6)
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.18))
+                        )
+                        .accessibilityHidden(true)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.14))
+                )
+        )
+        .shadow(color: .black.opacity(0.16), radius: 18, x: 0, y: 12)
     }
 }
 

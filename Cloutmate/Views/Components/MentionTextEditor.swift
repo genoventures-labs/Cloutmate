@@ -176,6 +176,8 @@ struct MentionTextEditor: View {
             tab = .notes
         case .artifact:
             tab = .posts
+        case .area:
+            tab = .areas
         case .post:
             tab = .posts
         case .reminder:
@@ -184,6 +186,8 @@ struct MentionTextEditor: View {
             tab = .inbox
         case .focusSession:
             tab = .focusMode
+        case .event:
+            tab = .calendar
         }
         
         NotificationCenter.default.post(name: .switchTab, object: tab)

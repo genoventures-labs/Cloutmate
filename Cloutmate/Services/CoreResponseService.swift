@@ -65,23 +65,29 @@ actor CoreResponseService {
         currentMessageStyle: TypingStyle? = nil,
         userStyleProfile: UserPreferences? = nil,
         confidence: ConfidenceSnapshot? = nil,
-        modelContext: ModelContext? = nil
+        modelContext: ModelContext? = nil,
+        preselectedDecision: ModelRoutingDecision? = nil
     ) async throws -> (response: String, thinking: String?, modelUsed: String) {
         // Use local Ollama routing with ModelRoutingEngine
         if let modelContext = modelContext {
             // Get routing decision from ModelRoutingEngine
-            let intentCluster = payloadContext?.intentClusters?.primaryCluster
-            let confidenceScore = payloadContext?.intentClusters?.confidence ?? confidence?.score ?? 0.7
-            let messageLength = input.count
-            
-            let routingDecision = await ModelRoutingEngine.shared.selectModel(
-                input: input,
-                intentCluster: intentCluster,
-                confidence: confidenceScore,
-                messageLength: messageLength,
-                userStyle: currentMessageStyle,
-                conversationId: nil
-            )
+            let routingDecision: ModelRoutingDecision
+            if let preselectedDecision {
+                routingDecision = preselectedDecision
+            } else {
+                let intentCluster = payloadContext?.intentClusters?.primaryCluster
+                let confidenceScore = payloadContext?.intentClusters?.confidence ?? confidence?.score ?? 0.7
+                let messageLength = input.count
+                
+                routingDecision = await ModelRoutingEngine.shared.selectModel(
+                    input: input,
+                    intentCluster: intentCluster,
+                    confidence: confidenceScore,
+                    messageLength: messageLength,
+                    userStyle: currentMessageStyle,
+                    conversationId: nil
+                )
+            }
             
             // Use OllamaBridgeService with the selected model and thinking setting
             let result = try await ollamaBridge.generateResponseWithAppContext(

@@ -13,10 +13,12 @@ struct AreaDetailDrawer: View {
     @Bindable var area: Area
     let projects: [CloutmateShared.Project]
     let notes: [Note]
+    let tasks: [CloutmateShared.Task]
     let onDismiss: () -> Void
-    let onAddProject: () -> Void
-    let onAddNote: () -> Void
     let onArchive: () -> Void
+    let onOpenProject: (CloutmateShared.Project) -> Void
+    let onOpenNote: (Note) -> Void
+    let onOpenTask: (CloutmateShared.Task) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -27,6 +29,9 @@ struct AreaDetailDrawer: View {
     @State private var editedTags: [String] = []
     @State private var editedStatus: AreaStatus = .active
     @State private var auroraInsight: String = ""
+    @State private var showProjectLinker = false
+    @State private var showNoteLinker = false
+    @State private var showTaskLinker = false
     
     private var linkedProjects: [CloutmateShared.Project] {
         projects.filter { $0.areaId == area.id }
@@ -34,6 +39,22 @@ struct AreaDetailDrawer: View {
     
     private var linkedNotes: [Note] {
         notes.filter { $0.areaId == area.id }
+    }
+    
+    private var linkedTasks: [CloutmateShared.Task] {
+        tasks.filter { $0.areaId == area.id }
+    }
+    
+    private var availableProjects: [CloutmateShared.Project] {
+        projects.filter { $0.areaId == nil || $0.areaId == area.id }
+    }
+    
+    private var availableNotes: [Note] {
+        notes.filter { $0.areaId == nil || $0.areaId == area.id }
+    }
+    
+    private var availableTasks: [CloutmateShared.Task] {
+        tasks.filter { $0.areaId == nil || $0.areaId == area.id }
     }
     
     private var arteColor: Color {
@@ -97,6 +118,15 @@ struct AreaDetailDrawer: View {
             editedTags = area.tags
             editedStatus = area.status
             loadAuroraInsight()
+        }
+        .sheet(isPresented: $showProjectLinker) {
+            projectLinkerSheet
+        }
+        .sheet(isPresented: $showNoteLinker) {
+            noteLinkerSheet
+        }
+        .sheet(isPresented: $showTaskLinker) {
+            taskLinkerSheet
         }
     }
     
@@ -181,26 +211,83 @@ struct AreaDetailDrawer: View {
     }
     
     private var linkedEntitiesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Linked Entities")
-                .font(.headline)
-                .foregroundColor(glassColorSystem.textPrimary())
-            
-            LinkedEntitiesCard(
-                title: "Projects",
-                icon: "folder.fill",
-                color: .kosmicBlue,
-                count: linkedProjects.count,
-                items: linkedProjects.prefix(5).map { $0.title }
-            )
-            
-            LinkedEntitiesCard(
-                title: "Notes",
-                icon: "doc.text.fill",
-                color: .kosmicPurple,
-                count: linkedNotes.count,
-                items: linkedNotes.prefix(5).map { $0.title }
-            )
+        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Image(systemName: "link")
+                        .foregroundColor(.kosmicBlue)
+                    Text("Linked Entities")
+                        .font(.headline)
+                        .foregroundColor(glassColorSystem.textPrimary())
+                    Spacer()
+                    linkControlMenu
+                }
+                
+                if linkedProjects.isEmpty && linkedNotes.isEmpty && linkedTasks.isEmpty {
+                    Text("Link projects, tasks, or notes to keep this area anchored in your workflow.")
+                        .font(.caption)
+                        .foregroundColor(glassColorSystem.textSecondary())
+                        .padding(.vertical, 4)
+                }
+                
+                if !linkedProjects.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabel(title: "Projects", icon: "folder.fill", color: .kosmicBlue)
+                        ForEach(linkedProjects.sorted(by: { $0.updatedAt > $1.updatedAt })) { project in
+                            Button {
+                                onOpenProject(project)
+                            } label: {
+                                LinkedEntityRow(
+                                    title: project.title,
+                                    subtitle: project.status.displayName,
+                                    icon: "folder",
+                                    accent: .kosmicBlue
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                if !linkedTasks.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabel(title: "Tasks", icon: "checkmark.circle", color: .kosmicGreen)
+                        ForEach(linkedTasks.sorted(by: { ($0.dueDate ?? Date.distantFuture) < ($1.dueDate ?? Date.distantFuture) })) { task in
+                            Button {
+                                onOpenTask(task)
+                            } label: {
+                                LinkedEntityRow(
+                                    title: task.title,
+                                    subtitle: subtitle(for: task),
+                                    icon: task.status == .done ? "checkmark.circle.fill" : "circle",
+                                    accent: task.status == .done ? .kosmicGreen : .kosmicBlue
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                
+                if !linkedNotes.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        sectionLabel(title: "Notes", icon: "doc.text.fill", color: .kosmicPurple)
+                        ForEach(linkedNotes.sorted(by: { $0.updatedAt > $1.updatedAt })) { note in
+                            Button {
+                                onOpenNote(note)
+                            } label: {
+                                LinkedEntityRow(
+                                    title: note.title.isEmpty ? "Untitled Note" : note.title,
+                                    subtitle: note.updatedAt.formatted(date: .abbreviated, time: .shortened),
+                                    icon: "doc.text",
+                                    accent: .kosmicPurple
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .padding(16)
         }
     }
     
@@ -237,20 +324,28 @@ struct AreaDetailDrawer: View {
             Spacer()
             
             Button(action: {
-                saveEdits()
-                onAddProject()
+                showProjectLinker = true
             }) {
                 Label("Link Project", systemImage: "link")
             }
             .buttonStyle(.bordered)
+            .disabled(availableProjects.isEmpty)
             
             Button(action: {
-                saveEdits()
-                onAddNote()
+                showNoteLinker = true
             }) {
                 Label("Link Note", systemImage: "doc.text")
             }
             .buttonStyle(.bordered)
+            .disabled(availableNotes.isEmpty)
+            
+            Button(action: {
+                showTaskLinker = true
+            }) {
+                Label("Link Task", systemImage: "checkmark.circle")
+            }
+            .buttonStyle(.bordered)
+            .disabled(availableTasks.isEmpty)
             
             Button(action: saveAndDismiss) {
                 Text("Done")
@@ -276,6 +371,265 @@ struct AreaDetailDrawer: View {
     
     private func loadAuroraInsight() {
         auroraInsight = "You've maintained steady focus in this area. Consider reviewing linked projects for updates."
+    }
+    
+    private var linkControlMenu: some View {
+        Menu {
+            Button("Link Project", systemImage: "folder") {
+                showProjectLinker = true
+            }
+            .disabled(availableProjects.isEmpty)
+            
+            Button("Link Task", systemImage: "checkmark.circle") {
+                showTaskLinker = true
+            }
+            .disabled(availableTasks.isEmpty)
+            
+            Button("Link Note", systemImage: "doc.text") {
+                showNoteLinker = true
+            }
+            .disabled(availableNotes.isEmpty)
+        } label: {
+            Image(systemName: "plus.circle")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(glassColorSystem.textSecondary())
+        }
+        .menuStyle(.borderlessButton)
+    }
+    
+    private func sectionLabel(title: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+            Text(title.uppercased())
+                .font(.caption2)
+                .foregroundColor(glassColorSystem.textSecondary())
+        }
+    }
+    
+    private func subtitle(for task: CloutmateShared.Task) -> String {
+        if let due = task.dueDate {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            return task.status == .done ? "Completed" : "Due \(formatter.string(from: due))"
+        }
+        return task.status.displayName
+    }
+    
+    private func linkProject(_ project: Project) {
+        project.areaId = area.id
+        project.updatedAt = Date()
+        area.updatedAt = Date()
+        AreaStabilityService.shared.invalidateCache(for: area.id)
+        try? modelContext.save()
+        AreaReviewService.shared.syncStatus(for: area, modelContext: modelContext)
+    }
+    
+    private func linkNote(_ note: Note) {
+        note.areaId = area.id
+        note.updatedAt = Date()
+        area.updatedAt = Date()
+        AreaStabilityService.shared.invalidateCache(for: area.id)
+        try? modelContext.save()
+        AreaReviewService.shared.syncStatus(for: area, modelContext: modelContext)
+    }
+    
+    private func linkTask(_ task: CloutmateShared.Task) {
+        task.areaId = area.id
+        task.updatedAt = Date()
+        area.updatedAt = Date()
+        AreaStabilityService.shared.invalidateCache(for: area.id)
+        try? modelContext.save()
+        AreaReviewService.shared.syncStatus(for: area, modelContext: modelContext)
+    }
+    
+    private var projectLinkerSheet: some View {
+        NavigationStack {
+            List {
+                if availableProjects.isEmpty {
+                    Text("No projects available to link.")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(availableProjects) { project in
+                        Button {
+                            linkProject(project)
+                            showProjectLinker = false
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(project.title)
+                                        .font(.body)
+                                    if let due = project.dueDate {
+                                        Text("Due \(due.formatted(date: .abbreviated, time: .omitted))")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                if project.areaId == area.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.kosmicBlue)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Link Project")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        showProjectLinker = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("New Project") {
+                        NotificationCenter.default.post(name: .showCreateProject, object: nil)
+                        showProjectLinker = false
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 420)
+    }
+    
+    private var noteLinkerSheet: some View {
+        NavigationStack {
+            List {
+                if availableNotes.isEmpty {
+                    Text("No notes available to link.")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(availableNotes) { note in
+                        Button {
+                            linkNote(note)
+                            showNoteLinker = false
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(note.title.isEmpty ? "Untitled Note" : note.title)
+                                        .font(.body)
+                                    Text(note.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if note.areaId == area.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.kosmicPurple)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Link Note")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        showNoteLinker = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("New Note") {
+                        NotificationCenter.default.post(name: .showCreateNote, object: nil)
+                        showNoteLinker = false
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 420)
+    }
+    
+    private var taskLinkerSheet: some View {
+        NavigationStack {
+            List {
+                if availableTasks.isEmpty {
+                    Text("No tasks available to link.")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(availableTasks) { task in
+                        Button {
+                            linkTask(task)
+                            showTaskLinker = false
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(task.title)
+                                        .font(.body)
+                                    Text(subtitle(for: task))
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if task.areaId == area.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.kosmicGreen)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Link Task")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        showTaskLinker = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("New Task") {
+                        NotificationCenter.default.post(name: .showCreateTask, object: nil)
+                        showTaskLinker = false
+                    }
+                }
+            }
+        }
+        .frame(minWidth: 420, minHeight: 420)
+    }
+}
+
+struct LinkedEntityRow: View {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let accent: Color
+    
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundColor(accent)
+                .frame(width: 18, height: 18)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.callout)
+                    .foregroundColor(glassColorSystem.textPrimary())
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(glassColorSystem.textSecondary())
+                    .lineLimit(1)
+            }
+            
+            Spacer()
+            
+            Image(systemName: "arrow.up.right")
+                .font(.caption)
+                .foregroundColor(glassColorSystem.textSecondary())
+        }
+        .padding(10)
+        .background(glassColorSystem.glassTint(for: .surface).opacity(0.25))
+        .cornerRadius(10)
     }
 }
 
@@ -332,67 +686,22 @@ struct AreaTagChip: View {
     }
 }
 
-struct LinkedEntitiesCard: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let count: Int
-    let items: [String]
-    
-    @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    
-    var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: icon)
-                        .foregroundColor(color)
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(glassColorSystem.textPrimary())
-                    Text("(\(count))")
-                        .font(.caption)
-                        .foregroundColor(glassColorSystem.textSecondary())
-                }
-                
-                if items.isEmpty {
-                    Text("No \(title.lowercased()) linked")
-                        .font(.caption)
-                        .foregroundColor(glassColorSystem.textTertiary())
-                        .padding(.vertical, 8)
-                } else {
-                    ForEach(items, id: \.self) { item in
-                        Text(item)
-                            .font(.body)
-                            .foregroundColor(glassColorSystem.textSecondary())
-                            .lineLimit(1)
-                    }
-                    
-                    if count > items.count {
-                        Text("+\(count - items.count) more")
-                            .font(.caption)
-                            .foregroundColor(glassColorSystem.textTertiary())
-                    }
-                }
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-}
-
 #Preview {
     let area = Area(title: "Health & Wellness", notes: "Maintaining physical and mental health.")
     area.tags = ["personal", "health"]
+    let sampleTask = Task(title: "Update workout plan")
+    sampleTask.areaId = area.id
     
     return AreaDetailDrawer(
         area: area,
         projects: [],
         notes: [],
+        tasks: [sampleTask],
         onDismiss: {},
-        onAddProject: {},
-        onAddNote: {},
-        onArchive: {}
+        onArchive: {},
+        onOpenProject: { _ in },
+        onOpenNote: { _ in },
+        onOpenTask: { _ in }
     )
     .environmentObject(GlassColorSystem())
 }

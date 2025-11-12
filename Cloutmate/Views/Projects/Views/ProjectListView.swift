@@ -16,7 +16,8 @@ struct ProjectListView: View {
     let selectionMode: Bool
     let selectedProjectIDs: Set<UUID>
     let onSelectionToggle: (Project) -> Void
-    let onProjectSelected: (Project) -> Void
+    let onProjectDetail: (Project) -> Void
+    let onProjectEdit: (Project) -> Void
     let onDuplicateProject: (Project) -> Void
     let onArchiveProject: (Project) -> Void
     let onDeleteProject: (Project) -> Void
@@ -37,7 +38,8 @@ struct ProjectListView: View {
                         selectionMode: selectionMode,
                         isSelected: selectedProjectIDs.contains(project.id),
                         onSelectionToggle: { onSelectionToggle(project) },
-                        onTap: { onProjectSelected(project) },
+                        onOpenDetail: { onProjectDetail(project) },
+                        onEdit: { onProjectEdit(project) },
                         onDuplicate: { onDuplicateProject(project) },
                         onArchive: { onArchiveProject(project) },
                         onDelete: { onDeleteProject(project) }
@@ -76,7 +78,8 @@ struct ProjectListCard: View {
     let selectionMode: Bool
     let isSelected: Bool
     let onSelectionToggle: () -> Void
-    let onTap: () -> Void
+    let onOpenDetail: () -> Void
+    let onEdit: () -> Void
     let onDuplicate: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
@@ -164,7 +167,7 @@ struct ProjectListCard: View {
             if selectionMode {
                 onSelectionToggle()
             } else {
-                onTap()
+                onOpenDetail()
             }
         }
         .contextMenu {
@@ -173,7 +176,22 @@ struct ProjectListCard: View {
                     showFocusDurationSheet = true
                 }
                 Divider()
-                contextMenuContent
+                Button("Open") {
+                    onOpenDetail()
+                }
+                Button("Edit") {
+                    onEdit()
+                }
+                Button("Duplicate") {
+                    onDuplicate()
+                }
+                Divider()
+                Button("Archive") {
+                    onArchive()
+                }
+                Button("Delete", role: .destructive) {
+                    onDelete()
+                }
             }
         }
         .sheet(isPresented: $showFocusDurationSheet) {
@@ -259,10 +277,10 @@ struct ProjectListCard: View {
     private var quickActionsView: some View {
         HStack(spacing: 8) {
             ProjectQuickActionButton(icon: "pencil", color: .kosmicBlue) {
-                // Edit action
+                onEdit()
             }
             ProjectQuickActionButton(icon: "archivebox.fill", color: .gray) {
-                // Archive action
+                onArchive()
             }
         }
         .transition(.opacity.combined(with: .scale))
@@ -376,24 +394,6 @@ struct ProjectListCard: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
-    }
-    
-    private var contextMenuContent: some View {
-        Group {
-            Button("Open") {
-                onTap()
-            }
-            Button("Duplicate") {
-                onDuplicate()
-            }
-            Divider()
-            Button("Archive") {
-                onArchive()
-            }
-            Button("Delete", role: .destructive) {
-                onDelete()
-            }
-        }
     }
     
     // MARK: - Helper Methods

@@ -9,31 +9,77 @@ import SwiftUI
 import SwiftData
 import CloutmateShared
 
+struct ProjectDraft: Equatable {
+    var title: String
+    var goal: String
+    var status: ProjectStatus
+    var dueDate: Date?
+    var areaId: UUID?
+    var tags: [String]
+    var linkedEntityIds: [UUID]
+    var linkedEntityTypes: [String]
+    
+    init(
+        title: String = "",
+        goal: String = "",
+        status: ProjectStatus = .active,
+        dueDate: Date? = nil,
+        areaId: UUID? = nil,
+        tags: [String] = [],
+        linkedEntityIds: [UUID] = [],
+        linkedEntityTypes: [String] = []
+    ) {
+        self.title = title
+        self.goal = goal
+        self.status = status
+        self.dueDate = dueDate
+        self.areaId = areaId
+        self.tags = tags
+        self.linkedEntityIds = linkedEntityIds
+        self.linkedEntityTypes = linkedEntityTypes
+    }
+    
+    init(project: Project) {
+        self.title = project.title
+        self.goal = project.goal ?? ""
+        self.status = project.status
+        self.dueDate = project.dueDate
+        self.areaId = project.areaId
+        self.tags = project.tags
+        self.linkedEntityIds = project.linkedEntityIds
+        self.linkedEntityTypes = project.linkedEntityTypes
+    }
+    
+    var canCommit: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !goal.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 struct ProjectDetailDrawer: View {
     enum Mode {
         case create
         case edit
     }
     
-    @Bindable var project: Project
-    @Binding var isPresented: Bool
     let mode: Mode
+    let existingProject: Project?
+    let initialDraft: ProjectDraft
+    @Binding var isPresented: Bool
+    let onCommit: (ProjectDraft) -> Void
+    let onCancel: () -> Void
     
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @FocusState private var isTitleFocused: Bool
     @Query private var allAreas: [Area]
     
-    @State private var tagsText: String = ""
-    @State private var hasDueDate: Bool = false
+    @State private var draft: ProjectDraft
+    @State private var tagsText: String
+    @State private var hasDueDate: Bool
     @State private var energyRequirement: EnergyRequirement?
     
-    private var isCreation: Bool {
-        mode == .create
-    }
-    
     private var focusGravityIntensity: Double {
-        guard mode == .edit else { return 0 }
+        guard mode == .edit, let project = existingProject else { return 0 }
         
         let daysSinceUpdate = Calendar.current.dateComponents([.day], from: project.updatedAt, to: Date()).day ?? 0
         let daysSinceCreation = Calendar.current.dateComponents([.day], from: project.createdAt, to: Date()).day ?? 1
@@ -45,161 +91,201 @@ struct ProjectDetailDrawer: View {
         return (recencyScore + frequencyScore) / 2.0
     }
     
+    private var accentGradient: LinearGradient {
+        let intensity = mode == .edit ? max(0.2, focusGravityIntensity) : 0.25
+        return LinearGradient(
+            colors: [
+                Color.kosmicBlue.opacity(0.45 + 0.35 * intensity),
+                Color.kosmicPurple.opacity(0.35 + 0.3 * intensity)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
+    init(
+        mode: Mode,
+        existingProject: Project?,
+        initialDraft: ProjectDraft,
+        isPresented: Binding<Bool>,
+        onCommit: @escaping (ProjectDraft) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.mode = mode
+        self.existingProject = existingProject
+        self.initialDraft = initialDraft
+        self._isPresented = isPresented
+        self.onCommit = onCommit
+        self.onCancel = onCancel
+        _draft = State(initialValue: initialDraft)
+        _tagsText = State(initialValue: initialDraft.tags.joined(separator: ", "))
+        _hasDueDate = State(initialValue: initialDraft.dueDate != nil)
+    }
+    
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                if mode == .edit {
-                    RoundedRectangle(cornerRadius: 0, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    .kosmicBlue.opacity(focusGravityIntensity),
-                                    .kosmicPurple.opacity(focusGravityIntensity * 0.8)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 4)
-                }
-                
-                VStack(spacing: 0) {
-                    header
-                        .padding()
-                        .background(.ultraThinMaterial)
-                    
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            goalSection
-                            statusSection
-                            areaSection
-                            dueDateSection
-                            tagsSection
-                            
-                            if mode == .create {
-                                energyRequirementSection
-                            }
-                        }
-                        .padding()
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    goalSection
+                    statusSection
+                    areaSection
+                    dueDateSection
+                    tagsSection
+                    if mode == .create {
+                        energyRequirementSection
                     }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(glassColorSystem.backgroundColor())
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 680, minHeight: 540)
+            .frame(idealWidth: 860, idealHeight: 640)
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        closeDrawer()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                    Button("Cancel") {
+                        cancel()
                     }
                     .keyboardShortcut(.escape, modifiers: [])
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        commit()
+                    }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .disabled(!draft.canCommit)
                 }
             }
         }
         .frame(minWidth: 600, minHeight: 500)
         .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
-            tagsText = project.tags.joined(separator: ", ")
-            hasDueDate = project.dueDate != nil
-            
-            if project.title.isEmpty {
+            if draft.title.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isTitleFocused = true
                 }
             }
         }
-        .onDisappear {
-            guard mode == .create else { return }
-            let trimmedTitle = project.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedGoal = (project.goal ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedTitle.isEmpty && trimmedGoal.isEmpty {
-                modelContext.delete(project)
-                try? modelContext.save()
+        .onChange(of: tagsText) { _, newValue in
+            draft.tags = parseTags(from: newValue)
+        }
+        .onChange(of: hasDueDate) { _, newValue in
+            if !newValue {
+                draft.dueDate = nil
+            } else {
+                draft.dueDate = draft.dueDate ?? Date()
+            }
+        }
+        .onChange(of: isPresented) { _, newValue in
+            if !newValue {
+                draft = initialDraft
+                tagsText = initialDraft.tags.joined(separator: ", ")
+                hasDueDate = initialDraft.dueDate != nil
             }
         }
     }
     
     // MARK: - Sections
     
-    private var header: some View {
-        HStack(spacing: 12) {
-            TextField("Project Title", text: $project.title)
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .textFieldStyle(.plain)
-                .focused($isTitleFocused)
-                .onChange(of: project.title) { _, _ in
-                    project.updatedAt = Date()
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                TextField("Project Title", text: $draft.title)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.semibold)
+                    .textFieldStyle(.plain)
+                    .focused($isTitleFocused)
+                
+                HStack(spacing: 12) {
+                    Label(draft.status.displayName, systemImage: "chart.bar.doc.horizontal")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    let tagCount = draft.tags.count
+                    if tagCount > 0 {
+                        Label("\(tagCount) tag\(tagCount == 1 ? "" : "s")", systemImage: "number")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if hasDueDate, let dueDate = draft.dueDate {
+                        Label(dueDate, systemImage: "calendar")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
+            }
             
             Spacer()
+            
+            VStack(spacing: 8) {
+                GlassButton(
+                    "Save",
+                    icon: "tray.and.arrow.down.fill",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    commit()
+                }
+                .disabled(!draft.canCommit)
+                
+                GlassButton(
+                    "Cancel",
+                    icon: "xmark",
+                    style: .standard,
+                    role: .surface
+                ) {
+                    cancel()
+                }
+            }
         }
     }
     
     private var goalSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Goal / Description")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        DrawerSection(title: "Goal / Description", icon: "doc.richtext") {
             MentionTextEditor(
                 text: Binding(
-                    get: { project.goal ?? "" },
+                    get: { draft.goal },
                     set: { newValue in
-                        project.goal = newValue.isEmpty ? nil : newValue
-                        project.updatedAt = Date()
+                        draft.goal = newValue
                     }
                 ),
                 placeholder: "Describe the project...",
-                excludeObjectId: mode == .edit ? project.id : nil,
+                excludeObjectId: mode == .edit ? existingProject?.id : nil,
                 excludeObjectType: mode == .edit ? .project : nil
             ) { ids, types in
-                project.linkedEntityIds = ids
-                project.linkedEntityTypes = types
-                project.updatedAt = Date()
+                draft.linkedEntityIds = ids
+                draft.linkedEntityTypes = types
             }
-            .frame(minHeight: 200)
-            .padding(8)
+            .frame(minHeight: 220)
+            .padding(12)
             .background(.ultraThinMaterial)
-            .cornerRadius(8)
+            .cornerRadius(10)
         }
     }
     
     private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Status")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Picker("Status", selection: $project.status) {
+        DrawerSection(title: "Status", icon: "chart.bar") {
+            Picker("Status", selection: $draft.status) {
                 ForEach(ProjectStatus.allCases, id: \.self) { status in
                     Text(status.displayName).tag(status)
                 }
             }
             .pickerStyle(.segmented)
-            .onChange(of: project.status) { _, _ in
-                project.updatedAt = Date()
-            }
         }
     }
     
+    @ViewBuilder
     private var areaSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if allAreas.isEmpty {
-                EmptyView()
-            } else {
-                Text("Area")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
+        if !allAreas.isEmpty {
+            DrawerSection(title: "Area", icon: "rectangle.stack.fill") {
                 Picker("Area", selection: Binding(
-                    get: { project.areaId },
+                    get: { draft.areaId },
                     set: { newValue in
-                        project.areaId = newValue
-                        project.updatedAt = Date()
+                        draft.areaId = newValue
                     }
                 )) {
                     Text("None").tag(UUID?.none)
@@ -212,28 +298,16 @@ struct ProjectDetailDrawer: View {
     }
     
     private var dueDateSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle("Set Due Date", isOn: Binding(
-                get: { project.dueDate != nil },
-                set: { newValue in
-                    hasDueDate = newValue
-                    if newValue {
-                        project.dueDate = project.dueDate ?? Date()
-                    } else {
-                        project.dueDate = nil
-                    }
-                    project.updatedAt = Date()
-                }
-            ))
+        DrawerSection(title: "Due Date", icon: "calendar") {
+            Toggle("Set Due Date", isOn: $hasDueDate)
             
-            if let dueDate = project.dueDate {
+            if hasDueDate, let dueDate = draft.dueDate {
                 DatePicker(
                     "Due Date",
                     selection: Binding(
                         get: { dueDate },
                         set: { newValue in
-                            project.dueDate = newValue
-                            project.updatedAt = Date()
+                            draft.dueDate = newValue
                         }
                     ),
                     displayedComponents: .date
@@ -243,33 +317,17 @@ struct ProjectDetailDrawer: View {
     }
     
     private var tagsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Tags (comma separated)")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        DrawerSection(title: "Tags", icon: "tag.fill", subtitle: "Use commas to separate tags") {
             TextField("e.g., work, priority", text: $tagsText)
                 .textFieldStyle(.plain)
-                .padding(8)
+                .padding(10)
                 .background(.ultraThinMaterial)
                 .cornerRadius(8)
-                .onChange(of: tagsText) { _, newValue in
-                    let parsed = newValue
-                        .split(separator: ",")
-                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                        .filter { !$0.isEmpty }
-                    project.tags = parsed
-                    project.updatedAt = Date()
-                }
         }
     }
     
     private var energyRequirementSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Energy Requirement")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        DrawerSection(title: "Energy Requirement", icon: "bolt.fill") {
             Picker("Energy Requirement", selection: $energyRequirement) {
                 Text("None").tag(EnergyRequirement?.none)
                 ForEach(EnergyRequirement.allCases, id: \.self) { energy in
@@ -319,16 +377,40 @@ struct ProjectDetailDrawer: View {
         }
     }
     
+    private func parseTags(from input: String) -> [String] {
+        input
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+    
     // MARK: - Actions
     
-    private func closeDrawer() {
-        let trimmedTitle = project.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedTitle.isEmpty {
-            project.title = "Untitled Project"
-        }
-        project.updatedAt = Date()
-        try? modelContext.save()
+    private func cancel() {
+        onCancel()
+        isPresented = false
+    }
+    
+    private func commit() {
+        guard draft.canCommit else { return }
+        draft.tags = parseTags(from: tagsText)
+        onCommit(draft)
         isPresented = false
     }
 }
 
+struct ProjectDetailDrawer_Previews: PreviewProvider {
+    static var previews: some View {
+        ProjectDetailDrawer(
+            mode: .edit,
+            existingProject: Project(title: "Launch Campaign"),
+            initialDraft: ProjectDraft(project: Project(title: "Launch Campaign")),
+            isPresented: .constant(true),
+            onCommit: { _ in },
+            onCancel: {}
+        )
+        .environmentObject(GlassColorSystem())
+        .modelContainer(for: [Project.self, Area.self])
+    }
+}
+//

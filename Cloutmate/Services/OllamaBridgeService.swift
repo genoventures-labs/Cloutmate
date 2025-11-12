@@ -139,7 +139,7 @@ actor OllamaBridgeService {
     private let casualTimeout: TimeInterval = 35.0 // Casual (no thinking) - fast Qwen3 responses
     private let analyticalTimeout: TimeInterval = 60.0 // Analytical (thinking) - multi-step thought
     private let fallbackTimeout: TimeInterval = 75.0 // Fallback / Granite3 - safety net
-    private let initialLoadTimeout: TimeInterval = 120.0 // Longer timeout for first request/model loading
+    private let initialLoadTimeout: TimeInterval = 210.0 // Longer timeout for first request/model loading
     
     // Context window-based timeout thresholds
     private let lightContextTimeout: TimeInterval = 35.0 // < 2,000 chars - Light casual queries
@@ -157,6 +157,11 @@ actor OllamaBridgeService {
     private let promptBuilder = AuroraSystemPromptBuilder.shared
     private var hasAnnouncedPatchNotes: Bool = false
     // Granite handles silent cognition (memory graph, tagging) while Gemma/Gwen stay user-facing
+
+    // Warmup tracking
+    private var modelWarmupReadyAt: [String: Date] = [:]
+    private var modelWarmupTasks: [String: _Concurrency.Task<Void, Error>] = [:]
+    private let warmupFreshnessWindow: TimeInterval = 1800 // 30 minutes freshness window
     private let backgroundModelName = ModelTierMap.backgroundModel()
     private var hasPreWarmedBackgroundModel = false
     private var isPreWarmingBackgroundModel = false
@@ -177,80 +182,134 @@ actor OllamaBridgeService {
         }
     }
     
-    /// Pre-warms the model by making a small test request to ensure it's loaded
-    private func preWarmModel() async {
-        // Wait a bit for model setting to load and Ollama to potentially start
-        try? await _Concurrency.Task.sleep(nanoseconds: 1_000_000_000) // 1 second (reduced from 3s for faster startup)
-        
-        // Check if Ollama is available first - do a more thorough check
-        let isAvailable = await checkOllamaAvailability()
-        if !isAvailable {
-            print("[OllamaBridgeService] Skipping pre-warm: Ollama not available (not running or not accessible)")
-            print("[OllamaBridgeService] Pre-warm will be skipped. First user request will trigger model loading.")
+    func isModelReady(_ model: String) -> Bool {
+        if let readyAt = modelWarmupReadyAt[model],
+           Date().timeIntervalSince(readyAt) < warmupFreshnessWindow {
+            return true
+        }
+        modelWarmupReadyAt.removeValue(forKey: model)
+        return false
+    }
+    
+    func ensureModelReady(
+        model: String,
+        progressHandler: ((String) async -> Void)? = nil
+    ) async throws {
+        if isModelReady(model) {
             return
         }
         
-        // Double-check with a quick API call to ensure Ollama is really ready
+        if let existingTask = modelWarmupTasks[model] {
+            try await existingTask.value
+            return
+        }
+        
+        let warmupTask = _Concurrency.Task<Void, Error> {
+            try await performModelWarmup(
+                model: model,
+                progressHandler: progressHandler
+            )
+        }
+        
+        modelWarmupTasks[model] = warmupTask
+        defer {
+            modelWarmupTasks.removeValue(forKey: model)
+        }
+        
         do {
-            guard let url = URL(string: "\(baseURL)/api/tags") else { return }
-            var testRequest = URLRequest(url: url)
-            testRequest.httpMethod = "GET"
-            testRequest.timeoutInterval = 2.0 // Quick 2s check
-            
-            let (_, response) = try await URLSession.shared.data(for: testRequest)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                print("[OllamaBridgeService] Ollama API not ready, skipping pre-warm")
-                return
-            }
+            try await warmupTask.value
         } catch {
-            print("[OllamaBridgeService] Ollama API check failed, skipping pre-warm: \(error.localizedDescription)")
-            return
+            modelWarmupReadyAt.removeValue(forKey: model)
+            throw error
+        }
+    }
+    
+    private func performModelWarmup(
+        model: String,
+        progressHandler: ((String) async -> Void)?
+    ) async throws {
+        // Quick availability check before attempting any warmup
+        guard await checkOllamaAvailability() else {
+            throw OllamaError.connectionFailed
         }
         
-        // Make a tiny test request to load the model
-        // This will happen in the background and shouldn't block
-        do {
-            let testPrompt = "Hi"
-            print("[OllamaBridgeService] Pre-warming model '\(currentModel)' with test request...")
+        let attempts: [(timeout: TimeInterval, sleep: UInt64)] = [
+            (90.0, 700_000_000),
+            (150.0, 1_200_000_000),
+            (210.0, 1_800_000_000)
+        ]
+        
+        for (index, attempt) in attempts.enumerated() {
+            let attemptNumber = index + 1
+            let totalAttempts = attempts.count
+            let statusPrefix = ModelTierMap.displayName(for: model)
             
-            // Use a shorter timeout for pre-warm since we're just checking if model loads
-            guard let url = URL(string: "\(baseURL)/api/generate") else { return }
+            if let handler = progressHandler {
+                await handler("\(statusPrefix) is waking up (\(attemptNumber)/\(totalAttempts))—give me a sec.")
+            }
             
-            let testRequest = OllamaRequest(model: currentModel, prompt: testPrompt, stream: false, images: nil, options: nil)
-            var urlRequest = URLRequest(url: url)
-            urlRequest.httpMethod = "POST"
-            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            urlRequest.timeoutInterval = 60.0 // 60s for pre-warm (shorter since it's just a test)
-            
-            urlRequest.httpBody = try JSONEncoder().encode(testRequest)
-            
-            let (data, response) = try await URLSession.shared.data(for: urlRequest)
-            
-            if let httpResponse = response as? HTTPURLResponse,
-               httpResponse.statusCode == 200 {
-                let decoder = JSONDecoder()
-                let ollamaResponse = try decoder.decode(OllamaResponse.self, from: data)
-                
-                if !ollamaResponse.response.isEmpty {
-                    print("[OllamaBridgeService] Model pre-warmed successfully - ready for requests")
-                    // Mark that we've made a request so subsequent requests use normal timeout
+            do {
+                try await runWarmupPing(model: model, timeout: attempt.timeout)
+                modelWarmupReadyAt[model] = Date()
+                if model == currentModel {
                     isFirstRequest = false
                 }
+                if let handler = progressHandler {
+                    await handler("\(statusPrefix) is ready. Jumping back in.")
+                }
+                return
+            } catch {
+                if attemptNumber == totalAttempts {
+                    throw error
+                }
+                
+                if let handler = progressHandler {
+                    await handler("Still loading \(statusPrefix). Trying again.")
+                }
+                try? await _Concurrency.Task.sleep(nanoseconds: attempt.sleep)
             }
-        } catch let urlError as URLError {
-            // Only log if it's not a connection refused (which means Ollama isn't running)
-            if urlError.code != .cannotConnectToHost && 
-               !urlError.localizedDescription.contains("Connection refused") {
-                print("[OllamaBridgeService] Pre-warm failed (non-fatal): \(urlError.localizedDescription)")
-            } else {
-                print("[OllamaBridgeService] Pre-warm skipped: Ollama not running")
-            }
-            print("[OllamaBridgeService] First request will use extended timeout (240s)")
+        }
+    }
+    
+    private func runWarmupPing(model: String, timeout: TimeInterval) async throws {
+        guard let url = URL(string: "\(baseURL)/api/generate") else {
+            throw OllamaError.serviceUnavailable
+        }
+        
+        let prompt = "Warmup ping for \(model)."
+        let requestPayload = OllamaRequest(model: model, prompt: prompt, stream: false, images: nil, options: nil)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = timeout
+        request.httpBody = try JSONEncoder().encode(requestPayload)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw OllamaError.apiError("Invalid response type during warmup")
+        }
+        
+        guard httpResponse.statusCode == 200 else {
+            throw OllamaError.apiError("Warmup ping returned HTTP \(httpResponse.statusCode)")
+        }
+        
+        let decoder = JSONDecoder()
+        let ollamaResponse = try decoder.decode(OllamaResponse.self, from: data)
+        guard ollamaResponse.error == nil else {
+            throw OllamaError.apiError("Warmup ping error: \(ollamaResponse.error!)")
+        }
+        
+        guard !ollamaResponse.response.isEmpty else {
+            throw OllamaError.emptyResponse
+        }
+    }
+    
+    /// Pre-warms the model by making a small test request to ensure it's loaded
+    private func preWarmModel() async {
+        do {
+            try await ensureModelReady(model: currentModel, progressHandler: nil)
         } catch {
-            // Pre-warm failure is non-fatal - just log it quietly
-            print("[OllamaBridgeService] Pre-warm failed (non-fatal): \(error.localizedDescription)")
-            print("[OllamaBridgeService] First request will use extended timeout (240s)")
+            print("[OllamaBridgeService] Initial warmup failed (non-fatal): \(error.localizedDescription)")
         }
     }
     
@@ -1097,6 +1156,14 @@ Aurora:
         
         // Use provided model or currentModel
         let modelToUse = model ?? currentModel
+        
+        if !isModelReady(modelToUse) {
+            do {
+                try await ensureModelReady(model: modelToUse, progressHandler: nil)
+            } catch {
+                print("[OllamaBridgeService] Warmup for \(modelToUse) failed before request: \(error.localizedDescription)")
+            }
+        }
         
         let options = useThinking && ModelTierMap.supportsThinking(modelToUse) ? OllamaOptions(thinking: true) : nil
         let request = OllamaRequest(model: modelToUse, prompt: prompt, stream: false, images: nil, options: options)

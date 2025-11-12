@@ -9,30 +9,84 @@ import SwiftUI
 import SwiftData
 import CloutmateShared
 
+struct TaskDraft: Equatable {
+    var title: String
+    var notes: String
+    var status: TaskStatus
+    var priority: TaskPriority
+    var dueDate: Date?
+    var projectId: UUID?
+    var areaId: UUID?
+    var effort: String?
+    var linkedEntityIds: [UUID]
+    var linkedEntityTypes: [String]
+    
+    init(
+        title: String = "",
+        notes: String = "",
+        status: TaskStatus = .todo,
+        priority: TaskPriority = .medium,
+        dueDate: Date? = nil,
+        projectId: UUID? = nil,
+        areaId: UUID? = nil,
+        effort: String? = nil,
+        linkedEntityIds: [UUID] = [],
+        linkedEntityTypes: [String] = []
+    ) {
+        self.title = title
+        self.notes = notes
+        self.status = status
+        self.priority = priority
+        self.dueDate = dueDate
+        self.projectId = projectId
+        self.areaId = areaId
+        self.effort = effort
+        self.linkedEntityIds = linkedEntityIds
+        self.linkedEntityTypes = linkedEntityTypes
+    }
+    
+    init(task: Task) {
+        self.title = task.title
+        self.notes = task.notes ?? ""
+        self.status = task.status
+        self.priority = task.priority
+        self.dueDate = task.dueDate
+        self.projectId = task.projectId
+        self.areaId = task.areaId
+        self.effort = task.effort
+        self.linkedEntityIds = task.linkedEntityIds
+        self.linkedEntityTypes = task.linkedEntityTypes
+    }
+    
+    var canCommit: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
 struct TaskDetailDrawer: View {
     enum Mode {
         case create
         case edit
     }
     
-    @Bindable var task: Task
-    @Binding var isPresented: Bool
     let mode: Mode
+    let existingTask: Task?
+    let initialDraft: TaskDraft
+    @Binding var isPresented: Bool
+    let onCommit: (TaskDraft) -> Void
+    let onCancel: () -> Void
     
-    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @FocusState private var isTitleFocused: Bool
     @Query private var allProjects: [Project]
     @Query private var allAreas: [Area]
     
+    @State private var draft: TaskDraft
     @State private var energyRequirement: EnergyRequirement?
     
-    private var isCreation: Bool {
-        mode == .create
-    }
-    
     private var focusGravityIntensity: Double {
-        guard mode == .edit else { return 0 }
+        guard mode == .edit, let task = existingTask else { return 0 }
         
         let daysSinceUpdate = Calendar.current.dateComponents([.day], from: task.updatedAt, to: Date()).day ?? 0
         let daysSinceCreation = Calendar.current.dateComponents([.day], from: task.createdAt, to: Date()).day ?? 1
@@ -44,139 +98,172 @@ struct TaskDetailDrawer: View {
         return (recencyScore + frequencyScore) / 2.0
     }
     
+    private var accentGradient: LinearGradient {
+        let intensity = mode == .edit ? max(0.2, focusGravityIntensity) : 0.25
+        return LinearGradient(
+            colors: [
+                Color.kosmicBlue.opacity(0.4 + 0.4 * intensity),
+                Color.kosmicPurple.opacity(0.3 + 0.3 * intensity)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
+    init(
+        mode: Mode,
+        existingTask: Task?,
+        initialDraft: TaskDraft,
+        isPresented: Binding<Bool>,
+        onCommit: @escaping (TaskDraft) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.mode = mode
+        self.existingTask = existingTask
+        self.initialDraft = initialDraft
+        self._isPresented = isPresented
+        self.onCommit = onCommit
+        self.onCancel = onCancel
+        _draft = State(initialValue: initialDraft)
+    }
+    
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                if mode == .edit {
-                    RoundedRectangle(cornerRadius: 0, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    .kosmicBlue.opacity(focusGravityIntensity),
-                                    .kosmicPurple.opacity(focusGravityIntensity * 0.8)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 4)
-                }
-                
-                VStack(spacing: 0) {
-                    header
-                        .padding()
-                        .background(.ultraThinMaterial)
-                    
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            notesSection
-                            statusSection
-                            prioritySection
-                            dueDateSection
-                            projectSection
-                            areaSection
-                            effortSection
-                            
-                            if mode == .create {
-                                energyRequirementSection
-                            }
-                        }
-                        .padding()
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    notesSection
+                    statusSection
+                    prioritySection
+                    dueDateSection
+                    projectSection
+                    areaSection
+                    effortSection
+                    if mode == .create {
+                        energyRequirementSection
                     }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(glassColorSystem.backgroundColor())
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 680, minHeight: 540)
+            .frame(idealWidth: 860, idealHeight: 640)
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        closeDrawer()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                    Button("Cancel") {
+                        cancel()
                     }
                     .keyboardShortcut(.escape, modifiers: [])
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        commit()
+                    }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .disabled(!draft.canCommit)
                 }
             }
         }
         .frame(minWidth: 600, minHeight: 500)
         .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
-            if mode == .create {
-                energyRequirement = nil
-            }
+            energyRequirement = nil
             
-            if task.title.isEmpty {
+            if draft.title.isEmpty {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isTitleFocused = true
                 }
             }
         }
-        .onDisappear {
-            guard mode == .create else { return }
-            let trimmedTitle = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedNotes = (task.notes ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedTitle.isEmpty && trimmedNotes.isEmpty {
-                modelContext.delete(task)
-                try? modelContext.save()
+        .onChange(of: isPresented) { _, newValue in
+            if !newValue {
+                draft = initialDraft
             }
         }
     }
     
     // MARK: - Sections
     
-    private var header: some View {
-        HStack(spacing: 12) {
-            TextField("Task Title", text: $task.title)
-                .font(.system(.title2, design: .rounded))
-                .fontWeight(.bold)
-                .textFieldStyle(.plain)
-                .focused($isTitleFocused)
-                .onChange(of: task.title) { _, _ in
-                    task.updatedAt = Date()
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                TextField("Task Title", text: $draft.title)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.semibold)
+                    .textFieldStyle(.plain)
+                    .focused($isTitleFocused)
+                
+                HStack(spacing: 12) {
+                    Label(draft.status.displayName, systemImage: "checkmark.circle")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Label(draft.priority.displayName, systemImage: "flag.fill")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if let dueDate = draft.dueDate {
+                        Label(dueDate, systemImage: "calendar")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
+            }
             
             Spacer()
+            
+            VStack(spacing: 8) {
+                GlassButton(
+                    "Save",
+                    icon: "tray.and.arrow.down.fill",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    commit()
+                }
+                .disabled(!draft.canCommit)
+                
+                GlassButton(
+                    "Cancel",
+                    icon: "xmark",
+                    style: .standard,
+                    role: .surface
+                ) {
+                    cancel()
+                }
+            }
         }
     }
     
     private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Notes")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        DrawerSection(title: "Notes", icon: "doc.richtext") {
             MentionTextEditor(
                 text: Binding(
-                    get: { task.notes ?? "" },
+                    get: { draft.notes },
                     set: { newValue in
-                        task.notes = newValue.isEmpty ? nil : newValue
-                        task.updatedAt = Date()
+                        draft.notes = newValue
                     }
                 ),
                 placeholder: "Add notes...",
-                excludeObjectId: mode == .edit ? task.id : nil,
+                excludeObjectId: mode == .edit ? existingTask?.id : nil,
                 excludeObjectType: mode == .edit ? .task : nil
             ) { ids, types in
-                task.linkedEntityIds = ids
-                task.linkedEntityTypes = types
-                task.updatedAt = Date()
+                draft.linkedEntityIds = ids
+                draft.linkedEntityTypes = types
             }
             .frame(minHeight: 200)
-            .padding(8)
+            .padding(12)
             .background(.ultraThinMaterial)
-            .cornerRadius(8)
+            .cornerRadius(10)
         }
     }
     
     private var statusSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Status")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Picker("Status", selection: $task.status) {
+        DrawerSection(title: "Status", icon: "checkmark.circle") {
+            Picker("Status", selection: $draft.status) {
                 ForEach(TaskStatus.allCases, id: \.self) { status in
                     Text(status.displayName).tag(status)
                 }
@@ -186,12 +273,8 @@ struct TaskDetailDrawer: View {
     }
     
     private var prioritySection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Priority")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Picker("Priority", selection: $task.priority) {
+        DrawerSection(title: "Priority", icon: "flag.fill") {
+            Picker("Priority", selection: $draft.priority) {
                 ForEach(TaskPriority.allCases, id: \.self) { priority in
                     Text(priority.displayName).tag(priority)
                 }
@@ -201,27 +284,21 @@ struct TaskDetailDrawer: View {
     }
     
     private var dueDateSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        DrawerSection(title: "Due Date", icon: "calendar") {
             Toggle("Set Due Date", isOn: Binding(
-                get: { task.dueDate != nil },
+                get: { draft.dueDate != nil },
                 set: { newValue in
-                    if newValue {
-                        task.dueDate = task.dueDate ?? Date()
-                    } else {
-                        task.dueDate = nil
-                    }
-                    task.updatedAt = Date()
+                    draft.dueDate = newValue ? (draft.dueDate ?? Date()) : nil
                 }
             ))
             
-            if let dueDate = task.dueDate {
+            if let dueDate = draft.dueDate {
                 DatePicker(
                     "Due Date",
                     selection: Binding(
                         get: { dueDate },
                         set: { newValue in
-                            task.dueDate = newValue
-                            task.updatedAt = Date()
+                            draft.dueDate = newValue
                         }
                     ),
                     displayedComponents: .date
@@ -230,20 +307,14 @@ struct TaskDetailDrawer: View {
         }
     }
     
+    @ViewBuilder
     private var projectSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if allProjects.isEmpty {
-                EmptyView()
-            } else {
-                Text("Project")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
+        if !allProjects.isEmpty {
+            DrawerSection(title: "Project", icon: "folder.fill") {
                 Picker("Project", selection: Binding(
-                    get: { task.projectId },
+                    get: { draft.projectId },
                     set: { newValue in
-                        task.projectId = newValue
-                        task.updatedAt = Date()
+                        draft.projectId = newValue
                     }
                 )) {
                     Text("None").tag(UUID?.none)
@@ -255,20 +326,14 @@ struct TaskDetailDrawer: View {
         }
     }
     
+    @ViewBuilder
     private var areaSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if allAreas.isEmpty {
-                EmptyView()
-            } else {
-                Text("Area")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
+        if !allAreas.isEmpty {
+            DrawerSection(title: "Area", icon: "rectangle.stack.fill") {
                 Picker("Area", selection: Binding(
-                    get: { task.areaId },
+                    get: { draft.areaId },
                     set: { newValue in
-                        task.areaId = newValue
-                        task.updatedAt = Date()
+                        draft.areaId = newValue
                     }
                 )) {
                     Text("None").tag(UUID?.none)
@@ -281,16 +346,11 @@ struct TaskDetailDrawer: View {
     }
     
     private var effortSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Effort")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        DrawerSection(title: "Effort", icon: "timer") {
             Picker("Effort", selection: Binding(
-                get: { task.effort ?? "" },
+                get: { draft.effort ?? "" },
                 set: { newValue in
-                    task.effort = newValue.isEmpty ? nil : newValue
-                    task.updatedAt = Date()
+                    draft.effort = newValue.isEmpty ? nil : newValue
                 }
             )) {
                 Text("None").tag("")
@@ -302,11 +362,7 @@ struct TaskDetailDrawer: View {
     }
     
     private var energyRequirementSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Energy Requirement")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
+        DrawerSection(title: "Energy Requirement", icon: "bolt.fill") {
             Picker("Energy Requirement", selection: $energyRequirement) {
                 Text("None").tag(EnergyRequirement?.none)
                 ForEach(EnergyRequirement.allCases, id: \.self) { energy in
@@ -358,14 +414,30 @@ struct TaskDetailDrawer: View {
     
     // MARK: - Actions
     
-    private func closeDrawer() {
-        let trimmedTitle = task.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedTitle.isEmpty {
-            task.title = "Untitled Task"
-        }
-        task.updatedAt = Date()
-        try? modelContext.save()
+    private func cancel() {
+        onCancel()
+        isPresented = false
+    }
+    
+    private func commit() {
+        guard draft.canCommit else { return }
+        onCommit(draft)
         isPresented = false
     }
 }
 
+struct TaskDetailDrawer_Previews: PreviewProvider {
+    static var previews: some View {
+        TaskDetailDrawer(
+            mode: .edit,
+            existingTask: Task(title: "Draft blog outline"),
+            initialDraft: TaskDraft(task: Task(title: "Draft blog outline")),
+            isPresented: .constant(true),
+            onCommit: { _ in },
+            onCancel: {}
+        )
+        .environmentObject(GlassColorSystem())
+        .modelContainer(for: [Task.self, Project.self, Area.self])
+    }
+}
+//

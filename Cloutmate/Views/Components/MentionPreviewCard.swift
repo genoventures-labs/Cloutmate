@@ -64,6 +64,8 @@ struct MentionPreviewCard: View {
             tab = .notes
         case .artifact:
             tab = .posts
+        case .area:
+            tab = .areas
         case .post:
             tab = .posts
         case .reminder:
@@ -72,6 +74,8 @@ struct MentionPreviewCard: View {
             tab = .inbox
         case .focusSession:
             tab = .focusMode
+        case .event:
+            tab = .calendar
         }
         
         NotificationCenter.default.post(name: .switchTab, object: tab)
@@ -88,6 +92,12 @@ struct MentionPreviewCard: View {
 struct MentionDetailPopover: View {
     let mention: ResolvedMention
     @Environment(\.modelContext) private var modelContext
+    
+    private let relativeFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter
+    }()
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -139,6 +149,8 @@ struct MentionDetailPopover: View {
             noteContent
         case .artifact:
             artifactContent
+        case .area:
+            areaContent
         case .post:
             postContent
         case .reminder:
@@ -147,6 +159,8 @@ struct MentionDetailPopover: View {
             inboxItemContent
         case .focusSession:
             focusSessionContent
+        case .event:
+            eventContent
         }
     }
     
@@ -309,6 +323,99 @@ struct MentionDetailPopover: View {
         }
     }
     
+    private var eventContent: some View {
+        Group {
+            if let event = fetchEvent() {
+                VStack(alignment: .leading, spacing: 8) {
+                    let formatter = DateFormatter()
+                    formatter.dateStyle = .medium
+                    formatter.timeStyle = event.allDay ? .none : .short
+                    
+                    Label(
+                        event.allDay ? "All-day" : "\(formatter.string(from: event.startDate)) – \(formatter.string(from: event.endDate))",
+                        systemImage: event.allDay ? "sun.max.fill" : "clock"
+                    )
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    
+                    if let location = event.location, !location.isEmpty {
+                        Label(location, systemImage: "mappin.and.ellipse")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if let recurrence = event.recurrence {
+                        Label(recurrenceDescription(for: recurrence), systemImage: "arrow.2.squarepath")
+                            .font(.caption)
+                            .foregroundColor(.cyan)
+                    }
+                    
+                    if let notes = event.notes, !notes.isEmpty {
+                        Text(String(notes.prefix(160)))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                }
+            } else {
+                Text("Cannot load event details")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+    
+    private var areaContent: some View {
+        Group {
+            if let area = fetchArea() {
+                VStack(alignment: .leading, spacing: 8) {
+                    StatusBadge(status: areaStatusLabel(area.status), color: areaStatusColor(area.status))
+                    
+                    if let lastReview = area.lastReviewDate {
+                        Label("Reviewed \(relativeFormatter.localizedString(for: lastReview, relativeTo: Date()))", systemImage: "clock.arrow.circlepath")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if area.stabilityScore > 0 {
+                        Label("\(Int(area.stabilityScore.rounded())) Stability", systemImage: "chart.line.uptrend.xyaxis")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if let notes = area.notes, !notes.isEmpty {
+                        Text(String(notes.prefix(160)))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(3)
+                    }
+                    
+                    if !area.tags.isEmpty {
+                        tagWrapLayout(for: area.tags)
+                    }
+                }
+            } else {
+                Text("Cannot load area details")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+    
+    private func areaStatusLabel(_ status: AreaStatus) -> String {
+        switch status {
+        case .active: return "Active"
+        case .archived: return "Archived"
+        case .reviewNeeded: return "Needs Review"
+        }
+    }
+    
+    private func areaStatusColor(_ status: AreaStatus) -> Color {
+        switch status {
+        case .active: return .kosmicBlue
+        case .archived: return .gray
+        case .reviewNeeded: return .orange
+        }
+    }
+    
     private func navigateToItem() {
         let tab: TabIdentifier
         
@@ -321,6 +428,8 @@ struct MentionDetailPopover: View {
             tab = .notes
         case .artifact:
             tab = .posts
+        case .area:
+            tab = .areas
         case .post:
             tab = .posts
         case .reminder:
@@ -359,6 +468,14 @@ struct MentionDetailPopover: View {
     
     private func fetchProject(by id: UUID) -> CloutmateShared.Project? {
         let descriptor = FetchDescriptor<CloutmateShared.Project>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+    
+    private func fetchArea() -> Area? {
+        let id = mention.id
+        let descriptor = FetchDescriptor<Area>(
             predicate: #Predicate { $0.id == id }
         )
         return try? modelContext.fetch(descriptor).first
@@ -404,6 +521,14 @@ struct MentionDetailPopover: View {
         return try? modelContext.fetch(descriptor).first
     }
     
+    private func fetchEvent() -> CalendarEvent? {
+        let id = mention.id
+        let descriptor = FetchDescriptor<CalendarEvent>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try? modelContext.fetch(descriptor).first
+    }
+    
     private func statusColor(_ status: TaskStatus) -> Color {
         switch status {
         case .todo: return .gray
@@ -423,6 +548,8 @@ struct MentionDetailPopover: View {
             return fetchNote()?.markdown ?? ""
         case .artifact:
             return fetchArtifact()?.content ?? ""
+        case .area:
+            return fetchArea()?.notes ?? ""
         case .post:
             return fetchPost()?.caption ?? ""
         case .reminder:
@@ -431,6 +558,8 @@ struct MentionDetailPopover: View {
             return fetchInboxItem()?.content ?? ""
         case .focusSession:
             return fetchFocusSession()?.objective ?? ""
+        case .event:
+            return fetchEvent()?.notes ?? ""
         }
     }
     
@@ -440,6 +569,31 @@ struct MentionDetailPopover: View {
             predicate: #Predicate { $0.id == id }
         )
         return try? modelContext.fetch(descriptor).first
+    }
+    
+    private func recurrenceDescription(for recurrence: EventRecurrence) -> String {
+        switch recurrence.frequency {
+        case .daily:
+            return recurrence.interval == 1 ? "Daily" : "Every \(recurrence.interval) days"
+        case .weekly:
+            let weekdays = recurrence.weekdays?.compactMap { weekdayName(from: $0) } ?? []
+            let frequency = recurrence.interval == 1 ? "Weekly" : "Every \(recurrence.interval) weeks"
+            if !weekdays.isEmpty {
+                return "\(frequency) on \(weekdays.joined(separator: ", "))"
+            }
+            return frequency
+        case .monthly:
+            return recurrence.interval == 1 ? "Monthly" : "Every \(recurrence.interval) months"
+        case .yearly:
+            return recurrence.interval == 1 ? "Yearly" : "Every \(recurrence.interval) years"
+        }
+    }
+    
+    private func weekdayName(from value: Int) -> String? {
+        guard value >= 1 && value <= 7 else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        return formatter.weekdaySymbols[value - 1]
     }
     
     @ViewBuilder

@@ -17,6 +17,8 @@ struct AreaCardV2: View {
     let onEdit: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
+    let isReviewDue: Bool
+    let onReview: (() -> Void)?
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -64,10 +66,32 @@ struct AreaCardV2: View {
                     .foregroundColor(accentColor)
                     .frame(width: 32, height: 32)
                 
-                Text(area.title)
-                    .font(.headline)
-                    .foregroundColor(glassColorSystem.textPrimary())
-                    .lineLimit(2)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(area.title)
+                        .font(.headline)
+                        .foregroundColor(glassColorSystem.textPrimary())
+                        .lineLimit(2)
+                    
+                    if isReviewDue, let onReview {
+                        Button {
+                            onReview()
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "calendar.badge.exclamationmark")
+                                    .font(.caption.weight(.semibold))
+                                Text("Review")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.orange.opacity(0.16))
+                            .foregroundColor(.orange)
+                            .cornerRadius(6)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Review area")
+                    }
+                }
                 
                 Spacer()
                 
@@ -266,7 +290,9 @@ struct StabilityScoreBadge: View {
         onTap: {},
         onEdit: {},
         onArchive: {},
-        onDelete: {}
+        onDelete: {},
+        isReviewDue: true,
+        onReview: {}
     )
     .padding()
     .background(Color(.windowBackgroundColor))

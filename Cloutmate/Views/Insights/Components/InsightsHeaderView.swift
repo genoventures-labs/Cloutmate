@@ -15,17 +15,21 @@ enum InsightsViewType: String, CaseIterable {
     case cognition = "Cognition"
 }
 
+enum InsightsExportFormat: String {
+    case pdf = "PDF"
+    case markdown = "Markdown"
+}
+
 struct InsightsHeaderView: View {
     @Binding var selectedTimeRange: AnalyticsTimeRange
     @Binding var selectedViewType: InsightsViewType
     @Binding var searchText: String
-    let onExport: () -> Void
+    let onExport: (InsightsExportFormat) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.accessibilityGlassManager) private var accessibilityManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var scrollOffset: CGFloat = 0
-    @State private var showingExportMenu = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -108,28 +112,36 @@ struct InsightsHeaderView: View {
                 HStack {
                     Spacer()
                     Menu {
-                        Button(action: {
-                            onExport()
-                        }) {
-                            Label("Export as PDF", systemImage: "doc.fill")
+                        Button {
+                            onExport(.pdf)
+                        } label: {
+                            Label("Export as PDF", systemImage: "doc.richtext")
                         }
                         
-                        Button(action: {
-                            onExport()
-                        }) {
-                            Label("Export as Markdown", systemImage: "doc.text.fill")
+                        Button {
+                            onExport(.markdown)
+                        } label: {
+                            Label("Export as Markdown", systemImage: "doc.text")
                         }
                     } label: {
-                        GlassButton(
-                            nil,
-                            icon: "square.and.arrow.up",
-                            style: .iconOnly,
-                            role: .surface,
-                            action: {
-                                showingExportMenu.toggle()
-                            }
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.arrow.up")
+                                .font(.system(size: 14, weight: .semibold))
+                            Text("Export")
+                                .font(.system(size: 13, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            LinearGradient(
+                                colors: [.kosmicBlue, .kosmicPurple],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            .clipShape(Capsule())
                         )
-                        .frame(width: 40, height: 40)
+                        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
                     }
                     .menuStyle(.borderlessButton)
                 }
@@ -165,7 +177,7 @@ struct InsightsHeaderView: View {
         selectedTimeRange: .constant(.thisWeek),
         selectedViewType: .constant(.focus),
         searchText: .constant(""),
-        onExport: {}
+        onExport: { _ in }
     )
     .environmentObject(GlassColorSystem())
     .padding()

@@ -27,6 +27,12 @@ class WorkspaceObjectSearchService {
     
     private init() {}
     
+    private let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return formatter
+    }()
+    
     /// Search all workspace objects by query string
     func search(
         query: String,
@@ -73,6 +79,36 @@ class WorkspaceObjectSearchService {
                         subtitle: subtitle,
                         matchScore: score
                     ))
+                }
+            }
+        }
+        
+        // Search Areas
+        let areaDescriptor = FetchDescriptor<Area>()
+        if let areas = try? modelContext.fetch(areaDescriptor) {
+            for area in areas {
+                let score = calculateMatchScore(text: area.title.lowercased(), query: lowerQuery)
+                var bestScore = score
+                
+                if let notes = area.notes, !notes.isEmpty {
+                    let cleanedNotes = cleanDescription(notes.lowercased())
+                    let notesScore = calculateMatchScore(text: cleanedNotes, query: lowerQuery)
+                    let weightedNotesScore = notesScore * 0.6
+                    if weightedNotesScore > bestScore {
+                        bestScore = weightedNotesScore
+                    }
+                }
+                
+                if bestScore > 0 {
+                    results.append(
+                        WorkspaceObjectResult(
+                            id: area.id,
+                            type: .area,
+                            title: area.title,
+                            subtitle: areaSubtitle(for: area),
+                            matchScore: bestScore
+                        )
+                    )
                 }
             }
         }
@@ -175,6 +211,28 @@ class WorkspaceObjectSearchService {
             }
         }
         
+        // Search Calendar Events
+        let eventDescriptor = FetchDescriptor<CalendarEvent>()
+        if let calendarEvents = try? modelContext.fetch(eventDescriptor) {
+            for event in calendarEvents {
+                var score = calculateMatchScore(text: event.title.lowercased(), query: lowerQuery)
+                if let notes = event.notes, !notes.isEmpty {
+                    score = max(score, calculateMatchScore(text: notes.lowercased(), query: lowerQuery) * 0.6)
+                }
+                if score > 0 {
+                    results.append(
+                        WorkspaceObjectResult(
+                            id: event.id,
+                            type: .event,
+                            title: event.title.isEmpty ? "Untitled Event" : event.title,
+                            subtitle: eventSubtitle(for: event),
+                            matchScore: score
+                        )
+                    )
+                }
+            }
+        }
+        
         // Sort by match score (highest first) and limit results
         return results
             .sorted { $0.matchScore > $1.matchScore }
@@ -190,6 +248,8 @@ class WorkspaceObjectSearchService {
         case .note: return "Notes"
         case .post: return "Posts"
         case .artifact: return "Artifacts"
+        case .area: return "Areas"
+        case .event: return "Calendar Events"
         case .reminder: return "Reminders"
         case .inboxItem: return "Inbox"
         case .focusSession: return "Focus Sessions"
@@ -207,6 +267,8 @@ class WorkspaceObjectSearchService {
         case "notes", "note": return .note
         case "posts", "post": return .post
         case "artifacts", "artifact": return .artifact
+        case "areas", "area": return .area
+        case "events", "event": return .event
         case "reminders", "reminder": return .reminder
         case "inbox", "inboxitems", "inboxitem": return .inboxItem
         case "focus", "focussessions", "focussession": return .focusSession
@@ -222,6 +284,8 @@ class WorkspaceObjectSearchService {
             case "notes", "note": return .note
             case "posts", "post": return .post
             case "artifacts", "artifact": return .artifact
+            case "areas", "area": return .area
+            case "events", "event": return .event
             case "reminders", "reminder": return .reminder
             case "inbox", "inboxitems", "inboxitem": return .inboxItem
             case "focus", "focussessions", "focussession": return .focusSession
@@ -244,6 +308,8 @@ class WorkspaceObjectSearchService {
            (tabFilter == .note && (firstComponent == "notes" || firstComponent == "note")) ||
            (tabFilter == .post && (firstComponent == "posts" || firstComponent == "post")) ||
            (tabFilter == .artifact && (firstComponent == "artifacts" || firstComponent == "artifact")) ||
+           (tabFilter == .area && (firstComponent == "areas" || firstComponent == "area")) ||
+           (tabFilter == .event && (firstComponent == "events" || firstComponent == "event")) ||
            (tabFilter == .reminder && (firstComponent == "reminders" || firstComponent == "reminder")) ||
            (tabFilter == .inboxItem && (firstComponent == "inbox" || firstComponent == "inboxitems" || firstComponent == "inboxitem")) ||
            (tabFilter == .focusSession && (firstComponent == "focus" || firstComponent == "focussessions" || firstComponent == "focussession")) {
@@ -290,6 +356,22 @@ class WorkspaceObjectSearchService {
                     subtitle: subtitle,
                     matchScore: 1.0
                 ))
+            }
+        }
+        
+        // Get all Areas
+        let areaDescriptor = FetchDescriptor<Area>()
+        if let areas = try? modelContext.fetch(areaDescriptor) {
+            for area in areas {
+                results.append(
+                    WorkspaceObjectResult(
+                        id: area.id,
+                        type: .area,
+                        title: area.title,
+                        subtitle: areaSubtitle(for: area),
+                        matchScore: 1.0
+                    )
+                )
             }
         }
         
@@ -369,6 +451,22 @@ class WorkspaceObjectSearchService {
                     subtitle: subtitle,
                     matchScore: 1.0
                 ))
+            }
+        }
+        
+        // Get all Calendar Events
+        let eventDescriptor = FetchDescriptor<CalendarEvent>()
+        if let calendarEvents = try? modelContext.fetch(eventDescriptor) {
+            for event in calendarEvents {
+                results.append(
+                    WorkspaceObjectResult(
+                        id: event.id,
+                        type: .event,
+                        title: event.title.isEmpty ? "Untitled Event" : event.title,
+                        subtitle: eventSubtitle(for: event),
+                        matchScore: 1.0
+                    )
+                )
             }
         }
         
@@ -551,6 +649,20 @@ class WorkspaceObjectSearchService {
                 }
                 return (title: artifact.title.isEmpty ? artifact.format.displayName : artifact.title, subtitle: subtitle)
             }
+        case .area:
+            let descriptor = FetchDescriptor<Area>(
+                predicate: #Predicate { $0.id == id }
+            )
+            if let area = try? modelContext.fetch(descriptor).first {
+                return (title: area.title, subtitle: areaSubtitle(for: area))
+            }
+        case .event:
+            let descriptor = FetchDescriptor<CalendarEvent>(
+                predicate: #Predicate { $0.id == id }
+            )
+            if let event = try? modelContext.fetch(descriptor).first {
+                return (title: event.title.isEmpty ? "Untitled Event" : event.title, subtitle: eventSubtitle(for: event))
+            }
         case .reminder:
             let descriptor = FetchDescriptor<CloutmateShared.Reminder>(
                 predicate: #Predicate { $0.id == id }
@@ -578,6 +690,80 @@ class WorkspaceObjectSearchService {
         }
         
         return nil
+    }
+    
+    private func areaSubtitle(for area: Area) -> String {
+        var parts: [String] = []
+        
+        switch area.status {
+        case .active:
+            parts.append("Active")
+        case .archived:
+            parts.append("Archived")
+        case .reviewNeeded:
+            parts.append("Needs Review")
+        }
+        
+        if let lastReview = area.lastReviewDate {
+            let relative = relativeDateFormatter.localizedString(for: lastReview, relativeTo: Date())
+            parts.append("Reviewed \(relative)")
+        }
+        
+        if !area.tags.isEmpty {
+            let tagCount = area.tags.count
+            parts.append("\(tagCount) tag\(tagCount == 1 ? "" : "s")")
+        }
+        
+        if parts.isEmpty {
+            return "Area"
+        }
+        
+        return parts.joined(separator: " · ")
+    }
+    
+    private func eventSubtitle(for event: CalendarEvent) -> String {
+        var parts: [String] = []
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateStyle = .medium
+        formatter.timeStyle = event.allDay ? .none : .short
+        
+        parts.append(event.allDay ? "All-day" : formatter.string(from: event.startDate))
+        
+        if let recurrence = event.recurrence {
+            parts.append(recurrenceSummary(recurrence))
+        }
+        
+        if let location = event.location, !location.isEmpty {
+            parts.append(location)
+        }
+        
+        return parts.joined(separator: " · ")
+    }
+    
+    private func recurrenceSummary(_ recurrence: EventRecurrence) -> String {
+        switch recurrence.frequency {
+        case .daily:
+            return recurrence.interval == 1 ? "Daily" : "Every \(recurrence.interval) days"
+        case .weekly:
+            let frequency = recurrence.interval == 1 ? "Weekly" : "Every \(recurrence.interval) weeks"
+            if let weekdays = recurrence.weekdays, !weekdays.isEmpty {
+                let formatter = DateFormatter()
+                formatter.locale = Locale.current
+                let names = weekdays.compactMap { index -> String? in
+                    guard index >= 1 && index <= 7 else { return nil }
+                    return formatter.weekdaySymbols[index - 1]
+                }
+                if !names.isEmpty {
+                    return "\(frequency) on \(names.joined(separator: ", "))"
+                }
+            }
+            return frequency
+        case .monthly:
+            return recurrence.interval == 1 ? "Monthly" : "Every \(recurrence.interval) months"
+        case .yearly:
+            return recurrence.interval == 1 ? "Yearly" : "Every \(recurrence.interval) years"
+        }
     }
 }
 

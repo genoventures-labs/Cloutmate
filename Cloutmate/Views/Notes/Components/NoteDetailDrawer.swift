@@ -49,158 +49,36 @@ struct NoteDetailDrawer: View {
         return (recencyScore + frequencyScore) / 2.0
     }
     
+    private var accentGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.kosmicBlue.opacity(0.45 + 0.4 * focusGravityIntensity),
+                Color.kosmicPurple.opacity(0.35 + 0.3 * focusGravityIntensity)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
     var body: some View {
         NavigationStack {
-        HStack(spacing: 0) {
-            // Focus Gravity Sidebar
-            RoundedRectangle(cornerRadius: 0, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            .kosmicBlue.opacity(focusGravityIntensity),
-                            .kosmicPurple.opacity(focusGravityIntensity * 0.8)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(width: 4)
-            
-            // Main content
-            VStack(spacing: 0) {
-                // Header
-                HStack(spacing: 12) {
-                    TextField("Note Title", text: $editingTitle)
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.bold)
-                        .textFieldStyle(.plain)
-                    
-                    if note.author == .aurora {
-                        AuroraAuthorBadge()
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    contentSection
+                    tagsSection
+                    aiSummarySection
+                    if hasLinkedItems {
+                        linkedItemsSection
                     }
-                    
-                    Spacer()
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        // Body editor
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Content")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                                MentionTextEditor(
-                                    text: $editingContent,
-                                    placeholder: "Write your note...",
-                                    excludeObjectId: note.id,
-                                    excludeObjectType: .note
-                                ) { ids, types in
-                                    // Update note's backlinks when mentions change
-                                    note.backlinks = ids
-                                }
-                                .frame(minHeight: 200)
-                                .padding(8)
-                                .background(.ultraThinMaterial)
-                                .cornerRadius(8)
-                        }
-                        
-                        // Tags editor
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Tags")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            // Tag chips
-                            if !editingTags.isEmpty {
-                                NoteTagFlowLayout(spacing: 8) {
-                                    ForEach(editingTags, id: \.self) { tag in
-                                        HStack(spacing: 4) {
-                                            Text("#\(tag)")
-                                                .font(.caption)
-                                            Button(action: {
-                                                editingTags.removeAll { $0 == tag }
-                                            }) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                    .font(.caption2)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.kosmicPurple.opacity(0.1))
-                                        .foregroundColor(.kosmicPurple)
-                                        .cornerRadius(6)
-                                    }
-                                }
-                            }
-                            
-                            // Add tag field
-                            HStack {
-                                TextField("Add tag", text: $newTag)
-                                    .textFieldStyle(.plain)
-                                    .onSubmit {
-                                        addTag()
-                                    }
-                                
-                                Button(action: addTag) {
-                                    Image(systemName: "plus.circle.fill")
-                                        .foregroundColor(.kosmicPurple)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(newTag.isEmpty)
-                            }
-                            .padding(8)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(8)
-                        }
-                        
-                        // AI Summary Section
-                        AISummarySection(
-                            summary: aiSummary,
-                            isGenerating: isGeneratingSummary,
-                            isExpanded: $isSummaryExpanded,
-                            emotionalTone: emotionalTone,
-                            onRegenerate: generateSummary
-                        )
-                        
-                        // Linked Items
-                        LinkedItemsSection(
-                            tasks: linkedTasks,
-                            projects: linkedProjects,
-                            artifacts: linkedArtifacts
-                        )
-                        
-                        // Ask Aurora button
-                        Button(action: {
-                            // TODO: Open Aurora chat overlay contextual to this note
-                        }) {
-                            HStack {
-                                Image(systemName: "sparkles")
-                                Text("Ask Aurora")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                LinearGradient(
-                                    colors: [.kosmicBlue, .kosmicPurple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding()
-                }
-            }
-        }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(glassColorSystem.backgroundColor())
+                    auroraSection
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 700, minHeight: 560)
+            .frame(idealWidth: 860, idealHeight: 640)
             .navigationTitle("")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -211,11 +89,10 @@ struct NoteDetailDrawer: View {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
                     }
+                    .keyboardShortcut(.escape, modifiers: [])
                 }
             }
         }
-        .frame(minWidth: 600, minHeight: 500)
-        .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
             editingTitle = note.title
             editingContent = note.markdown
@@ -245,6 +122,176 @@ struct NoteDetailDrawer: View {
             if note.title.isEmpty && note.markdown.isEmpty && note.tags.isEmpty {
                 modelContext.delete(note)
                 try? modelContext.save()
+            }
+        }
+    }
+    
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center, spacing: 8) {
+                    TextField("Note Title", text: $editingTitle)
+                        .font(.system(.title2, design: .rounded))
+                        .fontWeight(.semibold)
+                        .textFieldStyle(.plain)
+                        .disableAutocorrection(true)
+                    
+                    if note.author == .aurora {
+                        AuroraAuthorBadge()
+                    }
+                }
+                
+                HStack(spacing: 12) {
+                    Label(note.updatedAt, systemImage: "clock.arrow.circlepath")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if !note.tags.isEmpty {
+                        Label("\(note.tags.count) tag\(note.tags.count == 1 ? "" : "s")", systemImage: "number")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    if let projectId = note.projectId,
+                       let project = linkedProjects.first(where: { $0.id == projectId }) {
+                        Label(project.title, systemImage: "folder.fill")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            VStack(spacing: 8) {
+                GlassButton(
+                    "Done",
+                    icon: "checkmark",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    saveNote()
+                    isPresented = false
+                }
+                
+                GlassButton(
+                    nil,
+                    icon: "xmark",
+                    style: .iconOnly,
+                    role: .surface
+                ) {
+                    saveNote()
+                    isPresented = false
+                }
+                .accessibilityLabel("Close")
+            }
+        }
+    }
+    
+    private var contentSection: some View {
+        DrawerSection(title: "Content", icon: "doc.richtext") {
+            VStack(alignment: .leading, spacing: 8) {
+                MentionTextEditor(
+                    text: $editingContent,
+                    placeholder: "Write your note...",
+                    excludeObjectId: note.id,
+                    excludeObjectType: .note
+                ) { ids, _ in
+                    note.backlinks = ids
+                }
+                .focused($isContentFocused)
+                .frame(minHeight: 220)
+                .padding(12)
+                .background(.ultraThinMaterial)
+                .cornerRadius(10)
+            }
+        }
+    }
+    
+    private var tagsSection: some View {
+        DrawerSection(title: "Tags", icon: "tag.fill") {
+            VStack(alignment: .leading, spacing: 12) {
+                if !editingTags.isEmpty {
+                    NoteTagFlowLayout(spacing: 8) {
+                        ForEach(editingTags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text("#\(tag)")
+                                    .font(.caption)
+                                Button {
+                                    editingTags.removeAll { $0 == tag }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.kosmicPurple.opacity(0.12))
+                            .foregroundColor(.kosmicPurple)
+                            .cornerRadius(6)
+                        }
+                    }
+                } else {
+                    Text("Add tags to organize and surface this note in other contexts.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                HStack {
+                    TextField("Add tag", text: $newTag)
+                        .textFieldStyle(.plain)
+                        .onSubmit(addTag)
+                    
+                    Button(action: addTag) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.kosmicPurple)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(newTag.isEmpty)
+                }
+                .padding(10)
+                .background(.ultraThinMaterial)
+                .cornerRadius(8)
+            }
+        }
+    }
+    
+    private var aiSummarySection: some View {
+        DrawerSection(title: "Aurora Summary", icon: "sparkles") {
+            AISummarySection(
+                summary: aiSummary,
+                isGenerating: isGeneratingSummary,
+                isExpanded: $isSummaryExpanded,
+                emotionalTone: emotionalTone,
+                onRegenerate: generateSummary
+            )
+        }
+    }
+    
+    private var hasLinkedItems: Bool {
+        !linkedTasks.isEmpty || !linkedProjects.isEmpty || !linkedArtifacts.isEmpty
+    }
+    
+    private var linkedItemsSection: some View {
+        DrawerSection(title: "Linked Items", icon: "link") {
+            LinkedItemsSection(
+                tasks: linkedTasks,
+                projects: linkedProjects,
+                artifacts: linkedArtifacts
+            )
+        }
+    }
+    
+    private var auroraSection: some View {
+        DrawerSection(title: "Aurora Tools", icon: "wand.and.stars") {
+            GlassButton(
+                "Ask Aurora",
+                icon: "sparkles",
+                style: .standard,
+                role: .primary
+            ) {
+                // TODO: Open Aurora chat overlay contextual to this note
             }
         }
     }

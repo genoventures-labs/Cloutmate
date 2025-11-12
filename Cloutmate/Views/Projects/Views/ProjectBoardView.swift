@@ -18,7 +18,8 @@ struct ProjectBoardView: View {
     let selectionMode: Bool
     let selectedProjectIDs: Set<UUID>
     let onSelectionToggle: (Project) -> Void
-    let onProjectSelected: (Project) -> Void
+    let onProjectDetail: (Project) -> Void
+    let onProjectEdit: (Project) -> Void
     let onDuplicateProject: (Project) -> Void
     let onArchiveProject: (Project) -> Void
     let onDeleteProject: (Project) -> Void
@@ -103,7 +104,8 @@ struct ProjectBoardView: View {
                         selectionMode: selectionMode,
                         selectedProjectIDs: selectedProjectIDs,
                         onSelectionToggle: onSelectionToggle,
-                        onProjectSelected: onProjectSelected,
+                        onProjectDetail: onProjectDetail,
+                        onProjectEdit: onProjectEdit,
                         onDuplicateProject: onDuplicateProject,
                         onArchiveProject: onArchiveProject,
                         onDeleteProject: onDeleteProject,
@@ -149,7 +151,8 @@ struct BoardLaneColumn: View {
     let selectionMode: Bool
     let selectedProjectIDs: Set<UUID>
     let onSelectionToggle: (Project) -> Void
-    let onProjectSelected: (Project) -> Void
+    let onProjectDetail: (Project) -> Void
+    let onProjectEdit: (Project) -> Void
     let onDuplicateProject: (Project) -> Void
     let onArchiveProject: (Project) -> Void
     let onDeleteProject: (Project) -> Void
@@ -222,7 +225,8 @@ struct BoardLaneColumn: View {
                             selectionMode: selectionMode,
                             isSelected: selectedProjectIDs.contains(project.id),
                             onSelectionToggle: { onSelectionToggle(project) },
-                            onTap: { onProjectSelected(project) },
+                            onOpenDetail: { onProjectDetail(project) },
+                            onEdit: { onProjectEdit(project) },
                             onDuplicate: { onDuplicateProject(project) },
                             onArchive: { onArchiveProject(project) },
                             onDelete: { onDeleteProject(project) }
@@ -298,7 +302,8 @@ struct BoardProjectCard: View {
     let selectionMode: Bool
     let isSelected: Bool
     let onSelectionToggle: () -> Void
-    let onTap: () -> Void
+    let onOpenDetail: () -> Void
+    let onEdit: () -> Void
     let onDuplicate: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
@@ -367,24 +372,22 @@ struct BoardProjectCard: View {
         .onTapGesture {
             if selectionMode {
                 onSelectionToggle()
+            }
+        }
+        .onTapGesture(count: 2) {
+            if selectionMode {
+                onSelectionToggle()
             } else {
-                onTap()
+                onOpenDetail()
             }
         }
         .contextMenu {
-            Button("Open") {
-                onTap()
-            }
-            Button("Duplicate", systemImage: "doc.on.doc") {
-                onDuplicate()
-            }
-            Button("Archive", systemImage: "archivebox") {
-                onArchive()
-            }
+            Button("Open") { onOpenDetail() }
+            Button("Edit") { onEdit() }
+            Button("Duplicate", systemImage: "doc.on.doc") { onDuplicate() }
+            Button("Archive", systemImage: "archivebox") { onArchive() }
             Divider()
-            Button("Delete", role: .destructive) {
-                onDelete()
-            }
+            Button("Delete", role: .destructive) { onDelete() }
         }
     }
 }

@@ -13,6 +13,8 @@ enum ObjectType: String, Codable {
     case task
     case note
     case artifact
+    case area
+    case event
     case post
     case reminder
     case inboxItem
@@ -24,6 +26,8 @@ enum ObjectType: String, Codable {
         case .task: return "checkmark.circle"
         case .note: return "doc.text.fill"
         case .artifact: return "doc.richtext"
+        case .area: return "rectangle.stack.fill"
+        case .event: return "calendar"
         case .post: return "square.and.pencil"
         case .reminder: return "bell.fill"
         case .inboxItem: return "tray.fill"
@@ -37,6 +41,8 @@ struct LinkedContext: Codable {
     var linkedTasks: [UUID] = []
     var linkedNotes: [UUID] = []
     var linkedArtifacts: [UUID] = []
+    var linkedAreas: [UUID] = []
+    var linkedEvents: [UUID] = []
     var linkedPosts: [UUID] = []
     var linkedReminders: [UUID] = []
     var linkedInboxItems: [UUID] = []
@@ -52,6 +58,8 @@ struct LinkedContext: Codable {
         case linkedTasks
         case linkedNotes
         case linkedArtifacts
+        case linkedAreas
+        case linkedEvents
         case linkedPosts
         case linkedReminders
         case linkedInboxItems
@@ -78,6 +86,14 @@ struct LinkedContext: Codable {
         case .artifact:
             if !linkedArtifacts.contains(id) {
                 linkedArtifacts.append(id)
+            }
+        case .area:
+            if !linkedAreas.contains(id) {
+                linkedAreas.append(id)
+            }
+        case .event:
+            if !linkedEvents.contains(id) {
+                linkedEvents.append(id)
             }
         case .post:
             if !linkedPosts.contains(id) {
@@ -114,6 +130,8 @@ struct LinkedContext: Codable {
         linkedTasks.removeAll()
         linkedNotes.removeAll()
         linkedArtifacts.removeAll()
+        linkedAreas.removeAll()
+        linkedEvents.removeAll()
         linkedPosts.removeAll()
         linkedReminders.removeAll()
         linkedInboxItems.removeAll()
@@ -127,11 +145,12 @@ struct LinkedContext: Codable {
                linkedTasks.isEmpty &&
                linkedNotes.isEmpty &&
                linkedArtifacts.isEmpty &&
+               linkedAreas.isEmpty &&
+               linkedEvents.isEmpty &&
                linkedPosts.isEmpty &&
                linkedReminders.isEmpty &&
                linkedInboxItems.isEmpty &&
                linkedFocusSessions.isEmpty
     }
 }
-
 

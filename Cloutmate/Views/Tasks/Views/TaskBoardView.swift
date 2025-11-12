@@ -21,6 +21,8 @@ struct TaskBoardView: View {
     let onDuplicateTask: (Task) -> Void
     let onArchiveTask: (Task) -> Void
     let onDeleteTask: (Task) -> Void
+    let onStartFocus: (Task) -> Void
+    let onQuickAddTask: (TaskStatus) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -96,7 +98,9 @@ struct TaskBoardView: View {
                         onDeleteTask: onDeleteTask,
                         onTaskDropped: { task, targetLane in
                             updateTaskStatus(task: task, to: targetLane.status)
-                        }
+                        },
+                        onStartFocus: onStartFocus,
+                        onQuickAddTask: onQuickAddTask
                     )
                 }
             }
@@ -107,7 +111,9 @@ struct TaskBoardView: View {
     }
     
     private func updateTaskStatus(task: Task, to status: TaskStatus) {
+        withAnimation(GlassMotion.Easing.spring) {
         task.status = status
+        }
         try? modelContext.save()
     }
 }
@@ -128,42 +134,85 @@ private struct TaskBoardLaneColumn: View {
     let onArchiveTask: (Task) -> Void
     let onDeleteTask: (Task) -> Void
     let onTaskDropped: (Task, TaskBoardView.BoardLane) -> Void
+    let onStartFocus: (Task) -> Void
+    let onQuickAddTask: (TaskStatus) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
+    @State private var isTargeted = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Lane Header
-            HStack {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [lane.focusColor.opacity(0.8), lane.focusColor.opacity(0.4)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 12, height: 12)
+                    .shadow(color: lane.focusColor.opacity(0.4), radius: 6, y: 2)
+                
                 Text(lane.displayName)
-                    .font(.headline)
+                    .font(.system(.headline, design: .rounded))
+                    .fontWeight(.semibold)
                     .foregroundColor(glassColorSystem.textPrimary())
                 
                 Spacer()
                 
+                Capsule()
+                    .fill(lane.focusColor.opacity(0.12))
+                    .overlay(
                 Text("\(tasks.count)")
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(lane.focusColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(lane.focusColor.opacity(0.2))
-                    .cornerRadius(8)
+                    )
+                    .frame(height: 24)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(width: 280)
             .background(
-                lane.focusColor.opacity(0.1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(lane.focusColor.opacity(0.08))
                     .overlay(
-                        Rectangle()
-                            .fill(lane.focusColor.opacity(0.2))
-                            .frame(height: 2),
-                        alignment: .top
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(lane.focusColor.opacity(0.18), lineWidth: 1)
                     )
             )
-            .cornerRadius(8)
+            
+            if metrics.hasHighlights {
+                HStack(spacing: 6) {
+                    if metrics.overdueCount > 0 {
+                        MetricPill(
+                            icon: "exclamationmark.triangle.fill",
+                            text: "\(metrics.overdueCount) overdue",
+                            tint: .red
+                        )
+                    }
+                    if metrics.dueSoonCount > 0 {
+                        MetricPill(
+                            icon: "clock.badge.exclamationmark",
+                            text: "\(metrics.dueSoonCount) due soon",
+                            tint: .orange
+                        )
+                    }
+                    if metrics.highPriorityCount > 0 {
+                        MetricPill(
+                            icon: "bolt.fill",
+                            text: "\(metrics.highPriorityCount) high priority",
+                            tint: .kosmicPurple
+                        )
+                    }
+                }
+                .padding(.horizontal, 12)
+            }
             
             // Tasks in this lane
             ScrollView {
@@ -179,7 +228,11 @@ private struct TaskBoardLaneColumn: View {
                             onTap: { onTaskSelected(task) },
                             onDuplicate: { onDuplicateTask(task) },
                             onArchive: { onArchiveTask(task) },
-                            onDelete: { onDeleteTask(task) }
+                            onDelete: { onDeleteTask(task) },
+                            onStartFocus: { onStartFocus(task) },
+                            onMoveToLane: { targetLane in
+                                onTaskDropped(task, targetLane)
+                            }
                         )
                         .applyIf(!selectionMode) { view in
                             view.draggable(TaskDragInfo(taskID: task.id))
@@ -187,18 +240,82 @@ private struct TaskBoardLaneColumn: View {
                         .padding(.horizontal, 2)
                         .padding(.vertical, 1)
                     }
+                    
+                    Button(action: {
+                        onQuickAddTask(lane.status)
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Quick add task")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                        }
+                        .foregroundColor(.secondary)
+                        .padding(.vertical, 10)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.secondary.opacity(0.06))
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, tasks.isEmpty ? 32 : 12)
                 }
             }
             .frame(height: 600)
         }
         .frame(width: 280)
         .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(lane.focusColor.opacity(isTargeted ? 0.45 : 0), lineWidth: isTargeted ? 3 : 0)
+                .animation(.easeInOut(duration: 0.2), value: isTargeted)
+        )
         .onDrop(of: [.text], delegate: TaskDropDelegate(
             targetLane: lane,
             tasks: allTasks,
             onTaskDropped: onTaskDropped,
-            modelContext: modelContext
+            modelContext: modelContext,
+            onHoverChanged: { hovering in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isTargeted = hovering
+                }
+            }
         ))
+    }
+    
+    private var metrics: TaskLaneMetrics {
+        TaskLaneMetrics(tasks: tasks)
+    }
+    
+    private struct TaskLaneMetrics {
+        let overdueCount: Int
+        let dueSoonCount: Int
+        let highPriorityCount: Int
+        
+        var hasHighlights: Bool {
+            overdueCount > 0 || dueSoonCount > 0 || highPriorityCount > 0
+        }
+        
+        init(tasks: [Task]) {
+            let now = Date()
+            let calendar = Calendar.current
+            
+            overdueCount = tasks.filter { task in
+                guard let dueDate = task.dueDate else { return false }
+                return dueDate < now && task.status != .done
+            }.count
+            
+            dueSoonCount = tasks.filter { task in
+                guard let dueDate = task.dueDate else { return false }
+                guard dueDate >= now else { return false }
+                let days = calendar.dateComponents([.day], from: now, to: dueDate).day ?? 0
+                return days <= 3 && task.status != .done
+            }.count
+            
+            highPriorityCount = tasks.filter { task in
+                task.priority == .high && task.status != .done
+            }.count
+        }
     }
 }
 
@@ -215,6 +332,8 @@ private struct BoardTaskCard: View {
     let onDuplicate: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
+    let onStartFocus: () -> Void
+    let onMoveToLane: (TaskBoardView.BoardLane) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -256,6 +375,25 @@ private struct BoardTaskCard: View {
                     .lineLimit(2)
             }
             
+            if project != nil || area != nil {
+                HStack(spacing: 6) {
+                    if let project {
+                        AssociationChip(
+                            icon: "folder.fill",
+                            text: project.title,
+                            tint: .kosmicBlue
+                        )
+                    }
+                    if let area {
+                        AssociationChip(
+                            icon: "rectangle.stack.fill",
+                            text: area.title,
+                            tint: .kosmicPurple
+                        )
+                    }
+                }
+            }
+            
             HStack {
                 InteractiveProgressPill(task: task)
                 
@@ -286,6 +424,18 @@ private struct BoardTaskCard: View {
                 )
         )
         .overlay(alignment: .topTrailing) {
+            if !selectionMode {
+                QuickActionBar(
+                    isVisible: isHovered,
+                    onEdit: onTap,
+                    onFocus: onStartFocus,
+                    onDuplicate: onDuplicate,
+                    onMove: onMoveToLane
+                )
+                .padding(.trailing, 4)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
             if selectionMode {
                 SelectionIndicator(isSelected: isSelected)
                     .padding(8)
@@ -305,17 +455,25 @@ private struct BoardTaskCard: View {
             }
         }
         .contextMenu {
-            Button("Start Focus Session") {
-                // Handle focus session
-            }
-            Divider()
             Button("Edit") {
                 onTap()
             }
-            Button("Duplicate") {
+            Menu("Move to") {
+                ForEach(TaskBoardView.BoardLane.allCases, id: \.self) { lane in
+                    Button(lane.displayName) {
+                        onMoveToLane(lane)
+                    }
+                    .disabled(lane.status == task.status)
+                }
+            }
+            Button("Start Focus Session", systemImage: "bolt.fill") {
+                onStartFocus()
+            }
+            Divider()
+            Button("Duplicate", systemImage: "doc.on.doc") {
                 onDuplicate()
             }
-            Button("Archive") {
+            Button("Archive", systemImage: "archivebox") {
                 onArchive()
             }
             Divider()
@@ -357,6 +515,20 @@ struct TaskDropDelegate: DropDelegate {
     let tasks: [Task]
     let onTaskDropped: (Task, TaskBoardView.BoardLane) -> Void
     let modelContext: ModelContext
+    let onHoverChanged: (Bool) -> Void
+    
+    func validateDrop(info: DropInfo) -> Bool {
+        onHoverChanged(true)
+        return info.hasItemsConforming(to: [.text])
+    }
+    
+    func dropEntered(info: DropInfo) {
+        onHoverChanged(true)
+    }
+    
+    func dropExited(info: DropInfo) {
+        onHoverChanged(false)
+    }
     
     func performDrop(info: DropInfo) -> Bool {
         guard let itemProvider = info.itemProviders(for: [.text]).first else {
@@ -373,6 +545,7 @@ struct TaskDropDelegate: DropDelegate {
                     return
                 }
                 onTaskDropped(task, targetLane)
+                onHoverChanged(false)
             }
         }
         
@@ -388,6 +561,141 @@ extension View {
             }
             return NSItemProvider()
         }
+    }
+}
+
+private struct MetricPill: View {
+    let icon: String
+    let text: String
+    let tint: Color
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(tint)
+            Text(text)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.08))
+        .clipShape(Capsule())
+    }
+}
+
+private struct AssociationChip: View {
+    let icon: String
+    let text: String
+    let tint: Color
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(tint)
+            Text(text)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.08))
+        .clipShape(Capsule())
+    }
+}
+
+private struct QuickActionBar: View {
+    let isVisible: Bool
+    let onEdit: () -> Void
+    let onFocus: () -> Void
+    let onDuplicate: () -> Void
+    let onMove: (TaskBoardView.BoardLane) -> Void
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            QuickActionButton(systemName: "pencil", tint: .primary, action: onEdit)
+            QuickActionButton(systemName: "bolt.fill", tint: .kosmicGreen, action: onFocus)
+            QuickActionButton(systemName: "doc.on.doc", tint: .kosmicBlue, action: onDuplicate)
+            
+            Menu {
+                ForEach(TaskBoardView.BoardLane.allCases, id: \.self) { lane in
+                    Button(lane.displayName) {
+                        onMove(lane)
+                    }
+                }
+            } label: {
+                QuickActionGlyph(systemName: "ellipsis.circle", tint: .secondary)
+            }
+            .menuStyle(.borderlessButton)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.14), radius: 8, y: 4)
+        .opacity(isVisible ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: isVisible)
+        .allowsHitTesting(isVisible)
+    }
+}
+
+private struct QuickActionButton: View {
+    let systemName: String
+    let tint: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            QuickActionGlyph(systemName: systemName, tint: tint)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct QuickActionGlyph: View {
+    let systemName: String
+    let tint: Color
+    
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundColor(tint)
+            .padding(8)
+            .background(Color.white.opacity(0.15))
+            .clipShape(Circle())
+    }
+}
+
+private struct StatusBadge: View {
+    let status: String
+    let color: Color
+    
+    var body: some View {
+        Text(status)
+            .font(.caption2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.2))
+            .foregroundColor(color)
+            .cornerRadius(4)
+    }
+}
+
+private struct PriorityBadge: View {
+    let priority: String
+    let color: Color
+    
+    var body: some View {
+        Text(priority)
+            .font(.caption2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.2))
+            .foregroundColor(color)
+            .cornerRadius(4)
     }
 }
 

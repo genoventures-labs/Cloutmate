@@ -2,13 +2,12 @@
 //  JournalDetailDrawer.swift
 //  Cloutmate
 //
-//  Journal detail drawer with ARTE reflection and Focus Gravity sidebar
+//  Modern side-drawer for composing and editing journals with draft support.
 //
 
 import SwiftUI
 import SwiftData
 import CloutmateShared
-import AppKit
 
 enum JournalTemplate {
     case morning
@@ -25,280 +24,697 @@ enum JournalTemplate {
             return ""
         }
     }
+    
+    var title: String {
+        switch self {
+        case .morning:
+            return "Morning Intention"
+        case .evening:
+            return "Evening Reflection"
+        case .freeWrite:
+            return "Free Write"
+        }
+    }
+}
+
+struct JournalDraft: Equatable {
+    var title: String
+    var content: String
+    var entryDate: Date
+    var entryType: JournalEntryType
+    var mood: JournalMood
+    var tags: [String]
+    var projectId: UUID?
+    var areaId: UUID?
+    var linkedNoteIds: [UUID]
+    var linkedAreaIds: [UUID]
+    var linkedProjectIds: [UUID]
+    var linkedEntityIds: [UUID]
+    var linkedEntityTypes: [String]
+    var author: JournalAuthor
+    var aiPrompt: String?
+    var aiGeneratedContent: String?
+    var auroraNotes: String?
+    var isArchived: Bool
+    
+    init(
+        title: String = "",
+        content: String = "",
+        entryDate: Date = Date(),
+        entryType: JournalEntryType = .reflection,
+        mood: JournalMood = .none,
+        tags: [String] = [],
+        projectId: UUID? = nil,
+        areaId: UUID? = nil,
+        linkedNoteIds: [UUID] = [],
+        linkedAreaIds: [UUID] = [],
+        linkedProjectIds: [UUID] = [],
+        linkedEntityIds: [UUID] = [],
+        linkedEntityTypes: [String] = [],
+        author: JournalAuthor = .user,
+        aiPrompt: String? = nil,
+        aiGeneratedContent: String? = nil,
+        auroraNotes: String? = nil,
+        isArchived: Bool = false
+    ) {
+        self.title = title
+        self.content = content
+        self.entryDate = entryDate
+        self.entryType = entryType
+        self.mood = mood
+        self.tags = tags
+        self.projectId = projectId
+        self.areaId = areaId
+        self.linkedNoteIds = linkedNoteIds
+        self.linkedAreaIds = linkedAreaIds
+        self.linkedProjectIds = linkedProjectIds
+        self.linkedEntityIds = linkedEntityIds
+        self.linkedEntityTypes = linkedEntityTypes
+        self.author = author
+        self.aiPrompt = aiPrompt
+        self.aiGeneratedContent = aiGeneratedContent
+        self.auroraNotes = auroraNotes
+        self.isArchived = isArchived
+    }
+    
+    init(journal: Journal) {
+        self.title = journal.title
+        self.content = journal.content
+        self.entryDate = journal.entryDate
+        self.entryType = journal.journalEntryType
+        self.mood = journal.journalMood
+        self.tags = journal.tags
+        self.projectId = journal.projectId
+        self.areaId = journal.areaId
+        self.linkedNoteIds = journal.linkedNoteIds
+        self.linkedAreaIds = journal.linkedAreaIds
+        self.linkedProjectIds = journal.linkedProjectIds
+        self.linkedEntityIds = journal.linkedEntityIds
+        self.linkedEntityTypes = journal.linkedEntityTypes
+        self.author = journal.author
+        self.aiPrompt = journal.aiPrompt
+        self.aiGeneratedContent = journal.aiGeneratedContent
+        self.auroraNotes = journal.auroraNotes
+        self.isArchived = journal.isArchived
+    }
+    
+    var canCommit: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 }
 
 struct JournalDetailDrawer: View {
-    @Bindable var journal: Journal
-    @Binding var isPresented: Bool
+    enum Mode {
+        case create
+        case edit
+    }
+    
+    let mode: Mode
+    let existingJournal: Journal?
     
     let template: JournalTemplate?
+    let initialDraft: JournalDraft
+    @Binding var isPresented: Bool
+    let onCommit: (JournalDraft) -> Void
+    let onCancel: () -> Void
     
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @FocusState private var isContentFocused: Bool
     
-    @State private var editingTitle: String = ""
-    @State private var editingContent: String = ""
-    @State private var editingMood: JournalMood = .none
-    @State private var editingEntryType: JournalEntryType = .reflection
-    
+    @State private var draft: JournalDraft
+    @State private var newTagText: String = ""
     @State private var aiSummary: String?
     @State private var isGeneratingSummary = false
     @State private var isSummaryExpanded = true
-    
     @State private var emotionalState: EmotionalStateDetection?
     @State private var dailySnapshot: AnalyticsSnapshot?
     @State private var showAuroraChat = false
     
-    @FocusState private var isContentFocused: Bool
+    @State private var linkedTasks: [Task] = []
+    @State private var linkedProjects: [Project] = []
+    @State private var linkedArtifacts: [Artifact] = []
     
-    init(journal: Journal, isPresented: Binding<Bool>, template: JournalTemplate? = nil) {
-        self.journal = journal
-        self._isPresented = isPresented
+    init(
+        mode: Mode,
+        existingJournal: Journal?,
+        template: JournalTemplate? = nil,
+        initialDraft: JournalDraft,
+        isPresented: Binding<Bool>,
+        onCommit: @escaping (JournalDraft) -> Void,
+        onCancel: @escaping () -> Void
+    ) {
+        self.mode = mode
+        self.existingJournal = existingJournal
         self.template = template
+        self.initialDraft = initialDraft
+        self._isPresented = isPresented
+        self.onCommit = onCommit
+        self.onCancel = onCancel
+        _draft = State(initialValue: initialDraft)
+        _aiSummary = State(initialValue: initialDraft.aiGeneratedContent)
     }
     
-    private var focusGravityIntensity: Double {
-        // Calculate engagement weight based on update frequency and age
+    private var accentIntensity: Double {
+        guard let journal = existingJournal else { return 0.2 }
         let daysSinceUpdate = Calendar.current.dateComponents([.day], from: journal.updatedAt, to: Date()).day ?? 0
         let daysSinceCreation = Calendar.current.dateComponents([.day], from: journal.createdAt, to: Date()).day ?? 1
-        
-        // More recent updates = higher intensity
         let recencyScore = max(0, 1.0 - (Double(daysSinceUpdate) / 30.0))
-        
-        // More frequent updates = higher intensity
         let updateFrequency = Double(daysSinceCreation) > 0 ? Double(journal.content.count) / Double(daysSinceCreation) : 0.0
         let frequencyScore = min(1.0, updateFrequency / 100.0)
-        
-        return (recencyScore + frequencyScore) / 2.0
+        return max(0.2, (recencyScore + frequencyScore) / 2.0)
     }
     
     var body: some View {
-                        HStack(spacing: 0) {
-                            // Focus Gravity Sidebar
-                            RoundedRectangle(cornerRadius: 0, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            .kosmicBlue.opacity(focusGravityIntensity),
-                                            .kosmicPurple.opacity(focusGravityIntensity * 0.8)
-                                        ],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .frame(width: 4)
-                            
-                            // Main content
-                            VStack(spacing: 0) {
-                                // Header
+        NavigationStack {
+            HStack(spacing: 0) {
+                accentBar
+                
+                VStack(spacing: 0) {
+                    headerSection
+                    Divider().opacity(0.08)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            entryDetailsCard
+                            contentCard
+                            tagsCard
+                            if !linkedTasks.isEmpty || !linkedProjects.isEmpty || !linkedArtifacts.isEmpty {
+                                linkedItemsCard
+                            }
+                            if mode == .create {
+                                templateCard
+                            }
+                        }
+                        .padding(.vertical, 24)
+                        .padding(.horizontal, 24)
+                        .frame(maxWidth: 680, alignment: .leading)
+                    }
+                    .background(glassColorSystem.backgroundColor())
+                }
+                
+                if mode == .edit {
+                    Divider().opacity(0.08)
+                    insightsSidebar
+                }
+            }
+            .background(glassColorSystem.backgroundColor())
+            .navigationTitle("Journal Entry")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        cancel()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        commit()
+                    }
+                    .keyboardShortcut(.return, modifiers: [])
+                    .disabled(!draft.canCommit)
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+        }
+        .frame(minWidth: 960, minHeight: 640)
+        .onAppear(perform: handleOnAppear)
+        .onChange(of: draft.linkedEntityIds) { _, _ in
+            loadLinkedItems()
+        }
+        .onChange(of: isPresented) { _, newValue in
+            if !newValue {
+                resetState()
+            }
+        }
+        .sheet(isPresented: $showAuroraChat) {
+            if let journal = existingJournal {
+                AuroraJournalChatOverlay(journal: journal, isPresented: $showAuroraChat)
+            }
+        }
+    }
+    
+    // MARK: - Layout Sections
+    
+    private var accentBar: some View {
+        LinearGradient(
+            colors: [
+                Color.kosmicBlue.opacity(accentIntensity),
+                Color.kosmicPurple.opacity(accentIntensity * 0.8)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(width: 4)
+        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 0)
+    }
+    
+    private var headerSection: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 0) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                                    TextField("Journal Title", text: $editingTitle)
-                                        .font(.system(.title2, design: .rounded))
-                                        .fontWeight(.bold)
-                                        .textFieldStyle(.plain)
-                                    
-                    if journal.author == .aurora {
+                    TextField("Journal Title", text: $draft.title)
+                        .font(.system(.title2, design: .rounded))
+                        .fontWeight(.bold)
+                        .textFieldStyle(.plain)
+                    
+                    if draft.author == .aurora {
                         AuroraAuthorBadge()
                     }
                     
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        saveJournal()
-                                            isPresented = false
-                                    }) {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.title3)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .keyboardShortcut(.escape, modifiers: [])
-                                }
-                                .padding()
-                                .background(.ultraThinMaterial)
-                                
-                                ScrollView {
-                                    VStack(alignment: .leading, spacing: 20) {
-                                        // Entry metadata
-                                        HStack(spacing: 16) {
-                                            // Entry type picker
-                                            Picker("Type", selection: $editingEntryType) {
-                                                ForEach(JournalEntryType.allCases, id: \.self) { type in
-                                                    Label(type.rawValue, systemImage: type.icon).tag(type)
-                                                }
-                                            }
-                                            .pickerStyle(.menu)
-                                            
-                                            // Mood picker
-                                            Picker("Mood", selection: $editingMood) {
-                                                ForEach(JournalMood.allCases, id: \.self) { mood in
-                                                    Text(mood.rawValue).tag(mood)
-                                                }
-                                            }
-                                            .pickerStyle(.menu)
-                                            
-                                            Spacer()
-                                            
-                                            // Date
-                                            Text(journal.entryDate, style: .date)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        .padding(.horizontal)
-                                        .padding(.top, 8)
-                                        
-                                        // Body editor
-                                        VStack(alignment: .leading, spacing: 8) {
-                                            Text("Content")
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                            
-                                            TextEditor(text: $editingContent)
-                                                .font(.body)
-                                                .frame(minHeight: 200)
-                                                .scrollContentBackground(.hidden)
-                                                .focused($isContentFocused)
-                                                .padding(8)
-                                                .background(.ultraThinMaterial)
-                                                .cornerRadius(8)
-                                                .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: isContentFocused)
-                                        }
-                                        .padding(.horizontal)
-                                        
-                                        // Sidebar components
-                                        VStack(spacing: 16) {
-                                            // ARTE Reflection Card
-                                            if let emotionalState = emotionalState {
-                                                ARTEReflectionCard(
-                                                    journal: journal,
-                                                    emotionalState: emotionalState,
-                                                    snapshot: dailySnapshot
-                                                )
-                                                .padding(.horizontal)
-                                            }
-                                            
-                                            // Mood Radar Chart
-                                            MoodRadarChart(
-                                                calm: calculateMoodValue(for: .calm),
-                                                creative: calculateMoodValue(for: .creative),
-                                                chaotic: calculateMoodValue(for: .frustrated),
-                                                restless: calculateMoodValue(for: .excited)
-                                            )
-                                            .padding(.horizontal)
-                                            
-                                            // AI Summary Section
-                                            JournalAISummarySection(
-                                                summary: aiSummary,
-                                                isGenerating: isGeneratingSummary,
-                                                isExpanded: $isSummaryExpanded,
-                                                onRegenerate: generateSummary
-                                            )
-                                            .padding(.horizontal)
-                                            
-                                            // Ask Aurora button
-                                            Button(action: {
-                                                showAuroraChat = true
-                                            }) {
-                                                HStack {
-                                                    Image(systemName: "sparkles")
-                                                    Text("Ask Aurora")
-                                                }
-                                                .frame(maxWidth: .infinity)
-                                                .padding(.vertical, 12)
-                                                .background(
-                                                    LinearGradient(
-                                                        colors: [.kosmicBlue, .kosmicPurple],
-                                                        startPoint: .leading,
-                                                        endPoint: .trailing
-                                                    )
-                                                )
-                                                .foregroundColor(.white)
-                                                .cornerRadius(8)
-                                            }
-                                            .buttonStyle(.plain)
-                                            .padding(.horizontal)
-                                        }
-                                    }
-                                    .padding(.vertical)
-                                }
+                    Spacer()
+                }
+                
+                HStack(spacing: 12) {
+                    typeControl
+                    moodControl
+                    dateControl
+                    
+                    Spacer()
+                }
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+        }
+    }
+    
+    private var entryDetailsCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 18) {
+                SectionHeader(title: "Entry Details", subtitle: "Capture context and framing")
+                
+                if mode == .create {
+                    Text("Choose a template or start freeform. Aurora will adapt the tone and structure.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Picker("Entry Type", selection: $draft.entryType) {
+                            ForEach(JournalEntryType.allCases, id: \.self) { type in
+                                Text(type.rawValue.capitalized).tag(type)
                             }
-        .frame(width: 700, height: 700)
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Picker("Mood", selection: $draft.mood) {
+                            ForEach(JournalMood.allCases, id: \.self) { mood in
+                                Text(mood.rawValue.capitalized).tag(mood)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: 180)
+                    }
+                    
+                    DatePicker(
+                        "Entry Date",
+                        selection: $draft.entryDate,
+                        displayedComponents: [.date]
+                    )
+                    .datePickerStyle(.compact)
+                }
+            }
+            .padding(20)
+        }
+    }
+    
+    private var contentCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+                SectionHeader(
+                    title: "Content",
+                    subtitle: "Mentions, context links, and reflective narrative",
+                    icon: "square.and.pencil"
+                )
+                
+                MentionTextEditor(
+                    text: $draft.content,
+                    placeholder: "Capture your thoughts…",
+                    excludeObjectId: existingJournal?.id,
+                    excludeObjectType: .journal
+                ) { ids, types in
+                    draft.linkedEntityIds = ids
+                    draft.linkedEntityTypes = types
+                }
+                .frame(minHeight: 260)
+                .focused($isContentFocused)
+                .cornerRadius(14)
+            }
+            .padding(20)
+        }
+    }
+    
+    private var tagsCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(
+                    title: "Tags",
+                    subtitle: "Organize this entry with lightweight metadata",
+                    icon: "number"
+                )
+                
+                if draft.tags.isEmpty {
+                    Text("Add tags to surface this entry in reflections and search.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                if !draft.tags.isEmpty {
+                    NoteTagFlowLayout(spacing: 8) {
+                        ForEach(draft.tags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text("#\(tag)")
+                                    .font(.caption)
+                                Button {
+                                    removeTag(tag)
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(Color.kosmicPurple.opacity(0.12))
+                            .foregroundColor(.kosmicPurple)
+                            .cornerRadius(8)
+                        }
+                    }
+                }
+                
+                HStack(spacing: 10) {
+                    TextField("Add tag", text: $newTagText)
+                        .textFieldStyle(.plain)
+                        .onSubmit(addTag)
+                    
+                    Button(action: addTag) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.kosmicPurple)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(glassColorSystem.glassTint(for: .surface).opacity(0.45))
+                .cornerRadius(10)
+            }
+            .padding(20)
+        }
+    }
+    
+    private var linkedItemsCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+                SectionHeader(
+                    title: "Linked Items",
+                    subtitle: "Context captured from mentions and associations",
+                    icon: "link"
+                )
+                
+                LinkedItemsSection(
+                    tasks: linkedTasks,
+                    projects: linkedProjects,
+                    artifacts: linkedArtifacts
+                )
+            }
+            .padding(20)
+        }
+    }
+    
+    private var templateCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 20) {
+            VStack(alignment: .leading, spacing: 16) {
+                SectionHeader(
+                    title: "Templates",
+                    subtitle: "Kick off with guided prompts sourced from Aurora",
+                    icon: "sparkles"
+                )
+                
+                HStack(spacing: 12) {
+                    templateButton(.morning)
+                    templateButton(.evening)
+                    templateButton(.freeWrite)
+                }
+            }
+            .padding(20)
+        }
+    }
+    
+    private func templateButton(_ template: JournalTemplate) -> some View {
+        Button {
+            applyTemplate(template)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(template.title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                Text(template.content.isEmpty ? "Blank canvas" : template.content)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var insightsSidebar: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if let journal = existingJournal, let emotionalState {
+                    GlassPanel(tier: .contentCard, cornerRadius: 18) {
+                        ARTEReflectionCard(
+                            journal: journal,
+                            emotionalState: emotionalState,
+                            snapshot: dailySnapshot
+                        )
+                        .padding(20)
+                    }
+                }
+                
+                GlassPanel(tier: .contentCard, cornerRadius: 18) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SectionHeader(
+                            title: "Emotional Radar",
+                            subtitle: "How Aurora perceives your tonal balance",
+                            icon: "circle.grid.cross"
+                        )
+                        MoodRadarChart(
+                            calm: calculateMoodValue(for: .calm),
+                            creative: calculateMoodValue(for: .creative),
+                            chaotic: calculateMoodValue(for: .frustrated),
+                            restless: calculateMoodValue(for: .excited)
+                        )
+                        .frame(height: 200)
+                    }
+                    .padding(20)
+                }
+                
+                GlassPanel(tier: .contentCard, cornerRadius: 18) {
+                    JournalAISummarySection(
+                        summary: aiSummary,
+                        isGenerating: isGeneratingSummary,
+                        isExpanded: $isSummaryExpanded,
+                        onRegenerate: generateSummary
+                    )
+                    .padding(20)
+                }
+                
+                if existingJournal != nil {
+                    GlassPanel(tier: .contentCard, cornerRadius: 18) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            SectionHeader(
+                                title: "Aurora Assistance",
+                                subtitle: "Request coaching or reflective prompts",
+                                icon: "sparkles"
+                            )
+                            
+                            Button {
+                                showAuroraChat = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "message.and.waveform")
+                                    Text("Ask Aurora for a reflection")
+                                }
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.white)
+                                .padding(.vertical, 12)
+                                .frame(maxWidth: .infinity)
+                                .background(
+                                    LinearGradient(
+                                        colors: [.kosmicBlue, .kosmicPurple],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(12)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(20)
+                    }
+                }
+            }
+            .padding(.vertical, 24)
+            .padding(.horizontal, 16)
+        }
+        .frame(width: 320)
         .background(glassColorSystem.backgroundColor())
-        .onAppear {
-            editingTitle = journal.title
-            editingContent = template?.content ?? journal.content
-            editingMood = journal.journalMood
-            editingEntryType = journal.journalEntryType
-            
-            // Load ARTE and Focus Gravity data
-            loadARTEData()
-            loadFocusGravityData()
+    }
+    
+    // MARK: - Controls
+    
+    private var typeControl: some View {
+        Menu {
+            Picker("Entry Type", selection: $draft.entryType) {
+                ForEach(JournalEntryType.allCases, id: \.self) { type in
+                    Text(type.rawValue.capitalized).tag(type)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            metaControlLabel(icon: "doc.richtext", title: draft.entryType.rawValue.capitalized)
         }
-        .onChange(of: editingTitle) { _, newValue in
-            journal.title = newValue
-            journal.updatedAt = Date()
+        .menuStyle(.borderlessButton)
+    }
+    
+    private var moodControl: some View {
+        Menu {
+            Picker("Mood", selection: $draft.mood) {
+                ForEach(JournalMood.allCases, id: \.self) { mood in
+                    Text(mood.rawValue.capitalized).tag(mood)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            metaControlLabel(icon: "face.smiling", title: draft.mood.rawValue.capitalized)
         }
-        .onChange(of: editingContent) { _, newValue in
-            journal.content = newValue
-            journal.updatedAt = Date()
+        .menuStyle(.borderlessButton)
+    }
+    
+    private var dateControl: some View {
+        DatePicker(
+            "",
+            selection: $draft.entryDate,
+            displayedComponents: .date
+        )
+        .labelsHidden()
+        .datePickerStyle(.compact)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
+        .cornerRadius(12)
+    }
+    
+    private func metaControlLabel(icon: String, title: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+            Text(title)
+                .font(.caption.weight(.semibold))
         }
-        .onChange(of: editingMood) { _, newValue in
-            journal.journalMood = newValue
-            journal.updatedAt = Date()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
+        .cornerRadius(12)
+    }
+    
+    // MARK: - Actions
+    
+    private func addTag() {
+        let trimmed = newTagText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !draft.tags.contains(trimmed) else { return }
+        draft.tags.append(trimmed)
+        newTagText = ""
+    }
+    
+    private func removeTag(_ tag: String) {
+        draft.tags.removeAll { $0.caseInsensitiveCompare(tag) == .orderedSame }
+    }
+    
+    private func applyTemplate(_ template: JournalTemplate) {
+        switch template {
+        case .morning:
+            draft.entryType = .contentIdea
+            draft.mood = .motivated
+        case .evening:
+            draft.entryType = .reflection
+            draft.mood = .reflective
+        case .freeWrite:
+            draft.entryType = .reflection
         }
-        .onChange(of: editingEntryType) { _, newValue in
-            journal.journalEntryType = newValue
-            journal.updatedAt = Date()
-        }
-        .sheet(isPresented: $showAuroraChat) {
-            AuroraJournalChatOverlay(journal: journal, isPresented: $showAuroraChat)
-        }
-        .task {
-            // Auto-focus content field on open
+        
+        draft.content = template.content
+        draft.title = template.title
+        isContentFocused = true
+    }
+    
+    private func handleOnAppear() {
+        if mode == .create {
+            draft.entryDate = Date()
+            if draft.content.isEmpty, let template {
+                applyTemplate(template)
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isContentFocused = true
             }
-        }
-        .onDisappear {
-            // Delete empty journals when sheet closes
-            if journal.title.isEmpty && journal.content.isEmpty && journal.tags.isEmpty {
-                modelContext.delete(journal)
-                try? modelContext.save()
-            }
+        } else {
+            loadARTEData()
+            loadLinkedItems()
         }
     }
     
-    private func calculateMoodValue(for mood: JournalMood) -> Double {
-        // Calculate mood values based on journal mood and ARTE data
-        if journal.journalMood == mood {
-            return 0.8
-        }
+    private func loadLinkedItems() {
+        linkedTasks.removeAll()
+        linkedProjects.removeAll()
+        linkedArtifacts.removeAll()
         
-        // Use emotional state to infer mood values
-        if let detection = emotionalState {
-            switch mood {
-            case .calm:
-                return detection.state == .calm ? 0.7 : 0.3
-            case .creative:
-                return detection.state == .reflective ? 0.6 : 0.2
-            case .frustrated:
-                return detection.state == .fatigued ? 0.5 : 0.1
-            case .excited:
-                return detection.state == .energized ? 0.7 : 0.2
-            default:
-                return 0.3
-            }
-        }
+        guard !draft.linkedEntityIds.isEmpty else { return }
+        let idSet = Set(draft.linkedEntityIds)
         
-        return 0.3
+        let taskDescriptor = FetchDescriptor<Task>(predicate: #Predicate { idSet.contains($0.id) })
+        linkedTasks = (try? modelContext.fetch(taskDescriptor)) ?? []
+        
+        let projectDescriptor = FetchDescriptor<Project>(predicate: #Predicate { idSet.contains($0.id) })
+        linkedProjects = (try? modelContext.fetch(projectDescriptor)) ?? []
+        
+        let artifactDescriptor = FetchDescriptor<Artifact>(predicate: #Predicate { idSet.contains($0.id) })
+        linkedArtifacts = (try? modelContext.fetch(artifactDescriptor)) ?? []
     }
+    
+    private func resetState() {
+        draft = initialDraft
+        newTagText = ""
+        aiSummary = initialDraft.aiGeneratedContent
+        emotionalState = nil
+        dailySnapshot = nil
+        loadLinkedItems()
+    }
+    
+    private func cancel() {
+        onCancel()
+        isPresented = false
+    }
+    
+    private func commit() {
+        var updatedDraft = draft
+        updatedDraft.aiGeneratedContent = aiSummary
+        onCommit(updatedDraft)
+        isPresented = false
+    }
+    
+    // MARK: - Insights & Analytics
     
     private func loadARTEData() {
-        _Concurrency.Task { @MainActor in
-            // Get snapshot for entry date
+        guard let journal = existingJournal else { return }
+        
+        Task { @MainActor in
             let calendar = Calendar.current
             let startOfDay = calendar.startOfDay(for: journal.entryDate)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? journal.entryDate
@@ -308,69 +724,35 @@ struct JournalDetailDrawer: View {
                 customRange: (startOfDay, endOfDay),
                 modelContext: modelContext
             )
-            
-            // Detect emotional state
-            let detector = EmotionalStateDetector()
-            let detection = detector.detectState(
-                from: snapshot,
-                modelContext: modelContext
-            )
-            
-            emotionalState = detection
             dailySnapshot = snapshot
+            
+            let detector = EmotionalStateDetector()
+            emotionalState = detector.detectState(from: snapshot, modelContext: modelContext)
         }
     }
     
-    private func loadFocusGravityData() {
-        // Focus Gravity data is already calculated in focusGravityIntensity computed property
-        // Additional Focus Gravity trend can be loaded here if needed
-    }
-    
-    private func saveJournal() {
-        journal.title = editingTitle.isEmpty ? "Untitled Entry" : editingTitle
-        journal.content = editingContent
-        journal.journalMood = editingMood
-        journal.journalEntryType = editingEntryType
-        journal.updatedAt = Date()
-        
-        try? modelContext.save()
-        
-        // Haptic feedback
-        let generator = NSHapticFeedbackManager.defaultPerformer
-        generator.perform(.generic, performanceTime: .default)
-        
-        // Update Memory Graph
-        updateMemoryGraph()
-    }
-    
     private func generateSummary() {
-        guard !isGeneratingSummary else { return }
+        guard !isGeneratingSummary, existingJournal != nil else { return }
         
         isGeneratingSummary = true
         
-        _Concurrency.Task { @MainActor in
+        Task { @MainActor in
+            defer { isGeneratingSummary = false }
             do {
-                let ollamaService = OllamaBridgeService.shared
-                
-                // Create document descriptor
                 let descriptor = DocumentDescriptor(
-                    text: journal.content,
-                    preview: String(journal.content.prefix(200)),
-                    fileName: journal.title.isEmpty ? "Untitled Entry" : journal.title,
+                    text: draft.content,
+                    preview: String(draft.content.prefix(200)),
+                    fileName: draft.title.isEmpty ? "Untitled Entry" : draft.title,
                     mimeType: "text/plain",
-                    sizeInBytes: journal.content.utf8.count,
+                    sizeInBytes: draft.content.utf8.count,
                     pageCount: nil,
                     sourceURL: nil
                 )
                 
-                // Build app context
-                let appContext = buildAppContext()
-                
-                // Analyze document
-                let result = try await ollamaService.analyzeDocument(
+                let result = try await OllamaBridgeService.shared.analyzeDocument(
                     descriptor: descriptor,
                     userPrompt: "Provide a concise reflection summary with key insights and emotional tone.",
-                    appContext: appContext,
+                    appContext: buildAppContext(),
                     payloadContext: nil,
                     conversationMessages: nil,
                     currentMessageStyle: nil,
@@ -379,49 +761,72 @@ struct JournalDetailDrawer: View {
                 )
                 
                 aiSummary = result.summary
-                journal.aiGeneratedContent = result.summary
-                isGeneratingSummary = false
+                draft.aiGeneratedContent = result.summary
             } catch {
                 aiSummary = "Unable to generate summary: \(error.localizedDescription)"
-                isGeneratingSummary = false
             }
         }
     }
     
     private func buildAppContext() -> String {
-        var context = "Journal Entry: \(journal.title)\n"
-        context += "Mood: \(journal.journalMood.rawValue)\n"
-        context += "Type: \(journal.journalEntryType.rawValue)\n"
-        context += "Date: \(journal.entryDate.formatted(date: .abbreviated, time: .omitted))\n"
+        var context = "Journal Entry: \(draft.title)\n"
+        context += "Mood: \(draft.mood.rawValue)\n"
+        context += "Type: \(draft.entryType.rawValue)\n"
+        context += "Date: \(draft.entryDate.formatted(date: .abbreviated, time: .omitted))\n"
         return context
     }
     
-    private func updateMemoryGraph() {
-        _Concurrency.Task { @MainActor in
-            // Register journal update with Recall Service
-            AIRecallService.shared.registerUpdated(journal, modelContext: modelContext)
-            
-            // Link to related concepts/themes via tags
-            if !journal.tags.isEmpty && AIConfigService.shared.config.featureFlags.memoryGraphEnabled {
-                do {
-                    // Find or create node for this journal entry
-                    let node = try await MemoryGraphService.shared.findOrCreateNode(
-                        for: journal,
-                        modelContext: modelContext
-                    )
-                    
-                    // Update node tags
-                    node.tags = journal.tags
-                    try? modelContext.save()
-                } catch {
-                    // Silently fail if Memory Graph is disabled or unavailable
+    private func calculateMoodValue(for mood: JournalMood) -> Double {
+        if draft.mood == mood {
+            return 0.85
+        }
+        
+        guard let detection = emotionalState else {
+            return 0.35
+        }
+        
+        switch mood {
+        case .calm:
+            return detection.state == .calm ? 0.7 : 0.3
+        case .creative:
+            return detection.state == .reflective ? 0.65 : 0.25
+        case .frustrated:
+            return detection.state == .fatigued ? 0.55 : 0.15
+        case .excited:
+            return detection.state == .energized ? 0.75 : 0.25
+        default:
+            return 0.3
+        }
+    }
+}
+
+// MARK: - Subviews
+
+private struct SectionHeader: View {
+    let title: String
+    var subtitle: String? = nil
+    var icon: String? = nil
+    
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.kosmicPurple)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(.headline, design: .rounded))
+                    .fontWeight(.semibold)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
         }
     }
 }
-
-// MARK: - AI Summary Section
 
 struct JournalAISummarySection: View {
     let summary: String?
@@ -430,12 +835,12 @@ struct JournalAISummarySection: View {
     let onRegenerate: () -> Void
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(action: {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
                 withAnimation(GlassMotion.Easing.spring) {
                     isExpanded.toggle()
                 }
-            }) {
+            } label: {
                 HStack {
                     Image(systemName: "sparkles")
                         .foregroundColor(.kosmicPurple)
@@ -451,51 +856,52 @@ struct JournalAISummarySection: View {
             
             if isExpanded {
                 if isGenerating {
-                    HStack {
+                    HStack(spacing: 8) {
                         ProgressView()
                             .scaleEffect(0.8)
-                        Text("Generating summary...")
+                        Text("Generating summary…")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     .padding()
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.ultraThinMaterial)
-                    .cornerRadius(8)
-                } else if let summary = summary {
+                    .cornerRadius(12)
+                } else if let summary {
                     Text(summary)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.callout)
+                        .foregroundColor(.primary)
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .background(.ultraThinMaterial)
-                        .cornerRadius(8)
+                        .cornerRadius(12)
                     
                     Button(action: onRegenerate) {
-                        HStack {
+                        HStack(spacing: 6) {
                             Image(systemName: "arrow.clockwise")
-                            Text("Regenerate")
+                            Text("Regenerate summary")
                         }
-                        .font(.caption)
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.kosmicPurple)
                     }
                     .buttonStyle(.plain)
                 } else {
                     Button(action: onRegenerate) {
-                        HStack {
+                        HStack(spacing: 6) {
                             Image(systemName: "sparkles")
-                            Text("Generate Summary")
+                            Text("Generate summary with Aurora")
                         }
-                        .font(.caption)
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.kosmicPurple)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.kosmicPurple.opacity(0.12))
+                        .cornerRadius(12)
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .cornerRadius(12)
     }
 }
 
@@ -503,10 +909,15 @@ struct JournalAISummarySection: View {
     @Previewable @State var isPresented = true
     
     JournalDetailDrawer(
-        journal: Journal(title: "Sample Entry", content: "This is a sample journal entry."),
-        isPresented: $isPresented
+        mode: .edit,
+        existingJournal: Journal(title: "Sample Entry", content: "This is a sample journal entry."),
+        template: nil,
+        initialDraft: JournalDraft(journal: Journal(title: "Sample Entry", content: "This is a sample journal entry.")),
+        isPresented: $isPresented,
+        onCommit: { _ in },
+        onCancel: {}
     )
     .environmentObject(GlassColorSystem())
-    .modelContainer(for: [Journal.self])
+    .modelContainer(for: [Journal.self, Task.self, Project.self, Artifact.self])
 }
 

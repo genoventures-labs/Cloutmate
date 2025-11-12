@@ -78,6 +78,7 @@ final class Journal {
     // AI-related fields
     var aiPrompt: String?
     var aiGeneratedContent: String?
+    var auroraNotes: String?
     var authorRaw: String = JournalAuthor.user.rawValue
     
     // Metadata

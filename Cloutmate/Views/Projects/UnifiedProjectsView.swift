@@ -25,10 +25,12 @@ struct UnifiedProjectsView: View {
     @State private var activeProject: Project?
     @State private var isDrawerVisible = false
     @State private var isCreatingProject = false
+    @State private var pendingProjectDraft: ProjectDraft?
     @State private var isSelectionMode = false
     @State private var selectedProjectIDs: Set<UUID> = []
     @State private var focusOverlayProject: Project?
     @State private var focusDuration: TimeInterval = 1800 // Default 30 min
+    @State private var detailProject: Project?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -42,20 +44,52 @@ struct UnifiedProjectsView: View {
             }
             .opacity(isDrawerVisible ? 0 : 1)
             
-            if let project = activeProject, isDrawerVisible {
-                ProjectDetailDrawer(
-                    project: project,
-                    isPresented: Binding(
-                        get: { isDrawerVisible },
-                        set: { newValue in
+            if isDrawerVisible {
+                if isCreatingProject, let draft = pendingProjectDraft {
+                    ProjectDetailDrawer(
+                        mode: .create,
+                        existingProject: nil,
+                        initialDraft: draft,
+                        isPresented: creationDrawerBinding(),
+                        onCommit: { committedDraft in
+                            commitNewProject(from: committedDraft)
+                        },
+                        onCancel: {
+                            pendingProjectDraft = nil
                             withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
-                                isDrawerVisible = newValue
+                                isDrawerVisible = false
+                            }
+                            isCreatingProject = false
+                        }
+                    )
+                    .transition(.move(edge: .trailing))
+                } else if let project = activeProject {
+                    ProjectDetailDrawer(
+                        mode: .edit,
+                        existingProject: project,
+                        initialDraft: ProjectDraft(project: project),
+                        isPresented: editDrawerBinding(),
+                        onCommit: { draft in
+                            apply(draft, to: project)
+                            try? modelContext.save()
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = false
+                            }
+                            DispatchQueue.main.async {
+                                activeProject = nil
+                            }
+                        },
+                        onCancel: {
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = false
+                            }
+                            DispatchQueue.main.async {
+                                activeProject = nil
                             }
                         }
-                    ),
-                    mode: isCreatingProject ? .create : .edit
-                )
-                .transition(.move(edge: .trailing))
+                    )
+                    .transition(.move(edge: .trailing))
+                }
             }
             
             if let focusProject = focusOverlayProject {
@@ -77,16 +111,10 @@ struct UnifiedProjectsView: View {
                 )
             }
         }
-        .onChange(of: isDrawerVisible) { _, newValue in
-            if !newValue, let project = activeProject {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    if !isDrawerVisible {
-                        cleanupIfNecessary(project)
-                        activeProject = nil
-                        isCreatingProject = false
-                    }
-                }
-            }
+        .sheet(item: $detailProject) { project in
+            ProjectDetailView(project: project)
+                .environmentObject(glassColorSystem)
+                .frame(minWidth: 900, minHeight: 600)
         }
         .onChange(of: selectedFilter) { _, _ in
             pruneSelection()
@@ -175,6 +203,9 @@ struct UnifiedProjectsView: View {
                 withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                     isDrawerVisible = false
                 }
+                pendingProjectDraft = nil
+                activeProject = nil
+                isCreatingProject = false
             }
         }
     }
@@ -196,6 +227,9 @@ struct UnifiedProjectsView: View {
                 isDrawerVisible = false
                 focusOverlayProject = nil
             }
+            pendingProjectDraft = nil
+            activeProject = nil
+            isCreatingProject = false
         }
     }
     
@@ -271,6 +305,9 @@ struct UnifiedProjectsView: View {
             focusOverlayProject = project
             isDrawerVisible = false
         }
+        pendingProjectDraft = nil
+        isCreatingProject = false
+        activeProject = nil
     }
     
     private func startFocusSession(for project: Project) {
@@ -303,6 +340,9 @@ struct UnifiedProjectsView: View {
                     withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                         isDrawerVisible = false
                     }
+                    pendingProjectDraft = nil
+                    activeProject = nil
+                    isCreatingProject = false
                 }
             }
         }
@@ -311,9 +351,17 @@ struct UnifiedProjectsView: View {
     private func startCreatingProject() {
         guard !isDrawerVisible else { return }
         
-        let newProject = Project(title: "")
-        modelContext.insert(newProject)
-        activeProject = newProject
+        pendingProjectDraft = ProjectDraft(
+            title: "",
+            goal: "",
+            status: .active,
+            dueDate: nil,
+            areaId: nil,
+            tags: [],
+            linkedEntityIds: [],
+            linkedEntityTypes: []
+        )
+        activeProject = nil
         isCreatingProject = true
         
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
@@ -321,10 +369,28 @@ struct UnifiedProjectsView: View {
         }
     }
     
-    private func openDrawer(for project: Project) {
+    private func showProjectDetail(_ project: Project) {
         guard !isSelectionActive else { return }
         
+        detailProject = project
+        focusOverlayProject = nil
+        
+        if isDrawerVisible {
+            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                isDrawerVisible = false
+            }
+            pendingProjectDraft = nil
+            activeProject = nil
+            isCreatingProject = false
+        }
+    }
+    
+    private func openEditDrawer(for project: Project) {
+        guard !isSelectionActive else { return }
+        
+        detailProject = nil
         activeProject = project
+        pendingProjectDraft = nil
         isCreatingProject = false
         
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
@@ -332,16 +398,87 @@ struct UnifiedProjectsView: View {
         }
     }
     
-    private func cleanupIfNecessary(_ project: Project) {
-        guard isCreatingProject else { return }
-        let trimmedTitle = project.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedGoal = (project.goal ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmedTitle.isEmpty && trimmedGoal.isEmpty && project.tags.isEmpty {
-            modelContext.delete(project)
-            try? modelContext.save()
+    private func creationDrawerBinding() -> Binding<Bool> {
+        Binding(
+            get: { isDrawerVisible && isCreatingProject },
+            set: { newValue in
+                if !newValue {
+                    pendingProjectDraft = nil
+                    isCreatingProject = false
+                }
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private func editDrawerBinding() -> Binding<Bool> {
+        Binding(
+            get: { isDrawerVisible && !isCreatingProject },
+            set: { newValue in
+                if !newValue {
+                    activeProject = nil
+                }
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private func commitNewProject(from draft: ProjectDraft) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedGoal = draft.goal.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle: String
+        if !normalizedTitle.isEmpty {
+            resolvedTitle = normalizedTitle
+        } else if !normalizedGoal.isEmpty {
+            resolvedTitle = String(normalizedGoal.prefix(64))
         } else {
-            try? modelContext.save()
+            resolvedTitle = "Untitled Project"
         }
+        
+        let project = Project(
+            title: resolvedTitle,
+            goal: normalizedGoal.isEmpty ? nil : draft.goal,
+            status: draft.status,
+            dueDate: draft.dueDate,
+            areaId: draft.areaId,
+            tags: draft.tags
+        )
+        project.linkedEntityIds = draft.linkedEntityIds
+        project.linkedEntityTypes = draft.linkedEntityTypes
+        modelContext.insert(project)
+        try? modelContext.save()
+        
+        pendingProjectDraft = nil
+        isCreatingProject = false
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = false
+        }
+    }
+    
+    private func apply(_ draft: ProjectDraft, to project: Project) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedGoal = draft.goal.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if !normalizedTitle.isEmpty {
+            project.title = normalizedTitle
+        } else if !normalizedGoal.isEmpty {
+            project.title = String(normalizedGoal.prefix(64))
+        } else {
+            project.title = "Untitled Project"
+        }
+        
+        project.goal = normalizedGoal.isEmpty ? nil : draft.goal
+        project.status = draft.status
+        project.dueDate = draft.dueDate
+        project.areaId = draft.areaId
+        project.tags = draft.tags
+        project.linkedEntityIds = draft.linkedEntityIds
+        project.linkedEntityTypes = draft.linkedEntityTypes
+        project.updatedAt = Date()
     }
     
     // MARK: - Header Zone
@@ -481,9 +618,8 @@ struct UnifiedProjectsView: View {
                                 selectionMode: isSelectionActive,
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
-                                onProjectSelected: { project in
-                                    openDrawer(for: project)
-                                },
+                                onProjectDetail: { project in showProjectDetail(project) },
+                                onProjectEdit: { project in openEditDrawer(for: project) },
                                 onDuplicateProject: { project in duplicateProject(project) },
                                 onArchiveProject: { project in archiveProject(project) },
                                 onDeleteProject: { project in deleteProject(project) }
@@ -496,9 +632,8 @@ struct UnifiedProjectsView: View {
                                 selectionMode: isSelectionActive,
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
-                                onProjectSelected: { project in
-                                    openDrawer(for: project)
-                                },
+                                onProjectDetail: { project in showProjectDetail(project) },
+                                onProjectEdit: { project in openEditDrawer(for: project) },
                                 onDuplicateProject: { project in duplicateProject(project) },
                                 onArchiveProject: { project in archiveProject(project) },
                                 onDeleteProject: { project in deleteProject(project) }
@@ -508,9 +643,7 @@ struct UnifiedProjectsView: View {
                                 projects: filteredProjects,
                                 tasks: allTasks,
                                 areas: allAreas,
-                                onProjectSelected: { project in
-                                    openDrawer(for: project)
-                                }
+                                onProjectSelected: { project in showProjectDetail(project) }
                             )
                         case .gallery:
                             ProjectGalleryView(
@@ -520,9 +653,8 @@ struct UnifiedProjectsView: View {
                                 selectionMode: isSelectionActive,
                                 selectedProjectIDs: selectedProjectIDs,
                                 onSelectionToggle: { project in toggleProjectSelection(project) },
-                                onProjectSelected: { project in
-                                    openDrawer(for: project)
-                                }
+                                onProjectDetail: { project in showProjectDetail(project) },
+                                onProjectEdit: { project in openEditDrawer(for: project) }
                             )
                         }
                     }

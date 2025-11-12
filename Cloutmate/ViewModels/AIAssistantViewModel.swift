@@ -39,12 +39,20 @@ final class AIAssistantViewModel {
     var errorMessage: String?
     var pendingImageAttachment: ImageAttachmentService.ImageAttachment?
     var pendingDocumentAttachment: DocumentAttachmentService.DocumentAttachment?
+    var isScrolledToBottom: Bool = true
+    
+    private struct ResendPayload {
+        let text: String
+        let image: ImageAttachmentService.ImageAttachment?
+        let document: DocumentAttachmentService.DocumentAttachment?
+    }
     
     // Task cancellation support
     @ObservationIgnored private var currentResponseTask: _Concurrency.Task<Void, Never>?
     
     // Last message for retry functionality
     @ObservationIgnored private var lastUserMessage: (text: String, image: ImageAttachmentService.ImageAttachment?, document: DocumentAttachmentService.DocumentAttachment?)?
+    @ObservationIgnored private var messagePayloadCache: [UUID: ResendPayload] = [:]
     
     var canRetry: Bool {
         lastUserMessage != nil
@@ -55,6 +63,7 @@ final class AIAssistantViewModel {
     
     // Activity tracking for dynamic thinking indicator
     enum ActivityType {
+        case warmingUp
         case thinking
         case analyzingDocument
         case analyzingImage
@@ -259,6 +268,7 @@ final class AIAssistantViewModel {
         
         // Track if this is the first message in the conversation
         let isFirstMessage = (currentConversation?.messages?.count ?? 0) == 0
+        isScrolledToBottom = true
         
         // Check if AI is enabled
         guard aiSettings.isAIEnabled else {
@@ -301,6 +311,11 @@ final class AIAssistantViewModel {
         modelContext.insert(userMessage)
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
+        messagePayloadCache[userMessage.id] = ResendPayload(
+            text: text,
+            image: resolvedImage,
+            document: resolvedDocument
+        )
         
         // Ensure conversation and user message are saved immediately so it appears in the list
         do {
@@ -325,7 +340,6 @@ final class AIAssistantViewModel {
         stylePreferences.lastEmotionalUpdate = Date()
         try? modelContext.save()
         
-        inputText = ""
         pendingImageAttachment = nil
         pendingDocumentAttachment = nil
         isLoading = true
@@ -654,6 +668,53 @@ final class AIAssistantViewModel {
                 userInputWithWebSearch = cleanText.isEmpty ? text : cleanText
             }
             
+            let intentCluster = payloadContext.intentClusters?.primaryCluster
+            let routingConfidence = payloadContext.intentClusters?.confidence ?? confidenceSnapshot.score
+            let messageLength = userInputWithWebSearch.count
+            
+            var routingDecision = await ModelRoutingEngine.shared.selectModel(
+                input: userInputWithWebSearch,
+                intentCluster: intentCluster,
+                confidence: routingConfidence,
+                messageLength: messageLength,
+                userStyle: currentStyle,
+                conversationId: nil
+            )
+            
+            if !(await OllamaBridgeService.shared.isModelReady(routingDecision.model)) {
+                await MainActor.run {
+                    updateActivity(.warmingUp)
+                    updateStatus("\(ModelTierMap.displayName(for: routingDecision.model)) is spinning up.")
+                }
+                do {
+                    try await OllamaBridgeService.shared.ensureModelReady(
+                        model: routingDecision.model,
+                        progressHandler: { message in
+                            await MainActor.run {
+                                self.updateStatus(message)
+                            }
+                        }
+                    )
+                    await MainActor.run {
+                        self.clearStatus()
+                    }
+                } catch {
+                    let fallbackModel = ModelTierMap.fallbackModel()
+                    routingDecision = ModelRoutingDecision(
+                        model: fallbackModel,
+                        useThinking: false,
+                        isCasual: true
+                    )
+                    await MainActor.run {
+                        self.updateStatus("Gemma needs a little more time. Switching to \(ModelTierMap.displayName(for: fallbackModel)).")
+                    }
+                }
+            }
+            
+            await MainActor.run {
+                updateActivity(.generatingResponse)
+            }
+            
             var result = try await coreResponseService.generateResponseWithAppContext(
                 for: userInputWithWebSearch,
                 appContext: appContext,
@@ -662,7 +723,8 @@ final class AIAssistantViewModel {
                 currentMessageStyle: currentStyle,
                 userStyleProfile: styleProfile,
                 confidence: confidenceSnapshot,
-                modelContext: modelContext
+                modelContext: modelContext,
+                preselectedDecision: routingDecision
             )
             
             var response = result.response
@@ -721,8 +783,10 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+                inputText = ""
                 isLoading = false
                 currentActivity = .thinking // Reset activity when done
+                clearStatus()
                 currentSourceModel = nil // Clear source model
                 currentResponseTask = nil // Clear task reference
                 
@@ -770,6 +834,7 @@ final class AIAssistantViewModel {
                 self.errorMessage = error.localizedDescription
                 isLoading = false
                 currentActivity = .thinking // Reset activity on error
+                clearStatus()
                 currentSourceModel = nil // Clear source model
                 currentResponseTask = nil // Clear task reference
                 
@@ -964,6 +1029,7 @@ final class AIAssistantViewModel {
                     analysis: analysisText,
                     modelContext: modelContext
                 )
+                inputText = ""
                 isLoading = false
                 currentActivity = .thinking // Reset activity when done
                 currentSourceModel = nil // Clear source model
@@ -1110,6 +1176,7 @@ final class AIAssistantViewModel {
                     summary: finalSummaryWithSource,
                     modelContext: modelContext
                 )
+                inputText = ""
                 isLoading = false
                 currentActivity = .thinking // Reset activity when done
                 try? modelContext.save()
@@ -1360,6 +1427,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 try? modelContext.save()
             }
@@ -1673,6 +1741,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 try? modelContext.save()
             }
@@ -1875,6 +1944,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 do {
                     try modelContext.save()
@@ -2062,6 +2132,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 do {
                     try modelContext.save()
@@ -2220,6 +2291,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 currentActivity = .thinking // Reset activity when done
                 do {
@@ -2317,6 +2389,7 @@ final class AIAssistantViewModel {
             modelContext.insert(assistantMessage)
             messages.append(assistantMessage)
             currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
             isLoading = false
             try? modelContext.save()
         }
@@ -2361,6 +2434,11 @@ final class AIAssistantViewModel {
         modelContext.insert(userMessage)
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
+        messagePayloadCache[userMessage.id] = ResendPayload(
+            text: userMessage.content ?? "",
+            image: nil,
+            document: nil
+        )
         
         let result = await aiService.executeTool(tool, input: topic, context: "")
         
@@ -2376,6 +2454,7 @@ final class AIAssistantViewModel {
             modelContext.insert(assistantMessage)
             messages.append(assistantMessage)
             currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
             isLoading = false
             
             // Save after adding quick tool message
@@ -2660,6 +2739,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 try? modelContext.save()
             }
@@ -2785,6 +2865,7 @@ final class AIAssistantViewModel {
             modelContext.insert(assistantMessage)
             messages.append(assistantMessage)
             conversation.messages?.append(assistantMessage)
+            inputText = ""
             conversation.pendingSuggestionPatternId = pattern.id
             lastLinkingSuggestionAt = now
             try? modelContext.save()
@@ -2820,6 +2901,7 @@ final class AIAssistantViewModel {
         modelContext.insert(assistantMessage)
         messages.append(assistantMessage)
         currentConversation?.messages?.append(assistantMessage)
+        inputText = ""
         stylePreferences.suggestedLinkingConcepts.append(normalized)
         stylePreferences.updatedAt = now
         lastLinkingSuggestionAt = now
@@ -2867,6 +2949,7 @@ final class AIAssistantViewModel {
             modelContext.insert(assistantMessage)
             messages.append(assistantMessage)
             currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
             isLoading = false
             try? modelContext.save()
         }
@@ -2999,6 +3082,8 @@ final class AIAssistantViewModel {
         pendingOperation = nil
         pendingImageAttachment = nil
         inputText = ""
+        isScrolledToBottom = true
+        messagePayloadCache.removeAll()
     }
     
     // MARK: - Message Editing
@@ -3011,6 +3096,19 @@ final class AIAssistantViewModel {
         // Update the message content
         messageToEdit.content = newContent
         messageToEdit.timestamp = Date()
+        if let existingPayload = messagePayloadCache[messageToEdit.id] {
+            messagePayloadCache[messageToEdit.id] = ResendPayload(
+                text: newContent,
+                image: existingPayload.image,
+                document: existingPayload.document
+            )
+        } else {
+            messagePayloadCache[messageToEdit.id] = ResendPayload(
+                text: newContent,
+                image: nil,
+                document: nil
+            )
+        }
         
         // Remove all messages after the edited one (to regenerate from this point)
         let messagesToRemove = messages.suffix(from: messageIndex + 1)
@@ -3023,6 +3121,9 @@ final class AIAssistantViewModel {
                     conversation.messages?.remove(at: idx)
                 }
                 modelContext.delete(message)
+                if message.role == "user" {
+                    messagePayloadCache.removeValue(forKey: message.id)
+                }
             }
         }
         
@@ -3087,6 +3188,14 @@ final class AIAssistantViewModel {
         } else {
             messages = []
         }
+        messagePayloadCache.removeAll()
+        for message in messages where message.role == "user" {
+            messagePayloadCache[message.id] = ResendPayload(
+                text: message.content ?? "",
+                image: nil,
+                document: nil
+            )
+        }
         
         // Auto-generate summary if conditions are met
         if let messages = conversation.messages,
@@ -3097,6 +3206,7 @@ final class AIAssistantViewModel {
             }
         }
         
+        isScrolledToBottom = true
         return true // Successfully loaded
     }
     
@@ -3592,6 +3702,37 @@ final class AIAssistantViewModel {
         }
     }
     
+    func resendAssistantMessage(_ message: AIMessage, modelContext: ModelContext) {
+        guard message.role == "assistant" else { return }
+        guard let targetIndex = messages.firstIndex(where: { $0.id == message.id }) else { return }
+        guard let userMessage = messages[..<targetIndex].last(where: { $0.role == "user" }) else { return }
+        
+        let payload = messagePayloadCache[userMessage.id]
+        let content = payload?.text ?? userMessage.content ?? ""
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasAttachment = (payload?.image != nil) || (payload?.document != nil)
+        guard !trimmed.isEmpty || hasAttachment else { return }
+        
+        inputText = content
+        isScrolledToBottom = true
+        sendMessage(
+            content,
+            modelContext: modelContext,
+            image: payload?.image,
+            document: payload?.document
+        )
+    }
+    
+    func canResendPayload(for message: AIMessage) -> Bool {
+        guard message.role == "assistant" else { return false }
+        guard let targetIndex = messages.firstIndex(where: { $0.id == message.id }) else { return false }
+        guard let userMessage = messages[..<targetIndex].last(where: { $0.role == "user" }) else { return false }
+        let payload = messagePayloadCache[userMessage.id]
+        let content = payload?.text ?? userMessage.content ?? ""
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (!trimmed.isEmpty || payload?.image != nil || payload?.document != nil) && !isLoading
+    }
+    
     /// Export conversation to Journal (emotional reflection only)
     func exportToJournal(messages: [AIMessage], conversation: AIConversation, modelContext: ModelContext) -> Bool {
         guard !messages.isEmpty else { return false }
@@ -3656,6 +3797,16 @@ final class AIAssistantViewModel {
             image: lastMessage.image,
             document: lastMessage.document
         )
+    }
+
+    var canResendLastAssistant: Bool {
+        guard let lastAssistant = messages.last(where: { $0.role == "assistant" }) else { return false }
+        return canResendPayload(for: lastAssistant)
+    }
+
+    func resendLastAssistant(modelContext: ModelContext) {
+        guard let lastAssistant = messages.last(where: { $0.role == "assistant" }) else { return }
+        resendAssistantMessage(lastAssistant, modelContext: modelContext)
     }
 
     private func executeCompoundArtifactCreation(
@@ -3860,6 +4011,7 @@ final class AIAssistantViewModel {
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
+            inputText = ""
                 isLoading = false
                 do {
                     try modelContext.save()

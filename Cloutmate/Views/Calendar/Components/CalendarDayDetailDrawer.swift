@@ -14,6 +14,7 @@ struct CalendarDayDetailDrawer: View {
             case post(CloutmateShared.Post)
             case artifact(CloutmateShared.Artifact)
             case task(CloutmateShared.Task)
+            case event(CalendarEventOccurrence)
         }
         let id = UUID()
         let kind: Kind
@@ -142,6 +143,30 @@ struct CalendarDayDetailDrawer: View {
 }
 
 extension CalendarDayDetailDrawer.Item {
+    static func event(_ occurrence: CalendarEventOccurrence) -> CalendarDayDetailDrawer.Item {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .none
+        dateFormatter.timeStyle = .short
+        
+        let subtitle: String
+        if occurrence.event.allDay {
+            subtitle = "All-day"
+        } else {
+            let start = dateFormatter.string(from: occurrence.startDate)
+            let end = dateFormatter.string(from: occurrence.endDate)
+            subtitle = "\(start) – \(end)"
+        }
+        
+        return CalendarDayDetailDrawer.Item(
+            kind: .event(occurrence),
+            title: occurrence.event.title.isEmpty ? "Untitled Event" : occurrence.event.title,
+            subtitle: subtitle,
+            icon: "calendar",
+            accent: .cyan,
+            timestamp: occurrence.startDate
+        )
+    }
+    
     static func post(_ post: CloutmateShared.Post) -> CalendarDayDetailDrawer.Item {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium

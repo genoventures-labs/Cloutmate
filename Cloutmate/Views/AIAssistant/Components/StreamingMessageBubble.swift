@@ -69,7 +69,9 @@ struct StreamingMessageBubble: View {
         return MessageBubble(
             message: streamingMessage,
             onEdit: onEdit,
-            onCopy: onCopy
+            onCopy: onCopy,
+            onResend: { _ in },
+            canResend: false
         )
         .onAppear {
             if shouldStream && !isUser && !isStreaming {

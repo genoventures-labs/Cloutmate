@@ -28,6 +28,7 @@ struct UnifiedJournalView: View {
     @State private var isDrawerVisible = false
     @State private var isCreatingJournal = false
     @State private var activeTemplate: JournalTemplate?
+    @State private var pendingJournalDraft: JournalDraft?
     @State private var expandedGroups: Set<String> = []
     @State private var showTimeline = false
     @State private var focusedJournalIndex: Int?
@@ -136,20 +137,45 @@ struct UnifiedJournalView: View {
             }
             .opacity(isDrawerVisible ? 0 : 1)
             
-            if let journal = activeJournal, isDrawerVisible {
-                JournalDetailDrawer(
-                    journal: journal,
-                    isPresented: Binding(
-                        get: { isDrawerVisible },
-                        set: { newValue in
+            if isDrawerVisible {
+                if isCreatingJournal, let draft = pendingJournalDraft {
+                    JournalDetailDrawer(
+                        mode: .create,
+                        existingJournal: nil,
+                        template: activeTemplate,
+                        initialDraft: draft,
+                        isPresented: creationDrawerBinding(),
+                        onCommit: { committedDraft in
+                            commitNewJournal(from: committedDraft)
+                        },
+                        onCancel: {
+                            pendingJournalDraft = nil
+                            activeTemplate = nil
                             withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
-                                isDrawerVisible = newValue
+                                isDrawerVisible = false
                             }
+                            isCreatingJournal = false
                         }
-                    ),
-                    template: isCreatingJournal ? activeTemplate : nil
-                )
-                .transition(.move(edge: .trailing))
+                    )
+                    .transition(.move(edge: .trailing))
+                } else if let journal = activeJournal {
+                    JournalDetailDrawer(
+                        mode: .edit,
+                        existingJournal: journal,
+                        template: nil,
+                        initialDraft: JournalDraft(journal: journal),
+                        isPresented: editDrawerBinding(),
+                        onCommit: { updatedDraft in
+                            apply(updatedDraft, to: journal)
+                            try? modelContext.save()
+                            closeEditor()
+                        },
+                        onCancel: {
+                            closeEditor()
+                        }
+                    )
+                    .transition(.move(edge: .trailing))
+                }
             }
         }
         .overlay(alignment: .bottom) {
@@ -187,13 +213,10 @@ struct UnifiedJournalView: View {
         }
         .onChange(of: isDrawerVisible) { _, newValue in
             if !newValue {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    if !isDrawerVisible {
-                        activeJournal = nil
-                        activeTemplate = nil
-                        isCreatingJournal = false
-                    }
-                }
+                activeJournal = nil
+                activeTemplate = nil
+                pendingJournalDraft = nil
+                isCreatingJournal = false
             }
         }
     }
@@ -350,6 +373,10 @@ struct UnifiedJournalView: View {
                 withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                     isDrawerVisible = false
                 }
+                pendingJournalDraft = nil
+                activeTemplate = nil
+                activeJournal = nil
+                isCreatingJournal = false
             }
         }
     }
@@ -371,32 +398,148 @@ struct UnifiedJournalView: View {
             withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                 isDrawerVisible = false
             }
+            pendingJournalDraft = nil
+            activeTemplate = nil
+            activeJournal = nil
+            isCreatingJournal = false
         }
     }
     
     private func startCreatingJournal(template: JournalTemplate? = nil) {
         guard !isDrawerVisible else { return }
         
-        let newJournal: Journal
+        let baseDraft: JournalDraft
         if let template {
-            newJournal = Journal(
-                title: "",
-                content: template.content,
-                entryDate: Date(),
-                entryType: .reflection
-            )
+            baseDraft = JournalDraft(content: template.content)
         } else {
-            newJournal = Journal(title: "", content: "")
+            baseDraft = JournalDraft()
         }
-        newJournal.author = .user
-        modelContext.insert(newJournal)
         
-        activeJournal = newJournal
+        pendingJournalDraft = baseDraft
         activeTemplate = template
         isCreatingJournal = true
+        activeJournal = nil
         
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
             isDrawerVisible = true
+        }
+    }
+    
+    private func creationDrawerBinding() -> Binding<Bool> {
+        Binding(
+            get: { isDrawerVisible && isCreatingJournal },
+            set: { newValue in
+                if !newValue {
+                    pendingJournalDraft = nil
+                    activeTemplate = nil
+                    isCreatingJournal = false
+                }
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private func editDrawerBinding() -> Binding<Bool> {
+        Binding(
+            get: { isDrawerVisible && !isCreatingJournal },
+            set: { newValue in
+                if !newValue {
+                    activeJournal = nil
+                }
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private func commitNewJournal(from draft: JournalDraft) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedContent = draft.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle: String
+        if !normalizedTitle.isEmpty {
+            resolvedTitle = normalizedTitle
+        } else if !normalizedContent.isEmpty {
+            resolvedTitle = String(normalizedContent.prefix(64))
+        } else {
+            resolvedTitle = "Untitled Entry"
+        }
+        
+        let journal = Journal(
+            title: resolvedTitle,
+            content: draft.content,
+            entryDate: draft.entryDate,
+            entryType: draft.entryType,
+            mood: draft.mood,
+            tags: draft.tags,
+            projectId: draft.projectId,
+            areaId: draft.areaId,
+            linkedNoteIds: draft.linkedNoteIds,
+            linkedAreaIds: draft.linkedAreaIds,
+            linkedProjectIds: draft.linkedProjectIds
+        )
+        journal.linkedEntityIds = draft.linkedEntityIds
+        journal.linkedEntityTypes = draft.linkedEntityTypes
+        journal.author = draft.author
+        journal.aiPrompt = draft.aiPrompt
+        journal.aiGeneratedContent = draft.aiGeneratedContent
+        journal.auroraNotes = draft.auroraNotes
+        journal.isArchived = draft.isArchived
+        
+        modelContext.insert(journal)
+        try? modelContext.save()
+        
+        pendingJournalDraft = nil
+        activeTemplate = nil
+        isCreatingJournal = false
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = false
+        }
+    }
+    
+    private func apply(_ draft: JournalDraft, to journal: Journal) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedContent = draft.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if !normalizedTitle.isEmpty {
+            journal.title = normalizedTitle
+        } else if !normalizedContent.isEmpty {
+            journal.title = String(normalizedContent.prefix(64))
+        } else {
+            journal.title = "Untitled Entry"
+        }
+        
+        journal.content = draft.content
+        journal.entryDate = draft.entryDate
+        journal.journalEntryType = draft.entryType
+        journal.journalMood = draft.mood
+        journal.tags = draft.tags
+        journal.projectId = draft.projectId
+        journal.areaId = draft.areaId
+        journal.linkedNoteIds = draft.linkedNoteIds
+        journal.linkedAreaIds = draft.linkedAreaIds
+        journal.linkedProjectIds = draft.linkedProjectIds
+        journal.linkedEntityIds = draft.linkedEntityIds
+        journal.linkedEntityTypes = draft.linkedEntityTypes
+        journal.author = draft.author
+        journal.aiPrompt = draft.aiPrompt
+        journal.aiGeneratedContent = draft.aiGeneratedContent
+        journal.auroraNotes = draft.auroraNotes
+        journal.isArchived = draft.isArchived
+        journal.updatedAt = Date()
+    }
+    
+    private func closeEditor() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = false
+        }
+        DispatchQueue.main.async {
+            activeJournal = nil
+            pendingJournalDraft = nil
+            activeTemplate = nil
+            isCreatingJournal = false
         }
     }
     
@@ -406,6 +549,7 @@ struct UnifiedJournalView: View {
         activeJournal = journal
         activeTemplate = nil
         isCreatingJournal = false
+        pendingJournalDraft = nil
         
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
             isDrawerVisible = true
@@ -461,6 +605,10 @@ struct UnifiedJournalView: View {
                     withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                         isDrawerVisible = false
                     }
+                    pendingJournalDraft = nil
+                    activeTemplate = nil
+                    activeJournal = nil
+                    isCreatingJournal = false
                 }
             }
         }

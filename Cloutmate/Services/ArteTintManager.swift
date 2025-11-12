@@ -52,6 +52,8 @@ final class ArteTintManager {
         
         // Map activities to tint colors
         switch activity {
+        case .warmingUp:
+            return Color.orange.opacity(0.75)
         case .analyzingDocument, .analyzingImage:
             return Color.orange.opacity(0.8) // Warm amber for analyzing
         case .thinking, .reflecting:

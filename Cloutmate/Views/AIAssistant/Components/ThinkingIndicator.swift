@@ -10,16 +10,18 @@ import SwiftUI
 struct ThinkingIndicator: View {
     let activity: AIAssistantViewModel.ActivityType
     let sourceModel: SummarySource?
-    
+    let statusMessage: String?
+
     @State private var displayedActivity: AIAssistantViewModel.ActivityType
     @State private var opacity: Double = 1.0
     @State private var animationSpeed: Double = 0.6
     
     private let timingService = ResponseTimingService.shared
     
-    init(activity: AIAssistantViewModel.ActivityType, sourceModel: SummarySource? = nil) {
+    init(activity: AIAssistantViewModel.ActivityType, sourceModel: SummarySource? = nil, statusMessage: String? = nil) {
         self.activity = activity
         self.sourceModel = sourceModel
+        self.statusMessage = statusMessage
         _displayedActivity = State(initialValue: activity)
         
         // Adjust animation speed based on activity complexity
@@ -36,7 +38,7 @@ struct ThinkingIndicator: View {
                 .symbolEffect(.pulse, options: .repeating.speed(animationSpeed), isActive: true)
             
             // Dynamic text based on activity (with adaptive phrasing for offline)
-            Text(activityText)
+            Text(statusMessage ?? activityText)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -73,6 +75,8 @@ struct ThinkingIndicator: View {
     
     private var iconName: String {
         switch displayedActivity {
+        case .warmingUp:
+            return "hourglass"
         case .thinking:
             return "sparkles"
         case .analyzingDocument:
@@ -98,6 +102,8 @@ struct ThinkingIndicator: View {
     
     private var iconColor: Color {
         switch displayedActivity {
+        case .warmingUp:
+            return .orange
         case .thinking:
             return .kosmicBlue
         case .analyzingDocument:
@@ -126,6 +132,8 @@ struct ThinkingIndicator: View {
         let isOffline = sourceModel == .offline || sourceModel == .appleLLM
         
         switch displayedActivity {
+        case .warmingUp:
+            return "Warming up Gemma..."
         case .thinking:
             return "Thinking..."
         case .analyzingDocument:

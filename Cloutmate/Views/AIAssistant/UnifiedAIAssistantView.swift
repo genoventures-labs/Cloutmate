@@ -40,9 +40,12 @@ struct UnifiedAIAssistantView: View {
     @FocusState private var isInputFocused: Bool
     @State private var showCreateSheet = false
     @State private var contextualCreateTab: TabIdentifier = .home
+    @State private var chatScrollProxy: ScrollViewProxy?
     
     private let voiceService = VoiceTranscriptionService.shared
     @State private var imagePasteObserver: NSObjectProtocol?
+    
+    private let chatBottomAnchor = "ai-chat-bottom-anchor"
     
     // ARTE gradient colors based on emotional state
     private var arteGradientColors: [Color] {
@@ -66,7 +69,7 @@ struct UnifiedAIAssistantView: View {
     private var sidebarView: some View {
         AIAssistantSidebar(
             conversations: conversations,
-            selectedConversation: viewModel.selectedConversation,
+            selectedConversation: viewModel.currentConversation,
             searchText: $viewModel.searchText,
             selectedDateFilter: $viewModel.selectedDateFilter,
             selectedTags: $viewModel.selectedTags,
@@ -140,60 +143,99 @@ struct UnifiedAIAssistantView: View {
     }
     
     private var conversationPane: some View {
-        ZStack(alignment: .bottomTrailing) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(spacing: 8) {
-                        if viewModel.messages.isEmpty {
-                            welcomeView
-                        } else {
-                            ForEach(viewModel.messages) { message in
-                                MessageBubble(
-                                    message: message,
-                                    onEdit: { editedMessage, newContent in
-                                        viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
-                                    },
-                                    onCopy: { _ in }
-                                )
-                                .id(message.id)
+        GeometryReader { geometry in
+            ZStack(alignment: .bottomTrailing) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 8) {
+                            if viewModel.messages.isEmpty {
+                                welcomeView
+                            } else {
+                                ForEach(viewModel.messages) { message in
+                                    MessageBubble(
+                                        message: message,
+                                        onEdit: { editedMessage, newContent in
+                                            viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
+                                        },
+                                        onCopy: { _ in },
+                                        onResend: { assistantMessage in
+                                            viewModel.resendAssistantMessage(assistantMessage, modelContext: modelContext)
+                                        },
+                                    canResend: viewModel.canResendPayload(for: message)
+                                    )
+                                    .id(message.id)
+                                }
                             }
+                            
+                            if viewModel.isLoading {
+                                ThinkingIndicator(
+                                    activity: viewModel.displayedActivity,
+                                    sourceModel: viewModel.currentSourceModel,
+                                    statusMessage: viewModel.currentStatus
+                                )
+                                .padding()
+                            } else if !viewModel.messages.isEmpty {
+                                IdleIndicator()
+                                    .padding(.top, 8)
+                            }
+                            
+                            Color.clear
+                                .frame(height: 1)
+                                .id(chatBottomAnchor)
+                                .background(
+                                    GeometryReader { bottomGeo in
+                                        Color.clear.preference(
+                                            key: ChatScrollOffsetPreferenceKey.self,
+                                            value: bottomGeo.frame(in: .named("chatScroll")).minY
+                                        )
+                                    }
+                                )
                         }
-                        
-                        if viewModel.isLoading {
-                            ThinkingIndicator(
-                                activity: viewModel.displayedActivity,
-                                sourceModel: viewModel.currentSourceModel
-                            )
-                            .padding()
-                        } else if !viewModel.messages.isEmpty {
-                            IdleIndicator()
-                                .padding(.top, 8)
+                        .padding(.vertical, 16)
+                        .padding(.bottom, 60)
+                    }
+                    .coordinateSpace(name: "chatScroll")
+                    .onAppear {
+                        chatScrollProxy = proxy
+                    }
+                    .onChange(of: viewModel.messages.count) { _, _ in
+                        if viewModel.isScrolledToBottom {
+                            scrollToBottom(animated: true)
                         }
                     }
-                    .padding(.vertical, 16)
-                    .padding(.bottom, 60)
-                }
-                .onChange(of: viewModel.messages.count) { _, _ in
-                    if let lastMessage = viewModel.messages.last {
-                        withAnimation(GlassMotion.Easing.spring) {
-                            proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                        }
+                    .onChange(of: viewModel.currentConversation?.id) { _, _ in
+                        scrollToBottom(animated: false)
                     }
                 }
+                .onPreferenceChange(ChatScrollOffsetPreferenceKey.self) { bottomOffset in
+                    let containerHeight = geometry.size.height
+                    let isAtBottom = bottomOffset <= containerHeight + 32
+                    if viewModel.isScrolledToBottom != isAtBottom {
+                        viewModel.isScrolledToBottom = isAtBottom
+                    }
+                }
+                
+                VStack(alignment: .trailing, spacing: 16) {
+                    if viewModel.messages.count >= 10 {
+                        summarizeButton
+                    }
+                    
+                    ScrollToBottomButton(isVisible: !viewModel.isScrolledToBottom) {
+                        scrollToBottom(animated: true)
+                    }
+                }
+                .padding(.trailing, 24)
+                .padding(.bottom, 32)
             }
-            
-            if viewModel.messages.count >= 10 {
-                summarizeButton
-            }
-        }
-        .background(
-            LinearGradient(
-                colors: arteGradientColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+            .background(
+                LinearGradient(
+                    colors: arteGradientColors,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .opacity(0.1)
             )
-            .opacity(0.1)
-        )
+        }
         .environment(\.glassTier, .background)
     }
     
@@ -275,6 +317,9 @@ struct UnifiedAIAssistantView: View {
             pendingDocumentAttachment: viewModel.pendingDocumentAttachment,
             lastConfidenceScore: viewModel.messages.last(where: { $0.role == "assistant" })?.confidenceScore,
             canRetry: viewModel.canRetry,
+            onResendLastAssistant: viewModel.canResendLastAssistant ? {
+                viewModel.resendLastAssistant(modelContext: modelContext)
+            } : nil,
             onSend: {
                 sendCurrentMessage()
             },
@@ -409,6 +454,7 @@ struct UnifiedAIAssistantView: View {
     // MARK: - Actions
     
     private func handleConversationTap(_ conversation: AIConversation) {
+        viewModel.isScrolledToBottom = true
         let loaded = viewModel.loadConversation(conversation, modelContext: modelContext)
         
         if !loaded {
@@ -547,6 +593,21 @@ struct UnifiedAIAssistantView: View {
         _ = task
     }
     
+    private func scrollToBottom(animated: Bool = true) {
+        guard let proxy = chatScrollProxy else { return }
+        let scrollAction = {
+            proxy.scrollTo(chatBottomAnchor, anchor: .bottom)
+        }
+        if animated {
+            withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                scrollAction()
+            }
+        } else {
+            scrollAction()
+        }
+        viewModel.isScrolledToBottom = true
+    }
+    
     private func setupImagePasteHandler() {
         // Remove existing observer if any
         if let observer = imagePasteObserver {
@@ -664,6 +725,13 @@ struct UnifiedAIAssistantView: View {
         }
         isRecording = false
         voiceInputText = ""
+    }
+}
+
+private struct ChatScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = .zero
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

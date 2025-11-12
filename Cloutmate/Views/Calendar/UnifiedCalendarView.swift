@@ -16,20 +16,25 @@ struct UnifiedCalendarView: View {
     @Query(sort: \CloutmateShared.Post.scheduledDate) private var posts: [CloutmateShared.Post]
     @Query(sort: \CloutmateShared.Artifact.publishedAt) private var artifacts: [CloutmateShared.Artifact]
     @Query(sort: \CloutmateShared.Task.dueDate) private var tasks: [CloutmateShared.Task]
+    @Query(sort: \CalendarEvent.startDate) private var events: [CalendarEvent]
     
     @State private var selectedDate = Date()
     @State private var isWeeklyView = false
     @State private var activePost: CloutmateShared.Post?
     @State private var activeArtifact: CloutmateShared.Artifact?
     @State private var activeTask: CloutmateShared.Task?
+    @State private var activeEvent: CalendarEvent?
     @State private var dayItems: [CalendarDayDetailDrawer.Item] = []
     @State private var dayDrawerVisible = false
     @State private var postDrawerVisible = false
     @State private var artifactDrawerVisible = false
     @State private var taskDrawerVisible = false
+    @State private var eventDrawerVisible = false
     @State private var selectedDay: Date = Date()
     @State private var composerRequest: CalendarComposerRequest?
     @State private var showingComposer = false
+    @State private var isCreatingEvent = false
+    @State private var pendingEventDraft: CalendarEventDraft?
     
     private let calendar = Calendar.current
     
@@ -79,16 +84,59 @@ struct UnifiedCalendarView: View {
             
             if let task = activeTask, taskDrawerVisible {
                 TaskDetailDrawer(
-                    task: task,
+                    mode: .edit,
+                    existingTask: task,
+                    initialDraft: TaskDraft(task: task),
                     isPresented: Binding(
                         get: { taskDrawerVisible },
                         set: { newValue in
                             withAnimation(calendarAnimation) {
                                 taskDrawerVisible = newValue
+                                if !newValue {
+                                    activeTask = nil
+                                }
                             }
                         }
                     ),
-                    mode: .edit
+                    onCommit: { draft in
+                        update(task, with: draft)
+                        try? modelContext.save()
+                        withAnimation(calendarAnimation) {
+                            taskDrawerVisible = false
+                            activeTask = nil
+                        }
+                    },
+                    onCancel: {
+                        withAnimation(calendarAnimation) {
+                            taskDrawerVisible = false
+                            activeTask = nil
+                        }
+                    }
+                )
+                .environmentObject(glassColorSystem)
+                .transition(.move(edge: .trailing))
+            }
+            
+            if eventDrawerVisible, let draft = pendingEventDraft {
+                CalendarEventDrawer(
+                    mode: isCreatingEvent ? .create : .edit,
+                    existingEvent: activeEvent,
+                    initialDraft: draft,
+                    isPresented: Binding(
+                        get: { eventDrawerVisible },
+                        set: { newValue in
+                            withAnimation(calendarAnimation) {
+                                eventDrawerVisible = newValue
+                                if !newValue {
+                                    resetEventDrawerState()
+                                }
+                            }
+                        }
+                    ),
+                    onCommit: { commitEvent(from: $0) },
+                    onDelete: isCreatingEvent ? nil : deleteActiveEvent,
+                    onCancel: cancelEventEditing,
+                    onAskAurora: { askAuroraForEventSuggestions(using: draft) }
                 )
                 .environmentObject(glassColorSystem)
                 .transition(.move(edge: .trailing))
@@ -134,24 +182,87 @@ struct UnifiedCalendarView: View {
             let request = mapComposerNotification(notification)
             launchComposer(with: request)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openEntity)) { notification in
+            guard let info = notification.userInfo,
+                  let typeRaw = info["type"] as? String,
+                  typeRaw == ObjectType.event.rawValue,
+                  let idString = info["id"] as? String,
+                  let uuid = UUID(uuidString: idString),
+                  let event = events.first(where: { $0.id == uuid })
+            else { return }
+            
+            let occurrence = CalendarEventOccurrence(
+                event: event,
+                startDate: event.startDate,
+                endDate: event.endDate
+            )
+            openEventDrawer(for: occurrence)
+        }
         .navigationTitle("Calendar")
         .environmentObject(glassColorSystem)
     }
     
     private var hasActiveDrawer: Bool {
-        postDrawerVisible || artifactDrawerVisible || taskDrawerVisible || dayDrawerVisible || showingComposer
+        postDrawerVisible || artifactDrawerVisible || taskDrawerVisible || eventDrawerVisible || dayDrawerVisible || showingComposer
     }
     
     private var calendarAnimation: Animation {
         reduceMotion ? .default : GlassMotion.Easing.modalOpen
     }
     
-    private var calendarHeader: some View {
-                VStack(spacing: 16) {
-                    CalendarViewToggle(isWeeklyView: $isWeeklyView)
-                        .padding(.horizontal)
-                        .padding(.top)
+    private func update(_ task: CloutmateShared.Task, with draft: TaskDraft) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if !normalizedTitle.isEmpty {
+            task.title = normalizedTitle
+        } else if !normalizedNotes.isEmpty {
+            task.title = String(normalizedNotes.prefix(48))
+        } else {
+            task.title = "Untitled Task"
         }
+        
+        task.notes = normalizedNotes.isEmpty ? nil : draft.notes
+        task.status = draft.status
+        task.priority = draft.priority
+        task.dueDate = draft.dueDate
+        task.projectId = draft.projectId
+        task.areaId = draft.areaId
+        task.effort = draft.effort
+        task.linkedEntityIds = draft.linkedEntityIds
+        task.linkedEntityTypes = draft.linkedEntityTypes
+        task.updatedAt = Date()
+    }
+    
+    private var calendarHeader: some View {
+        HStack(alignment: .center, spacing: 16) {
+                    CalendarViewToggle(isWeeklyView: $isWeeklyView)
+            
+            Spacer()
+            
+            Button {
+                startCreatingEvent(at: selectedDate)
+            } label: {
+                Label("New Event", systemImage: "plus")
+                    .font(.system(size: 14, weight: .semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        LinearGradient(
+                            colors: [.kosmicBlue, .kosmicPurple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.12), radius: 10, y: 6)
+        }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 12)
     }
                     
     private var calendarContent: some View {
@@ -161,11 +272,13 @@ struct UnifiedCalendarView: View {
                             posts: posts,
                             artifacts: artifacts,
                             tasks: tasks,
+                    events: events,
                             selectedDate: $selectedDate,
                     onOpenDay: openDayDrawer,
                     onOpenPost: openPostDrawer,
                     onOpenArtifact: openArtifactDrawer,
                     onOpenTask: openTaskDrawer,
+                    onOpenEvent: openEventDrawer,
                     onCompose: launchComposer
                 )
                     } else {
@@ -173,11 +286,13 @@ struct UnifiedCalendarView: View {
                             posts: posts,
                             artifacts: artifacts,
                             tasks: tasks,
+                    events: events,
                             selectedDate: $selectedDate,
                     onOpenDay: openDayDrawer,
                     onOpenPost: openPostDrawer,
                     onOpenArtifact: openArtifactDrawer,
                     onOpenTask: openTaskDrawer,
+                    onOpenEvent: openEventDrawer,
                     onCompose: launchComposer
                 )
             }
@@ -203,6 +318,119 @@ struct UnifiedCalendarView: View {
     private func openTaskDrawer(for task: CloutmateShared.Task) {
         activeTask = task
         taskDrawerVisible = true
+    }
+    
+    private func openEventDrawer(for occurrence: CalendarEventOccurrence) {
+        var draft = CalendarEventDraft(event: occurrence.event)
+        draft.startDate = occurrence.startDate
+        draft.endDate = occurrence.endDate
+        
+        activeEvent = occurrence.event
+        pendingEventDraft = draft
+        isCreatingEvent = false
+        
+        withAnimation(calendarAnimation) {
+            eventDrawerVisible = true
+        }
+    }
+    
+    private func startCreatingEvent(at date: Date? = nil) {
+        let baseDate = date ?? selectedDate
+        let startOfDay = calendar.startOfDay(for: baseDate)
+        let defaultStart = calendar.date(bySettingHour: 10, minute: 0, second: 0, of: startOfDay) ?? baseDate
+        let defaultEnd = calendar.date(byAdding: .hour, value: 1, to: defaultStart) ?? defaultStart.addingTimeInterval(3600)
+        
+        pendingEventDraft = CalendarEventDraft(
+            title: "",
+            location: "",
+            notes: "",
+            startDate: defaultStart,
+            endDate: defaultEnd,
+            allDay: false
+        )
+        activeEvent = nil
+        isCreatingEvent = true
+        
+        withAnimation(calendarAnimation) {
+            eventDrawerVisible = true
+        }
+    }
+    
+    private func commitEvent(from draft: CalendarEventDraft) {
+        if isCreatingEvent {
+            let newEvent = CalendarEvent(
+                title: draft.title,
+                notes: draft.notes.isEmpty ? nil : draft.notes,
+                location: draft.location.isEmpty ? nil : draft.location,
+                startDate: draft.startDate,
+                endDate: draft.endDate,
+                allDay: draft.allDay,
+                recurrence: draft.recurrence,
+                remindMinutesBefore: draft.remindMinutesBefore,
+                colorHex: nil,
+                auroraGenerated: false
+            )
+            newEvent.linkedEntityIds = draft.linkedEntityIds
+            newEvent.linkedEntityTypes = draft.linkedEntityTypes
+            modelContext.insert(newEvent)
+        } else if let event = activeEvent {
+            event.title = draft.title
+            event.location = draft.location.isEmpty ? nil : draft.location
+            event.notes = draft.notes.isEmpty ? nil : draft.notes
+            event.startDate = draft.startDate
+            event.endDate = draft.endDate
+            event.allDay = draft.allDay
+            event.recurrence = draft.recurrence
+            event.remindMinutesBefore = draft.remindMinutesBefore
+            event.linkedEntityIds = draft.linkedEntityIds
+            event.linkedEntityTypes = draft.linkedEntityTypes
+            event.touch()
+        }
+        
+        try? modelContext.save()
+    }
+    
+    private func deleteActiveEvent() {
+        guard let event = activeEvent else { return }
+        modelContext.delete(event)
+        try? modelContext.save()
+        withAnimation(calendarAnimation) {
+            eventDrawerVisible = false
+        }
+        resetEventDrawerState()
+    }
+    
+    private func cancelEventEditing() {
+        resetEventDrawerState()
+    }
+    
+    private func resetEventDrawerState() {
+        pendingEventDraft = nil
+        activeEvent = nil
+        isCreatingEvent = false
+    }
+    
+    private func askAuroraForEventSuggestions(using draft: CalendarEventDraft) {
+        var payload: [String: Any] = [
+            "intent": "scheduleEvent",
+            "title": draft.title,
+            "allDay": draft.allDay
+        ]
+        let isoFormatter = ISO8601DateFormatter()
+        payload["startDate"] = isoFormatter.string(from: draft.startDate)
+        payload["endDate"] = isoFormatter.string(from: draft.endDate)
+        if !draft.location.isEmpty {
+            payload["location"] = draft.location
+        }
+        if !draft.notes.isEmpty {
+            payload["notes"] = draft.notes
+        }
+        if let recurrence = draft.recurrence {
+            payload["recurrence"] = recurrence.frequency.rawValue
+        }
+        
+        NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.aiAssistant)
+        NotificationCenter.default.post(name: .openAIAssistantThread, object: payload)
     }
     
     private func launchComposer(with payload: CalendarComposerRequest?) {
@@ -238,6 +466,8 @@ struct UnifiedCalendarView: View {
             openArtifactDrawer(for: artifact)
         case .task(let task):
             openTaskDrawer(for: task)
+        case .event(let occurrence):
+            openEventDrawer(for: occurrence)
         }
     }
     
@@ -276,6 +506,14 @@ struct UnifiedCalendarView: View {
         }
         items.append(contentsOf: dayTasks.map { CalendarDayDetailDrawer.Item.task($0) })
         
+        // Add calendar events (including recurrences)
+        let dayInterval = DateInterval(
+            start: calendar.startOfDay(for: date),
+            end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+        )
+        let dayOccurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
+        items.append(contentsOf: dayOccurrences.map { CalendarDayDetailDrawer.Item.event($0) })
+        
         items.sort { lhs, rhs in
             switch (lhs.timestamp, rhs.timestamp) {
             case let (l?, r?):
@@ -297,11 +535,13 @@ struct UnifiedWeeklyCalendarView: View {
     let posts: [CloutmateShared.Post]
     let artifacts: [CloutmateShared.Artifact]
     let tasks: [CloutmateShared.Task]
+    let events: [CalendarEvent]
     @Binding var selectedDate: Date
     let onOpenDay: (Date) -> Void
     let onOpenPost: (CloutmateShared.Post) -> Void
     let onOpenArtifact: (CloutmateShared.Artifact) -> Void
     let onOpenTask: (CloutmateShared.Task) -> Void
+    let onOpenEvent: (CalendarEventOccurrence) -> Void
     let onCompose: (CalendarComposerRequest?) -> Void
     
     @State private var displayedWeek = Date()
@@ -332,6 +572,7 @@ struct UnifiedWeeklyCalendarView: View {
                             onPostClick: onOpenPost,
                             onArtifactClick: onOpenArtifact,
                             onTaskClick: onOpenTask,
+                            onEventClick: onOpenEvent,
                             onDoubleTap: {
                                 onCompose(CalendarComposerRequest(prefilledDate: date))
                             },
@@ -405,6 +646,13 @@ struct UnifiedWeeklyCalendarView: View {
         }
         items.append(contentsOf: dayTasks.map { CalendarItem.task($0) })
         
+        let dayInterval = DateInterval(
+            start: calendar.startOfDay(for: date),
+            end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+        )
+        let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
+        items.append(contentsOf: occurrences.map { CalendarItem.event($0) })
+        
         items.sort { $0.time < $1.time }
         return items
     }
@@ -426,11 +674,13 @@ struct UnifiedMonthlyCalendarView: View {
     let posts: [CloutmateShared.Post]
     let artifacts: [CloutmateShared.Artifact]
     let tasks: [CloutmateShared.Task]
+    let events: [CalendarEvent]
     @Binding var selectedDate: Date
     let onOpenDay: (Date) -> Void
     let onOpenPost: (CloutmateShared.Post) -> Void
     let onOpenArtifact: (CloutmateShared.Artifact) -> Void
     let onOpenTask: (CloutmateShared.Task) -> Void
+    let onOpenEvent: (CalendarEventOccurrence) -> Void
     let onCompose: (CalendarComposerRequest?) -> Void
     
     @State private var currentMonth = Date()
@@ -478,6 +728,7 @@ struct UnifiedMonthlyCalendarView: View {
                                 onPostTap: onOpenPost,
                                 onArtifactTap: onOpenArtifact,
                                 onTaskTap: onOpenTask,
+                                onEventTap: onOpenEvent,
                                 onCompose: {
                                     onCompose(CalendarComposerRequest(prefilledDate: date))
                                 }
@@ -544,6 +795,13 @@ struct UnifiedMonthlyCalendarView: View {
         }
         items.append(contentsOf: dayTasks.map { CalendarItem.task($0) })
         
+        let dayInterval = DateInterval(
+            start: calendar.startOfDay(for: date),
+            end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+        )
+        let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
+        items.append(contentsOf: occurrences.map { CalendarItem.event($0) })
+        
         items.sort { $0.time < $1.time }
         return items
     }
@@ -565,15 +823,18 @@ enum CalendarItem: Identifiable {
     case post(CloutmateShared.Post)
     case artifact(CloutmateShared.Artifact)
     case task(CloutmateShared.Task)
+    case event(CalendarEventOccurrence)
     
-    var id: UUID {
+    var id: String {
         switch self {
         case .post(let post):
-            return post.id
+            return post.id.uuidString
         case .artifact(let artifact):
-            return artifact.id
+            return artifact.id.uuidString
         case .task(let task):
-            return task.id
+            return task.id.uuidString
+        case .event(let occurrence):
+            return occurrence.id
         }
     }
     
@@ -585,6 +846,8 @@ enum CalendarItem: Identifiable {
             return artifact.publishedAt ?? artifact.createdAt
         case .task(let task):
             return task.dueDate ?? Date()
+        case .event(let occurrence):
+            return occurrence.startDate
         }
     }
 }
@@ -596,6 +859,7 @@ struct UnifiedDayColumn: View {
     var onPostClick: ((CloutmateShared.Post) -> Void)?
     var onArtifactClick: ((CloutmateShared.Artifact) -> Void)?
     var onTaskClick: ((CloutmateShared.Task) -> Void)?
+    var onEventClick: ((CalendarEventOccurrence) -> Void)?
     var onDoubleTap: (() -> Void)?
     var onDaySelected: (() -> Void)?
     
@@ -619,6 +883,7 @@ struct UnifiedDayColumn: View {
                     let postCount = items.filter { if case .post = $0 { return true }; return false }.count
                     let artifactCount = items.filter { if case .artifact = $0 { return true }; return false }.count
                     let taskCount = items.filter { if case .task = $0 { return true }; return false }.count
+                    let eventCount = items.filter { if case .event = $0 { return true }; return false }.count
                     
                     if postCount > 0 {
                         Text("\(postCount)")
@@ -652,6 +917,17 @@ struct UnifiedDayColumn: View {
                             .background(Color.kosmicGreen)
                             .cornerRadius(8)
                     }
+                    
+                    if eventCount > 0 {
+                        Text("\(eventCount)")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.cyan)
+                            .cornerRadius(8)
+                    }
                 }
             }
             .padding(.horizontal, 16)
@@ -681,6 +957,10 @@ struct UnifiedDayColumn: View {
                 case .task(let task):
                     TaskCard(task: task, onTap: {
                         onTaskClick?(task)
+                    })
+            case .event(let occurrence):
+                EventCard(occurrence: occurrence, onTap: {
+                    onEventClick?(occurrence)
                     })
                 }
             }
@@ -760,6 +1040,95 @@ struct TaskCard: View {
             x: 0,
             y: isHovering ? 2 : 1
         )
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                isHovering = hovering
+            }
+        }
+        .onTapGesture {
+            onTap?()
+        }
+    }
+}
+
+struct EventCard: View {
+    let occurrence: CalendarEventOccurrence
+    var onTap: (() -> Void)?
+    
+    @State private var isHovering = false
+    
+    private var event: CalendarEvent {
+        occurrence.event
+    }
+    
+    private var timeRangeText: String {
+        if event.allDay {
+            return "All-day"
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return "\(formatter.string(from: occurrence.startDate)) – \(formatter.string(from: occurrence.endDate))"
+    }
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar")
+                .foregroundColor(.cyan)
+                .font(.title3)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title.isEmpty ? "Untitled Event" : event.title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                
+                HStack(spacing: 6) {
+                    Label(timeRangeText, systemImage: "clock")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    if let location = event.location, !location.isEmpty {
+                        Label(location, systemImage: "mappin.and.ellipse")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                
+                if event.recurrence != nil {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.2.squarepath")
+                            .font(.caption2)
+                        Text("Repeating")
+                            .font(.caption2)
+                    }
+                    .foregroundColor(.cyan)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.cyan.opacity(isHovering ? 0.18 : 0.12),
+                            Color.cyan.opacity(isHovering ? 0.1 : 0.06)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.cyan.opacity(isHovering ? 0.35 : 0.2), lineWidth: isHovering ? 1.5 : 1)
+        )
+        .shadow(color: Color.cyan.opacity(isHovering ? 0.25 : 0.08), radius: isHovering ? 6 : 3, y: isHovering ? 3 : 1)
         .onHover { hovering in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                 isHovering = hovering

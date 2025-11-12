@@ -22,6 +22,7 @@ struct AIMessageComposer: View {
     var pendingDocumentAttachment: DocumentAttachmentService.DocumentAttachment?
     var lastConfidenceScore: Double? // Confidence score from last assistant message
     var canRetry: Bool // Whether retry is available
+    var onResendLastAssistant: (() -> Void)?
     
     let onSend: () -> Void
     let onAttachImage: () -> Void
@@ -237,6 +238,18 @@ struct AIMessageComposer: View {
                             .frame(width: 32, height: 32)
                             .help("Send message")
                         }
+                        if let onResendLastAssistant {
+                            GlassButton(
+                                icon: "arrow.uturn.backward.circle",
+                                style: .iconOnly,
+                                tintColor: .kosmicBlue,
+                                action: {
+                                    onResendLastAssistant()
+                                }
+                            )
+                            .frame(width: 32, height: 32)
+                            .help("Resend last assistant reply")
+                        }
                     }
                 } else if canSend {
                     // Regular send button
@@ -266,8 +279,8 @@ struct AIMessageComposer: View {
                 .padding(.leading, 20)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
         }
     }
     
@@ -341,6 +354,7 @@ struct AIMessageComposer: View {
         pendingDocumentAttachment: nil,
         lastConfidenceScore: nil,
         canRetry: false,
+        onResendLastAssistant: nil,
         onSend: {},
         onAttachImage: {},
         onAttachDocument: {},

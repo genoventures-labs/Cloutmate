@@ -100,6 +100,9 @@ struct AIAssistantSpotlightOverlay: View {
         case .artifact:
             NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.posts)
             NotificationCenter.default.post(name: .openEntity, object: result.id)
+        case .area:
+            NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.areas)
+            NotificationCenter.default.post(name: .openEntity, object: result.id)
         case .post:
             NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.posts)
             NotificationCenter.default.post(name: .openEntity, object: result.id)
@@ -152,6 +155,7 @@ struct AIAssistantSearchResultRow: View {
         case .task: return "checkmark.circle"
         case .note: return "doc.text.fill"
         case .artifact: return "doc.richtext"
+        case .area: return "rectangle.stack.fill"
         case .post: return "square.and.pencil"
         case .reminder: return "bell.fill"
         case .inboxItem: return "tray.fill"

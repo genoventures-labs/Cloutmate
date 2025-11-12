@@ -13,7 +13,7 @@ struct JournalTimelineView: View {
     let journals: [Journal]
     let onEntryTap: (Journal) -> Void
     
-    @State private var hoveredEntry: Journal?
+    @State private var hoveredEntryID: UUID?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
@@ -27,193 +27,255 @@ struct JournalTimelineView: View {
         return (first.entryDate, last.entryDate)
     }
     
-    var body: some View {
-        guard !sortedJournals.isEmpty else {
-            return AnyView(EmptyView())
+    private var journalData: [PositionedJournalData] {
+        guard let range = dateRange else { return [] }
+        let totalDuration = range.end.timeIntervalSince(range.start)
+        let calendar = Calendar.current
+        
+        var counts: [Date: Int] = [:]
+        sortedJournals.forEach { journal in
+            let bucket = calendar.startOfDay(for: journal.entryDate)
+            counts[bucket, default: 0] += 1
         }
         
-        let trackHeight: CGFloat = 150
-        let spacing: CGFloat = 88
-        let horizontalPadding: CGFloat = 52
-        let verticalPadding: CGFloat = 28
-        let minTrackWidth: CGFloat = 360
-        let availableHeight = trackHeight - verticalPadding * 2
-        let trackWidth = max(horizontalPadding * 2 + spacing * CGFloat(max(sortedJournals.count - 1, 0)), minTrackWidth)
+        var laneAssignments: [Date: Int] = [:]
         
-        let timelinePoints: [TimelinePoint] = sortedJournals.enumerated().map { index, journal in
-            let score = moodScore(for: journal.journalMood)
-            let x = horizontalPadding + CGFloat(index) * spacing
-            let y = trackHeight - verticalPadding - CGFloat(score) * availableHeight
-            return TimelinePoint(journal: journal, index: index, position: CGPoint(x: x, y: y), score: score)
-        }
-        
-        let monthMarkers = monthMarkers(for: sortedJournals, spacing: spacing, horizontalPadding: horizontalPadding)
-        let baselineY = trackHeight - verticalPadding
-        
-        return AnyView(
-            GlassPanel(tier: .contentCard, cornerRadius: 12) {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .firstTextBaseline) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Emotional Timeline")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                            
-                            if let range = dateRange {
-                                Text("\(range.start.formatted(.dateTime.month().day())) – \(range.end.formatted(.dateTime.month().day().year()))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        
-                        Spacer()
-                        
-                        Text("\(sortedJournals.count) entries")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        ZStack {
-                            Canvas { context, size in
-                                // Month separators
-                                for marker in monthMarkers {
-                                    var markerPath = Path()
-                                    markerPath.move(to: CGPoint(x: marker.positionX, y: verticalPadding - 8))
-                                    markerPath.addLine(to: CGPoint(x: marker.positionX, y: baselineY + 12))
-                                    context.stroke(
-                                        markerPath,
-                                        with: .color(Color.secondary.opacity(0.12)),
-                                        style: StrokeStyle(lineWidth: 1, dash: [6, 8])
-                                    )
-                                }
-                                
-                                // Baseline
-                                var baseline = Path()
-                                baseline.move(to: CGPoint(x: horizontalPadding, y: baselineY))
-                                baseline.addLine(to: CGPoint(x: trackWidth - horizontalPadding, y: baselineY))
-                                context.stroke(
-                                    baseline,
-                                    with: .linearGradient(
-                                        Gradient(colors: [.kosmicBlue.opacity(0.35), .kosmicPurple.opacity(0.35), .kosmicGreen.opacity(0.35)]),
-                                        startPoint: CGPoint(x: horizontalPadding, y: baselineY),
-                                        endPoint: CGPoint(x: trackWidth - horizontalPadding, y: baselineY)
-                                    ),
-                                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-                                )
-                                
-                                guard timelinePoints.count >= 2 else { return }
-                                
-                                // Mood drift fill
-                                var fill = Path()
-                                fill.move(to: CGPoint(x: timelinePoints.first!.position.x, y: baselineY))
-                                timelinePoints.forEach { fill.addLine(to: $0.position) }
-                                fill.addLine(to: CGPoint(x: timelinePoints.last!.position.x, y: baselineY))
-                                fill.closeSubpath()
-                                context.fill(
-                                    fill,
-                                    with: .linearGradient(
-                                        Gradient(colors: [
-                                            Color.kosmicBlue.opacity(0.08),
-                                            Color.kosmicPurple.opacity(0.08),
-                                            Color.kosmicGreen.opacity(0.08)
-                                        ]),
-                                        startPoint: CGPoint(x: horizontalPadding, y: verticalPadding),
-                                        endPoint: CGPoint(x: trackWidth - horizontalPadding, y: baselineY)
-                                    )
-                                )
-                                
-                                // Mood drift line
-                                var drift = Path()
-                                drift.move(to: timelinePoints.first!.position)
-                                timelinePoints.dropFirst().forEach { drift.addLine(to: $0.position) }
-                                context.stroke(
-                                    drift,
-                                    with: .linearGradient(
-                                        Gradient(colors: [.kosmicBlue, .kosmicPurple, .kosmicGreen]),
-                                        startPoint: CGPoint(x: horizontalPadding, y: verticalPadding),
-                                        endPoint: CGPoint(x: trackWidth - horizontalPadding, y: baselineY)
-                                    ),
-                                    style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
-                                )
-                            }
-                            .frame(width: trackWidth, height: trackHeight)
-                            .drawingGroup()
-                            
-                            // Month labels
-                            ForEach(monthMarkers) { marker in
-                                Text(marker.label)
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary.opacity(0.8))
-                                    .position(x: marker.positionX, y: trackHeight - 10)
-                            }
-                            
-                            // Timeline markers
-                            ForEach(timelinePoints) { data in
-                                TimelineMarker(
-                                    journal: data.journal,
-                                    isHovered: hoveredEntry?.id == data.journal.id,
-                                    moodColor: moodColor(for: data.journal.journalMood),
-                                    shortDate: timelineShortDateFormatter.string(from: data.journal.entryDate),
-                                    onTap: { onEntryTap(data.journal) },
-                                    onHover: { hovering in
-                                        if reduceMotion {
-                                            hoveredEntry = hovering ? data.journal : nil
-                                        } else {
-                                            withAnimation(GlassMotion.Easing.spring) {
-                                                hoveredEntry = hovering ? data.journal : nil
-                                            }
-                                        }
-                                    }
-                                )
-                                .position(data.position)
-                            }
-                        }
-                        .frame(width: trackWidth, height: trackHeight)
-                        .padding(.vertical, 4)
-                    }
-                    
-                    if let hovered = hoveredEntry {
-                        TimelinePreview(journal: hovered)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    } else {
-                        MoodLegend()
-                            .transition(.opacity)
-                    }
-                }
-                .padding(16)
+        return sortedJournals.map { journal in
+            let bucket = calendar.startOfDay(for: journal.entryDate)
+            let laneIndex = laneAssignments[bucket, default: 0]
+            laneAssignments[bucket] = laneIndex + 1
+            let laneCount = counts[bucket] ?? 1
+            
+            let offsetFromStart = journal.entryDate.timeIntervalSince(range.start)
+            let ratio: CGFloat
+            if totalDuration <= 0 {
+                ratio = 0.5
+            } else {
+                ratio = min(max(CGFloat(offsetFromStart / totalDuration), 0), 1)
             }
-            .animation(.easeInOut(duration: 0.35), value: hoveredEntry?.id)
-        )
+            
+            return PositionedJournalData(
+                journal: journal,
+                ratio: ratio,
+                laneIndex: laneIndex,
+                laneCount: laneCount,
+                moodScore: moodScore(for: journal.journalMood)
+            )
+        }
     }
-}
-
-private struct TimelinePoint: Identifiable {
-    let journal: Journal
-    let index: Int
-    let position: CGPoint
-    let score: Double
     
-    var id: UUID { journal.id }
-}
-
-private struct TimelineMonthMarker: Identifiable {
-    let id = UUID()
-    let label: String
-    let positionX: CGFloat
+    var body: some View {
+        if journalData.isEmpty {
+            EmptyView()
+        } else {
+            timelineCard
+        }
+    }
+    
+    private var timelineCard: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+            VStack(alignment: .leading, spacing: 16) {
+                header
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    GeometryReader { geometry in
+                        let trackWidth = max(geometry.size.width, TimelineLayout.minTrackWidth)
+                        timelineContent(trackWidth: trackWidth)
+                            .frame(width: trackWidth, height: TimelineLayout.trackHeight)
+                    }
+                    .frame(height: TimelineLayout.trackHeight)
+                }
+                .scrollIndicators(.hidden)
+                
+                if let hovered = hoveredEntryID.flatMap({ id in sortedJournals.first(where: { $0.id == id }) }) {
+                    TimelinePreview(journal: hovered)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                } else {
+                    MoodLegend()
+                        .transition(.opacity)
+                }
+            }
+            .padding(16)
+            .animation(.easeInOut(duration: 0.3), value: hoveredEntryID)
+        }
+    }
+    
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Emotional Timeline")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                
+                if let range = dateRange {
+                    Text("\(range.start.formatted(.dateTime.month().day())) – \(range.end.formatted(.dateTime.month().day().year()))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            Spacer()
+            
+            Text("\(sortedJournals.count) entries")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    @ViewBuilder
+    private func timelineContent(trackWidth: CGFloat) -> some View {
+        let availableWidth = trackWidth - (TimelineLayout.horizontalPadding * 2)
+        let amplitude = TimelineLayout.trackHeight * 0.42
+        let baselineY = TimelineLayout.baselineY
+        
+        let positioned = journalData.map { data -> PositionedJournal in
+            let baseX = TimelineLayout.horizontalPadding + data.ratio * availableWidth
+            let duplicateSpread = CGFloat(max(data.laneCount - 1, 0)) * TimelineLayout.duplicateSpacing
+            let duplicateOffset = CGFloat(data.laneIndex) * TimelineLayout.duplicateSpacing - duplicateSpread / 2
+            let clampedX = min(max(baseX + duplicateOffset, TimelineLayout.horizontalPadding), trackWidth - TimelineLayout.horizontalPadding)
+            let y = baselineY - CGFloat(data.moodScore) * amplitude
+            return PositionedJournal(journal: data.journal, x: clampedX, y: y)
+        }
+        
+        let monthMarkers = computeMonthMarkers(for: positioned)
+        
+        ZStack(alignment: .topLeading) {
+            timelineBackground(width: trackWidth, positioned: positioned, baselineY: baselineY)
+            
+            ForEach(monthMarkers) { marker in
+                Text(marker.label)
+                    .font(.caption2)
+                    .foregroundColor(.secondary.opacity(0.8))
+                    .position(x: marker.x, y: TimelineLayout.trackHeight - 10)
+            }
+            
+            ForEach(positioned) { entry in
+                TimelineMarker(
+                    journal: entry.journal,
+                    isActive: hoveredEntryID == entry.journal.id,
+                    moodColor: moodColor(for: entry.journal.journalMood),
+                    shortDate: timelineShortDateFormatter.string(from: entry.journal.entryDate),
+                    reduceMotion: reduceMotion,
+                    onTap: { onEntryTap(entry.journal) },
+                    onHoverChanged: { hovering in
+                        hoveredEntryID = hovering ? entry.journal.id : nil
+                    }
+                )
+                .position(x: entry.x, y: entry.y)
+                .zIndex(hoveredEntryID == entry.journal.id ? 2 : 1)
+            }
+        }
+    }
+    
+    private func timelineBackground(width: CGFloat, positioned: [PositionedJournal], baselineY: CGFloat) -> some View {
+        Canvas { context, size in
+            guard positioned.count >= 1 else { return }
+            
+            // Baseline
+            var baseline = Path()
+            baseline.move(to: CGPoint(x: TimelineLayout.horizontalPadding, y: baselineY))
+            baseline.addLine(to: CGPoint(x: width - TimelineLayout.horizontalPadding, y: baselineY))
+            context.stroke(
+                baseline,
+                with: .linearGradient(
+                    Gradient(colors: [.kosmicBlue.opacity(0.3), .kosmicPurple.opacity(0.3), .kosmicGreen.opacity(0.3)]),
+                    startPoint: CGPoint(x: TimelineLayout.horizontalPadding, y: baselineY),
+                    endPoint: CGPoint(x: width - TimelineLayout.horizontalPadding, y: baselineY)
+                ),
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
+            )
+            
+            guard positioned.count >= 2 else { return }
+            
+            // Mood drift fill
+            var fill = Path()
+            fill.move(to: CGPoint(x: positioned.first!.x, y: baselineY))
+            positioned.forEach { fill.addLine(to: CGPoint(x: $0.x, y: $0.y)) }
+            fill.addLine(to: CGPoint(x: positioned.last!.x, y: baselineY))
+            fill.closeSubpath()
+            context.fill(
+                fill,
+                with: .linearGradient(
+                    Gradient(colors: [
+                        Color.kosmicBlue.opacity(0.08),
+                        Color.kosmicPurple.opacity(0.08),
+                        Color.kosmicGreen.opacity(0.08)
+                    ]),
+                    startPoint: CGPoint(x: TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY - TimelineLayout.trackHeight * 0.4),
+                    endPoint: CGPoint(x: width - TimelineLayout.horizontalPadding, y: baselineY)
+                )
+            )
+            
+            // Mood drift line
+            var line = Path()
+            line.move(to: CGPoint(x: positioned.first!.x, y: positioned.first!.y))
+            positioned.dropFirst().forEach { line.addLine(to: CGPoint(x: $0.x, y: $0.y)) }
+            context.stroke(
+                line,
+                with: .linearGradient(
+                    Gradient(colors: [.kosmicBlue, .kosmicPurple, .kosmicGreen]),
+                    startPoint: CGPoint(x: TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY - TimelineLayout.trackHeight * 0.4),
+                    endPoint: CGPoint(x: width - TimelineLayout.horizontalPadding, y: baselineY)
+                ),
+                style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round)
+            )
+        }
+    }
+    
+    private struct PositionedJournalData {
+        let journal: Journal
+        let ratio: CGFloat
+        let laneIndex: Int
+        let laneCount: Int
+        let moodScore: Double
+    }
+    
+    private struct PositionedJournal: Identifiable {
+        let journal: Journal
+        let x: CGFloat
+        let y: CGFloat
+        
+        var id: UUID { journal.id }
+    }
+    
+    private func computeMonthMarkers(for entries: [PositionedJournal]) -> [TimelineMonthMarker] {
+        var markers: [TimelineMonthMarker] = []
+        let calendar = Calendar.current
+        var seenKeys: Set<String> = []
+        
+        for entry in entries {
+            let components = calendar.dateComponents([.year, .month], from: entry.journal.entryDate)
+            let key = "\(components.year ?? 0)-\(components.month ?? 0)"
+            if !seenKeys.contains(key) {
+                let label = timelineMonthFormatter.string(from: entry.journal.entryDate)
+                markers.append(TimelineMonthMarker(label: label, x: entry.x))
+                seenKeys.insert(key)
+            }
+        }
+        
+        return markers
+    }
 }
 
 private struct TimelineMarker: View {
     let journal: Journal
-    let isHovered: Bool
+    let isActive: Bool
     let moodColor: Color
     let shortDate: String
+    let reduceMotion: Bool
     let onTap: () -> Void
-    let onHover: (Bool) -> Void
+    let onHoverChanged: (Bool) -> Void
+    
+    @State private var isHovered = false
+    
+    private var nodeScale: CGFloat {
+        guard !reduceMotion else { return 1 }
+        return (isHovered || isActive) ? TimelineLayout.activeNodeScale : 1
+    }
     
     var body: some View {
-        VStack(spacing: 8) {
-            if isHovered {
+        VStack(spacing: TimelineLayout.infoCardSpacing) {
+            if isHovered || isActive {
                 Text(journal.journalMood.rawValue)
                     .font(.caption2)
                     .padding(.horizontal, 8)
@@ -228,22 +290,22 @@ private struct TimelineMarker: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            moodColor.opacity(isHovered ? 0.8 : 0.6),
-                            moodColor.opacity(isHovered ? 0.15 : 0.05)
+                            moodColor.opacity((isHovered || isActive) ? 0.85 : 0.6),
+                            moodColor.opacity((isHovered || isActive) ? 0.18 : 0.08)
                         ],
                         center: .center,
                         startRadius: 0,
-                        endRadius: isHovered ? 22 : 16
+                        endRadius: (isHovered || isActive) ? 22 : 16
                     )
                 )
-                .frame(width: isHovered ? 20 : 14, height: isHovered ? 20 : 14)
+                .frame(width: TimelineLayout.nodeBaseSize, height: TimelineLayout.nodeBaseSize)
                 .overlay(
                     Circle()
-                        .stroke(.white.opacity(isHovered ? 0.9 : 0.6), lineWidth: isHovered ? 2 : 1)
+                        .stroke(.white.opacity((isHovered || isActive) ? 0.85 : 0.55), lineWidth: (isHovered || isActive) ? 2 : 1)
                 )
-                .shadow(color: moodColor.opacity(isHovered ? 0.45 : 0.15), radius: isHovered ? 12 : 6, y: isHovered ? 6 : 3)
-                .scaleEffect(isHovered ? 1.12 : 1.0)
-                .animation(GlassMotion.Easing.spring, value: isHovered)
+                .shadow(color: moodColor.opacity((isHovered || isActive) ? 0.4 : 0.18), radius: (isHovered || isActive) ? 12 : 6, y: (isHovered || isActive) ? 6 : 3)
+                .scaleEffect(nodeScale, anchor: .center)
+                .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: nodeScale)
             
             Text(shortDate)
                 .font(.caption2)
@@ -252,9 +314,82 @@ private struct TimelineMarker: View {
         .frame(width: 92)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .onHover { hovering in onHover(hovering) }
+        .onHover { hovering in
+            if isHovered != hovering {
+                isHovered = hovering
+                onHoverChanged(hovering)
+            }
+        }
     }
 }
+
+private struct TimelineMonthMarker: Identifiable {
+    let id = UUID()
+    let label: String
+    let x: CGFloat
+}
+
+private func moodColor(for mood: JournalMood) -> Color {
+    switch mood {
+    case .excited: return .orange
+    case .grateful: return .yellow
+    case .reflective: return .kosmicBlue
+    case .motivated: return .kosmicGreen
+    case .contemplative: return .kosmicPurple
+    case .creative: return .pink
+    case .frustrated: return .red
+    case .calm: return .cyan
+    case .none: return .gray
+    }
+}
+
+private func moodColorForPreview(for mood: JournalMood) -> Color {
+    moodColor(for: mood)
+}
+
+private func moodScore(for mood: JournalMood) -> Double {
+    switch mood {
+    case .excited: return 0.88
+    case .grateful: return 0.76
+    case .reflective: return 0.62
+    case .motivated: return 0.82
+    case .contemplative: return 0.48
+    case .creative: return 0.7
+    case .frustrated: return 0.24
+    case .calm: return 0.65
+    case .none: return 0.45
+    }
+}
+
+private func moodLegendColor(for mood: JournalMood) -> Color {
+    moodColor(for: mood)
+}
+
+#Preview {
+    JournalTimelineView(
+        journals: [
+            Journal(title: "Morning Reflection", content: "Today I felt focused and grounded.", entryDate: Date(), mood: .motivated),
+            Journal(title: "Midday Note", content: "Energy dipped in the afternoon, but recovered after a walk.", entryDate: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date(), mood: .calm),
+            Journal(title: "Creative Burst", content: "Ideas flowed effortlessly into the draft.", entryDate: Calendar.current.date(byAdding: .day, value: -5, to: Date()) ?? Date(), mood: .creative),
+            Journal(title: "Evening Reflection", content: "Grateful for the small wins.", entryDate: Calendar.current.date(byAdding: .day, value: -9, to: Date()) ?? Date(), mood: .grateful)
+        ],
+        onEntryTap: { _ in }
+    )
+    .padding()
+    .environmentObject(GlassColorSystem())
+}
+
+private let timelineMonthFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMM"
+    return formatter
+}()
+
+private let timelineShortDateFormatter: DateFormatter = {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "MMM d"
+    return formatter
+}()
 
 private struct TimelinePreview: View {
     let journal: Journal
@@ -351,83 +486,4 @@ private struct MoodLegend: View {
         }
     }
 }
-
-private func monthMarkers(for journals: [Journal], spacing: CGFloat, horizontalPadding: CGFloat) -> [TimelineMonthMarker] {
-    guard !journals.isEmpty else { return [] }
-    
-    var markers: [TimelineMonthMarker] = []
-    let calendar = Calendar.current
-    var previousKey: String?
-    
-    for (index, journal) in journals.enumerated() {
-        let components = calendar.dateComponents([.year, .month], from: journal.entryDate)
-        let key = "\(components.year ?? 0)-\(components.month ?? 0)"
-        if previousKey == nil || key != previousKey {
-            let label = timelineMonthFormatter.string(from: journal.entryDate)
-            let positionX = horizontalPadding + CGFloat(index) * spacing
-            markers.append(TimelineMonthMarker(label: label, positionX: positionX))
-            previousKey = key
-        }
-    }
-    
-    return markers
-}
-
-private func moodColor(for mood: JournalMood) -> Color {
-    switch mood {
-    case .excited: return .orange
-    case .grateful: return .yellow
-    case .reflective: return .kosmicBlue
-    case .motivated: return .kosmicGreen
-    case .contemplative: return .kosmicPurple
-    case .creative: return .pink
-    case .frustrated: return .red
-    case .calm: return .cyan
-    case .none: return .gray
-    }
-}
-
-private func moodColorForPreview(for mood: JournalMood) -> Color {
-    moodColor(for: mood)
-}
-
-private func moodScore(for mood: JournalMood) -> Double {
-    switch mood {
-    case .excited: return 0.88
-    case .grateful: return 0.76
-    case .reflective: return 0.62
-    case .motivated: return 0.82
-    case .contemplative: return 0.48
-    case .creative: return 0.7
-    case .frustrated: return 0.24
-    case .calm: return 0.65
-    case .none: return 0.45
-    }
-}
-
-#Preview {
-    JournalTimelineView(
-        journals: [
-            Journal(title: "Morning Reflection", content: "Today I felt focused and grounded.", entryDate: Date(), mood: .motivated),
-            Journal(title: "Midday Note", content: "Energy dipped in the afternoon, but recovered after a walk.", entryDate: Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date(), mood: .calm),
-            Journal(title: "Creative Burst", content: "Ideas flowed effortlessly into the draft.", entryDate: Calendar.current.date(byAdding: .day, value: -5, to: Date()) ?? Date(), mood: .creative),
-            Journal(title: "Evening Reflection", content: "Grateful for the small wins.", entryDate: Calendar.current.date(byAdding: .day, value: -9, to: Date()) ?? Date(), mood: .grateful)
-        ],
-        onEntryTap: { _ in }
-    )
-    .padding()
-    .environmentObject(GlassColorSystem())
-}
-
-private let timelineMonthFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MMM"
-    return formatter
-}()
-
-private let timelineShortDateFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "MMM d"
-    return formatter
-}()
 

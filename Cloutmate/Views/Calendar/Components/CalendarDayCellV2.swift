@@ -17,6 +17,7 @@ struct CalendarDayCellV2: View {
     var onPostTap: ((CloutmateShared.Post) -> Void)? = nil
     var onArtifactTap: ((CloutmateShared.Artifact) -> Void)? = nil
     var onTaskTap: ((CloutmateShared.Task) -> Void)? = nil
+    var onEventTap: ((CalendarEventOccurrence) -> Void)? = nil
     var onCompose: (() -> Void)? = nil
     
     @State private var isHovered = false
@@ -43,6 +44,10 @@ struct CalendarDayCellV2: View {
     
     private var postCount: Int {
         items.filter { if case .post = $0 { return true }; return false }.count
+    }
+    
+    private var eventCount: Int {
+        items.filter { if case .event = $0 { return true }; return false }.count
     }
     
     private var hasItems: Bool {
@@ -78,6 +83,11 @@ struct CalendarDayCellV2: View {
                         if postCount > 0 {
                             Circle()
                                 .fill(Color.kosmicBlue)
+                                .frame(width: 4, height: 4)
+                        }
+                        if eventCount > 0 {
+                            Circle()
+                                .fill(Color.cyan)
                                 .frame(width: 4, height: 4)
                         }
                     }
@@ -163,6 +173,14 @@ struct CalendarDayCellV2: View {
             }).first {
                 Button("Open Artifact") {
                     onArtifactTap?(firstArtifact)
+                }
+            }
+            if let firstEvent = items.compactMap({ item -> CalendarEventOccurrence? in
+                if case .event(let occurrence) = item { return occurrence }
+                return nil
+            }).first {
+                Button("Open Event") {
+                    onEventTap?(firstEvent)
                 }
             }
         }

@@ -14,6 +14,8 @@ struct MessageBubble: View {
     let message: AIMessage
     let onEdit: ((AIMessage, String) -> Void)?
     let onCopy: ((String) -> Void)?
+    let onResend: ((AIMessage) -> Void)?
+    let canResend: Bool
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @State private var isEditing = false
@@ -335,7 +337,6 @@ struct MessageBubble: View {
             if !isSystemMessage {
                 HStack(spacing: 8) {
                     if isUser {
-                        // Edit button for user messages
                         Button(action: {
                             editText = message.content ?? ""
                             isEditing = true
@@ -350,7 +351,6 @@ struct MessageBubble: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        // Copy button for AI messages
                         Button(action: copyMessage) {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.on.doc")
@@ -361,6 +361,21 @@ struct MessageBubble: View {
                             .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
+                        
+                        Button(action: {
+                            onResend?(message)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.caption2)
+                                Text("Resend")
+                                    .font(.caption2)
+                            }
+                            .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .opacity(canResend ? 1 : 0.4)
+                        .disabled(!canResend || onResend == nil)
                     }
                 }
                 .padding(.top, 8)
@@ -783,19 +798,16 @@ struct MessageBubble: View {
         pasteboard.clearContents()
         pasteboard.setString(content, forType: .string)
         
-        // Show copied toast
         withAnimation {
             showCopiedToast = true
         }
         
-        // Hide after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation {
                 showCopiedToast = false
             }
         }
         
-        // Call callback if provided
         onCopy?(content)
     }
     
@@ -1037,12 +1049,16 @@ struct ModelBadge: View {
         MessageBubble(
             message: AIMessage(role: "user", content: "Generate a hook for my social media post"),
             onEdit: { _, _ in },
-            onCopy: { _ in }
+            onCopy: { _ in },
+            onResend: { _ in },
+            canResend: false
         )
         MessageBubble(
             message: AIMessage(role: "assistant", content: "Here are some engaging hook ideas:\n\n💡 Ever wondered...\n🚀 This one simple trick..."),
             onEdit: { _, _ in },
-            onCopy: { _ in }
+            onCopy: { _ in },
+            onResend: { _ in },
+            canResend: true
         )
     }
     .environmentObject(GlassColorSystem())

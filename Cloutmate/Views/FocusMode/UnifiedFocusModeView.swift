@@ -27,6 +27,9 @@ struct UnifiedFocusModeView: View {
     @State private var timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     @State private var lastRefreshTime = Date()
     @State private var pendingSessionParams: PendingFocusSessionParams?
+    @State private var analyticsSnapshot: FocusAnalyticsSnapshot?
+    @State private var recentSessions: [FocusSession] = []
+    @State private var lastAnalyticsRefresh = Date.distantPast
     
     // Objective drawer state
     @State private var objective: String = ""
@@ -49,7 +52,12 @@ struct UnifiedFocusModeView: View {
                 FocusHeaderView(
                     activeSession: activeSession,
                     selectedFilter: selectedFilter,
-                    onFilterChange: { selectedFilter = $0 },
+                    onFilterChange: { filter in
+                        selectedFilter = filter
+                        if filter != .session {
+                            refreshAnalyticsSnapshot(force: true)
+                        }
+                    },
                     onStartSession: {
                         showObjectiveDrawer = true
                     },
@@ -66,32 +74,14 @@ struct UnifiedFocusModeView: View {
                 .padding(.top)
                 .padding(.bottom, 8)
                 
-                // Main Content
-                HStack(spacing: 20) {
-                    // Session Panel (Left)
-                    VStack {
-                        FocusSessionPanel(
-                            session: activeSession,
-                            streakCount: streakCount,
-                            cpsScore: cpsScore,
-                            durationMode: durationMode,
-                            onDurationModeChange: { durationMode = $0 }
-                        )
-                        .frame(maxWidth: .infinity)
-                        
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity)
-                    
-                    // Sidebar (Right)
-                    FocusSidebar(
-                        session: activeSession,
-                        onLogTone: logTone
-                    )
-                    .frame(width: 320)
+                switch selectedFilter {
+                case .session:
+                    sessionLayout
+                case .stats:
+                    statsLayout
+                case .streak:
+                    streakLayout
                 }
-                .padding(.horizontal)
-                .padding(.top, 8)
             }
         }
         .coordinateSpace(name: "scroll")
@@ -250,6 +240,8 @@ struct UnifiedFocusModeView: View {
         } else {
             cpsScore = nil
         }
+        
+        refreshAnalyticsSnapshotIfNeeded()
     }
     
     private func tryStartPendingSession() {
@@ -299,6 +291,88 @@ struct UnifiedFocusModeView: View {
                 .repeatForever(autoreverses: true)
         ) {
             breathingPhase = 1.0
+        }
+    }
+    
+    // MARK: - Layouts
+    
+    @ViewBuilder
+    private var sessionLayout: some View {
+        HStack(spacing: 20) {
+            VStack {
+                FocusSessionPanel(
+                    session: activeSession,
+                    streakCount: streakCount,
+                    cpsScore: cpsScore,
+                    durationMode: durationMode,
+                    onDurationModeChange: { durationMode = $0 }
+                )
+                .frame(maxWidth: .infinity)
+                
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
+            
+            FocusSidebar(
+                session: activeSession,
+                onLogTone: logTone
+            )
+            .frame(width: 320)
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+    
+    @ViewBuilder
+    private var statsLayout: some View {
+        if let snapshot = analyticsSnapshot {
+            FocusStatsTabView(
+                snapshot: snapshot,
+                onStartSession: { showObjectiveDrawer = true },
+                onOpenAnalytics: { showAnalyticsDrawer = true }
+            )
+        } else {
+            VStack {
+                ProgressView()
+                    .padding(.top, 80)
+                Spacer()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var streakLayout: some View {
+        if let snapshot = analyticsSnapshot {
+            FocusStreakTabView(
+                snapshot: snapshot,
+                currentStreak: streakCount,
+                recentSessions: recentSessions,
+                onStartSession: { showObjectiveDrawer = true }
+            )
+        } else {
+            VStack {
+                ProgressView()
+                    .padding(.top, 80)
+                Spacer()
+            }
+        }
+    }
+    
+    // MARK: - Analytics Refresh
+    
+    private func refreshAnalyticsSnapshotIfNeeded() {
+        refreshAnalyticsSnapshot(force: false)
+    }
+    
+    private func refreshAnalyticsSnapshot(force: Bool) {
+        let now = Date()
+        guard force || now.timeIntervalSince(lastAnalyticsRefresh) > 60 || analyticsSnapshot == nil else { return }
+        lastAnalyticsRefresh = now
+        let snapshot = FocusAnalyticsService.shared.snapshot(modelContext: modelContext)
+        analyticsSnapshot = snapshot
+        recentSessions = snapshot.recentSessions
+        if let latestStreak = snapshot.streakTimeline.last?.streakCount {
+            streakCount = max(streakCount, latestStreak)
         }
     }
 }

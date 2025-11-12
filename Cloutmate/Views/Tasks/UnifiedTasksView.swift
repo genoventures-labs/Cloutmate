@@ -24,6 +24,7 @@ struct UnifiedTasksView: View {
     @State private var activeTask: Task?
     @State private var isDrawerVisible = false
     @State private var isCreatingTask = false
+    @State private var pendingTaskDraft: TaskDraft?
     @State private var focusOverlayTask: Task?
     @State private var focusDuration: TimeInterval = 1800
     @State private var scrollOffset: CGFloat = 0
@@ -174,20 +175,52 @@ struct UnifiedTasksView: View {
             }
             .opacity(isDrawerVisible ? 0 : 1)
             
-            if let task = activeTask, isDrawerVisible {
-                TaskDetailDrawer(
-                    task: task,
-                    isPresented: Binding(
-                        get: { isDrawerVisible },
-                        set: { newValue in
+            if isDrawerVisible {
+                if isCreatingTask, let draft = pendingTaskDraft {
+                    TaskDetailDrawer(
+                        mode: .create,
+                        existingTask: nil,
+                        initialDraft: draft,
+                        isPresented: creationDrawerBinding(),
+                        onCommit: { committedDraft in
+                            commitNewTask(from: committedDraft)
+                        },
+                        onCancel: {
+                            pendingTaskDraft = nil
                             withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
-                                isDrawerVisible = newValue
+                                isDrawerVisible = false
+                            }
+                            isCreatingTask = false
+                        }
+                    )
+                    .transition(.move(edge: .trailing))
+                } else if let task = activeTask {
+                    TaskDetailDrawer(
+                        mode: .edit,
+                        existingTask: task,
+                        initialDraft: TaskDraft(task: task),
+                        isPresented: editDrawerBinding(),
+                        onCommit: { updatedDraft in
+                            apply(updatedDraft, to: task)
+                            try? modelContext.save()
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = false
+                            }
+                            DispatchQueue.main.async {
+                                activeTask = nil
+                            }
+                        },
+                        onCancel: {
+                            withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                                isDrawerVisible = false
+                            }
+                            DispatchQueue.main.async {
+                                activeTask = nil
                             }
                         }
-                    ),
-                    mode: isCreatingTask ? .create : .edit
-                )
-                .transition(.move(edge: .trailing))
+                    )
+                    .transition(.move(edge: .trailing))
+                }
             }
             
             if let focusTask = focusOverlayTask {
@@ -279,7 +312,13 @@ struct UnifiedTasksView: View {
                                     task.status = .cancelled
                                     try? modelContext.save()
                                 },
-                                onDeleteTask: deleteTask
+                                onDeleteTask: deleteTask,
+                                onStartFocus: { task in
+                                    requestFocusSession(for: task)
+                                },
+                                onQuickAddTask: { status in
+                                    startCreatingTask(status: status)
+                                }
                             )
                         case .timeline:
                             TaskTimelineView(
@@ -396,27 +435,112 @@ struct UnifiedTasksView: View {
         }
     }
     
-    private func startCreatingTask(dueDate: Date? = nil) {
+    private func startCreatingTask(status: TaskStatus = .todo, dueDate: Date? = nil) {
         guard !isDrawerVisible else { return }
         
-        let newTask = Task(
+        pendingTaskDraft = TaskDraft(
             title: "",
-            notes: nil,
-            status: .todo,
+            notes: "",
+            status: status,
             priority: .medium,
             dueDate: dueDate,
             projectId: nil,
             areaId: nil,
             effort: nil
         )
-        
-        modelContext.insert(newTask)
-        activeTask = newTask
+        activeTask = nil
         isCreatingTask = true
         
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
             isDrawerVisible = true
         }
+    }
+    
+    private func creationDrawerBinding() -> Binding<Bool> {
+        Binding(
+            get: { isDrawerVisible && isCreatingTask },
+            set: { newValue in
+                if !newValue {
+                    pendingTaskDraft = nil
+                    isCreatingTask = false
+                }
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private func editDrawerBinding() -> Binding<Bool> {
+        Binding(
+            get: { isDrawerVisible && !isCreatingTask },
+            set: { newValue in
+                if !newValue {
+                    activeTask = nil
+                }
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+                    isDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private func commitNewTask(from draft: TaskDraft) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedTitle: String
+        if !normalizedTitle.isEmpty {
+            resolvedTitle = normalizedTitle
+        } else if !normalizedNotes.isEmpty {
+            resolvedTitle = String(normalizedNotes.prefix(48))
+        } else {
+            resolvedTitle = "Untitled Task"
+        }
+        
+        let task = Task(
+            title: resolvedTitle,
+            notes: normalizedNotes.isEmpty ? nil : draft.notes,
+            status: draft.status,
+            priority: draft.priority,
+            dueDate: draft.dueDate,
+            projectId: draft.projectId,
+            areaId: draft.areaId,
+            effort: draft.effort
+        )
+        task.linkedEntityIds = draft.linkedEntityIds
+        task.linkedEntityTypes = draft.linkedEntityTypes
+        modelContext.insert(task)
+        try? modelContext.save()
+        
+        pendingTaskDraft = nil
+        isCreatingTask = false
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            isDrawerVisible = false
+        }
+    }
+    
+    private func apply(_ draft: TaskDraft, to task: Task) {
+        let normalizedTitle = draft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNotes = draft.notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if !normalizedTitle.isEmpty {
+            task.title = normalizedTitle
+        } else if !normalizedNotes.isEmpty {
+            task.title = String(normalizedNotes.prefix(48))
+        } else {
+            task.title = "Untitled Task"
+        }
+        
+        task.notes = normalizedNotes.isEmpty ? nil : draft.notes
+        task.status = draft.status
+        task.priority = draft.priority
+        task.dueDate = draft.dueDate
+        task.projectId = draft.projectId
+        task.areaId = draft.areaId
+        task.effort = draft.effort
+        task.linkedEntityIds = draft.linkedEntityIds
+        task.linkedEntityTypes = draft.linkedEntityTypes
+        task.updatedAt = Date()
     }
     
     private func openDrawer(for task: Task) {
