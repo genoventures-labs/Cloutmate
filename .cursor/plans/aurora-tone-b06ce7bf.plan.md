@@ -321,7 +321,6 @@ let imageInstructions = """
 9. Later, user asks "remember that desk photo?"
 10. Aurora recalls: "yeah! that was the wooden desk setup with the MacBook and the warm lighting, right?"
 
-
 ### To-dos
 
 - [x] Add intent cluster extraction method to ConversationArchive

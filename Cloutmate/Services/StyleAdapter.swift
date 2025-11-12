@@ -15,8 +15,37 @@ enum StyleAdapter {
         guard currentStyle != nil || persistentProfile != nil else { return nil }
         let style = currentStyle ?? TypingStyle.neutral
         let updates = persistentProfile?.styleUpdateCount ?? 0
-        let persistentWeight: Double = updates > 0 ? 0.6 : 0.0
-        let currentWeight: Double = 1.0 - persistentWeight
+        let hasHistory = (persistentProfile != nil) && updates > 0
+        var persistentWeight: Double = hasHistory ? 0.5 : 0.0
+        
+        if hasHistory, let profile = persistentProfile {
+            let sampleWordCount = max(0, style.wordCount)
+            let sampleConfidence = min(1.0, Double(sampleWordCount) / 16.0)
+            let reliabilityGuard = 0.6 + (0.4 * (1.0 - sampleConfidence))
+            persistentWeight *= reliabilityGuard
+            
+            let persistentFormality = clamp(profile.formalityScore, min: 0.0, max: 1.0)
+            let persistentEnergy = clamp(profile.energyLevel, min: 0.0, max: 1.0)
+            let formalityGap = persistentFormality - clamp(style.formalityScore, min: 0.0, max: 1.0)
+            
+            if formalityGap > 0.12 {
+                let adjustment = min(0.25, formalityGap * (0.5 + sampleConfidence * 0.3))
+                persistentWeight -= adjustment
+            }
+            
+            if style.formalityScore < 0.35 {
+                let casualBias = 0.35 - style.formalityScore
+                persistentWeight -= min(0.15, casualBias * 0.45)
+            }
+            
+            let energyGap = abs(persistentEnergy - clamp(style.energyLevel, min: 0.0, max: 1.0))
+            if energyGap > 0.25 {
+                persistentWeight -= min(0.1, energyGap * 0.25)
+            }
+        }
+        
+        persistentWeight = clamp(persistentWeight, min: 0.18, max: 0.6)
+        let currentWeight = clamp(1.0 - persistentWeight, min: 0.4, max: 0.82)
         
         let formality = weightedAverage(
             current: style.formalityScore,
@@ -166,6 +195,10 @@ enum StyleAdapter {
     private static func normalizeSentenceLength(_ length: Double) -> Double {
         let clamped = min(max(length, 1.0), 60.0)
         return (clamped - 1.0) / (60.0 - 1.0)
+    }
+    
+    private static func clamp(_ value: Double, min minValue: Double, max maxValue: Double) -> Double {
+        return min(max(value, minValue), maxValue)
     }
 
     private static func resolveCapitalization(

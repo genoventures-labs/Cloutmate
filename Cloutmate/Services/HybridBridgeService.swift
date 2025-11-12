@@ -224,7 +224,8 @@ actor HybridBridgeService {
             userStyleProfile: userStyleProfile,
             confidence: confidence,
             useThinking: routingDecision.useThinking,
-            model: routingDecision.model
+            model: routingDecision.model,
+            initialCasualConversation: routingDecision.isCasual
         )
         
         // Record model usage for cooldown/stickiness
@@ -899,70 +900,19 @@ actor HybridBridgeService {
         conversationMessages: [ConversationMessage]? = nil,
         currentMessageStyle: TypingStyle? = nil,
         userStyleProfile: UserPreferences? = nil,
-        confidence: ConfidenceSnapshot? = nil,
-        apiKey: String?
+        confidence: ConfidenceSnapshot? = nil
     ) async throws -> DocumentAnalysisResult {
-        // Use cloud model gemma3:latest for image analysis - NO FALLBACK
-        guard let apiKey = apiKey, !apiKey.isEmpty else {
-            print("[HybridBridgeService] Image analysis failed: No API key configured")
-            throw HybridBridgeError.authenticationFailed
-        }
-        
-        // Check airplane mode
-        let airplaneMode = UserDefaults.standard.bool(forKey: "com.kosmicapps.cloutmate.airplaneMode")
-        if airplaneMode {
-            print("[HybridBridgeService] Image analysis failed: Airplane mode is enabled")
-            throw HybridBridgeError.networkError("Image analysis requires cloud access. Please disable airplane mode.")
-        }
-        
-        print("[HybridBridgeService] Starting image analysis with gemma3:latest cloud model")
-        
-        // Encode image to base64
-        let base64Image = imageData.base64EncodedString()
-        print("[HybridBridgeService] Image encoded to base64 (\(base64Image.count) chars)")
-        
-        // Build prompt with context (reuse OllamaBridgeService's prompt building logic)
-        let promptText = userPrompt ?? "Analyze this image and describe what you see. Be detailed and conversational."
-        
-        // Build system prompt with app context
-        let systemPrompt = buildSystemPromptWithAppContext(
+        return try await OllamaBridgeService.shared.analyzeImage(
+            imageData: imageData,
+            mimeType: mimeType,
+            userPrompt: userPrompt,
             appContext: appContext,
             payloadContext: payloadContext,
-            confidence: confidence,
+            conversationMessages: conversationMessages,
             currentMessageStyle: currentMessageStyle,
-            userStyleProfile: userStyleProfile
+            userStyleProfile: userStyleProfile,
+            confidence: confidence
         )
-        
-        // Build conversation history
-        let historyText = buildConversationHistoryText(from: conversationMessages ?? [])
-        
-        let fullPrompt = historyText.isEmpty ?
-            "\(systemPrompt)\n\nUser: \(promptText)\n\nAurora:" :
-            "\(systemPrompt)\n\n\(historyText)\n\nUser: \(promptText)\n\nAurora:"
-        
-        // Use gemma3:latest cloud model for vision tasks - NO FALLBACK
-        do {
-            print("[HybridBridgeService] Making cloud request to gemma3:latest with image")
-            print("[HybridBridgeService] Request URL: \(cloudBaseURL)/chat/completions")
-            
-            let response = try await makeCloudRequest(
-                model: "gemma3:latest",
-                prompt: fullPrompt,
-                apiKey: apiKey,
-                timeout: 600.0, // 10 minutes for image analysis (vision models can be slow)
-                images: [base64Image]
-            )
-            
-            print("[HybridBridgeService] Image analysis successful")
-            return DocumentAnalysisResult(
-                summary: response.trimmingCharacters(in: .whitespacesAndNewlines),
-                truncatedContext: false,
-                sourceModel: .ollama // Using .ollama for cloud Ollama API
-            )
-        } catch {
-            print("[HybridBridgeService] Image analysis failed: \(error.localizedDescription)")
-            throw error
-        }
     }
 }
 

@@ -206,7 +206,7 @@ struct AIAssistantSection: View {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundColor(.green)
                     .font(.caption)
-                Text("Aurora automatically selects the best model for each task. Vision tasks use Gemini 2.5 Flash (cloud), coding tasks use qwen2.5-coder:1.5b, regular chat uses granite3.2:2b.")
+                Text("Aurora automatically selects the best model for each task. Gemma3 handles all chat and images, Gwen3 steps in for deep reasoning, and Granite quietly maintains memory and context.")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

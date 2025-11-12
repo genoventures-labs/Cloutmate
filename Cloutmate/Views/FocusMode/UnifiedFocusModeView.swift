@@ -119,12 +119,20 @@ struct UnifiedFocusModeView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .startPendingFocusSession)) { notification in
             // Handle pending session from task/project cards
-            // Open drawer with pre-filled values instead of starting immediately
             if let params = notification.object as? PendingFocusSessionParams {
                 pendingSessionParams = params
-                // Pre-fill the drawer with the pending session params
                 objective = params.objective
                 selectedDuration = params.plannedDuration
+                if params.shouldAutoStart, activeSession == nil {
+                    startSession(
+                        objective: params.objective,
+                        duration: params.plannedDuration,
+                        targetObjectId: params.targetObjectId,
+                        targetObjectType: params.targetObjectType,
+                        reflectAfterSession: reflectAfterSession
+                    )
+                    pendingSessionParams = nil
+                }
                 // Only open drawer if we're already on the Focus Mode tab
                 // Don't auto-open when switching tabs - let user manually start
             }

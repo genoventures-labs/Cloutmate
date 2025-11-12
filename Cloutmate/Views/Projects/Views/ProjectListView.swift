@@ -416,7 +416,8 @@ struct ProjectListCard: View {
             objective: project.title,
             plannedDuration: focusDuration,
             targetObjectId: project.id,
-            targetObjectType: "project"
+            targetObjectType: "project",
+            shouldAutoStart: true
         )
         
         // Post session parameters first (will be stored as pending)

@@ -1,7 +1,383 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-12T02:29:26.939708Z",
+  "lastUpdated": "2025-11-12T13:08:43.970379Z",
   "entries": [
+    {
+      "id": "44973e67-fe84-43fe-9c79-70e0d6c997c1",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Notification+Names",
+      "changeType": "modified",
+      "description": "Updated Notification+Names",
+      "impact": "Affects Notification+Names functionality",
+      "userFacing": false,
+      "tags": [],
+      "commitHash": null
+    },
+    {
+      "id": "80850f40-d9ed-4abd-b6e8-e3e378caf31e",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Aisettings",
+      "changeType": "improved",
+      "description": "Improved Aisettings",
+      "impact": "Enhances Aisettings performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "6748919a-1d5a-470b-b39e-a5f51464c6c2",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Model Tier Map",
+      "changeType": "improved",
+      "description": "Represents a local model tier with its capabilities",
+      "impact": "Enhances Model Tier Map performance or features",
+      "userFacing": false,
+      "tags": [
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "9743c192-e59f-4f0e-823f-7122e81ec015",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Airecall",
+      "changeType": "improved",
+      "description": "Focus session context for AI payload",
+      "impact": "Enhances Airecall performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "ollama",
+        "backend",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "304cc5cd-1cd0-4387-ae2a-9c5bbaf021f2",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Aurora System Prompt Builder",
+      "changeType": "modified",
+      "description": "Updated Aurora System Prompt Builder",
+      "impact": "Affects Aurora System Prompt Builder functionality",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend",
+        "system-prompt",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "034ff5bf-783f-4d5b-8577-780f8e161d45",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Contextual Adaptation",
+      "changeType": "improved",
+      "description": "Get time-of-day awareness",
+      "impact": "Enhances Contextual Adaptation performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2a4cff43-8b03-4beb-8c96-ba97350a92b2",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Conversational Quirks",
+      "changeType": "improved",
+      "description": "Inject verbal fillers into system prompt based on confidence",
+      "impact": "Enhances Conversational Quirks performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7921bc85-a785-40e3-8f08-67a8319650ac",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Core Response",
+      "changeType": "improved",
+      "description": "Converts AIMessage array to ConversationMessage array",
+      "impact": "Enhances Core Response performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "ollama",
+        "backend",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bfda38f0-30e0-4f50-8cd9-11771264db1e",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Hybrid Bridge",
+      "changeType": "modified",
+      "description": "Fetch available models from Ollama Cloud API",
+      "impact": "Affects Hybrid Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend",
+        "system-prompt",
+        "ollama",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "72a8a52c-24ae-4841-bca3-c86ff4306ca4",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Language Personality",
+      "changeType": "improved",
+      "description": "Enhance system prompt with natural language instructions",
+      "impact": "Enhances Language Personality performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "ffc5ecbe-ba75-4486-bf40-e13d36114a9b",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Model Routing Engine",
+      "changeType": "improved",
+      "description": "Selects the best model for a given input with casual detection and cooldown",
+      "impact": "Enhances Model Routing Engine performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend",
+        "concurrency",
+        "model"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "8d7718ca-a348-4dc4-89a8-59710131bec4",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend",
+        "system-prompt",
+        "ollama",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "d2b2838a-e7a2-4453-8275-bd71c06e395a",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Personality Quirks",
+      "changeType": "improved",
+      "description": "Improved Personality Quirks",
+      "impact": "Enhances Personality Quirks performance or features",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "af87898f-c468-4856-8ed0-baf653f8b4bf",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Style Adapter",
+      "changeType": "improved",
+      "description": "Improved Style Adapter",
+      "impact": "Enhances Style Adapter performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b8ccdea4-75db-4a59-a506-73f8b7be5a1d",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Style Analyzer",
+      "changeType": "improved",
+      "description": "Improved Style Analyzer",
+      "impact": "Enhances Style Analyzer performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "fc9e8a3c-891a-4248-88ef-5cafb53f309f",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Converts structured execution results to conversational format",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "ui",
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "71eb9495-3610-403b-8f76-b42a6b53af35",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Aiassistant Preferences Sheet",
+      "changeType": "modified",
+      "description": "Updated Aiassistant Preferences Sheet",
+      "impact": "Affects Aiassistant Preferences Sheet functionality",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "c0f61d10-e657-4c4c-923e-87e0eba53cd3",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Focus Mode",
+      "changeType": "improved",
+      "description": "Improved Focus Mode",
+      "impact": "Enhances Focus Mode performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7c103af4-7381-46fa-93ab-e48cabfe39b7",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Unified Focus Mode",
+      "changeType": "improved",
+      "description": "Improved Unified Focus Mode",
+      "impact": "Enhances Unified Focus Mode performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "fb33258d-e41a-4c3b-8697-5c03ab99d991",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Unified Projects",
+      "changeType": "improved",
+      "description": "Improved Unified Projects",
+      "impact": "Enhances Unified Projects performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "874ba489-a5d8-4724-8a04-5c8edaf0377c",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Project List",
+      "changeType": "improved",
+      "description": "Improved Project List",
+      "impact": "Enhances Project List performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "0f522e57-a480-4eda-b779-9401b5844220",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Aiassistant Section",
+      "changeType": "improved",
+      "description": "Improved Aiassistant Section",
+      "impact": "Enhances Aiassistant Section performance or features",
+      "userFacing": false,
+      "tags": [
+        "frontend",
+        "ollama",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "a9af86fa-21ed-413b-b243-046bb5338cb9",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Settings",
+      "changeType": "improved",
+      "description": "Improved Settings",
+      "impact": "Enhances Settings performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "714cfc88-afd8-4ed4-8f74-682de79ccef8",
+      "date": "2025-11-12T13:08:43.959512Z",
+      "version": "0.8",
+      "feature": "Unified Tasks",
+      "changeType": "improved",
+      "description": "Improved Unified Tasks",
+      "impact": "Enhances Unified Tasks performance or features",
+      "userFacing": true,
+      "tags": [
+        "frontend",
+        "ui"
+      ],
+      "commitHash": null
+    },
     {
       "id": "128cf604-852c-44c6-8667-186effbfc703",
       "date": "2025-11-12T02:29:26.934583Z",
@@ -15,7 +391,7 @@
         "data",
         "model"
       ],
-      "commitHash": null
+      "commitHash": "adf9ed345bd3ad324a792dd984ffb7dc10967447"
     },
     {
       "id": "1c3a5d6a-9db0-449c-85c5-1f33e2b7115e",

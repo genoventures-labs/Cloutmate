@@ -16,6 +16,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @StateObject private var themeManager = ReactiveThemeManager.shared
+    @State private var contextGuardEnabled = ContextGuardSettings.shared.isGuardEnabled
     
     var body: some View {
         ScrollView {
@@ -238,7 +239,19 @@ struct SettingsView: View {
                         Text("Adaptive scheduling, calendar sync, and guardrails for focus transitions")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        
+                        Toggle(isOn: $contextGuardEnabled) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Context switch guard")
+                                    .font(.subheadline.weight(.semibold))
+                                Text(contextGuardEnabled ? "Aurora will pause and double-check before you switch tabs." : "Switch tabs instantly without prompts.")
+                                    .font(.footnote)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: contextGuardEnabled) { _, newValue in
+                            ContextGuardSettings.shared.isGuardEnabled = newValue
+                        }
                         NavigationLink {
                             TemporalIntelligenceSettingsView()
                                 .navigationTitle("Temporal Intelligence")

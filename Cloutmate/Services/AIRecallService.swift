@@ -37,6 +37,13 @@ struct RecallSnippetWithTemporalContext: Identifiable, Hashable, Sendable {
     var id: UUID { snippet.id }
 }
 
+enum ConversationIntent: String, Sendable {
+    case social
+    case work
+    case reflection
+    case none
+}
+
 // MARK: - Adaptive Context Contract
 
 struct AIPayloadContext: Sendable {
@@ -51,6 +58,7 @@ struct AIPayloadContext: Sendable {
     var intentClusters: IntentClusterSummary?
     var conversationBreadcrumbs: ConversationBreadcrumbs?
     var cognitiveHealth: CognitiveHealthSnapshot?
+    var intent: ConversationIntent?
     var metadata: [String: String]
     
     init(
@@ -65,6 +73,7 @@ struct AIPayloadContext: Sendable {
         intentClusters: IntentClusterSummary? = nil,
         conversationBreadcrumbs: ConversationBreadcrumbs? = nil,
         cognitiveHealth: CognitiveHealthSnapshot? = nil,
+        intent: ConversationIntent? = nil,
         metadata: [String: String] = [:]
     ) {
         self.recall = recall
@@ -78,6 +87,7 @@ struct AIPayloadContext: Sendable {
         self.intentClusters = intentClusters
         self.conversationBreadcrumbs = conversationBreadcrumbs
         self.cognitiveHealth = cognitiveHealth
+        self.intent = intent
         self.metadata = metadata
     }
     

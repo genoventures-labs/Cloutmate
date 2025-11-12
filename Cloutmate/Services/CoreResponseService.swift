@@ -93,7 +93,8 @@ actor CoreResponseService {
                 userStyleProfile: userStyleProfile,
                 confidence: confidence,
                 useThinking: routingDecision.useThinking,
-                model: routingDecision.model
+                model: routingDecision.model,
+                initialCasualConversation: routingDecision.isCasual
             )
             
             // Record model usage for cooldown/stickiness
@@ -162,22 +163,8 @@ actor CoreResponseService {
         userStyleProfile: UserPreferences? = nil,
         confidence: ConfidenceSnapshot? = nil
     ) async throws -> DocumentAnalysisResult {
-        // Use Gemini 2.5 Flash for image analysis - STRICTLY GEMINI, NO FALLBACK
-        let apiKey = await MainActor.run {
-            AISettings.shared.googleAPIKey
-        }
-        
-        print("[CoreResponseService] Image analysis requested - Google API Key present: \(apiKey != nil && !apiKey!.isEmpty)")
-        
-        guard let apiKey = apiKey, !apiKey.isEmpty else {
-            let errorMsg = "Image analysis requires Google API key. Please configure it in Config.plist (GoogleAPIKey)."
-            print("[CoreResponseService] Image analysis failed: \(errorMsg)")
-            throw CoreResponseError.notImplemented(errorMsg)
-        }
-        
-        // Use Gemini 2.5 Flash via GeminiService - NO FALLBACK
-        print("[CoreResponseService] Routing image analysis to GeminiService (gemini-2.5-flash)")
-        return try await GeminiService.shared.analyzeImage(
+        print("[CoreResponseService] Routing image analysis to Gemma3 via Ollama")
+        return try await hybridBridge.analyzeImage(
             imageData: imageData,
             mimeType: mimeType,
             userPrompt: userPrompt,
@@ -186,8 +173,7 @@ actor CoreResponseService {
             conversationMessages: conversationMessages,
             currentMessageStyle: currentMessageStyle,
             userStyleProfile: userStyleProfile,
-            confidence: confidence,
-            apiKey: apiKey
+            confidence: confidence
         )
     }
     

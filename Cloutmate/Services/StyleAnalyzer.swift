@@ -48,7 +48,7 @@ enum StyleAnalyzer {
         "lol", "haha", "omg", "tbh", "idk", "btw", "brb", "gonna", "wanna",
         "kinda", "sorta", "dude", "buddy", "hey", "yo", "sup", "nah",
         "yeah", "yep", "y'all", "luv", "thx", "thanks", "pls", "plz",
-        "haha", "hehe", "ya"
+        "haha", "hehe", "ya", "xd", "lmao", "rofl"
     ]
     
     private static let formalLexicon: Set<String> = [
@@ -71,6 +71,16 @@ enum StyleAnalyzer {
         0x1F900...0x1F9FF, // Supplemental Symbols and Pictographs
         0x1FA70...0x1FAFF  // Symbols and Pictographs Extended-A
     ]
+    private static let textualEmojiPatterns: [String] = [
+        "xd",
+        ":p", ":-p", ";p", ";-p",
+        ":d", ":-d",
+        ":)", ":-)", ";)", ";-)",
+        ":(", ":-(",
+        ":3", ":-3",
+        "<3",
+        "lol"
+    ]
     
     static func analyzeStyle(text: String) -> TypingStyle {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,7 +96,9 @@ enum StyleAnalyzer {
         let sentences = splitSentences(trimmed)
         let averageSentenceLength = averageSentenceWordCount(sentences: sentences, tokens: tokens)
         
-        let emojiCount = countEmojis(in: trimmed)
+        let unicodeEmojiCount = countEmojis(in: trimmed)
+        let textualEmojiCount = countTextualEmojis(in: trimmed)
+        let emojiCount = unicodeEmojiCount + textualEmojiCount
         let emojiUsageFrequency = wordCount > 0 ? Double(emojiCount) / Double(max(wordCount, 1)) : 0.0
         
         let contractionCount = countContractions(in: lowercased)
@@ -121,7 +133,8 @@ enum StyleAnalyzer {
             questionFrequency: questionFrequency,
             averageSentenceLength: averageSentenceLength,
             uppercaseRatio: uppercaseRatio,
-            wordCount: wordCount
+            wordCount: wordCount,
+            emojiDensity: emojiUsageFrequency
         )
         
         return TypingStyle(
@@ -183,6 +196,18 @@ enum StyleAnalyzer {
         }
     }
     
+    private static func countTextualEmojis(in text: String) -> Int {
+        guard !text.isEmpty else { return 0 }
+        let normalized = text.lowercased()
+        var total = 0
+        for pattern in textualEmojiPatterns {
+            let trimmedPattern = pattern.replacingOccurrences(of: " ", with: "")
+            if trimmedPattern.isEmpty { continue }
+            total += max(0, normalized.components(separatedBy: trimmedPattern).count - 1)
+        }
+        return total
+    }
+    
     private static func countContractions(in text: String) -> Int {
         guard !text.isEmpty else { return 0 }
         var result = 0
@@ -232,12 +257,14 @@ enum StyleAnalyzer {
         questionFrequency: Double,
         averageSentenceLength: Double,
         uppercaseRatio: Double,
-        wordCount: Int
+        wordCount: Int,
+        emojiDensity: Double
     ) -> Double {
         let punctuationSignal = min(1.0, (punctuationDensity * 0.7) + (exclamationFrequency * 3.0) + (questionFrequency * 2.5))
         let sentenceLengthSignal = 1.0 - min(1.0, averageSentenceLength / 25.0)
         let uppercaseSignal = min(1.0, uppercaseRatio * 1.5)
-        var energy = (punctuationSignal * 0.45) + (sentenceLengthSignal * 0.35) + (uppercaseSignal * 0.2)
+        let emojiSignal = min(1.0, emojiDensity * 4.0)
+        var energy = (punctuationSignal * 0.4) + (sentenceLengthSignal * 0.32) + (uppercaseSignal * 0.16) + (emojiSignal * 0.12)
         if wordCount < 6 {
             energy = (energy * 0.6) + 0.2
         }

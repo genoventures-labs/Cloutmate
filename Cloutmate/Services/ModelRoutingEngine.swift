@@ -8,6 +8,12 @@
 import Foundation
 import SwiftData
 
+struct ModelRoutingDecision {
+    let model: String
+    let useThinking: Bool
+    let isCasual: Bool
+}
+
 actor ModelRoutingEngine {
     static let shared = ModelRoutingEngine()
     
@@ -29,7 +35,7 @@ actor ModelRoutingEngine {
         messageLength: Int,
         userStyle: TypingStyle?,
         conversationId: UUID?
-    ) async -> (model: String, useThinking: Bool) {
+    ) async -> ModelRoutingDecision {
         // Determine if this is casual
         let isCasual = await CasualConversationDetector.shared.isCasual(
             input: input,
@@ -43,7 +49,11 @@ actor ModelRoutingEngine {
             // If a model has active cooldown, use it (maintains continuity)
             let isShortQuery = messageLength < 80
             let useThinking = ModelTierMap.supportsThinking(model) && !isCasual && !isShortQuery
-            return (model, useThinking)
+            return ModelRoutingDecision(
+                model: model,
+                useThinking: useThinking,
+                isCasual: isCasual
+            )
         }
         
         // No active cooldown - determine model based on conversation type
@@ -54,19 +64,21 @@ actor ModelRoutingEngine {
         let isShortQuery = messageLength < 80
         
         if isCasual || isShortQuery {
-            // Casual or short → Qwen3, no thinking
             selectedModel = ModelTierMap.defaultModel()
             useThinking = false
         } else {
-            // Non-casual → Qwen3 with thinking
-            selectedModel = ModelTierMap.defaultModel()
+            selectedModel = ModelTierMap.thinkingModel()
             useThinking = true
         }
         
         // Activate cooldown for selected model
         activateCooldown(for: selectedModel)
         
-        return (selectedModel, useThinking)
+        return ModelRoutingDecision(
+            model: selectedModel,
+            useThinking: useThinking,
+            isCasual: isCasual
+        )
     }
     
     /// Activates cooldown/stickiness for a model

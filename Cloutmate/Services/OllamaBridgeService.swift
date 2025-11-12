@@ -130,7 +130,7 @@ actor OllamaBridgeService {
     static let shared = OllamaBridgeService()
     
     private let baseURL = "http://localhost:11434"
-    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (qwen3:1.7b)
+    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (gemma3:4b)
     private var previousModel: String? // Track previous model for switch notifications
     private var cachedAvailableModels: [String] = [] // Cache available models
     private var lastModelFetch: Date?
@@ -156,16 +156,24 @@ actor OllamaBridgeService {
     private let changelogService = AuroraChangelogService.shared
     private let promptBuilder = AuroraSystemPromptBuilder.shared
     private var hasAnnouncedPatchNotes: Bool = false
+    // Granite handles silent cognition (memory graph, tagging) while Gemma/Gwen stay user-facing
+    private let backgroundModelName = ModelTierMap.backgroundModel()
+    private var hasPreWarmedBackgroundModel = false
+    private var isPreWarmingBackgroundModel = false
     
     private init() {
         // Prepare schema document for prompts
         schemaDocument = SchemaIntrospector.generateSchemaDocument()
-        // Use default model from routing engine (qwen3:1.7b)
+        // Use default model from routing engine (gemma3:4b)
         currentModel = ModelTierMap.defaultModel()
         print("[OllamaBridgeService] Initialized with default model: \(currentModel)")
         // Pre-warm the default model
         _Concurrency.Task {
             await preWarmModel()
+        }
+        // Pre-warm background Granite model for silent inference tasks
+        _Concurrency.Task {
+            await preWarmBackgroundModel()
         }
     }
     
@@ -246,6 +254,76 @@ actor OllamaBridgeService {
         }
     }
     
+    /// Pre-warms the background model used for silent inference tasks
+    private func preWarmBackgroundModel() async {
+        guard !hasPreWarmedBackgroundModel, !isPreWarmingBackgroundModel else { return }
+        isPreWarmingBackgroundModel = true
+        defer { isPreWarmingBackgroundModel = false }
+        
+        // Give Ollama a moment to start before attempting background warmup
+        try? await _Concurrency.Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+        
+        let isAvailable = await checkOllamaAvailability()
+        if !isAvailable {
+            print("[OllamaBridgeService] Skipping background pre-warm: Ollama not available")
+            return
+        }
+        
+        // Quick readiness check
+        do {
+            guard let url = URL(string: "\(baseURL)/api/tags") else { return }
+            var request = URLRequest(url: url)
+            request.httpMethod = "GET"
+            request.timeoutInterval = 2.0
+            
+            let (_, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                print("[OllamaBridgeService] Background model tags check not ready, skipping pre-warm")
+                return
+            }
+        } catch {
+            print("[OllamaBridgeService] Background tags check failed, skipping pre-warm: \(error.localizedDescription)")
+            return
+        }
+        
+        // Make a tiny request to load the background model into memory
+        let wasFirstRequest = isFirstRequest
+        if wasFirstRequest {
+            isFirstRequest = false
+        }
+        defer {
+            if wasFirstRequest {
+                isFirstRequest = true
+            }
+        }
+        
+        do {
+            let pingPrompt = "Background model readiness check."
+            let result = try await makeOllamaRequest(
+                prompt: pingPrompt,
+                useThinking: false,
+                model: backgroundModelName
+            )
+            
+            if !result.response.isEmpty {
+                hasPreWarmedBackgroundModel = true
+                print("[OllamaBridgeService] Background model '\(backgroundModelName)' pre-warmed successfully.")
+            }
+        } catch let urlError as URLError {
+            hasPreWarmedBackgroundModel = false
+            if urlError.code != .cannotConnectToHost &&
+                !urlError.localizedDescription.contains("Connection refused") {
+                print("[OllamaBridgeService] Background pre-warm failed (non-fatal): \(urlError.localizedDescription)")
+            } else {
+                print("[OllamaBridgeService] Background pre-warm skipped: Ollama not running")
+            }
+        } catch {
+            hasPreWarmedBackgroundModel = false
+            print("[OllamaBridgeService] Background pre-warm failed (non-fatal): \(error.localizedDescription)")
+        }
+    }
+    
     /// Sets the current model (internal use only - for automatic switching during image/document tasks)
     private func setModel(_ model: String) {
         currentModel = model
@@ -261,7 +339,7 @@ actor OllamaBridgeService {
     ) async -> String {
         // Always use default model for regular chat - model switching is disabled
         // This function is kept for potential future use but currently returns default
-        return "granite3.2:2b"
+        return ModelTierMap.defaultModel()
     }
     
     /// Determines if task requires specialized model capabilities
@@ -351,6 +429,8 @@ actor OllamaBridgeService {
             .replacingOccurrences(of: "mistral", with: "Mistral ")
             .replacingOccurrences(of: "qwen2.5-coder", with: "Qwen2.5 Coder")
             .replacingOccurrences(of: "qwen", with: "Qwen ")
+            .replacingOccurrences(of: "gwen", with: "Gwen ")
+            .replacingOccurrences(of: "gemma", with: "Gemma ")
             .replacingOccurrences(of: "code", with: "Code ")
             .replacingOccurrences(of: "coder", with: "Coder")
             .capitalized
@@ -425,7 +505,7 @@ actor OllamaBridgeService {
         
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.timeoutInterval = 3.0 // Reduced timeout for faster failure
+        request.timeoutInterval = 10.0
         
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -433,6 +513,17 @@ actor OllamaBridgeService {
             lastAvailabilityCheck = Date()
             isAvailableCache = isAvailable
             return isAvailable
+        } catch let urlError as URLError {
+            lastAvailabilityCheck = Date()
+            if urlError.code == .timedOut {
+                print("[OllamaBridgeService] Availability check timed out – assuming Ollama is warming up")
+                if isAvailableCache || hasPreWarmedBackgroundModel || !isFirstRequest {
+                    isAvailableCache = true
+                    return true
+                }
+            }
+            isAvailableCache = false
+            return false
         } catch {
             lastAvailabilityCheck = Date()
             isAvailableCache = false
@@ -565,7 +656,8 @@ Aurora:
         userStyleProfile: UserPreferences? = nil,
         confidence: ConfidenceSnapshot? = nil,
         useThinking: Bool = false,
-        model: String? = nil
+        model: String? = nil,
+        initialCasualConversation: Bool = false
     ) async throws -> (response: String, thinking: String?, modelUsed: String) {
         // Check availability first
         guard await checkOllamaAvailability() else {
@@ -577,6 +669,8 @@ Aurora:
         var modelSwitchNotification = ""
         var modelToUse: String
         var useThinkingForModel: Bool
+        
+        var isCasualConversation = initialCasualConversation
         
         if let providedModel = model {
             // Use provided model from routing engine
@@ -608,6 +702,7 @@ Aurora:
             
             modelToUse = routingDecision.model
             useThinkingForModel = routingDecision.useThinking
+            isCasualConversation = routingDecision.isCasual
             
             print("[OllamaBridgeService] Routing engine selected: \(modelToUse), thinking: \(useThinkingForModel)")
             
@@ -665,7 +760,13 @@ Aurora:
             }
         }
         
+        // Apply social intent detection and contextual toggles
+        var resolvedPayloadContext = payloadContext
+        detectSocialIntent(in: input, payloadContext: &resolvedPayloadContext)
+        
         // Initialize humanization services and get contextual adaptations on MainActor
+        let casualConversation = isCasualConversation
+        let includeWorkloadCues = shouldIncludeWorkloadCues(for: input, payloadContext: resolvedPayloadContext)
         let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
             let languagePersonality = LanguagePersonalityService.shared
             let conversationalQuirks = ConversationalQuirksService.shared
@@ -677,13 +778,13 @@ Aurora:
             // Get contextual adaptations
             let timeContext = contextualAdaptation.getTimeOfDayContext()
             let userEnergy = currentMessageStyle?.energyLevel ?? 0.5
-            let workload = WorkloadLevel.moderate // Default until we can pass ModelContext
+            let workload = workloadLevel(from: resolvedPayloadContext)
             
             // Determine formality level
             let formalityLevel = userStyleProfile?.formalityScore ?? currentMessageStyle?.formalityScore ?? 0.5
             
             // Enhance tone instructions with humanization services
-            let enhancedToneInstructions: String
+            var enhancedToneInstructions: String
             if let styleText = StyleAdapter.instructions(currentStyle: currentMessageStyle, persistentProfile: userStyleProfile) {
                 // Enhance with language personality
                 let enhancedStyleText = languagePersonality.enhanceSystemPrompt(styleText, formalityLevel: formalityLevel)
@@ -697,6 +798,9 @@ Aurora:
 \(enhancedStyleText)
 \(quirksText)
 - Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
+- Default to a conversational ChatGPT-like voice: warm, natural, and curious.
+- When the user pivots into planning or structure, move into organized guidance while staying conversational and human. Never sound robotic.
+- Keep your productivity intelligence active in the background so you can surface next steps naturally when it helps.
 - CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
 - Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
 - Maintain Aurora's supportive personality and clarity while mirroring the user's vibe.
@@ -710,18 +814,34 @@ Aurora:
 - Default to a friendly, encouraging tone; mirror the user's energy level (relaxed vs focused) when evident.
 - Use natural contractions and approachable phrasing.
 - Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
+- Default to a conversational ChatGPT-like voice: warm, natural, and curious.
+- When the user pivots into planning or structure, move into organized guidance while staying conversational and human. Never sound robotic.
+- Keep your productivity intelligence active in the background so you can surface next steps naturally when it helps.
 - CRITICAL: Never use em-dashes (—) at all. Use commas, periods, or parentheses for asides and breaks. This is essential for Aurora's natural humanization.
 - Use your humanization implementations (LanguagePersonalityService, ConversationalQuirksService, PersonalityQuirksService) to make your responses feel authentically human and conversational.
 - Never copy typos or offensive language; keep it respectful and aligned with platform norms.
 """
             }
             
-            let personalityInstructions = personalityQuirks.enhancePromptWithPersonality("")
+            if casualConversation {
+                enhancedToneInstructions += "\n- This is a casual check-in—keep it playful and skip productivity pushes unless the user pivots."
+            }
+            
+            let personalityContext = buildPersonalityToneContext(
+                input: input,
+                style: currentMessageStyle,
+                userEnergy: userEnergy,
+                isCasualConversation: casualConversation
+            )
+            let personalityInstructions = personalityQuirks.buildPersonalityInstructions(context: personalityContext)
             let selfAwarenessInstructions = selfAwareness.generateSelfAwarenessInstructions()
             let contextualInstructions = contextualAdaptation.generateContextualInstructions(
                 timeContext: timeContext,
                 userEnergy: userEnergy,
-                workload: workload
+                workload: workload,
+                isCasualConversation: casualConversation,
+                includeWorkloadCues: includeWorkloadCues,
+                conversationIntent: resolvedPayloadContext?.intent
             )
             
             // Add response pattern instructions
@@ -736,7 +856,7 @@ Aurora:
             
             // Add memory behavior instructions if we have recall context
             var memoryInstructions = ""
-            if let recall = payloadContext?.recall, !recall.isEmpty {
+            if let recall = resolvedPayloadContext?.recall, !recall.isEmpty {
                 memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n- Prioritize emotional memories over routine tasks\n- If memory details are fuzzy, acknowledge it gracefully"
             }
             
@@ -744,8 +864,8 @@ Aurora:
         }
         
         // Extract enabled phases and features from payload context metadata
-        let enabledPhases = extractEnabledPhases(from: payloadContext)
-        let enabledFeatures = extractEnabledFeatures(from: payloadContext)
+        let enabledPhases = extractEnabledPhases(from: resolvedPayloadContext)
+        let enabledFeatures = extractEnabledFeatures(from: resolvedPayloadContext)
         
         // Get current commit hash for version tracking
         let commitHash = getCurrentCommitHash()
@@ -753,7 +873,7 @@ Aurora:
         // Build enhanced system prompt using AuroraSystemPromptBuilder
         let (systemPrompt, promptVersionId) = await promptBuilder.buildSystemPrompt(
             appContext: appContext,
-            payloadContext: payloadContext,
+            payloadContext: resolvedPayloadContext,
             confidence: confidence,
             enhancedToneInstructions: enhancedToneInstructions,
             personalityInstructions: personalityInstructions,
@@ -771,8 +891,13 @@ Aurora:
         
         // Add payload context if present (formatted separately)
         var finalSystemPrompt = systemPrompt
-        if let payloadContext, !payloadContext.recall.isEmpty || !payloadContext.priorities.isEmpty || !payloadContext.feedback.isEmpty || payloadContext.narrativeSummary != nil || payloadContext.intentClusters != nil {
-            finalSystemPrompt += "\n\nAdaptive intelligence payload:\n\(formatPayloadContext(payloadContext))"
+        if let resolvedPayloadContext,
+           (!resolvedPayloadContext.recall.isEmpty ||
+            !resolvedPayloadContext.priorities.isEmpty ||
+            !resolvedPayloadContext.feedback.isEmpty ||
+            resolvedPayloadContext.narrativeSummary != nil ||
+            resolvedPayloadContext.intentClusters != nil) {
+            finalSystemPrompt += "\n\nAdaptive intelligence payload:\n\(formatPayloadContext(resolvedPayloadContext))"
         }
         
         // Add recent changelog updates (last 14 days, user-facing only)
@@ -1174,6 +1299,45 @@ Aurora:
         }
     }
     
+    private func ensureBackgroundModelReady() async {
+        if hasPreWarmedBackgroundModel {
+            return
+        }
+        await preWarmBackgroundModel()
+    }
+    
+    private func withBackgroundModel<T>(_ operation: () async throws -> T) async rethrows -> T {
+        let wasFirstRequest = isFirstRequest
+        if wasFirstRequest {
+            isFirstRequest = false
+        }
+        defer {
+            if wasFirstRequest {
+                isFirstRequest = true
+            }
+        }
+        return try await operation()
+    }
+    
+    private func runBackgroundPrompt(
+        _ prompt: String,
+        allowThinking: Bool = false
+    ) async throws -> (response: String, thinking: String?) {
+        await ensureBackgroundModelReady()
+        return try await withBackgroundModel {
+            try await makeOllamaRequest(
+                prompt: prompt,
+                useThinking: allowThinking,
+                model: backgroundModelName
+            )
+        }
+    }
+    
+    private func runBackgroundPromptText(_ prompt: String) async throws -> String {
+        let result = try await runBackgroundPrompt(prompt)
+        return result.response
+    }
+    
     // MARK: - Helper Methods for Prompt Building
     
     private func extractEnabledPhases(from payloadContext: AIPayloadContext?) -> [Int] {
@@ -1331,36 +1495,424 @@ Aurora:
     
     // MARK: - Text Normalization
     
-    /// Normalizes text spacing by ensuring proper spaces after punctuation marks
+    /// Normalizes text spacing by ensuring proper spaces appear after sentence-ending punctuation.
+    /// Handles edge cases like closing quotes, parentheses, ellipses, and decimal numbers.
     nonisolated private func normalizeTextSpacing(_ text: String) -> String {
-        var result = text
-        // Pattern to match punctuation followed by a letter (no space between)
-        let pattern = "([.!?])([A-Za-z])"
-        let regex = try? NSRegularExpression(pattern: pattern, options: [])
+        guard !text.isEmpty else { return text }
         
-        if let regex = regex {
-            let nsString = result as NSString
-            let matches = regex.matches(in: result, options: [], range: NSRange(location: 0, length: nsString.length))
+        let characters = Array(text)
+        var result: [Character] = []
+        let spacingPunctuation: Set<Character> = [".", "!", "?"]
+        let closingDelimiters: Set<Character> = ["\"", "'", "”", "’", ")", "]", "}"]
+        
+        var index = 0
+        while index < characters.count {
+            let char = characters[index]
+            result.append(char)
             
-            // Process matches in reverse to maintain correct indices
-            for match in matches.reversed() {
-                let fullRange = match.range(at: 0)
-                let punctuationRange = match.range(at: 1)
-                let letterRange = match.range(at: 2)
+            if spacingPunctuation.contains(char) {
+                let previousChar: Character? = index > 0 ? characters[index - 1] : nil
+                var lookaheadIndex = index + 1
                 
-                guard punctuationRange.location != NSNotFound,
-                      letterRange.location != NSNotFound else { continue }
+                // Skip ellipses (e.g., "..." or "..")
+                if char == "." {
+                    let nextDot = lookaheadIndex < characters.count ? characters[lookaheadIndex] : nil
+                    if nextDot == "." || previousChar == "." {
+                        index += 1
+                        continue
+                    }
+                }
                 
-                let punctuation = nsString.substring(with: punctuationRange)
-                let letter = nsString.substring(with: letterRange)
+                // Skip if punctuation is part of a decimal number
+                if char == ".",
+                   let prev = previousChar, prev.isNumber,
+                   lookaheadIndex < characters.count, characters[lookaheadIndex].isNumber {
+                    index += 1
+                    continue
+                }
                 
-                // Replace punctuation + letter with punctuation + space + letter
-                let replacement = "\(punctuation) \(letter)"
-                result = (result as NSString).replacingCharacters(in: fullRange, with: replacement)
+                // If already followed by whitespace, nothing to do
+                if lookaheadIndex < characters.count,
+                   characters[lookaheadIndex].isWhitespace {
+                    index += 1
+                    continue
+                }
+                
+                // Consume closing delimiters immediately following the punctuation
+                while lookaheadIndex < characters.count,
+                      closingDelimiters.contains(characters[lookaheadIndex]) {
+                    result.append(characters[lookaheadIndex])
+                    lookaheadIndex += 1
+                }
+                
+                if lookaheadIndex < characters.count,
+                   !characters[lookaheadIndex].isWhitespace {
+                    result.append(" ")
+                }
+                
+                if lookaheadIndex > index + 1 {
+                    index = lookaheadIndex - 1
+                }
+            }
+            
+            index += 1
+        }
+        
+        return String(result)
+    }
+    
+    // MARK: - Context Signals
+    
+    nonisolated private func workloadLevel(from payloadContext: AIPayloadContext?) -> WorkloadLevel? {
+        guard let payloadContext else { return nil }
+        let metadata = payloadContext.metadata
+        let candidateKeys = ["workload", "workload_level", "workloadstate", "cps_workload", "workloadstatus"]
+        
+        for key in candidateKeys {
+            if let entry = metadata.first(where: { $0.key.caseInsensitiveCompare(key) == .orderedSame }) {
+                let value = entry.value.lowercased()
+                switch value {
+                case "heavy", "high", "overloaded", "max":
+                    return .heavy
+                case "moderate", "medium", "balanced":
+                    return .moderate
+                case "light", "low", "clear":
+                    return .light
+                default:
+                    continue
+                }
             }
         }
         
-        return result
+        return nil
+    }
+    
+    nonisolated private func shouldIncludeWorkloadCues(
+        for input: String,
+        payloadContext: AIPayloadContext?
+    ) -> Bool {
+        if let intent = payloadContext?.intent, intent == .social {
+            return false
+        }
+        if let metadata = payloadContext?.metadata {
+            if let metadataIntent = metadata["intent"], metadataIntent.lowercased() == "social" {
+                return false
+            }
+            let topicKeys = ["topicCategory", "topic_category"]
+            for key in topicKeys {
+                if let topicValue = metadata[key], topicValue.lowercased() == "casual" {
+                    return false
+                }
+            }
+        }
+        
+        let normalized = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return false }
+        
+        let tokens = normalized
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        
+        let keywordSet: Set<String> = [
+            "task", "tasks", "todo", "todos", "project", "projects",
+            "priority", "priorities", "deadline", "deadlines", "due", "overdue",
+            "schedule", "schedules", "plan", "planning", "action", "actions",
+            "workload"
+        ]
+        
+        if tokens.contains(where: { keywordSet.contains($0) }) {
+            return true
+        }
+        
+        let phrases = [
+            "what should i work on",
+            "what are my tasks",
+            "list my tasks",
+            "what's due",
+            "show my priorities",
+            "help me plan",
+            "help me schedule",
+            "start a focus session",
+            "need to get done",
+            "catch up on tasks"
+        ]
+        
+        if phrases.contains(where: { normalized.contains($0) }) {
+            return true
+        }
+        
+        let hyphenPhrases = ["to-do", "to-do list", "to do list", "focus session"]
+        if hyphenPhrases.contains(where: { normalized.contains($0) }) {
+            return true
+        }
+        
+        if let payloadContext,
+           !payloadContext.priorities.isEmpty,
+           normalized.contains("anything") && normalized.contains("focus") {
+            return true
+        }
+        
+        return false
+    }
+    
+    nonisolated private func buildPersonalityToneContext(
+        input: String,
+        style: TypingStyle?,
+        userEnergy: Double,
+        isCasualConversation: Bool
+    ) -> PersonalityQuirksService.PersonalityToneContext {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return .neutral
+        }
+        
+        let normalized = trimmed.lowercased()
+        let styleSnapshot = style ?? StyleAnalyzer.analyzeStyle(text: trimmed)
+        let tokens = normalized
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        
+        if tokens.isEmpty {
+            return .neutral
+        }
+        
+        let tokenSet = Set(tokens)
+        var emotionalKeywords = Set<String>()
+        
+        let playfulHits = tokenSet.intersection(Self.playfulLexicon)
+        let warmthHits = tokenSet.intersection(Self.warmthLexicon)
+        let challengeHits = tokenSet.intersection(Self.challengeLexicon)
+        let selfDoubtHits = tokenSet.intersection(Self.selfDoubtLexicon)
+        
+        emotionalKeywords.formUnion(playfulHits)
+        emotionalKeywords.formUnion(warmthHits)
+        emotionalKeywords.formUnion(challengeHits)
+        emotionalKeywords.formUnion(selfDoubtHits)
+        
+        var selfDoubtScore = Double(selfDoubtHits.count)
+        for phrase in Self.selfDoubtPhrases where normalized.contains(phrase) {
+            selfDoubtScore += 1.2
+            emotionalKeywords.insert(phrase)
+        }
+        
+        var warmthScore = Double(warmthHits.count)
+        for phrase in Self.warmthPhrases where normalized.contains(phrase) {
+            warmthScore += 0.8
+            emotionalKeywords.insert(phrase)
+        }
+        
+        var playfulScore = Double(playfulHits.count)
+        if isCasualConversation {
+            playfulScore += 0.5
+        }
+        if userEnergy > 0.65 {
+            playfulScore += 0.4
+        }
+        
+        var challengeScore = Double(challengeHits.count)
+        for phrase in Self.challengePhrases where normalized.contains(phrase) {
+            challengeScore += 1.0
+            emotionalKeywords.insert(phrase)
+        }
+        
+        let exclamationCount = trimmed.filter { $0 == "!" }.count
+        let questionCount = trimmed.filter { $0 == "?" }.count
+        
+        let energyBand: PersonalityQuirksService.PersonalityToneContext.EnergyBand
+        if userEnergy < 0.35 {
+            energyBand = .low
+        } else if userEnergy > 0.7 {
+            energyBand = .high
+        } else {
+            energyBand = .moderate
+        }
+        
+        let averageSentenceLength = styleSnapshot.averageSentenceLength
+        let conversationTempo: PersonalityQuirksService.PersonalityToneContext.ConversationTempo
+        if averageSentenceLength >= 18 {
+            conversationTempo = .slow
+        } else if averageSentenceLength >= 11 {
+            conversationTempo = .balanced
+        } else {
+            conversationTempo = .punchy
+        }
+        
+        var frictionScore = warmthScore * 1.1 + challengeScore * 1.0 + selfDoubtScore * 1.4
+        frictionScore += Double(exclamationCount) * 0.35
+        frictionScore += Double(questionCount) * 0.1
+        
+        let emotionalFriction: PersonalityQuirksService.PersonalityToneContext.EmotionalFriction
+        if frictionScore >= 3.2 {
+            emotionalFriction = .heavy
+        } else if frictionScore >= 1.5 {
+            emotionalFriction = .charged
+        } else {
+            emotionalFriction = .steady
+        }
+        
+        var dominantCue: PersonalityQuirksService.PersonalityToneContext.DominantCue = .neutral
+        var dominantValue: Double = 0.0
+        var dominantPriority = Int.max
+        let scores: [(Double, PersonalityQuirksService.PersonalityToneContext.DominantCue)] = [
+            (playfulScore, .playful),
+            (warmthScore, .warm),
+            (challengeScore, .assertive),
+            (selfDoubtScore, .protective)
+        ]
+        
+        for (value, cue) in scores where value > 0 {
+            let cuePriority = priority(for: cue)
+            if value > dominantValue || (abs(value - dominantValue) < 0.001 && cuePriority < dominantPriority) {
+                dominantValue = value
+                dominantPriority = cuePriority
+                dominantCue = cue
+            }
+        }
+        
+        if dominantValue == 0, energyBand == .high {
+            dominantCue = .playful
+        }
+        
+        var sass = 0.5
+        switch energyBand {
+        case .low:
+            sass -= 0.18
+        case .moderate:
+            break
+        case .high:
+            sass += 0.12
+        }
+        
+        switch conversationTempo {
+        case .slow:
+            sass -= 0.06
+        case .balanced:
+            break
+        case .punchy:
+            sass += 0.07
+        }
+        
+        if isCasualConversation {
+            sass += 0.05
+        }
+        
+        switch dominantCue {
+        case .playful:
+            sass += 0.2
+        case .warm:
+            sass -= 0.2
+        case .assertive:
+            sass += 0.18
+        case .protective:
+            sass += 0.12
+        case .neutral:
+            break
+        }
+        
+        switch emotionalFriction {
+        case .steady:
+            break
+        case .charged:
+            sass -= 0.05
+        case .heavy:
+            sass -= 0.12
+        }
+        
+        let clampedSass = min(max(sass, 0.1), 0.95)
+        let keywordList = Array(emotionalKeywords).sorted()
+        
+        return PersonalityQuirksService.PersonalityToneContext(
+            energyBand: energyBand,
+            conversationTempo: conversationTempo,
+            emotionalFriction: emotionalFriction,
+            dominantCue: dominantCue,
+            sassFactor: clampedSass,
+            isCasualChat: isCasualConversation,
+            emotionalKeywords: keywordList,
+            userEnergy: userEnergy
+        )
+    }
+    
+    private static let playfulLexicon: Set<String> = [
+        "lol", "haha", "kidding", "play", "tease", "flirt", "banter", "wild", "chaotic", "chaos", "fun", "spicy", "bold"
+    ]
+    
+    private static let warmthLexicon: Set<String> = [
+        "tired", "exhausted", "drained", "fatigued", "sleepy", "soft", "gentle", "sad", "lonely",
+        "anxious", "worried", "stressed", "overwhelmed", "ugh", "heavy", "raw", "numb", "mess"
+    ]
+    
+    private static let warmthPhrases: [String] = [
+        "i'm tired", "i feel tired", "i'm exhausted", "i feel exhausted",
+        "i'm anxious", "i feel anxious", "i'm stressed", "i feel stressed",
+        "i'm overwhelmed", "i feel overwhelmed", "i messed that up", "that was a mess"
+    ]
+    
+    private static let challengeLexicon: Set<String> = [
+        "fight", "battle", "spar", "argue", "debate", "prove", "challenge", "war", "versus", "vs", "bet", "dare", "contest"
+    ]
+    
+    private static let challengePhrases: [String] = [
+        "come at me", "try me", "want to fight", "square up", "you sure about that", "step up"
+    ]
+    
+    private static let selfDoubtLexicon: Set<String> = [
+        "failed", "failure", "mess", "worthless", "useless", "awful", "terrible", "horrible", "trash", "broken",
+        "embarrassed", "ashamed", "regret", "anxious", "nervous", "scared"
+    ]
+    
+    private static let selfDoubtPhrases: [String] = [
+        "i can't", "i cannot", "i'm not good enough", "i'm bad at this", "i suck", "i messed up",
+        "i keep failing", "why bother", "what's the point", "i'm the worst"
+    ]
+    
+    nonisolated private func priority(for cue: PersonalityQuirksService.PersonalityToneContext.DominantCue) -> Int {
+        switch cue {
+        case .protective:
+            return 0
+        case .warm:
+            return 1
+        case .assertive:
+            return 2
+        case .playful:
+            return 3
+        case .neutral:
+            return 4
+        }
+    }
+    
+    private func detectSocialIntent(
+        in input: String,
+        payloadContext: inout AIPayloadContext?
+    ) {
+        let normalized = input.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+        
+        let greetings = [
+            "hi", "hey", "hello", "yo", "sup", "hiya", "heya", "good morning",
+            "good afternoon", "good evening", "morning", "evening", "howdy"
+        ]
+        let socialPhrases = [
+            "how are you", "how's it going", "what's up", "how are things", "nice to see you",
+            "just saying hi", "just wanted to say hi"
+        ]
+        
+        var isSocial = false
+        if greetings.contains(where: { normalized == $0 || normalized.hasPrefix("\($0) ") }) {
+            isSocial = true
+        }
+        if !isSocial && socialPhrases.contains(where: { normalized.contains($0) }) {
+            isSocial = true
+        }
+        
+        if isSocial {
+            if payloadContext == nil {
+                payloadContext = AIPayloadContext(intent: .social)
+            } else {
+                payloadContext?.intent = .social
+            }
+            payloadContext?.metadata["intent"] = "social"
+        }
     }
     
     // MARK: - Payload Context Formatting
@@ -1529,6 +2081,10 @@ Aurora:
             throw OllamaError.connectionFailed
         }
         
+        if isLikelyGreeting(input) {
+            return nil
+        }
+        
         // Build conversation history for context (last 10 messages)
         let historyText = buildConversationHistoryText(from: conversationHistory.suffix(10))
         
@@ -1659,8 +2215,8 @@ Aurora:
         """
         
         do {
-            let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
-            let cleaned = result.response
+            let rawResponse = try await runBackgroundPromptText(prompt)
+            let cleaned = rawResponse
                 .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
                 .replacingOccurrences(of: "```json", with: "")
                 .replacingOccurrences(of: "```", with: "")
@@ -1685,6 +2241,26 @@ Aurora:
         } catch {
             return nil
         }
+    }
+    
+    private func isLikelyGreeting(_ input: String) -> Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return true }
+        
+        let lower = trimmed.lowercased()
+        let delimiters = CharacterSet.alphanumerics.inverted
+        let tokens = lower.components(separatedBy: delimiters).filter { !$0.isEmpty }
+        guard let firstToken = tokens.first else { return true }
+        
+        let greetingSet: Set<String> = [
+            "hi", "hey", "heyy", "hello", "hiya", "yo", "sup", "hola", "heyya", "heyoo"
+        ]
+        
+        if greetingSet.contains(firstToken) && tokens.count <= 3 && lower.count <= 40 {
+            return true
+        }
+        
+        return false
     }
     
     func detectReflectionIntent(input: String) async throws -> ReflectionIntent? {
@@ -1792,8 +2368,8 @@ Aurora:
         """
         
         do {
-            let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
-            let cleaned = result.response
+            let rawResponse = try await runBackgroundPromptText(prompt)
+            let cleaned = rawResponse
                 .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
                 .replacingOccurrences(of: "```json", with: "")
                 .replacingOccurrences(of: "```", with: "")
@@ -1840,8 +2416,8 @@ Aurora:
         JSON only.
         """
         
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
-        let cleaned = result.response
+        let rawResponse = try await runBackgroundPromptText(prompt)
+        let cleaned = rawResponse
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             .replacingOccurrences(of: "```json", with: "")
             .replacingOccurrences(of: "```", with: "")
@@ -1888,9 +2464,9 @@ Aurora:
         Return only the title, no quotes, no markdown, no explanations.
         """
         
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        let rawResponse = try await runBackgroundPromptText(prompt)
         
-        var title = result.response
+        var title = rawResponse
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             .replacingOccurrences(of: #"[`"]"#, with: "", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
@@ -1922,8 +2498,8 @@ Aurora:
         Summary:
         """
         
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
-        return result.response.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawResponse = try await runBackgroundPromptText(prompt)
+        return rawResponse.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     func categorizeConversation(messages: [AIMessage], summary: String?) async throws -> [String] {
@@ -1964,9 +2540,9 @@ Aurora:
         - Example format: Helping\nPlanning\nCreating
         """
         
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        let rawResponse = try await runBackgroundPromptText(prompt)
         
-        let lines = result.response.components(separatedBy: .newlines)
+        let lines = rawResponse.components(separatedBy: .newlines)
         let tags = lines.compactMap { line -> String? in
             var trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty || trimmed.hasPrefix("-") || trimmed.hasPrefix("•") || trimmed.hasPrefix("#") {
@@ -2032,8 +2608,8 @@ Aurora:
         Summary:
         """
         
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
-        return result.response.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawResponse = try await runBackgroundPromptText(prompt)
+        return rawResponse.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     func generateInsights(conversations: [(title: String, tags: [String])]) async throws -> String {
@@ -2052,8 +2628,8 @@ Aurora:
         Insights:
         """
         
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
-        return result.response.isEmpty ? "No insights available at this time." : result.response
+        let rawResponse = try await runBackgroundPromptText(prompt)
+        return rawResponse.isEmpty ? "No insights available at this time." : rawResponse
     }
     
     // MARK: - AI Tools
@@ -2064,7 +2640,7 @@ Aurora:
         }
         
         let prompt = await buildToolPrompt(for: tool, input: input, context: context)
-        let result = try await makeOllamaRequest(prompt: prompt, useThinking: false)
+        let result = try await runBackgroundPrompt(prompt)
         let improvements = tool == .improveText ? extractImprovements(from: result.response) : nil
         return AIToolResult(tool: tool, result: result.response, suggestedImprovements: improvements)
     }
@@ -2183,6 +2759,10 @@ Aurora:
         let promptText = userPrompt ?? "Analyze this image and describe what you see. Be detailed and conversational."
         
         // Build system prompt with app context
+        let casualConversation = false
+        var resolvedPayloadContext = payloadContext
+        detectSocialIntent(in: promptText, payloadContext: &resolvedPayloadContext)
+        let includeWorkloadCues = shouldIncludeWorkloadCues(for: promptText, payloadContext: resolvedPayloadContext)
         let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
             let languagePersonality = LanguagePersonalityService.shared
             let conversationalQuirks = ConversationalQuirksService.shared
@@ -2193,11 +2773,11 @@ Aurora:
             
             let timeContext = contextualAdaptation.getTimeOfDayContext()
             let userEnergy = currentMessageStyle?.energyLevel ?? 0.5
-            let workload = WorkloadLevel.moderate
+            let workload = workloadLevel(from: resolvedPayloadContext)
             
             let formalityLevel = userStyleProfile?.formalityScore ?? currentMessageStyle?.formalityScore ?? 0.5
             
-            let enhancedToneInstructions: String
+            var enhancedToneInstructions: String
             if let styleText = StyleAdapter.instructions(currentStyle: currentMessageStyle, persistentProfile: userStyleProfile) {
                 let enhancedStyleText = languagePersonality.enhanceSystemPrompt(styleText, formalityLevel: formalityLevel)
                 let confidenceLevel = confidence?.score ?? 0.7
@@ -2227,12 +2807,25 @@ Aurora:
 """
             }
             
-            let personalityInstructions = personalityQuirks.enhancePromptWithPersonality("")
+            if casualConversation {
+                enhancedToneInstructions += "\n- This is a casual check-in—keep it playful and skip productivity pushes unless the user pivots."
+            }
+            
+            let personalityContext = buildPersonalityToneContext(
+                input: promptText,
+                style: currentMessageStyle,
+                userEnergy: userEnergy,
+                isCasualConversation: casualConversation
+            )
+            let personalityInstructions = personalityQuirks.buildPersonalityInstructions(context: personalityContext)
             let selfAwarenessInstructions = selfAwareness.generateSelfAwarenessInstructions()
             let contextualInstructions = contextualAdaptation.generateContextualInstructions(
                 timeContext: timeContext,
                 userEnergy: userEnergy,
-                workload: workload
+                workload: workload,
+                isCasualConversation: casualConversation,
+                includeWorkloadCues: includeWorkloadCues,
+                conversationIntent: resolvedPayloadContext?.intent
             )
             
             let isQuestion = promptText.contains("?")
@@ -2245,7 +2838,7 @@ Aurora:
             let patternInstructions = responsePattern.getResponsePatternInstructions(pattern: pattern)
             
             var memoryInstructions = ""
-            if let recall = payloadContext?.recall, !recall.isEmpty {
+            if let recall = resolvedPayloadContext?.recall, !recall.isEmpty {
                 memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n- Prioritize emotional memories over routine tasks\n- If memory details are fuzzy, acknowledge it gracefully"
             }
             
@@ -2365,7 +2958,7 @@ You are Aurora, analyzing an image the user shared. Describe what you see in det
                                (userPrompt?.lowercased().contains("analyze") ?? false) ||
                                (userPrompt?.lowercased().contains("complex") ?? false)
         
-        // For document analysis, use default model (granite3.2:2b) unless it's a very complex document
+        // For document analysis, use default model (Gemma3) unless it's a very complex document
         // Complex documents (>10k chars) might benefit from a larger model, but we'll use default for now
         // Model switching for documents is disabled - always use default model
         let modelSwitchNotification = ""
@@ -2374,6 +2967,10 @@ You are Aurora, analyzing an image the user shared. Describe what you see in det
         let promptText = userPrompt ?? "Analyze this document and provide a helpful summary"
         
         // Build system prompt with app context and Aurora's personality
+        let casualConversation = false
+        var resolvedPayloadContext = payloadContext
+        detectSocialIntent(in: promptText, payloadContext: &resolvedPayloadContext)
+        let includeWorkloadCues = shouldIncludeWorkloadCues(for: promptText, payloadContext: resolvedPayloadContext)
         let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
             let languagePersonality = LanguagePersonalityService.shared
             let conversationalQuirks = ConversationalQuirksService.shared
@@ -2384,11 +2981,11 @@ You are Aurora, analyzing an image the user shared. Describe what you see in det
             
             let timeContext = contextualAdaptation.getTimeOfDayContext()
             let userEnergy = currentMessageStyle?.energyLevel ?? 0.5
-            let workload = WorkloadLevel.moderate
+            let workload = workloadLevel(from: resolvedPayloadContext)
             
             let formalityLevel = userStyleProfile?.formalityScore ?? currentMessageStyle?.formalityScore ?? 0.5
             
-            let enhancedToneInstructions: String
+            var enhancedToneInstructions: String
             if let styleText = StyleAdapter.instructions(currentStyle: currentMessageStyle, persistentProfile: userStyleProfile) {
                 let enhancedStyleText = languagePersonality.enhanceSystemPrompt(styleText, formalityLevel: formalityLevel)
                 let confidenceLevel = confidence?.score ?? 0.7
@@ -2418,12 +3015,25 @@ You are Aurora, analyzing an image the user shared. Describe what you see in det
 """
             }
             
-            let personalityInstructions = personalityQuirks.enhancePromptWithPersonality("")
+            if casualConversation {
+                enhancedToneInstructions += "\n- This is a casual check-in—keep it playful and skip productivity pushes unless the user pivots."
+            }
+            
+            let personalityContext = buildPersonalityToneContext(
+                input: promptText,
+                style: currentMessageStyle,
+                userEnergy: userEnergy,
+                isCasualConversation: casualConversation
+            )
+            let personalityInstructions = personalityQuirks.buildPersonalityInstructions(context: personalityContext)
             let selfAwarenessInstructions = selfAwareness.generateSelfAwarenessInstructions()
             let contextualInstructions = contextualAdaptation.generateContextualInstructions(
                 timeContext: timeContext,
                 userEnergy: userEnergy,
-                workload: workload
+                workload: workload,
+                isCasualConversation: casualConversation,
+                includeWorkloadCues: includeWorkloadCues,
+                conversationIntent: resolvedPayloadContext?.intent
             )
             
             let isQuestion = promptText.contains("?")
@@ -2436,7 +3046,7 @@ You are Aurora, analyzing an image the user shared. Describe what you see in det
             let patternInstructions = responsePattern.getResponsePatternInstructions(pattern: pattern)
             
             var memoryInstructions = ""
-            if let recall = payloadContext?.recall, !recall.isEmpty {
+            if let recall = resolvedPayloadContext?.recall, !recall.isEmpty {
                 memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n- Prioritize emotional memories over routine tasks\n- If memory details are fuzzy, acknowledge it gracefully"
             }
             

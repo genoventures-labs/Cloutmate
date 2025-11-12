@@ -14,24 +14,19 @@ final class ConversationalQuirksService {
     
     private init() {}
     
-    // Personality markers - Aurora's signature phrases
+    // Micro-expression phrases that feel like Aurora's half-beat pauses
     private let signaturePhrases = [
-        "Let me think...",
-        "Actually,",
-        "You know,",
-        "Hmm,",
-        "Wait,",
-        "I mean,",
-        "Honestly,",
-        "Pretty sure",
-        "Definitely",
-        "Totally"
+        "You know what, wait.",
+        "Hold on, that tracks.",
+        "Hang tight, I'm not done.",
+        "Don't roll your eyes at me.",
+        "Yeah, that makes sense."
     ]
     
     // Verbal fillers based on confidence level
     private func getFillers(for confidence: Double) -> [String] {
         if confidence < 0.4 {
-            return ["Hmm,", "Let me think...", "I'm not entirely sure, but", "Maybe", "Could be"]
+            return ["Hang on", "Let me think", "I'm not entirely sure, but", "Maybe", "Could be"]
         } else if confidence < 0.7 {
             return ["I think", "Probably", "Likely", "Seems like"]
         } else {
@@ -46,20 +41,21 @@ final class ConversationalQuirksService {
         let fillers = getFillers(for: confidence)
         let fillerText = fillers.joined(separator: ", ")
         
-        enhanced += "\n\n**CONVERSATIONAL STYLE:**\n"
-        enhanced += "- Use natural verbal fillers occasionally (like \(fillerText)) when appropriate\n"
-        enhanced += "- If uncertain, use phrases like 'I think', 'maybe', 'perhaps'\n"
-        enhanced += "- When confident, use 'definitely', 'for sure', 'totally'\n"
-        enhanced += "- Occasionally use self-corrections: 'Wait, let me reconsider...' or 'Actually,'\n"
-        enhanced += "- Use signature phrases naturally: 'Let me think...', 'You know,'\n"
-        enhanced += "- Never overuse fillers - keep them natural and sparse\n"
+        enhanced += "\n\n**CONVERSATIONAL CADENCE:**\n"
+        enhanced += "- Use percussive fillers sparingly (like \(fillerText)) to keep flow human without rambling.\n"
+        enhanced += "- When confidence dips, say it plainly: 'I'm not entirely sure, but here's my read.'\n"
+        enhanced += "- High confidence earns decisive language: 'Definitely', 'For sure', 'Absolutely'.\n"
+        enhanced += "- Self-corrections are half-beat pivots: 'Wait, new angle.' or 'Actually, let me sharpen that.' No ellipses.\n"
+        enhanced += "- Signature micro-expressions to sprinkle: \(signaturePhrases.joined(separator: ", ")). Keep them rare.\n"
+        enhanced += "- Mirror silence with intention: 'You went quiet. Need a second?' Deliver it softly, no filler empathy.\n"
+        enhanced += "- Keep sentences tight. Let commas and short lines handle pauses—never ellipses.\n"
         
         return enhanced
     }
     
     /// Get a random signature phrase (for variation)
     func randomSignaturePhrase() -> String {
-        signaturePhrases.randomElement() ?? "Let me think..."
+        signaturePhrases.randomElement() ?? "Let me think."
     }
     
     /// Determine if a self-correction should be added
@@ -71,10 +67,10 @@ final class ConversationalQuirksService {
     /// Get a self-correction phrase
     func getSelfCorrectionPhrase() -> String {
         let phrases = [
-            "Wait, let me reconsider...",
+            "Wait, let me reconsider.",
             "Actually,",
-            "Hmm, on second thought,",
-            "Let me think about that differently...",
+            "Hmm, on second thought.",
+            "Let me think about that differently.",
             "You know what,"
         ]
         return phrases.randomElement() ?? "Actually,"

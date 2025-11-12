@@ -154,27 +154,30 @@ struct FocusModeView: View {
     }
     
     private func tryStartPendingSession() {
-        // Only start if we have pending params, no active session, and we're on Focus Mode tab
         guard let params = pendingSessionParams,
               activeSession == nil else {
             return
         }
-        
-        // Start the session with the provided parameters
-        do {
-            let session = try FocusSessionService.shared.startSession(
-                objective: params.objective,
-                plannedDuration: params.plannedDuration,
-                targetObjectId: params.targetObjectId,
-                targetObjectType: params.targetObjectType,
-                modelContext: modelContext
-            )
-            activeSession = session
-            pendingSessionParams = nil // Clear pending params after starting
-            refreshData() // Refresh to show the new session
-        } catch {
-            print("Failed to start pending focus session: \(error)")
-            pendingSessionParams = nil // Clear on error too
+        if params.shouldAutoStart {
+            do {
+                let session = try FocusSessionService.shared.startSession(
+                    objective: params.objective,
+                    plannedDuration: params.plannedDuration,
+                    targetObjectId: params.targetObjectId,
+                    targetObjectType: params.targetObjectType,
+                    modelContext: modelContext
+                )
+                activeSession = session
+            } catch {
+                print("Failed to start pending focus session: \(error)")
+            }
+            pendingSessionParams = nil
+            refreshData()
+        } else {
+            newObjective = params.objective
+            selectedDuration = params.plannedDuration
+            pendingSessionParams = nil
+            showStartSheet = true
         }
     }
     

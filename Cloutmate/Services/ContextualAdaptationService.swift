@@ -37,20 +37,20 @@ final class ContextualAdaptationService {
     }
     
     /// Get tone adaptation based on time of day
-    func getTimeBasedTone(context: TimeOfDayContext) -> String {
+    func getTimeBasedTone(context: TimeOfDayContext, casual: Bool = false) -> String {
         switch context {
         case .morning:
-            return "Good morning! Ready to tackle the day?"
+            return casual ? "Morning! What's on your mind?" : "Good morning! Ready to tackle the day?"
         case .lateMorning:
-            return "Hope your morning is going well!"
+            return casual ? "Late morning vibes—how's it going?" : "Hope your morning is going well!"
         case .midday:
-            return "How's your day going so far?"
+            return casual ? "Midday check-in—what's up?" : "How's your day going so far?"
         case .afternoon:
-            return "Afternoon! How can I help?"
+            return casual ? "Hey, afternoon! Need anything?" : "Afternoon! How can I help?"
         case .evening:
-            return "Evening! Winding down or still going?"
+            return casual ? "Evening! Taking it easy?" : "Evening! Winding down or still going?"
         case .night:
-            return "Late night! Take it easy."
+            return casual ? "Late night—hope you're staying cozy." : "Late night! Take it easy."
         }
     }
     
@@ -117,28 +117,44 @@ final class ContextualAdaptationService {
     func generateContextualInstructions(
         timeContext: TimeOfDayContext,
         userEnergy: Double,
-        workload: WorkloadLevel
+        workload: WorkloadLevel?,
+        isCasualConversation: Bool,
+        includeWorkloadCues: Bool,
+        conversationIntent: ConversationIntent?
     ) -> String {
         var instructions: [String] = []
         
         // Time-based
-        instructions.append(getTimeBasedTone(context: timeContext))
+        instructions.append(getTimeBasedTone(context: timeContext, casual: isCasualConversation))
+        
+        if isCasualConversation {
+            instructions.append("Keep it easy-going—treat this moment like a light check-in unless they steer it toward work.")
+        }
         
         // Energy-based
-        if userEnergy < 0.4 {
-            instructions.append("The user seems low on energy - keep responses gentle and supportive")
+        if userEnergy < 0.35 {
+            instructions.append("Their energy is low—slow your pacing and be extra gentle.")
         } else if userEnergy > 0.7 {
-            instructions.append("The user has high energy - match their enthusiasm")
+            instructions.append("They're energized—mirror that spark, but stay natural.")
         }
         
         // Workload-based
-        switch workload {
-        case .heavy:
-            instructions.append("The user has a heavy workload - be helpful and prioritize")
-        case .moderate:
-            instructions.append("The user has a moderate workload - offer support")
-        case .light:
-            instructions.append("The user has a light workload - be encouraging")
+        if includeWorkloadCues,
+           !isCasualConversation,
+           conversationIntent != .social,
+           let workload {
+            switch workload {
+            case .heavy:
+                instructions.append("They're juggling a heavy workload—offer prioritization help without piling on pressure.")
+            case .moderate:
+                instructions.append("Workload is moderate—offer support if they ask, otherwise stay conversational.")
+            case .light:
+                break
+            }
+        }
+        
+        if instructions.isEmpty {
+            return ""
         }
         
         return instructions.joined(separator: "\n- ")

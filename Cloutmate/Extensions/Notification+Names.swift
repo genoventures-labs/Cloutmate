@@ -41,5 +41,20 @@ struct PendingFocusSessionParams {
     let plannedDuration: TimeInterval
     let targetObjectId: UUID?
     let targetObjectType: String?
+    let shouldAutoStart: Bool
+    
+    init(
+        objective: String,
+        plannedDuration: TimeInterval,
+        targetObjectId: UUID? = nil,
+        targetObjectType: String? = nil,
+        shouldAutoStart: Bool = false
+    ) {
+        self.objective = objective
+        self.plannedDuration = plannedDuration
+        self.targetObjectId = targetObjectId
+        self.targetObjectType = targetObjectType
+        self.shouldAutoStart = shouldAutoStart
+    }
 }
 

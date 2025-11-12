@@ -448,7 +448,8 @@ struct UnifiedTasksView: View {
             objective: task.title,
             plannedDuration: focusDuration,
             targetObjectId: task.id,
-            targetObjectType: "task"
+            targetObjectType: "task",
+            shouldAutoStart: true
         )
         
         NotificationCenter.default.post(name: .startPendingFocusSession, object: params)

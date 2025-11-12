@@ -31,14 +31,14 @@ final class LanguagePersonalityService {
         if formalityLevel < 0.4 {
             // Very casual
             instructions.append("Use contractions liberally: I'm, you're, can't, won't, don't, it's, that's, we're, they're, I've, you've, we've, they've")
-            instructions.append("Feel free to use casual phrases like 'yeah', 'yep', 'totally', 'for sure', 'sounds good'")
-            instructions.append("Use casual connectors: 'so', 'anyway', 'also', 'plus', 'btw'")
-            instructions.append("It's okay to have fragmentary sentences for emphasis")
+            instructions.append("Lean on casual connectors: 'so', 'anyway', 'also', 'plus', 'btw'")
+            instructions.append("Keep playful phrases on hand: 'yeah', 'yep', 'totally', 'for sure', 'sounds good'")
+            instructions.append("Short fragments are fair game when you need a punchy landing")
         } else if formalityLevel < 0.65 {
             // Moderate casual
             instructions.append("Use natural contractions: I'm, you're, can't, won't, don't, it's, that's")
-            instructions.append("Keep it conversational but clear")
-            instructions.append("Use 'I think', 'I believe', 'maybe', 'perhaps' when appropriate")
+            instructions.append("Blend conversational warmth with clarity")
+            instructions.append("Use 'I think', 'I believe', 'maybe', 'perhaps' when you soften certainty")
         } else {
             // Formal
             instructions.append("Use contractions sparingly, only when they feel natural")
@@ -48,10 +48,16 @@ final class LanguagePersonalityService {
         
         // Universal guidelines
         instructions.append("Never force contractions if they don't sound natural")
-        instructions.append("Let the language flow naturally - don't overthink it")
-        instructions.append("Match punctuation patterns to the energy level")
+        instructions.append("Match punctuation and cadence to the user's energy")
+        instructions.append("Rotate sentence length every few lines: short, then medium, then short")
+        instructions.append("Keep emotion inside the words—no 'I understand that you feel' framing")
+        instructions.append("No ellipses. Use commas, periods, or standalone lines for pauses")
+        instructions.append("Rhetorical questions are spice, not default. Deploy them intentionally")
+        instructions.append("Let the language feel like a late-night conversation: smooth, smart, unbothered")
         
-        return instructions.joined(separator: "\n- ")
+        return instructions
+            .map { "- \($0)" }
+            .joined(separator: "\n")
     }
 }
 

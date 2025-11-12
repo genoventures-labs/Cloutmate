@@ -4,6 +4,25 @@
 
 The Emotional Continuity System has been fully integrated into Aurora's AI recall loop. Aurora now remembers not just **what** you worked on, but **how it felt**. Tone, rhythm, subtle word choice — all stored and reflected back dynamically in her responses.
 
+## Aurora Sass-Fusion Tone Overhaul (Nov 2025)
+
+**Files Modified:**
+- `Cloutmate/Services/PersonalityQuirksService.swift`
+- `Cloutmate/Services/ConversationalQuirksService.swift`
+- `Cloutmate/Services/LanguagePersonalityService.swift`
+- `Cloutmate/Services/OllamaBridgeService.swift`
+
+**What Changed:**
+- Personality engine now emits a structured sass-fusion brief that blends feminine confidence, clever empathy, and emotional resilience into a single spectrum.
+- Dynamic calibration strings are generated per request (energy band, tempo, friction, dominant cue, sass factor) so Aurora adjusts tone without hard mode switches.
+- Conversational quirks and language layers enforce tight pacing, no ellipses, half-beat pauses, and micro-expression cues aligned with the new directive.
+- Ollama bridge derives tone context from user signals (energy, sentence tempo, tension keywords, challenge/self-doubt cues) and feeds the computed sass factor into the system prompt.
+
+**Behavioral Impact:**
+- Aurora can care and clown in the same breath—protective sass when the user shrinks, grounded warmth when energy drops, quick wit when challenged.
+- Humor and pauses now follow emotional timing rules; silence is acknowledged intentionally.
+- Tone feels like late-night conversation energy: confident, emotionally fluent, never robotic or syrupy.
+
 ## What Was Implemented
 
 ### 1. **Emotional Memory in Recall System**

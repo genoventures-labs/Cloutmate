@@ -109,6 +109,27 @@ final class AIAssistantViewModel {
     var currentStatus: String?
     private var pendingOperation: PendingOperation?
     private var lastLinkingSuggestionAt: Date?
+    private var lastSocialIntentAt: Date?
+    private let socialIntentCooldown: TimeInterval = 12.0
+    private let workKeywordSet: Set<String> = [
+        "task",
+        "tasks",
+        "todo",
+        "to-do",
+        "project",
+        "projects",
+        "due",
+        "deadline",
+        "plan",
+        "plans",
+        "planning",
+        "remind",
+        "reminder",
+        "schedule",
+        "focus",
+        "prep",
+        "draft"
+    ]
     
     var isAIEnabled: Bool {
         aiSettings.isAIEnabled
@@ -545,8 +566,15 @@ final class AIAssistantViewModel {
                 default:
                     updateActivity(.thinking)
                 }
-                await executeIntent(executionIntent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-                return
+                if await executeIntent(
+                    executionIntent,
+                    modelContext: modelContext,
+                    isFirstMessage: isFirstMessage,
+                    messageText: text,
+                    payloadContext: nil
+                ) {
+                    return
+                }
             }
             
             updateActivity(.generatingResponse)
@@ -557,6 +585,7 @@ final class AIAssistantViewModel {
                 currentStyle: currentStyle,
                 styleProfile: styleProfile
             )
+            recordIntent(from: payloadContext)
             let contextFreshness = AppContextService.shared.contextFreshness()
             let confidenceSnapshot = ConfidenceScorer.evaluate(
                 recallSnippets: payloadContext.recall,
@@ -725,7 +754,7 @@ final class AIAssistantViewModel {
             if isOllamaError {
                 errorContent = error.localizedDescription
             } else {
-                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `granite3.2:2b` model is available."
+                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `gemma3:4b` model is available."
             }
             
             // Handle errors
@@ -901,6 +930,7 @@ final class AIAssistantViewModel {
                 currentStyle: typingStyle,
                 styleProfile: stylePreferences
             )
+            recordIntent(from: payloadContext)
             let contextFreshness = AppContextService.shared.contextFreshness()
             let confidenceSnapshot = ConfidenceScorer.evaluate(
                 recallSnippets: payloadContext.recall,
@@ -1006,7 +1036,7 @@ final class AIAssistantViewModel {
                 currentStyle: typingStyle,
                 styleProfile: stylePreferences
             )
-
+            recordIntent(from: payloadContext)
             let contextFreshness = AppContextService.shared.contextFreshness()
             let confidenceSnapshot = ConfidenceScorer.evaluate(
                 recallSnippets: payloadContext.recall,
@@ -1100,9 +1130,16 @@ final class AIAssistantViewModel {
             if !text.isEmpty {
                 // Check for execution intent in the user's prompt
                 if let executionIntent = try? await coreResponseService.detectExecutionIntent(input: text) {
-                    await executeIntent(executionIntent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-                    // Don't generate title here since executeIntent might have already handled it
-                    return
+                    if await executeIntent(
+                        executionIntent,
+                        modelContext: modelContext,
+                        isFirstMessage: isFirstMessage,
+                        messageText: text,
+                        payloadContext: payloadContext
+                    ) {
+                        // Don't generate title here since executeIntent might have already handled it
+                        return
+                    }
                 }
             }
 
@@ -1141,7 +1178,23 @@ final class AIAssistantViewModel {
                     
                     // Check for execution intent (like creating tasks from the document)
                     if let executionIntent = try? await coreResponseService.detectExecutionIntent(input: text, linkedContext: resolvedLinkedContext.isEmpty ? nil : resolvedLinkedContext) {
-                        await executeIntent(executionIntent, modelContext: modelContext, isFirstMessage: isFirstMessage)
+                        if await executeIntent(
+                            executionIntent,
+                            modelContext: modelContext,
+                            isFirstMessage: isFirstMessage,
+                            messageText: text,
+                            payloadContext: payloadContext
+                        ) {
+                            return
+                        } else {
+                            await processMessage(
+                                text,
+                                modelContext: modelContext,
+                                isFirstMessage: false,
+                                currentStyle: typingStyle,
+                                styleProfile: stylePreferences
+                            )
+                        }
                     } else {
                         // If no explicit execution intent, process as a regular message to handle conversational requests
                         await processMessage(
@@ -1205,48 +1258,49 @@ final class AIAssistantViewModel {
         _ intent: ExecutionIntent,
         modelContext: ModelContext,
         isFirstMessage: Bool,
-        allowPromptForMissingFields: Bool = true
-    ) async {
-        // Make intent mutable so we can reassign if needed
+        allowPromptForMissingFields: Bool = true,
+        messageText: String? = nil,
+        payloadContext: AIPayloadContext? = nil
+    ) async -> Bool {
         var intent = intent
         
-        // Handle compound operations: create project with tasks/notes/posts
+        if intent.operation == .createTask,
+           shouldBlockTaskCreation(for: messageText, payloadContext: payloadContext) {
+            return false
+        }
+        
         if intent.operation == .createProject && (
             intent.createTasksWithProject == true || intent.createNotesWithProject == true || intent.createPostsWithProject == true ||
             intent.taskTitles != nil || intent.taskCount != nil ||
             intent.noteTitles != nil || intent.noteCount != nil
         ) {
             await executeCompoundProjectCreation(intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-            return
+            return true
         }
         
-        // Handle compound operations: create note with tasks/posts
         if intent.operation == .createNote && (
             intent.createTasksWithNote == true || intent.createPostsWithNote == true ||
             intent.taskTitles != nil || intent.taskCount != nil ||
             intent.postCaptions != nil || intent.postCount != nil
         ) {
             await executeCompoundNoteCreation(intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-            return
+            return true
         }
         
-        // Handle compound operations: create post with tasks/notes
         if intent.operation == .createPost && (
             intent.createTasksWithPost == true || intent.createNotesWithPost == true ||
             intent.taskTitles != nil || intent.taskCount != nil ||
             intent.noteTitles != nil || intent.noteCount != nil
         ) {
             await executeCompoundPostCreation(intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-            return
+            return true
         }
         
-        // Handle reminder creation
         if intent.operation == .createReminder {
             await executeReminderCreation(intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-            return
+            return true
         }
         
-        // For updateTask, try to find task ID from conversation if missing
         if intent.operation == .updateTask && intent.taskId == nil {
             if let lastTask = findLastCreatedTask(from: messages, modelContext: modelContext) {
                 intent.taskId = lastTask.id.uuidString
@@ -1258,65 +1312,64 @@ final class AIAssistantViewModel {
         
         if let action = AIIntentAction(from: intent) {
             await perform(action: action, intent: intent, modelContext: modelContext, isFirstMessage: isFirstMessage)
-            return
+            return true
         }
         if allowPromptForMissingFields,
            await handleIncompleteExecutionIntent(intent, modelContext: modelContext) {
-            return
+            return true
         }
         do {
-            // Fallback to legacy execution for supported operations
-                let executionService = AIExecutionService.shared
-                let legacyResult: AIExecutionService.ExecutionResult
-                
-                switch intent.operation {
-                case .archiveTasks:
-                    let criteria = AIExecutionService.ArchiveCriteria(rawValue: intent.criteria ?? "completed") ?? .completed
-                    legacyResult = try await executionService.archiveTasks(
-                        criteria: criteria,
-                        daysAgo: intent.daysAgo,
-                        projectId: nil,
-                        context: modelContext
-                    )
-                case .summarizePosts:
-                    let filter = AIExecutionService.PostFilter(rawValue: intent.postFilter ?? "all") ?? .all
-                    legacyResult = try await executionService.summarizePosts(
-                        filter: filter,
-                        filterValue: intent.filterValue,
-                        context: modelContext
-                    )
-                case .generateReport:
-                    let type = AIExecutionService.ReportType(rawValue: intent.reportType ?? "weekly") ?? .weekly
-                    legacyResult = try await executionService.generateProgressReport(
-                        type: type,
-                        context: modelContext
-                    )
-                case .predictScheduling:
-                    legacyResult = try await executionService.predictSchedulingNeeds(
-                        daysAhead: intent.daysAhead ?? 7,
-                        context: modelContext
-                    )
-                default:
-                    throw ExecutionError.executionFailed("Operation \(intent.operation.rawValue) not supported in legacy execution path")
-                }
-                
-                let attributed = convertMarkdownToAttributedString(legacyResult.asMarkdown())
-                let assistantMessage = AIMessage(role: "assistant", content: attributed)
-                
-                await MainActor.run {
-                    modelContext.insert(assistantMessage)
-                    messages.append(assistantMessage)
-                    currentConversation?.messages?.append(assistantMessage)
-                    isLoading = false
-                    try? modelContext.save()
+            let executionService = AIExecutionService.shared
+            let legacyResult: AIExecutionService.ExecutionResult
+            
+            switch intent.operation {
+            case .archiveTasks:
+                let criteria = AIExecutionService.ArchiveCriteria(rawValue: intent.criteria ?? "completed") ?? .completed
+                legacyResult = try await executionService.archiveTasks(
+                    criteria: criteria,
+                    daysAgo: intent.daysAgo,
+                    projectId: nil,
+                    context: modelContext
+                )
+            case .summarizePosts:
+                let filter = AIExecutionService.PostFilter(rawValue: intent.postFilter ?? "all") ?? .all
+                legacyResult = try await executionService.summarizePosts(
+                    filter: filter,
+                    filterValue: intent.filterValue,
+                    context: modelContext
+                )
+            case .generateReport:
+                let type = AIExecutionService.ReportType(rawValue: intent.reportType ?? "weekly") ?? .weekly
+                legacyResult = try await executionService.generateProgressReport(
+                    type: type,
+                    context: modelContext
+                )
+            case .predictScheduling:
+                legacyResult = try await executionService.predictSchedulingNeeds(
+                    daysAhead: intent.daysAhead ?? 7,
+                    context: modelContext
+                )
+            default:
+                throw ExecutionError.executionFailed("Operation \(intent.operation.rawValue) not supported in legacy execution path")
             }
+            
+            let attributed = convertMarkdownToAttributedString(legacyResult.asMarkdown())
+            let assistantMessage = AIMessage(role: "assistant", content: attributed)
+            
+            await MainActor.run {
+                modelContext.insert(assistantMessage)
+                messages.append(assistantMessage)
+                currentConversation?.messages?.append(assistantMessage)
+                isLoading = false
+                try? modelContext.save()
+            }
+            return true
         } catch {
-            // Check if this is a model overload error
             let errorDesc = error.localizedDescription.lowercased()
-            let isOverloadError = errorDesc.contains("overloaded") || 
-                                  errorDesc.contains("unavailable") || 
-                                  errorDesc.contains("503") ||
-                                  errorDesc.contains("try again later")
+            let isOverloadError = errorDesc.contains("overloaded") ||
+                errorDesc.contains("unavailable") ||
+                errorDesc.contains("503") ||
+                errorDesc.contains("try again later")
             
             let errorContent: String
             if isOverloadError {
@@ -1336,9 +1389,8 @@ final class AIAssistantViewModel {
                 currentConversation?.messages?.append(errorMessage)
                 self.errorMessage = error.localizedDescription
                 isLoading = false
-                
-                // Save after adding error message
             }
+            return true
         }
     }
     
@@ -3832,5 +3884,38 @@ final class AIAssistantViewModel {
                 try? modelContext.save()
             }
         }
+    }
+
+    private func recordIntent(from payloadContext: AIPayloadContext) {
+        if payloadContext.intent == .social {
+            lastSocialIntentAt = Date()
+        }
+    }
+
+    private func shouldBlockTaskCreation(
+        for messageText: String?,
+        payloadContext: AIPayloadContext?
+    ) -> Bool {
+        let now = Date()
+        if payloadContext?.intent == .social {
+            lastSocialIntentAt = now
+            return true
+        }
+        if let lastSocialIntentAt,
+           now.timeIntervalSince(lastSocialIntentAt) < socialIntentCooldown {
+            return true
+        }
+        guard let messageText = messageText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !messageText.isEmpty else {
+            return false
+        }
+        if messageText.count < 20 {
+            let lower = messageText.lowercased()
+            if !workKeywordSet.contains(where: { lower.contains($0) }) {
+                lastSocialIntentAt = now
+                return true
+            }
+        }
+        return false
     }
 }
