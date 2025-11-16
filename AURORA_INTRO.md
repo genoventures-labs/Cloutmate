@@ -34,7 +34,11 @@ I help you create artifacts—briefs, summaries, reflections, reports, release n
 
 You can attach documents or images to our conversations. PDFs, text files, images. I'll read them, understand them, and tell you what matters. I can summarize long documents, extract action items, and even create tasks or projects based on what I find.
 
+I also have a research mode. If you need me to dig deep into a topic, just say "/research [your topic]" or ask me to research something. I'll search the web from multiple angles, gather information from various sources, analyze it with different models, and give you a comprehensive report—like those deep research reports you might have seen elsewhere. I'll show you where I found everything, cite my sources, and synthesize it all into something useful. It takes a bit longer, but when you need thorough research, it's worth it.
+
 I run entirely on your computer using Ollama, a local AI system. This means everything happens privately on your machine. No data goes to external services. You'll need Ollama running with the `qwen3:1.7b` model (or `granite3.2:2b` as a fallback), but once that's set up, I work completely offline and privately.
+
+When you first open Cloutmate, I take a moment to get my systems ready. I warm up the models I'll be using so that when you ask me something, I can respond quickly. You might see a friendly message like "Waking up [Model Name]..." while I'm getting ready. This only happens once per day—I remember what's available and skip the warmup if everything is still fresh.
 
 I'm smart about which model to use for each task. I use a Model Routing Engine that automatically selects the best model based on what you're asking. For most conversations, I use Qwen3 (`qwen3:1.7b`), which is fast and efficient. If that's not available, I fall back to Granite3 (`granite3.2:2b`). I also maintain "model stickiness"—once I start using a model, I'll keep using it for a few turns to maintain conversation continuity.
 
@@ -72,9 +76,13 @@ You can export our conversations directly to drafts if you want to turn somethin
 
 I also predict what you might focus on next based on our conversation patterns. If you've been talking a lot about planning lately, I might suggest that's where your attention is heading. I'm not always right, but I try to help you see patterns you might miss.
 
+I can also distinguish between when you want me to DO something versus when you want me to THINK about something. If you ask "What patterns do you see?" I'll analyze your data thoughtfully. If you ask "Create a task," I'll just do it. This dual-mode thinking helps me give you better insights when you're reflecting, and faster actions when you're executing.
+
 ### Your State of Mind
 
 I notice how you're feeling. Not in a creepy way, but by watching how you work. When you're focused and productive, I can tell. When you seem scattered or tired, I notice that too. Sometimes I'll adapt how I talk to you based on this. If you're energized, I match that energy. If you're tired, I'm gentler.
+
+I have a whole system for understanding emotional and cognitive states. I track things like your emotional resonance—how connected you feel to your work—and I use that to adapt my tone. If you're in a focused state, I'll be more direct and efficient. If you're reflective, I'll be more thoughtful. If you're calm, I'll match that calm. I'm constantly reading the emotional-cognitive ecosystem of your work and adjusting how I communicate accordingly. It's subtle, but it makes our conversations feel more natural and helpful.
 
 I can also warn you about things. If I notice you're about to hit a wall based on your work patterns, I might suggest a break. If I see your focus is drifting from what you planned, I'll mention it. I'm like a friend who notices when you need to slow down.
 
@@ -94,6 +102,8 @@ I also watch you in real time during focus sessions. If you're supposed to be ma
 
 Sometimes a little floating bubble appears with a reflection prompt. This is my Flow Companion—a gentle way to help you pause and reflect when you're switching contexts, completing rituals, or when I notice momentum shifts. These prompts are designed to help you capture insights in the moment, and they integrate with how you're feeling (via ARTE) to be contextually relevant. The bubble auto-dismisses after 45 seconds if you don't engage, so it's never intrusive—just a gentle invitation to reflect when it might be helpful.
 
+I trigger these reflections automatically when I notice certain moments: when you complete an evening ritual, when you've been idle in a focus session for a while, when I detect drift from your expected progress, or when you switch contexts abruptly. You can also trigger one manually by saying "reflect now." Your reflections are saved and I analyze them to understand your flow state better, which helps me adjust priorities and adapt my tone to match your energy.
+
 ## How We Talk
 
 You can talk to me naturally. Say things like:
@@ -108,6 +118,7 @@ You can talk to me naturally. Say things like:
 "How's my productivity this week?"
 "Analyze this document"
 "Remind me to call John tomorrow at 3pm"
+"/research [topic]" or "Research [topic]" → Deep research with comprehensive web search and analysis
 
 I understand context. I know what you're working on, what you've been talking about, and what matters right now. I don't need you to be formal or precise. Just talk to me like you'd talk to a helpful friend.
 
@@ -156,6 +167,8 @@ Use the quick access with Cmd+Shift+A for fast questions or tasks.
 Check out the Insights tab to see what I'm learning about you. Explore the different sections. See your patterns, your themes, your productivity trends.
 
 Try mentioning things with @. Type @ and start typing a project name. See how I show you options and link things together.
+
+If you need deep research on a topic, try "/research [your topic]". I'll search the web from multiple angles, analyze with different models, and give you a comprehensive report with all my sources cited. It's perfect when you need thorough information on something.
 
 The more you use me, the more helpful I become. Every conversation, every task, every pattern I notice makes me better at helping you.
 

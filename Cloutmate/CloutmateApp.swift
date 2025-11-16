@@ -42,12 +42,6 @@ struct CloutmateApp: App {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.clear)
                     .onAppear {
-                        // FIRST: Start model warmup before any other processes
-                        _Concurrency.Task { @MainActor in
-                            let context = CloutmateApp.sharedModelContainer.mainContext
-                            await ModelWarmupService.shared.startWarmup(modelContext: context)
-                            
-                            // Only start other processes after warmup completes
                         startPublishingTimer()
                         checkAndRunMigration()
                         registerGlobalHotkey()
@@ -67,7 +61,6 @@ struct CloutmateApp: App {
                         _Concurrency.Task {
                             let apiKey = AISettings.shared.ollamaCloudAPIKey
                             _ = await HybridBridgeService.shared.performHealthCheck(apiKey: apiKey)
-                            }
                         }
                     }
             }
@@ -153,13 +146,6 @@ struct CloutmateApp: App {
                     NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.analyzeImage)
                 }
                 .keyboardShortcut("6", modifiers: [.command, .shift])
-            }
-            
-            // Suppress text editing menu warnings by explicitly managing Format menu
-            // This prevents AppKit from auto-generating orphaned submenus
-            CommandMenu("Format") {
-                // Empty - prevents automatic menu generation issues
-                // Text editing functionality is handled directly in text views
             }
         }
     }

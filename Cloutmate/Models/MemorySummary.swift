@@ -8,6 +8,13 @@
 import Foundation
 import SwiftData
 
+/// Compression mode used for generating memory summaries
+enum CompressionMode: String, Codable, CaseIterable {
+    case semantic = "semantic"       // AI-generated semantic summary
+    case extractive = "extractive"   // Key sentence extraction
+    case hybrid = "hybrid"           // Combination of semantic + extractive
+}
+
 @Model
 final class MemorySummary {
     @Attribute(.unique) var id: UUID
@@ -30,11 +37,30 @@ final class MemorySummary {
     // Link to original for full recall
     var originalContentHash: String?         // Hash of original content
     
+    // Generation metadata (for forward compatibility with Aurora version upgrades)
+    var modelName: String?                   // Which model was used (e.g., "qwen3:1.7b", "granite3.2:2b")
+    var promptVersion: String?               // Which prompt version ID was used (from AuroraSystemPromptBuilder)
+    var compressionModeRaw: String?          // Which compression mode was used (semantic, extractive, hybrid)
+    
+    /// Compression mode (computed property for type safety)
+    var compressionMode: CompressionMode? {
+        get {
+            guard let raw = compressionModeRaw else { return nil }
+            return CompressionMode(rawValue: raw)
+        }
+        set {
+            compressionModeRaw = newValue?.rawValue
+        }
+    }
+    
     init(
         originalObjectId: UUID?,
         originalObjectType: String,
         summaryText: String,
-        compressionRatio: Double
+        compressionRatio: Double,
+        modelName: String? = nil,
+        promptVersion: String? = nil,
+        compressionMode: CompressionMode? = nil
     ) {
         self.id = UUID()
         self.originalObjectId = originalObjectId
@@ -44,6 +70,9 @@ final class MemorySummary {
         self.compressedAt = Date()
         self.isArchived = false
         self.revivalCount = 0
+        self.modelName = modelName
+        self.promptVersion = promptVersion
+        self.compressionMode = compressionMode
     }
     
     /// Set embedding vector

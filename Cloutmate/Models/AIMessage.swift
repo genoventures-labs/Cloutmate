@@ -56,12 +56,6 @@ final class AIMessage: Identifiable {
     // Tone metadata (AuroraToneKit integration)
     @Attribute var tone: String? // AuroraTone rawValue for this response
     
-    // Research sources (from research mode)
-    @Attribute var researchSourcesData: Data? // Encoded [ResearchSource]
-    
-    // Research mode flag for user messages
-    @Attribute var wasSentInResearchMode: Bool = false
-    
     // Inverse relationship
     var conversation: AIConversation?
     
@@ -91,9 +85,7 @@ final class AIMessage: Identifiable {
         thinkingContent: String? = nil,
         modelUsed: String? = nil,
         wasThinking: Bool = false,
-        tone: String? = nil,
-        researchSources: [ResearchSource]? = nil,
-        wasSentInResearchMode: Bool = false
+        tone: String? = nil
     ) {
         self.id = UUID()
         self.role = role
@@ -131,13 +123,6 @@ final class AIMessage: Identifiable {
         if let chartData = chartData {
             self.chartDataEncoded = try? JSONEncoder().encode(chartData)
         }
-        
-        // Encode research sources if provided
-        if let researchSources = researchSources {
-            self.researchSourcesData = try? JSONEncoder().encode(researchSources)
-        }
-        
-        self.wasSentInResearchMode = wasSentInResearchMode
     }
     
     // Helper computed properties for tone metadata (reconstructed from AuroraToneKit)
@@ -190,17 +175,6 @@ final class AIMessage: Identifiable {
         }
         set {
             chartDataEncoded = newValue.flatMap { try? JSONEncoder().encode($0) }
-        }
-    }
-    
-    // Helper for research sources access
-    var researchSources: [ResearchSource]? {
-        get {
-            guard let data = researchSourcesData else { return nil }
-            return try? JSONDecoder().decode([ResearchSource].self, from: data)
-        }
-        set {
-            researchSourcesData = newValue.flatMap { try? JSONEncoder().encode($0) }
         }
     }
 }

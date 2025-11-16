@@ -86,29 +86,6 @@ struct MessageBubble: View {
                         .foregroundColor(.kosmicBlue)
                         .padding(.horizontal, 4)
                 }
-                
-                // Research mode indicator for user messages
-                if isUser && message.wasSentInResearchMode {
-                    HStack(spacing: 4) {
-                        Image(systemName: "magnifyingglass.circle.fill")
-                            .font(.caption2)
-                        Text("Research Mode")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                    }
-                    .foregroundColor(.kosmicBlue)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(Color.kosmicBlue.opacity(0.15))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.kosmicBlue.opacity(0.3), lineWidth: 1)
-                    )
-                    .padding(.horizontal, 4)
-                }
             }
             
             if !isUser && !isSystemMessage {
@@ -184,92 +161,46 @@ struct MessageBubble: View {
             if let content = message.content, !content.isEmpty {
                 if isUser {
                     styledUserMessage(content)
-                } else {
-                    // Check if this is a research report (has research sources)
-                    let isResearchReport = !isUser && message.researchSources != nil && !(message.researchSources?.isEmpty ?? true)
+                } else if #available(macOS 12.0, *) {
+                    // Split content into sections for proper spacing
+                    let sections = splitIntoSections(content)
                     
-                    if isResearchReport {
-                        // Render research report in collapsible view
-                        researchReportView(content: content)
-                    } else if #available(macOS 12.0, *) {
-                        // ALWAYS parse markdown for assistant messages
-                        // Split content into sections for proper spacing
-                        let sections = splitIntoSections(content)
-                        let normalizedContent = normalizeSpacing(content)
-                        
-                        if sections.count > 1 {
-                            // Multiple sections - render with explicit spacing
-                            ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
-                                let normalizedSection = normalizeSpacing(section)
-                                if let attributedSection = try? AttributedString(
-                                    markdown: normalizedSection,
-                                    options: AttributedString.MarkdownParsingOptions(
-                                        allowsExtendedAttributes: true,
-                                        interpretedSyntax: .full
-                                    )
-                                ) {
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        if index > 0 {
-                                            Spacer()
-                                                .frame(height: 16)
-                                        }
-                                        
-                                        Text(attributedSection)
-                                            .foregroundColor(isSystemMessage ? .secondary : .primary)
-                                            .textSelection(.enabled)
-                                            .multilineTextAlignment(.leading)
-                                            .lineSpacing(6)
-                                            .lineLimit(nil)
-                                            .allowsTightening(false)
-                                            .minimumScaleFactor(1.0)
-                                            .kerning(0) // Prevent character spacing issues
-                                            .tint(.kosmicBlue)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                } else {
-                                    // Fallback to plain text with normalized spacing
-                                    VStack(alignment: .leading, spacing: 0) {
-                                        if index > 0 {
-                                            Spacer()
-                                                .frame(height: 16)
-                                        }
-                                        Text(normalizedSection)
-                                            .font(isSystemMessage ? .caption : .body)
-                                            .fontWeight(isSystemMessage ? .medium : .regular)
-                                            .foregroundColor(isSystemMessage ? .secondary : .primary)
-                                            .textSelection(.enabled)
-                                            .multilineTextAlignment(.leading)
-                                            .lineSpacing(6)
-                                            .lineLimit(nil)
-                                            .allowsTightening(false)
-                                            .kerning(0)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                }
-                            }
-                        } else {
-                            // Single section - ALWAYS parse markdown first
-                            if let attributedContent = try? AttributedString(
-                                markdown: normalizedContent,
+                    if sections.count > 1 {
+                        // Multiple sections - render with explicit spacing
+                        ForEach(Array(sections.enumerated()), id: \.offset) { index, section in
+                            if let attributedSection = try? AttributedString(
+                                markdown: normalizeSpacing(section),
                                 options: AttributedString.MarkdownParsingOptions(
                                     allowsExtendedAttributes: true,
                                     interpretedSyntax: .full
                                 )
                             ) {
-                                // Render with fully parsed markdown
-                                Text(attributedContent)
-                                    .foregroundColor(isSystemMessage ? .secondary : .primary)
-                                    .textSelection(.enabled)
-                                    .multilineTextAlignment(.leading)
-                                    .lineSpacing(6)
-                                    .lineLimit(nil)
-                                    .allowsTightening(false)
-                                    .kerning(0)
-                                    .tint(.kosmicBlue)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    if index > 0 {
+                                        Spacer()
+                                            .frame(height: 16)
+                                    }
+                                    
+                                    Text(attributedSection)
+                                        .foregroundColor(isSystemMessage ? .secondary : .primary)
+                                        .textSelection(.enabled)
+                                        .multilineTextAlignment(.leading)
+                                        .lineSpacing(6)
+                                        .lineLimit(nil)
+                                        .allowsTightening(false)
+                                        .minimumScaleFactor(1.0)
+                                        .kerning(0) // Prevent character spacing issues
+                                        .tint(.kosmicBlue)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             } else {
-                                // If markdown parsing fails, fallback to plain text
-                                Text(normalizedContent)
+                                // Fallback to plain text with normalized spacing
+                                VStack(alignment: .leading, spacing: 0) {
+                                    if index > 0 {
+                                        Spacer()
+                                            .frame(height: 16)
+                                    }
+                                    Text(normalizeSpacing(section))
                                         .font(isSystemMessage ? .caption : .body)
                                         .fontWeight(isSystemMessage ? .medium : .regular)
                                         .foregroundColor(isSystemMessage ? .secondary : .primary)
@@ -280,20 +211,69 @@ struct MessageBubble: View {
                                         .allowsTightening(false)
                                         .kerning(0)
                                         .frame(maxWidth: .infinity, alignment: .leading)
+                                }
                             }
                         }
                     } else {
-                        // Fallback for older macOS versions
-                        Text(content)
-                            .font(isSystemMessage ? .caption : .body)
-                            .fontWeight(isSystemMessage ? .medium : .regular)
-                            .foregroundColor(isSystemMessage ? .secondary : .primary)
-                            .textSelection(.enabled)
-                            .multilineTextAlignment(.leading)
-                            .lineSpacing(6)
-                            .lineLimit(nil)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        // Single section - render normally with mention styling
+                        if let attributedContent = try? AttributedString(
+                            markdown: normalizeSpacing(content),
+                            options: AttributedString.MarkdownParsingOptions(
+                                allowsExtendedAttributes: true,
+                                interpretedSyntax: .full
+                            )
+                        ) {
+                            // Use MentionTextView for rendering with inline previews
+                            MentionRenderedTextView(text: normalizeSpacing(content))
+                                .foregroundColor(isSystemMessage ? .secondary : .primary)
+                                .textSelection(.enabled)
+                                .multilineTextAlignment(.leading)
+                                .lineSpacing(6)
+                                .lineLimit(nil)
+                                .tint(.kosmicBlue)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            // Fallback to plain text with mention styling
+                            let mentions = MentionParser.parseMentions(from: content)
+                            if mentions.isEmpty {
+                            Text(normalizeSpacing(content))
+                                .font(isSystemMessage ? .caption : .body)
+                                .fontWeight(isSystemMessage ? .medium : .regular)
+                                .foregroundColor(isSystemMessage ? .secondary : .primary)
+                                .textSelection(.enabled)
+                                .multilineTextAlignment(.leading)
+                                .lineSpacing(6)
+                                .lineLimit(nil)
+                                .allowsTightening(false)
+                                .kerning(0)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                let styledContent = createAttributedStringWithMentions(content, mentions: mentions, isUser: false)
+                                Text(styledContent)
+                                    .font(isSystemMessage ? .caption : .body)
+                                    .fontWeight(isSystemMessage ? .medium : .regular)
+                                    .foregroundColor(isSystemMessage ? .secondary : .primary)
+                                    .textSelection(.enabled)
+                                    .multilineTextAlignment(.leading)
+                                    .lineSpacing(6)
+                                    .lineLimit(nil)
+                                    .allowsTightening(false)
+                                    .kerning(0)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
                     }
+                } else {
+                    // Fallback for older macOS versions
+                    Text(content)
+                        .font(isSystemMessage ? .caption : .body)
+                        .fontWeight(isSystemMessage ? .medium : .regular)
+                        .foregroundColor(isSystemMessage ? .secondary : .primary)
+                        .textSelection(.enabled)
+                        .multilineTextAlignment(.leading)
+                        .lineSpacing(6)
+                        .lineLimit(nil)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             
@@ -411,12 +391,6 @@ struct MessageBubble: View {
                 }
                 .padding(.top, 8)
                 .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
-            }
-            
-            // Research sources pills (assistant messages only)
-            if !isUser, let sources = message.researchSources, !sources.isEmpty {
-                SourcePillsView(sources: sources)
-                    .padding(.top, 8)
             }
             
             // Thinking view (collapsible) for assistant messages - only show when thinking was actually enabled
@@ -1117,174 +1091,6 @@ struct ModelBadge: View {
                 .stroke(badgeColor.opacity(0.3), lineWidth: 1)
         )
         .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-}
-
-// MARK: - Source Pills View
-
-struct SourcePillsView: View {
-    let sources: [ResearchSource]
-    @State private var showAll = false
-    
-    private let maxVisible = 3
-    
-    var visibleSources: [ResearchSource] {
-        if showAll || sources.count <= maxVisible {
-            return sources
-        }
-        return Array(sources.prefix(maxVisible))
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                ForEach(visibleSources) { source in
-                    SourcePill(source: source)
-                }
-                
-                if sources.count > maxVisible && !showAll {
-                    Button(action: {
-                        showAll = true
-                    }) {
-                        HStack(spacing: 4) {
-                            Text("View all (\(sources.count))")
-                                .font(.caption2)
-                                .fontWeight(.medium)
-                        }
-                        .foregroundColor(.kosmicBlue)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(
-                            Capsule()
-                                .fill(Color.kosmicBlue.opacity(0.1))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.kosmicBlue.opacity(0.3), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-}
-
-private struct SourcePill: View {
-    let source: ResearchSource
-    
-    var body: some View {
-        Button(action: {
-            if let url = URL(string: source.url) {
-                NSWorkspace.shared.open(url)
-            }
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: "link")
-                    .font(.caption2)
-                    .foregroundColor(.kosmicBlue)
-                
-                Text(source.displayTitle)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule()
-                    .fill(Color.kosmicBlue.opacity(0.1))
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.kosmicBlue.opacity(0.3), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        .help(source.url)
-    }
-}
-
-extension ResearchSource {
-    var displayTitle: String {
-        if let title = title, !title.isEmpty {
-            return title
-        }
-        if let domain = domain, !domain.isEmpty {
-            return domain
-        }
-        // Extract domain from URL
-        if let url = URL(string: url) {
-            return url.host ?? url.absoluteString
-        }
-        return url
-    }
-}
-
-// MARK: - Research Report View
-
-@available(macOS 12.0, *)
-extension MessageBubble {
-    @ViewBuilder
-    private func researchReportView(content: String) -> some View {
-        let normalizedContent = normalizeSpacing(content)
-        
-        DisclosureGroup {
-            // Render research report content with markdown
-            if let attributedContent = try? AttributedString(
-                markdown: normalizedContent,
-                options: AttributedString.MarkdownParsingOptions(
-                    allowsExtendedAttributes: true,
-                    interpretedSyntax: .full
-                )
-            ) {
-                Text(attributedContent)
-                    .foregroundColor(.primary)
-                    .textSelection(.enabled)
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(6)
-                    .lineLimit(nil)
-                    .allowsTightening(false)
-                    .kerning(0)
-                    .tint(.kosmicBlue)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-            } else {
-                Text(normalizedContent)
-                    .font(.body)
-                    .foregroundColor(.primary)
-                    .textSelection(.enabled)
-                    .multilineTextAlignment(.leading)
-                    .lineSpacing(6)
-                    .lineLimit(nil)
-                    .allowsTightening(false)
-                    .kerning(0)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 8)
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass.circle.fill")
-                    .font(.caption)
-                    .foregroundColor(.kosmicBlue)
-                
-                Text("Research Report")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                
-                if let sources = message.researchSources, !sources.isEmpty {
-                    Text("(\(sources.count) sources)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-            }
-            .padding(.vertical, 4)
-        }
-        .padding(.vertical, 4)
     }
 }
 

@@ -24,25 +24,57 @@ enum ModelTierMap {
         ModelTier(
             name: "gemma3:1b",
             displayName: "Gemma3",
-            capabilities: ["multimodal", "foreground", "chat"],
-            primaryUseCases: ["Casual", "General"],
+            capabilities: ["casual", "foreground", "chat"],
+            primaryUseCases: ["Casual"],
             tier: 1,
             supportsThinking: false
         ),
         ModelTier(
-            name: "gwen3:8b",
-            displayName: "Gwen3",
-            capabilities: ["structured-reasoning", "chain-of-thought", "deep-analysis"],
-            primaryUseCases: ["Planning", "Reasoning"],
+            name: "qwen3:1.7b",
+            displayName: "Qwen3",
+            capabilities: ["casual", "tasks", "thinking"],
+            primaryUseCases: ["Casual Fallback", "Tasks"],
+            tier: 1,
+            supportsThinking: true
+        ),
+        ModelTier(
+            name: "qwen3-vl:2b",
+            displayName: "Qwen3-VL",
+            capabilities: ["vision", "image-processing", "multimodal"],
+            primaryUseCases: ["Images"],
+            tier: 2,
+            supportsThinking: false
+        ),
+        ModelTier(
+            name: "granite3.2-vision",
+            displayName: "Granite3-Vision",
+            capabilities: ["vision", "image-processing", "multimodal"],
+            primaryUseCases: ["Images"],
+            tier: 2,
+            supportsThinking: false
+        ),
+        ModelTier(
+            name: "gemma3:4b",
+            displayName: "Gemma3",
+            capabilities: ["document-analysis", "multimodal", "images"],
+            primaryUseCases: ["Documents", "Image Fallback"],
+            tier: 2,
+            supportsThinking: false
+        ),
+        ModelTier(
+            name: "gwen2.5-coder:1.5b",
+            displayName: "Gwen2.5-Coder",
+            capabilities: ["coding", "reasoning", "structured-reasoning"],
+            primaryUseCases: ["Coding", "Reasoning"],
             tier: 2,
             supportsThinking: true
         ),
         ModelTier(
             name: "deepseek-r1:1.5b",
-            displayName: "DeepSeek R1",
-            capabilities: ["research", "reasoning", "deep-analysis"],
-            primaryUseCases: ["Research", "Analysis"],
-            tier: 2,
+            displayName: "DeepSeek-R1",
+            capabilities: ["research", "document-fallback", "deep-reasoning"],
+            primaryUseCases: ["Research", "Document Fallback"],
+            tier: 3,
             supportsThinking: true
         ),
         ModelTier(
@@ -50,21 +82,13 @@ enum ModelTierMap {
             displayName: "Granite3",
             capabilities: ["background", "summaries", "memory"],
             primaryUseCases: ["Background", "Cognition"],
-            tier: 3,
-            supportsThinking: false
-        ),
-        ModelTier(
-            name: "granite3.2-vision",
-            displayName: "Granite3 Vision",
-            capabilities: ["multimodal", "vision", "image-analysis"],
-            primaryUseCases: ["Images", "Vision"],
-            tier: 3,
+            tier: 4,
             supportsThinking: false
         )
     ]
     
     private static let backgroundModelName = "granite3.2:2b"
-    private static let thinkingModelName = "gwen3:8b"
+    private static let thinkingModelName = "qwen3:1.7b"
     
     /// Gets model display name for UI (simplified, no version numbers)
     static func displayName(for model: String) -> String {
@@ -74,14 +98,14 @@ enum ModelTierMap {
         if model.lowercased().contains("gemma3") {
             return "Gemma3"
         }
-        if model.lowercased().contains("gwen3") {
-            return "Gwen3"
+        if model.lowercased().contains("qwen3") || model.lowercased().contains("qwen") {
+            return "Qwen3"
+        }
+        if model.lowercased().contains("gwen2.5") || model.lowercased().contains("gwen2") {
+            return "Gwen2.5"
         }
         if model.lowercased().contains("deepseek") {
-            return "DeepSeek R1"
-        }
-        if model.lowercased().contains("granite") && model.lowercased().contains("vision") {
-            return "Granite3 Vision"
+            return "DeepSeek"
         }
         if model.lowercased().contains("granite") {
             return "Granite3"
@@ -89,6 +113,10 @@ enum ModelTierMap {
         // Handle Gemini for image analysis
         if model.lowercased().contains("gemini") {
             return "Gemini"
+        }
+        // Handle OpenAI-OSS cloud model
+        if model.lowercased().contains("gpt-oss") || model.lowercased().contains("openai") {
+            return "OpenAI-OSS"
         }
         // Fallback: extract base name
         let components = model.components(separatedBy: ":")
@@ -108,19 +136,74 @@ enum ModelTierMap {
         return localModels.map { $0.name }
     }
     
-    /// Gets default model (gemma3:1b)
+    /// Gets default model (casual primary)
     static func defaultModel() -> String {
         return "gemma3:1b"
     }
     
-    /// Gets fallback model
+    /// Gets fallback model (casual fallback)
     static func fallbackModel() -> String {
-        return "granite3.2:2b"
+        return "qwen3:1.7b"
     }
     
     /// Gets background inference model (silent reasoning + prep)
     static func backgroundModel() -> String {
         return backgroundModelName
+    }
+    
+    /// Gets casual conversation model (primary)
+    static func casualModel() -> String {
+        return "gemma3:1b"
+    }
+    
+    /// Gets casual fallback model
+    static func casualFallbackModel() -> String {
+        return "qwen3:1.7b"
+    }
+    
+    /// Gets task model (with thinking enabled)
+    static func taskModel() -> String {
+        return "qwen3:1.7b"
+    }
+    
+    /// Gets image processing model (primary)
+    static func imageModel() -> String {
+        return "qwen3-vl:2b"
+    }
+    
+    /// Gets image secondary model
+    static func imageSecondaryModel() -> String {
+        return "granite3.2-vision"
+    }
+    
+    /// Gets image fallback model
+    static func imageFallbackModel() -> String {
+        return "gemma3:4b"
+    }
+    
+    /// Gets document analysis model (primary)
+    static func documentModel() -> String {
+        return "gemma3:4b"
+    }
+    
+    /// Gets document fallback model
+    static func documentFallbackModel() -> String {
+        return "deepseek-r1:1.5b"
+    }
+    
+    /// Gets coding model
+    static func codingModel() -> String {
+        return "gwen2.5-coder:1.5b"
+    }
+    
+    /// Gets reasoning model (secondary)
+    static func reasoningModel() -> String {
+        return "gwen2.5-coder:1.5b"
+    }
+    
+    /// Gets research mode models (cloud models)
+    static func researchModels() -> [String] {
+        return ["deepseek-r1:1.5b", "gpt-oss:20b"]
     }
     
     /// Checks if a model is a local model
@@ -133,6 +216,7 @@ enum ModelTierMap {
         return localModels.map { (name: $0.name, displayName: $0.displayName) }
     }
     
+    /// Gets thinking model (tasks with thinking)
     static func thinkingModel() -> String {
         return thinkingModelName
     }

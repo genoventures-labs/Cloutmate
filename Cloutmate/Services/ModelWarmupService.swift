@@ -62,15 +62,29 @@ final class ModelWarmupService {
         completedModels = 0
         warmupMessage = "Hi! I'm just getting my systems ready. This will only take a moment..."
         
-        // Get all models to warm up
-        let allLocalModels = ModelTierMap.allLocalModels()
+        // Get models to warm up in prioritized order based on usage frequency
+        let prioritizedModels = [
+            "gemma3:1b",           // 1. Casual primary
+            "qwen3:1.7b",          // 2. Casual fallback, tasks
+            "granite3.2:2b",       // 3. Background layer
+            "qwen3-vl:2b",         // 4. Image processing primary
+            "gemma3:4b",           // 5. Documents, image fallback
+            "gwen2.5-coder:1.5b", // 6. Coding, reasoning
+            "granite3.2-vision",   // 7. Image secondary
+            "deepseek-r1:1.5b"     // 8. Research mode, document fallback
+        ]
         
-        // Filter to only models that are actually available
+        // Filter to only models that are actually available, preserving priority order
         var modelsToWarmup: [(name: String, isLocal: Bool)] = []
         
-        // Check which local models are actually available
-        let availableLocalModels = await checkAvailableLocalModels(allLocalModels)
-        modelsToWarmup.append(contentsOf: availableLocalModels.map { (name: $0, isLocal: true) })
+        // Check which local models are actually available, in priority order
+        let availableLocalModels = await checkAvailableLocalModels(prioritizedModels)
+        // Preserve priority order by filtering prioritizedModels in order
+        for prioritizedModel in prioritizedModels {
+            if availableLocalModels.contains(prioritizedModel) {
+                modelsToWarmup.append((name: prioritizedModel, isLocal: true))
+            }
+        }
         
         // Add cloud model if API key is available and cloud is accessible
         let apiKey = AISettings.shared.ollamaCloudAPIKey

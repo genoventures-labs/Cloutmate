@@ -130,7 +130,7 @@ actor OllamaBridgeService {
     static let shared = OllamaBridgeService()
     
     private let baseURL = "http://localhost:11434"
-    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (gemma3:1b)
+    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (gemma3:4b)
     private var previousModel: String? // Track previous model for switch notifications
     private var cachedAvailableModels: [String] = [] // Cache available models
     private var lastModelFetch: Date?
@@ -169,16 +169,17 @@ actor OllamaBridgeService {
     private init() {
         // Prepare schema document for prompts
         schemaDocument = SchemaIntrospector.generateSchemaDocument()
-        // Use default model from routing engine (gemma3:1b)
+        // Use default model from routing engine (gemma3:4b)
         currentModel = ModelTierMap.defaultModel()
         print("[OllamaBridgeService] Initialized with default model: \(currentModel)")
-        
-        // Note: Pre-warming is now handled by ModelWarmupService to avoid conflicts and timeouts
-        // ModelWarmupService waits for Ollama to be ready and handles warmup properly
-        // These automatic pre-warms are disabled to prevent premature requests before user interaction
-        // 
-        // Pre-warm will happen on-demand when models are actually needed via ensureModelReady()
-        // This prevents timeouts when Ollama isn't ready yet
+        // Pre-warm the default model
+        _Concurrency.Task {
+            await preWarmModel()
+        }
+        // Pre-warm background Granite model for silent inference tasks
+        _Concurrency.Task {
+            await preWarmBackgroundModel()
+        }
     }
     
     func isModelReady(_ model: String) -> Bool {
@@ -632,9 +633,6 @@ Help users brainstorm, write, plan, schedule, optimize their workflows, and main
 **CRITICAL: Always respond conversationally. Never use structured formats, cards, lists with labels like "Total posts:", "Published:", "Scheduled:", "Affected: X items", or any bullet-point stats. Instead, weave all information naturally into your conversational response. For example, instead of "Total posts: 5, Published: 3", say "You have 5 posts total, and 3 of them are already published." Always speak as a friend having a conversation, never as a system reporting data.
 
 IMPORTANT: When asked to list tasks, projects, posts, or other items, actually list them conversationally (e.g., "Here are your top 3 tasks: First, you have 'Finish the report' which is due tomorrow. Second, there's 'Review the design' that's high priority. And third, 'Call the client' is scheduled for this afternoon."). Only provide summaries when explicitly asked for a summary. If the user asks "what are my tasks?" or "list my tasks", give them the actual list, not just a summary count.**
-
-**ABSOLUTE RULE - NEVER USE META-COMMENTARY:**
-NEVER start your response with phrases like "Here's how Aurora should respond", "**Aurora:**", "Here's how Aurora would respond", "Based on the given data", or any explanation about HOW to respond. Respond DIRECTLY as Aurora. Start immediately with your actual response. Never use quotes, formatting markers, or meta-instructions. Just BE Aurora and respond naturally as if you ARE Aurora, not someone describing how Aurora would respond.
 
 Data schema (reference):
 
@@ -3340,10 +3338,10 @@ Aurora:
             throw OllamaError.connectionFailed
         }
         
-        // Use granite3.2-vision for image analysis
+        // Use llama3.2-vision:latest for image analysis (from available models)
         let availableVisionModels = [
-            "granite3.2-vision",
-            "granite3.2-vision:latest"
+            "llama3.2-vision:latest",
+            "llama3.2-vision"
         ]
         
         // Check if vision model is available
@@ -3362,7 +3360,7 @@ Aurora:
         guard let modelToUse = visionModel else {
             // No vision model available - return helpful error
             return DocumentAnalysisResult(
-                summary: "I'd love to analyze that image, but I don't have a vision-capable model installed. To enable image analysis, please install granite3.2-vision by running: `ollama pull granite3.2-vision`",
+                summary: "I'd love to analyze that image, but I don't have a vision-capable model installed. To enable image analysis, please install llama3.2-vision by running: `ollama pull llama3.2-vision:latest`",
                 truncatedContext: false,
                 sourceModel: .ollama
             )
@@ -4033,6 +4031,269 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
         }
         
         return info
+    }
+    
+    // MARK: - Image Analysis
+    
+    func analyzeImage(
+        imageData: Data,
+        mimeType: String,
+        userPrompt: String?,
+        appContext: String,
+        payloadContext: AIPayloadContext? = nil,
+        conversationMessages: [ConversationMessage]? = nil,
+        currentMessageStyle: TypingStyle? = nil,
+        userStyleProfile: UserPreferences? = nil,
+        confidence: ConfidenceSnapshot? = nil
+    ) async throws -> DocumentAnalysisResult {
+        // Safety guard: Force isResearchMode = false for images
+        var safePayloadContext = payloadContext
+        if safePayloadContext == nil {
+            safePayloadContext = AIPayloadContext(intent: .general)
+        }
+        safePayloadContext?.metadata["isResearchMode"] = false
+        
+        // Use image routing from ModelRoutingEngine
+        let imageRoutingDecision = await ModelRoutingEngine.shared.selectImageModel()
+        let primaryModel = imageRoutingDecision.model
+        let secondaryModel = ModelTierMap.imageSecondaryModel()
+        let fallbackModel = ModelTierMap.imageFallbackModel()
+        
+        #if DEBUG
+        print("[OllamaBridgeService] [IMAGE] Routing to \(primaryModel) with fallbacks: \(secondaryModel) → \(fallbackModel)")
+        #endif
+        
+        // Encode image to base64
+        let base64Image = imageData.base64EncodedString()
+        
+        // Build prompt
+        let promptText = userPrompt ?? "Analyze this image and describe what you see. Be detailed and conversational."
+        
+        // Build full prompt with app context
+        var fullPrompt = promptText
+        if !appContext.isEmpty {
+            fullPrompt = "\(appContext)\n\n\(promptText)"
+        }
+        
+        // Try primary model first
+        do {
+            let result = try await makeOllamaRequestWithImages(
+                model: primaryModel,
+                prompt: fullPrompt,
+                images: [base64Image],
+                useThinking: false
+            )
+            
+            return DocumentAnalysisResult(
+                summary: result.response.trimmingCharacters(in: .whitespacesAndNewlines),
+                truncatedContext: false,
+                sourceModel: .ollama
+            )
+        } catch {
+            // Try secondary model
+            #if DEBUG
+            print("[OllamaBridgeService] [IMAGE] Primary model \(primaryModel) failed, trying \(secondaryModel)")
+            #endif
+            
+            do {
+                let result = try await makeOllamaRequestWithImages(
+                    model: secondaryModel,
+                    prompt: fullPrompt,
+                    images: [base64Image],
+                    useThinking: false
+                )
+                
+                return DocumentAnalysisResult(
+                    summary: result.response.trimmingCharacters(in: .whitespacesAndNewlines),
+                    truncatedContext: false,
+                    sourceModel: .ollama
+                )
+            } catch {
+                // Try fallback model
+                #if DEBUG
+                print("[OllamaBridgeService] [IMAGE] Secondary model \(secondaryModel) failed, trying fallback \(fallbackModel)")
+                #endif
+                
+                let result = try await makeOllamaRequestWithImages(
+                    model: fallbackModel,
+                    prompt: fullPrompt,
+                    images: [base64Image],
+                    useThinking: false
+                )
+                
+                return DocumentAnalysisResult(
+                    summary: result.response.trimmingCharacters(in: .whitespacesAndNewlines),
+                    truncatedContext: false,
+                    sourceModel: .ollama
+                )
+            }
+        }
+    }
+    
+    // MARK: - Document Analysis
+    
+    func analyzeDocument(
+        descriptor: DocumentDescriptor,
+        userPrompt: String?,
+        appContext: String,
+        payloadContext: AIPayloadContext? = nil,
+        conversationMessages: [ConversationMessage]? = nil,
+        currentMessageStyle: TypingStyle? = nil,
+        userStyleProfile: UserPreferences? = nil,
+        confidence: ConfidenceSnapshot? = nil
+    ) async throws -> DocumentAnalysisResult {
+        // Safety guard: Force isResearchMode = false for documents
+        var safePayloadContext = payloadContext
+        if safePayloadContext == nil {
+            safePayloadContext = AIPayloadContext(intent: .general)
+        }
+        safePayloadContext?.metadata["isResearchMode"] = false
+        
+        // Use document routing from ModelRoutingEngine
+        let documentRoutingDecision = await ModelRoutingEngine.shared.selectDocumentModel()
+        let primaryModel = documentRoutingDecision.model
+        let fallbackModel = ModelTierMap.documentFallbackModel()
+        
+        #if DEBUG
+        print("[OllamaBridgeService] [DOCUMENT] Routing to \(primaryModel) with fallback: \(fallbackModel)")
+        #endif
+        
+        // Build prompt with document text
+        let documentText = descriptor.text
+        let previewText = descriptor.preview
+        let promptText = userPrompt ?? "Analyze this document and provide a summary. Be detailed and conversational."
+        
+        let fullPrompt = """
+        \(promptText)
+        
+        Document: \(descriptor.fileName)
+        Preview: \(previewText)
+        
+        Full Document Text:
+        \(documentText)
+        """
+        
+        // Build full prompt with app context
+        var finalPrompt = fullPrompt
+        if !appContext.isEmpty {
+            finalPrompt = "\(appContext)\n\n\(fullPrompt)"
+        }
+        
+        // Try primary model first
+        do {
+            let result = try await makeOllamaRequest(
+                prompt: finalPrompt,
+                useThinking: false,
+                model: primaryModel
+            )
+            
+            return DocumentAnalysisResult(
+                summary: result.response.trimmingCharacters(in: .whitespacesAndNewlines),
+                truncatedContext: false,
+                sourceModel: .ollama
+            )
+        } catch {
+            // Try fallback model (deepseek-r1:1.5b for documents only)
+            #if DEBUG
+            print("[OllamaBridgeService] [DOCUMENT] Primary model \(primaryModel) failed, trying fallback \(fallbackModel)")
+            #endif
+            
+            let result = try await makeOllamaRequest(
+                prompt: finalPrompt,
+                useThinking: ModelTierMap.supportsThinking(fallbackModel),
+                model: fallbackModel
+            )
+            
+            return DocumentAnalysisResult(
+                summary: result.response.trimmingCharacters(in: .whitespacesAndNewlines),
+                truncatedContext: false,
+                sourceModel: .ollama
+            )
+        }
+    }
+    
+    /// Makes an Ollama request with images (for vision models)
+    private func makeOllamaRequestWithImages(
+        model: String,
+        prompt: String,
+        images: [String],
+        useThinking: Bool = false
+    ) async throws -> (response: String, thinking: String?) {
+        guard let url = URL(string: "\(baseURL)/api/generate") else {
+            throw OllamaError.serviceUnavailable
+        }
+        
+        if !isModelReady(model) {
+            do {
+                try await ensureModelReady(model: model, progressHandler: nil)
+            } catch {
+                print("[OllamaBridgeService] Warmup for \(model) failed before image request: \(error.localizedDescription)")
+            }
+        }
+        
+        let options = useThinking && ModelTierMap.supportsThinking(model) ? OllamaOptions(thinking: true) : nil
+        let request = OllamaRequest(model: model, prompt: prompt, stream: false, images: images, options: options)
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Use longer timeout for image analysis (images take longer to process)
+        let promptLength = prompt.count
+        let effectiveTimeout: TimeInterval
+        if promptLength >= 15000 {
+            effectiveTimeout = hugeContextTimeout
+        } else if promptLength >= 10000 {
+            effectiveTimeout = bigContextTimeout
+        } else if promptLength >= 6000 {
+            effectiveTimeout = largeContextTimeout
+        } else if promptLength >= 2000 {
+            effectiveTimeout = normalContextTimeout
+        } else {
+            effectiveTimeout = normalContextTimeout // Use normal timeout minimum for images
+        }
+        urlRequest.timeoutInterval = effectiveTimeout
+        
+        do {
+            urlRequest.httpBody = try JSONEncoder().encode(request)
+        } catch {
+            throw OllamaError.apiError("Failed to encode request: \(error.localizedDescription)")
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw OllamaError.apiError("Invalid response type")
+            }
+            
+            if httpResponse.statusCode == 404 {
+                throw OllamaError.modelNotFound
+            }
+            
+            if httpResponse.statusCode != 200 {
+                throw OllamaError.apiError("HTTP \(httpResponse.statusCode)")
+            }
+            
+            let decoder = JSONDecoder()
+            let ollamaResponse = try decoder.decode(OllamaResponse.self, from: data)
+            
+            if let error = ollamaResponse.error {
+                throw OllamaError.apiError(error)
+            }
+            
+            guard !ollamaResponse.response.isEmpty else {
+                throw OllamaError.emptyResponse
+            }
+            
+            // Only return thinking content if we actually requested it
+            let thinkingContent = useThinking ? ollamaResponse.thinking : nil
+            return (ollamaResponse.response, thinkingContent)
+        } catch let error as OllamaError {
+            throw error
+        } catch {
+            throw OllamaError.apiError("Unexpected error: \(error.localizedDescription)")
+        }
     }
 }
 

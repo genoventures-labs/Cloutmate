@@ -54,41 +54,8 @@ final class AIAssistantViewModel {
     @ObservationIgnored private var lastUserMessage: (text: String, image: ImageAttachmentService.ImageAttachment?, document: DocumentAttachmentService.DocumentAttachment?)?
     @ObservationIgnored private var messagePayloadCache: [UUID: ResendPayload] = [:]
     
-    // Research mode state
-    @ObservationIgnored private var isResearchMode: Bool = false
-    
-    // Research progress tracking
-    var currentResearchAction: String? = nil
-    var currentResearchSourceCount: Int = 0
-    
     var canRetry: Bool {
         lastUserMessage != nil
-    }
-    
-    var researchModeActive: Bool {
-        isResearchMode
-    }
-    
-    func clearResearchMode() {
-        isResearchMode = false
-        clearResearchProgress()
-    }
-    
-    func setResearchMode(_ active: Bool) {
-        isResearchMode = active
-        if !active {
-            clearResearchProgress()
-        }
-    }
-    
-    func updateResearchProgress(action: String, sourceCount: Int = 0) {
-        currentResearchAction = action
-        currentResearchSourceCount = sourceCount
-    }
-    
-    func clearResearchProgress() {
-        currentResearchAction = nil
-        currentResearchSourceCount = 0
     }
     
     // Linked context from @ mentions
@@ -239,9 +206,6 @@ final class AIAssistantViewModel {
     // MARK: - Methods
     
     func initializeConversation(modelContext: ModelContext) {
-        // Clear research mode when starting a new conversation
-        clearResearchMode()
-        
         if currentConversation == nil {
             let conversation = AIConversation(title: "Chat \(Date().formatted(date: .abbreviated, time: .omitted))")
             modelContext.insert(conversation)
@@ -273,31 +237,11 @@ final class AIAssistantViewModel {
         image: ImageAttachmentService.ImageAttachment? = nil,
         document: DocumentAttachmentService.DocumentAttachment? = nil
     ) {
-        var trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedImage = image ?? pendingImageAttachment
         let resolvedDocument = document ?? pendingDocumentAttachment
 
         guard !trimmedText.isEmpty || resolvedImage != nil || resolvedDocument != nil else { return }
-        
-        // Detect /research command - check both text and existing state (from slash drawer)
-        if researchModeActive {
-            // Already set via slash drawer, just ensure it stays active
-            // Remove /research from text if it exists (user might have typed it)
-            if trimmedText.contains("/research") || trimmedText.hasPrefix("/research ") || trimmedText == "/research" {
-                trimmedText = trimmedText.replacingOccurrences(of: "/research", with: "")
-                    .replacingOccurrences(of: "/research ", with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-        } else if trimmedText.contains("/research") || trimmedText.hasPrefix("/research ") || trimmedText == "/research" {
-            // Detect /research in text
-            setResearchMode(true)
-            // Remove /research from text
-            trimmedText = trimmedText.replacingOccurrences(of: "/research", with: "")
-                .replacingOccurrences(of: "/research ", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        // Don't clear research mode here - it stays active until response completes
-        // This allows the pill to remain visible during research
 
         if resolvedImage != nil && resolvedDocument != nil {
             let warning = AIMessage(
@@ -312,14 +256,8 @@ final class AIAssistantViewModel {
         }
         
         // Initialize conversation if needed
-        // Preserve research mode during initialization
-        let researchModeWasActive = researchModeActive
         if currentConversation == nil {
             initializeConversation(modelContext: modelContext)
-            // Restore research mode if it was active before initialization
-            if researchModeWasActive {
-                setResearchMode(true)
-            }
             // Ensure conversation is saved before proceeding
             do {
                 try modelContext.save()
@@ -345,18 +283,16 @@ final class AIAssistantViewModel {
             return
         }
         
-        // Analyze emotional tone of user message (use trimmedText if available and non-empty, otherwise use original text)
-        let messageContentForStorage = (!trimmedText.isEmpty) ? trimmedText : text
-        let emotionalSourceText = !messageContentForStorage.isEmpty ? messageContentForStorage : (resolvedDocument?.textPreview ?? "")
+        // Analyze emotional tone of user message
+        let emotionalSourceText = !text.isEmpty ? text : (resolvedDocument?.textPreview ?? "")
         let emotionalSnapshot = EmotionAnalyzer.analyzeTone(text: emotionalSourceText)
         
         let userMessage = AIMessage(
             role: "user",
-            content: messageContentForStorage,
+            content: text,
             emotion: emotionalSnapshot.primaryEmotion.rawValue,
             emotionScore: emotionalSnapshot.valence,
-            emotionIntensity: emotionalSnapshot.intensity,
-            wasSentInResearchMode: researchModeActive
+            emotionIntensity: emotionalSnapshot.intensity
         )
         if let attachment = resolvedImage {
             userMessage.imageData = attachment.data
@@ -376,7 +312,7 @@ final class AIAssistantViewModel {
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
         messagePayloadCache[userMessage.id] = ResendPayload(
-            text: messageContentForStorage,
+            text: text,
             image: resolvedImage,
             document: resolvedDocument
         )
@@ -389,15 +325,15 @@ final class AIAssistantViewModel {
         }
         
         let typingStyle: TypingStyle
-        if !messageContentForStorage.isEmpty {
-            typingStyle = StyleAnalyzer.analyzeStyle(text: messageContentForStorage)
+        if !trimmedText.isEmpty {
+            typingStyle = StyleAnalyzer.analyzeStyle(text: text)
         } else {
             typingStyle = TypingStyle.neutral
         }
         let stylePreferences = fetchOrCreatePreferences(modelContext: modelContext)
         applyStyleSample(typingStyle, to: stylePreferences)
         stylePreferences.lastUserEmotion = emotionalSnapshot.primaryEmotion.rawValue
-        let topicSource = !messageContentForStorage.isEmpty ? messageContentForStorage : (resolvedDocument?.textPreview ?? "")
+        let topicSource = !text.isEmpty ? text : (resolvedDocument?.textPreview ?? "")
         if let topic = StyleAnalyzer.primaryTopic(from: topicSource) {
             stylePreferences.lastConversationTopic = topic
         }
@@ -415,23 +351,8 @@ final class AIAssistantViewModel {
         // Cancel any existing task
         currentResponseTask?.cancel()
         
-        // Capture conversation ID and research mode state at task start
-        // This prevents cross-conversation updates and ensures research mode state is preserved
-        let taskConversationId = currentConversation?.id
-        let taskResearchMode = researchModeActive // Capture research mode state NOW, before async execution
-        
         // Create new task and store it
-        let task: _Concurrency.Task<Void, Never> = _Concurrency.Task { [weak self] in
-            guard let self = self else { return }
-            
-            // Verify this task is still relevant to current conversation
-            // If user switched conversations, this task should not update UI
-            if self.currentConversation?.id != taskConversationId {
-                // User switched conversations - don't update UI for this task
-                print("[AIAssistantViewModel] Task completed but conversation changed - skipping UI update")
-                return
-            }
-            
+        let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
             if let attachment = resolvedDocument {
                     updateActivity(.analyzingDocument)
                 await handleDocumentMessage(
@@ -458,21 +379,15 @@ final class AIAssistantViewModel {
                 )
                 return
             }
-            if await handlePendingOperationIfNeeded(with: messageContentForStorage, modelContext: modelContext, isFirstMessage: isFirstMessage) {
+            if await handlePendingOperationIfNeeded(with: text, modelContext: modelContext, isFirstMessage: isFirstMessage) {
                 return
             }
             // DISABLED: Creation intent detection is too aggressive and constantly asks about creating tasks
             // Only create items when explicitly requested through conversational flow
             
             // Try preference update intent
-            if let prefUpdate = try? await coreResponseService.inferPreferenceUpdate(input: messageContentForStorage) {
+            if let prefUpdate = try? await coreResponseService.inferPreferenceUpdate(input: text) {
                 await MainActor.run {
-                    // Verify conversation hasn't changed
-                    if self.currentConversation?.id != taskConversationId {
-                        print("[AIAssistantViewModel] Conversation changed during preference update - skipping")
-                        return
-                    }
-                    
                     // Fetch or create preferences
                     let prefs: UserPreferences
                     prefs = fetchOrCreatePreferences(modelContext: modelContext)
@@ -491,43 +406,26 @@ final class AIAssistantViewModel {
                     messages.append(confirm)
                     currentConversation?.messages?.append(confirm)
                 }
-                
-                // Verify conversation hasn't changed before processing
-                if await MainActor.run(body: { self.currentConversation?.id != taskConversationId }) {
-                    print("[AIAssistantViewModel] Conversation changed before processMessage - skipping")
-                    return
-                }
-                
                     currentActivity = .generatingResponse
                 await processMessage(
-                    messageContentForStorage,
+                    text,
                     modelContext: modelContext,
                     isFirstMessage: isFirstMessage,
                     currentStyle: typingStyle,
-                    styleProfile: stylePreferences,
-                    taskConversationId: taskConversationId,
-                    taskResearchMode: taskResearchMode
+                    styleProfile: stylePreferences
                 )
                 return
             }
             
             // REMOVED: Scheduling intent picker - will auto-schedule in processMessage if needed
             
-            // Verify conversation hasn't changed before processing
-            if await MainActor.run(body: { self.currentConversation?.id != taskConversationId }) {
-                print("[AIAssistantViewModel] Conversation changed before processMessage - skipping")
-                return
-            }
-            
                 updateActivity(.generatingResponse)
             await processMessage(
-                messageContentForStorage,
+                text,
                 modelContext: modelContext,
                 isFirstMessage: isFirstMessage,
                 currentStyle: typingStyle,
-                styleProfile: stylePreferences,
-                taskConversationId: taskConversationId,
-                taskResearchMode: taskResearchMode
+                styleProfile: stylePreferences
             )
         }
         currentResponseTask = task
@@ -538,9 +436,7 @@ final class AIAssistantViewModel {
         modelContext: ModelContext,
         isFirstMessage: Bool = false,
         currentStyle: TypingStyle? = nil,
-        styleProfile: UserPreferences? = nil,
-        taskConversationId: UUID? = nil,
-        taskResearchMode: Bool = false
+        styleProfile: UserPreferences? = nil
     ) async {
         do {
             // Check for REFLECTION intent first (introspective queries about patterns/state)
@@ -695,10 +591,7 @@ final class AIAssistantViewModel {
                 }
             }
             
-            // Only update activity if NOT in research mode (research mode uses its own progress indicator)
-            if !taskResearchMode {
             updateActivity(.generatingResponse)
-            }
             
             // Build AI context - transition state will be added after tone detection
             var (appContext, payloadContext, conversationModelContent) = try await buildAIContext(
@@ -776,6 +669,16 @@ final class AIAssistantViewModel {
                 userInputWithWebSearch = cleanText.isEmpty ? text : cleanText
             }
             
+            // Detect research mode from input or existing flag
+            let isResearchMode = text.lowercased().hasPrefix("/research") ||
+                               text.lowercased().contains("research mode") ||
+                               (payloadContext.metadata["isResearchMode"] as? Bool ?? false)
+            
+            // Set research mode in payload context metadata for CoreResponseService
+            if isResearchMode {
+                payloadContext.metadata["isResearchMode"] = true
+            }
+            
             let intentCluster = payloadContext.intentClusters?.primaryCluster
             let routingConfidence = payloadContext.intentClusters?.confidence ?? confidenceSnapshot.score
             let messageLength = userInputWithWebSearch.count
@@ -786,38 +689,10 @@ final class AIAssistantViewModel {
                 confidence: routingConfidence,
                 messageLength: messageLength,
                 userStyle: currentStyle,
-                conversationId: nil
+                conversationId: nil,
+                isResearchMode: isResearchMode
             )
             
-            // Step 0: Ensure the selected model is ready before processing (non-blocking)
-            // Show "Getting things ready" message if warmup is needed
-            let selectedModel = routingDecision.model
-            let needsWarmup = !ModelWarmupService.shared.checkModelReady(selectedModel)
-            
-            if needsWarmup {
-                await MainActor.run {
-                    // Show warmup message using existing status system
-                    updateActivity(.warmingUp)
-                    updateStatus("Getting things ready...")
-                }
-                
-                // Ensure model is ready (non-blocking - shows progress messages)
-                await ModelWarmupService.shared.ensureModelsReady(
-                    models: [selectedModel],
-                    progressHandler: { [weak self] message in
-                        // progressHandler is already called on MainActor by ModelWarmupService
-                        // Since AIAssistantViewModel is @MainActor, we can call methods directly
-                        self?.updateStatus(message)
-                    }
-                )
-                
-                // Clear warmup status after warmup completes
-                await MainActor.run {
-                    clearStatus()
-                }
-            }
-            
-            // Also check with OllamaBridge for on-demand loading if ModelWarmupService check passed
             if !(await OllamaBridgeService.shared.isModelReady(routingDecision.model)) {
                 await MainActor.run {
                     updateActivity(.warmingUp)
@@ -848,11 +723,8 @@ final class AIAssistantViewModel {
                 }
             }
             
-            // Only update activity if NOT in research mode (research mode uses its own progress indicator)
             await MainActor.run {
-                if !taskResearchMode {
                 updateActivity(.generatingResponse)
-                }
             }
             
             // Determine tone context based on conversation context
@@ -1072,83 +944,7 @@ final class AIAssistantViewModel {
             // Use prediction to bias response generation
             let predictedNextTone: AuroraTone? = tonePrediction.confidence >= 0.6 ? tonePrediction.predictedTone : nil
             
-            // Check if research mode is active
-            // Use the captured state from when sendMessage was called, not current state
-            // This ensures research mode applies even if state changes during async execution
-            let isResearchActive = taskResearchMode
-            
-            var result: (response: String, thinking: String?, modelUsed: String)
-            var researchSources: [ResearchSource]? = nil
-            
-            if isResearchActive {
-                // Use research mode
-                // Don't update activity to .generatingResponse or .searching - we only show research progress
-                // updateActivity(.searching) // Removed - we don't want to trigger ThinkingIndicator
-                
-                // Step 0: Ensure research models are ready before processing (non-blocking)
-                // Show "Getting things ready" message if warmup is needed
-                let researchModels = ["deepseek-r1:1.5b", "gpt-oss:20b"]
-                
-                // Check if any research models need warmup
-                let needsWarmup = !researchModels.allSatisfy { ModelWarmupService.shared.checkModelReady($0) }
-                
-                if needsWarmup {
-                    await MainActor.run {
-                        clearResearchProgress()
-                        updateResearchProgress(action: "Getting things ready...", sourceCount: 0)
-                    }
-                    
-                    // Ensure all research models are ready (non-blocking - shows progress messages)
-                    await ModelWarmupService.shared.ensureModelsReady(
-                        models: researchModels,
-                        progressHandler: { [weak self] message in
-                            // progressHandler is already called on MainActor by ModelWarmupService
-                            // Since AIAssistantViewModel is @MainActor, we can call methods directly
-                            self?.updateResearchProgress(action: message, sourceCount: 0)
-                        }
-                    )
-                }
-                
-                // Initialize research progress tracking - show initial state immediately
-                await MainActor.run {
-                    clearResearchProgress()
-                    // Set initial progress to show indicator immediately
-                    updateResearchProgress(action: "Starting research...", sourceCount: 0)
-                }
-                
-                do {
-                    let researchResult = try await coreResponseService.generateResearchResponse(
-                        for: userInputWithWebSearch,
-                        appContext: appContext,
-                        payloadContext: payloadContext,
-                        conversationMessages: conversationMessages,
-                        currentMessageStyle: currentStyle,
-                        userStyleProfile: styleProfile,
-                        confidence: confidenceSnapshot,
-                        toneContext: effectiveTone,
-                        modelContext: modelContext,
-                        onProgressUpdate: { [weak self] action, sourceCount in
-                            // Callback is already invoked on MainActor from services
-                            self?.updateResearchProgress(action: action, sourceCount: sourceCount)
-                        }
-                    )
-                
-                    result = (researchResult.response, researchResult.thinking, researchResult.modelUsed)
-                    researchSources = researchResult.sources
-                } catch {
-                    // If research fails, provide error message but don't crash
-                    print("[AIAssistantViewModel] Research mode error: \(error.localizedDescription)")
-                    result = ("Research mode encountered an error: \(error.localizedDescription). Please try again or check your model availability.", nil, "Research Mode")
-                    researchSources = []
-                }
-                
-                // Clear research mode after use (whether successful or failed)
-                await MainActor.run {
-                    clearResearchMode()
-                }
-            } else {
-                // Normal response
-                result = try await coreResponseService.generateResponseWithAppContext(
+            var result = try await coreResponseService.generateResponseWithAppContext(
                 for: userInputWithWebSearch,
                 appContext: appContext,
                 payloadContext: payloadContext,
@@ -1161,7 +957,6 @@ final class AIAssistantViewModel {
                 toneContext: effectiveTone,
                 predictedNextTone: predictedNextTone
             )
-            }
             
             var response = result.response
             
@@ -1214,20 +1009,10 @@ final class AIAssistantViewModel {
                 thinkingContent: limitedThinkingContent,
                 modelUsed: result.modelUsed,
                 wasThinking: result.thinking != nil && !result.thinking!.isEmpty,
-                tone: effectiveTone?.rawValue,
-                researchSources: researchSources
+                tone: effectiveTone?.rawValue
             )
             
             await MainActor.run {
-                // Double-check conversation hasn't changed before updating UI
-                // This prevents cross-conversation updates when user switches conversations mid-task
-                // If taskConversationId is provided, verify current conversation matches it
-                if let taskId = taskConversationId, self.currentConversation?.id != taskId {
-                    let currentIdString = self.currentConversation?.id.uuidString ?? "nil"
-                    print("[AIAssistantViewModel] Conversation changed before message update (task: \(taskId), current: \(currentIdString)) - skipping UI update")
-                    return
-                }
-                
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
@@ -1358,7 +1143,7 @@ final class AIAssistantViewModel {
             if isOllamaError {
                 errorContent = error.localizedDescription
             } else {
-                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `gemma3:1b` model is available."
+                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `gemma3:4b` model is available."
             }
             
             // Handle errors
@@ -1535,6 +1320,10 @@ final class AIAssistantViewModel {
                 currentStyle: typingStyle,
                 styleProfile: stylePreferences
             )
+            
+            // Safety guard: Force isResearchMode = false for images regardless of conversation mode
+            payloadContext.metadata["isResearchMode"] = false
+            
             recordIntent(from: payloadContext)
             let contextFreshness = AppContextService.shared.contextFreshness()
             let confidenceSnapshot = ConfidenceScorer.evaluate(
@@ -1642,6 +1431,10 @@ final class AIAssistantViewModel {
                 currentStyle: typingStyle,
                 styleProfile: stylePreferences
             )
+            
+            // Safety guard: Force isResearchMode = false for documents regardless of conversation mode
+            payloadContext.metadata["isResearchMode"] = false
+            
             recordIntent(from: payloadContext)
             let contextFreshness = AppContextService.shared.contextFreshness()
             let confidenceSnapshot = ConfidenceScorer.evaluate(
@@ -3624,26 +3417,6 @@ final class AIAssistantViewModel {
     }
     
     func clearMessages() {
-        // Clear research mode when clearing messages (new chat)
-        clearResearchMode()
-        
-        // Cancel any active response task
-        currentResponseTask?.cancel()
-        currentResponseTask = nil
-        
-        // Cancel activity debounce task
-        activityDebounceTask?.cancel()
-        activityDebounceTask = nil
-        
-        // Reset all status/activity indicators - don't persist across chats
-        isLoading = false
-        errorMessage = nil
-        currentActivity = .thinking
-        debouncedActivity = .thinking
-        currentStatus = nil
-        currentSourceModel = nil
-        isFirstActivityUpdate = true
-        
         messages.removeAll()
         currentConversation = nil
         selectedConversation = nil
@@ -3733,28 +3506,7 @@ final class AIAssistantViewModel {
     // MARK: - Conversation Management
     
     func loadConversation(_ conversation: AIConversation, modelContext: ModelContext) -> Bool {
-        // Cancel any active response task
-        currentResponseTask?.cancel()
-        currentResponseTask = nil
-        
-        // Cancel activity debounce task
-        activityDebounceTask?.cancel()
-        activityDebounceTask = nil
-        
-        // Reset all status/activity indicators - don't persist across conversations
-        isLoading = false
-        errorMessage = nil
-        currentActivity = .thinking
-        debouncedActivity = .thinking
-        currentStatus = nil
-        currentSourceModel = nil
-        isFirstActivityUpdate = true
-        
         pendingOperation = nil
-        
-        // Clear research mode when switching conversations - it's per-conversation
-        clearResearchMode()
-        
         // Check if there are unsaved messages in the current conversation
         if let current = currentConversation, !messages.isEmpty {
             // Check if messages have been saved

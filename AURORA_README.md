@@ -1,7 +1,7 @@
 # Aurora - AI Assistant Knowledge Base
 
 **Last Updated:** January 2025  
-**Current Phase:** 9 (Predictive Reflection Engine Complete)  
+**Current Phase:** 10 (Flow Companion Complete)  
 **Status:** ✅ Fully Operational  
 **AI Engine:** Powered by Ollama (local LLM) - requires Ollama running locally with qwen3:1.7b model
 
@@ -11,7 +11,7 @@
 
 - [Who Is Aurora?](#who-is-aurora)
 - [Core Capabilities](#core-capabilities)
-- [System Architecture (9 Phases)](#system-architecture-9-phases)
+- [System Architecture (10 Phases)](#system-architecture-10-phases)
 - [Natural Language Commands](#natural-language-commands)
 - [Behavioral Guidelines](#behavioral-guidelines)
 - [Limitations & Future Work](#limitations--future-work)
@@ -79,6 +79,49 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - **Smart Routing Fallback** - Intelligent tiered routing (Ollama → Apple LLM → Offline) with network-aware auto-promotion ensures zero interruptions
 - **Airplane Mode** - Complete offline operation. When enabled in Settings, Aurora runs entirely locally with zero network access. All cognition capabilities (recall, priority ranking, focus tracking, pattern recognition, predictions) work identically whether online or offline.
 
+**Research Mode:**
+- **Deep Research** - Comprehensive research mode that performs multi-query web searches and synthesizes comprehensive reports
+  - **Web Search Integration** - Uses Ollama Cloud API web search to gather information from multiple sources
+  - **Deep Research Queries** - Automatically generates multiple related search queries from the original query (how-to, what-is, best practices, latest, examples, comparisons, benefits)
+  - **Multi-Model Analysis** - Runs local model (deepseek-r1:1.5b) and cloud model (gpt-oss:20b) sequentially for comprehensive analysis
+  - **Source Extraction** - Automatically extracts and cites sources from web search results and model responses
+  - **Synthesized Reports** - Combines local analysis, cloud analysis, and web search results into cohesive, comprehensive research reports (like ChatGPT Deep Research)
+  - **Progress Tracking** - Real-time progress updates showing current research action and source count
+  - **Research Sources** - Displays source pills with titles and URLs, with "View All" option for comprehensive source lists
+  - **Activation**: Use `/research` command or enable research mode in conversation settings
+  - **Format**: Research responses are formatted as comprehensive reports with synthesized findings from all sources
+
+**Model Warmup Service:**
+- **Pre-Warmup Protocol** - Automatically warms up all available models on app startup for faster first responses
+  - **Model Availability Check** - Checks which local and cloud models are actually available before warmup
+  - **Staggered Warmup** - Warms up models with random 1-3 second delays to avoid overwhelming Ollama
+  - **Retry Logic** - Retries failed models with dynamic 5-second intervals
+  - **Caching** - Caches warmup state for 24 hours to skip warmup on subsequent launches
+  - **Progress Messages** - Shows friendly warmup messages like "Waking up [Model Name]..." with progress updates
+  - **On-Demand Warmup** - Ensures specific models are ready before processing requests, showing "Getting things ready..." messages
+  - **Graceful Degradation** - Proceeds even if some models aren't available, allowing Aurora to function with available models
+
+**Core Response Architecture:**
+- **CoreResponseService** - Abstraction layer for AI response generation with tone-aware responses
+  - Routes to HybridBridgeService (primary) or OllamaBridgeService (fallback)
+  - Integrates with AuroraToneKit for tone-aware responses
+  - Supports tone context and predicted tone transitions
+  - Handles research mode with multi-model synthesis
+- **HybridBridgeService** - Intelligent routing between local and cloud models
+  - **Latency-Based Routing** - Routes to cloud if latency threshold is met, falls back to local
+  - **Network-Aware** - Automatically detects network availability and adjusts routing
+  - **Web Search Integration** - Supports web search in cloud responses for research mode
+  - **Progress Updates** - Emits progress updates for long-running operations
+- **AuroraToneKit** - Advanced tone-aware response system
+  - **Tone Categories** - Categorizes tones (Focused, Reflective, Calm, Energized, Fatigued, etc.)
+  - **Tone Transitions** - Smooth transitions between emotional states
+  - **Prompt Prefixes** - Generates tone-specific prompt prefixes for model guidance
+  - **TTS Voice Characteristics** - Provides text-to-speech voice characteristics based on tone
+- **Advanced Tone Services:**
+  - **AuroraLuminara** - Emotional resonance index (ERI) and emotional resonance spectrum (ERS) tracking
+  - **AuroraEcosphericLayer** - Emotional-cognitive ecosystem layer with ERI category tracking
+  - **AuroraMetaSymphony** - Musical interpretation layer with ERS category tracking for tone forecasting
+
 **Cognitive Load Management:**
 - **Confidence Scoring** - Self-aware confidence metrics (low/medium/high) based on recall quality, context freshness, and intent signals
 - **Conversation Compression** - Automatically summarizes long conversations (>40 messages) to manage context window limits
@@ -112,7 +155,7 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 
 ---
 
-## System Architecture (9 Phases)
+## System Architecture (10 Phases)
 
 ### Phase 1: Recall & Emotional Continuity
 - **RecallIndexEntry** tracks all workspace objects with emotional snapshots (valence, tone, intensity)
@@ -143,8 +186,17 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 
 ### Phase 5+: Cross-Conversation Memory
 - **ConversationDigest** stores AI-generated summaries of past conversations
+  - AI-generated summaries (2-3 sentences) with key topics, emotional tone, action items, decisions, and insights
+  - Full-text searchability across all conversation content
+  - Automatic date tracking (start/last message)
+- **ConversationArchive** service manages conversation digestion and retrieval
+  - `digestConversation()` - Generate AI summary for specific conversation
+  - `digestAllConversations()` - Batch process all conversations
+  - `searchConversations()` - Search by keyword across titles, summaries, topics, and content
+  - `getRecentDigests()` - Get N most recent conversation summaries for context
 - Automatically accesses 3 most recent conversation summaries in every response
-- Natural language commands: "digest conversation", "search conversations", "remember when we talked about..."
+- Natural language commands: "digest conversation", "digest all conversations", "search conversations", "remember when we talked about..."
+- Integration with AIActionRouter: `digestConversation`, `digestAllConversations`, `searchConversations` operations
 
 ### Phase 5++: Intent Cluster Prediction
 - **ConversationArchive.extractIntentClusters** analyzes last 10 conversations to identify intent clusters:
@@ -175,43 +227,132 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
   6. Connections (Recurring themes)
 - **SmartAutomationEngine** detects patterns in user behavior and suggests workflow automation
 
+### Phase 6.1+: Reflection vs. Execution Routing
+- **Dual-Mode Architecture** - Aurora distinguishes between ACTION and INTROSPECTION queries
+- **Reflection Detection** - `detectReflectionIntent()` classifies introspective queries into 10 reflection intents:
+  - `productivityPatterns`, `emotionalTrends`, `focusEffectiveness`, `learningProgress`, `recurringThemes`, `cognitiveState`, `weekOverview`, `monthOverview`, `detectedPatterns`, `workingStyle`
+- **AIReflectionService** - Master reflection router that analyzes Intelligence Dashboard data using `AnalyticsEngine`
+- **Execution Detection** - `detectExecutionIntent()` handles action-oriented commands (create/update/delete)
+- **Routing Logic** - Checks reflection intent FIRST, then execution intent, ensuring introspective queries get thoughtful analysis instead of raw stats dumps
+- **Key Distinction**: "What patterns do you see?" → REFLECTION (analyzes data). "Create a task" → EXECUTION (takes action)
+
 ### Phase 7: ARTE (Aurora Reactive Theme Engine)
 - **ReactiveThemeManager** detects emotional-cognitive states: Focused, Reflective, Calm, Energized, Fatigued
-- Adapts UI theme/colors accordingly with smooth transitions
+  - Adaptive polling (10-60 seconds based on activity)
+  - Real-time state detection with < 100ms latency
+  - Smooth transitions (0.3s initial, 60-120s full morph)
+  - Debouncing (minimum 2 minutes between transitions)
+  - Configuration persistence (Auto/Manual/Blend modes, intensity slider, state locking)
 - **EmotionalStateDetector** analyzes completion rates, focus sessions, emotional valence, and theme activity
+- **ThemeInterpolator** - Smooth transition engine for state changes
+- **ThemeTelemetryService** - Performance monitoring and metrics
+- **ARTEConfiguration** - User preferences (operation modes, intensity, adaptive timing, learning)
+- **StateTransitionHistory** - Learning data model for state prediction
+- Adapts UI theme/colors accordingly with smooth transitions
+- GlassColorSystem integration: emotional accent colors, shadow tones, background shifts, animation speed modulation
 - Users can see current ARTE state in Insights → Overview
+- Settings → ARTE for configuration and manual override
 
 ### Phase 8: Focus Rituals & Smart Nudges
 - **FocusRitualManager** schedules morning/evening focus rituals with guided prompts
-- **RitualCompletion** tracks outcomes and streaks
+  - MorningRitualView displays top 3 CPS priorities with "Commit to Focus" action
+  - EveningRitualView provides Done/Deferred/Dropped reflection + AI recap
+  - RitualCompletion tracks outcomes, streaks, and momentum metadata
 - **WeeklyReview** provides five-step reflection process
+  - WeeklyReviewView guides: clearing inbox, reviewing CPS shifts, distilling insights, setting recommendations, defining next focuses
+  - Focus Gravity, Capture vs Output velocity, and Clarity Index surfaced in Insights
+- **RitualAnalytics** computes engagement, streaks, nudge response rates
 - **SmartNudgeService** delivers contextual micro-coaches that adapt tone based on ARTE state
-- Respects quiet hours, fatigue suppression, and global throttling (3/day, 1/hour)
+  - NudgeToneAdapter maps ARTE emotional state to nudge tone & suppression
+  - Evaluates triggers every 15 minutes and on analytics updates
+  - Respects quiet hours, fatigue suppression, per-category toggles, and global throttling (3/day, 1/hour)
+  - NudgeOverlayView surfaces non-disruptive actions ("Let's do it", "Remind me later", "Dismiss")
+- **RitualSettings** - UserDefaults-backed ritual and nudge configuration
+- Integration with AnalyticsEngine: ritual completion rates, streaks, weekly review metrics
 
 ### Phase 9: Predictive Reflection Engine
 - **CognitionPredictor** generates anticipatory forecasts every 1-4 hours analyzing last 48h of rituals, focus sessions, ARTE transitions, and nudges
-- Creates **FocusForecast** records with fatigue risk, focus stability, energy trend, recommended ARTE tone
+  - Computes fatigue/focus metrics and writes FocusForecast records
+  - Broadcasts Combine events for forecast updates
+  - Retroactively scores forecast accuracy
+- **FocusForecast** model persists predicted cognitive states:
+  - Fatigue risk, focus stability, energy trend, recommended ARTE tone
+  - Optional next focus window intervals
+  - Metadata for diagnostics and accuracy auditing
 - **DriftMonitor** observes active focus sessions in real-time (every 5 min), comparing actual progress vs. forecasted expectations
-- Detects drift when deviation exceeds user-configurable threshold (default 10%)
-- **PredictiveContextManager** bridges forecasts to UX: updates tone weights, sets suppression flags, triggers proactive nudges
+  - Applies configurable deviation thresholds
+  - Writes DriftEvent entries with severity, expected vs. actual metrics
+  - Notifies listeners via Combine
+- **DriftEvent** model captures runtime drift detections with trigger identifiers and linkage to focus sessions
+- **CognitionAnalytics** aggregates forecast accuracy, drift volume, nudge counts, and tone adaptations
+- **PredictiveContextManager** bridges forecasts to UX:
+  - Updates tone weights via ToneProfileCache
+  - Sets suppression flags
+  - Triggers proactive nudges through SmartNudgeService
+- **ToneProfileCache** - UserDefaults-backed store for tone weights, confidence thresholds, suppression flags, and adaptation history
 - **Insights → Cognitive Overview** includes "Cognitive Forecast" card showing next predicted focus peak, fatigue risk, and forecast accuracy
+- **Settings → Predictive Cognition** for configuration (master toggle, confidence threshold, forecast interval, drift sensitivity)
 
 **Phase 9 Extensions (Temporal Intelligence):**
 - **AdaptiveScheduler** - Reflows skipped focus blocks into next high-energy window using CPS urgency + energy forecasts
-- **CalendarSyncService** - Writes focus sessions to macOS Calendar (bi-directional), syncs when users drag events externally
-- **ContextSwitchGuard** - Intercepts abrupt tab switches with graduated prompts based on momentum velocity + ARTE state
-- **MomentumTracker** - Computes flow velocity, streaks, and recovery time; feeds ARTE tone bias + CPS adjustments
-- Insights include "Momentum" card with weekly curves; settings in Settings → Temporal Intelligence
+  - Explains reasoning to user when schedules shift automatically
+  - Uses energy forecasts to find optimal rescheduling windows
+- **CalendarSyncService** - Writes focus sessions to macOS Calendar (bi-directional)
+  - Syncs when users drag events externally
+  - Updates internal schedules and keeps tone/timing in sync
+  - Maintains calendar event metadata for focus sessions
+- **ContextSwitchGuard** - Intercepts abrupt tab switches with graduated prompts
+  - Soft → strong prompts based on momentum velocity + ARTE state
+  - Aurora can gently pause user, explain risks, and log overrides for learning
+  - Respects user momentum and flow state
+- **MomentumTracker** - Computes flow velocity, streaks, and recovery time
+  - Feeds ARTE tone bias + CPS adjustments
+  - Tracks qualitative "Flow Stability" metric from reflections
+  - Insights include "Momentum" card with weekly curves
+  - Settings in Settings → Temporal Intelligence
 
 **Phase 10: Flow Companion (Floating Reflection Bubble)**
 - **FlowCompanionEngine** - Central controller for floating reflection bubble
+  - Manages bubble visibility, prompt selection, and auto-dismiss timing
+  - Integrates with FlowTriggersService for contextual trigger detection
+  - Auto-dismisses bubble after 45 seconds if not engaged
+  - Handles inline replies + expansion to full reflection sheet
 - **AIFlowCompanion** - Flow state companion with structured nudges and insights ("Clarity Coach" personality)
-- **FlowTriggersService** - Detects reflection triggers (context switches, momentum shifts, ritual completions)
-- **ReflectionNote** - Captures reflection responses with emotional tone and context tags
+  - Observes momentum metrics, emotional states, ritual completions, and focus sessions
+  - Generates contextual insights based on flow state
+  - Provides structured nudges and clarifying questions
+- **FlowTriggersService** - Detects reflection triggers:
+  - DriftEvent detected (from Phase 9)
+  - Evening ritual opened
+  - Idle > 5 min (in Focus Mode)
+  - Context switches (tab changes)
+  - Momentum shifts (velocity changes)
+  - Ritual completions
+  - Focus session completions
+  - Manual "Reflect Now" command
+- **ReflectionNote** - Captures reflection responses with:
+  - Prompt text, user response, emotional tone (from ARTE), context tag (trigger type)
+  - Sentiment score, insight weight, keywords, summary
+  - Full-text searchability
 - **MetaReflectionProcessor** - Analyzes reflections and updates CPS weights dynamically
-- Floating bubble appears contextually with reflection prompts
-- Auto-dismisses after 45 seconds if not engaged
-- Integrates with ARTE emotional states for contextual prompts
+  - Extracts insights from reflection responses
+  - Updates priority scores based on reflection content
+  - Feeds into MomentumTracker for qualitative flow stability
+  - Syncs ARTE state if needed
+- **ReflectionBubbleView** - Floating chat bubble (minimal footprint, bottom-right)
+  - Tap → expands into short prompt + 1-line text field
+  - Expands to ReflectionPanelView for long entries
+- **ReflectionPanelView** - Full reflection sheet for deeper journaling
+  - Displays latest prompt + response
+  - Sentiment + AI summary preview
+  - "Show Past Reflections" list
+- **Integration Points:**
+  - ARTE supplies emotional state to FlowCompanionEngine
+  - CPS reflection weight adjusts recency/frequency bias
+  - MomentumTracker adds qualitative "Flow Stability" metric
+  - RitualAnalytics records reflection frequency
+  - Insights → Overview shows "Recent Reflections" card
+  - Settings → Flow Companion for configuration
 
 **Quality of Life Enhancements:**
 - **Document & Image Analysis** - Analyze attached documents (PDF, Markdown, text, RTF) and images (PNG, JPEG, WEBP, HEIC, HEIF) with full app context. Provides summaries, action items, and integrates with recall system.
@@ -277,6 +418,19 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - "Can you read this file?" → Processes document and provides summary
 - "Tell me about this PDF" → Extracts and analyzes PDF content
 
+### Research Mode
+- **"/research [query]"** → Activates deep research mode with comprehensive web search and multi-model analysis
+- "Research [topic]" → Performs deep research with multiple related searches and synthesizes comprehensive report
+- Research mode automatically:
+  - Generates multiple related search queries (how-to, what-is, best practices, latest, examples, comparisons, benefits)
+  - Performs web searches using Ollama Cloud API
+  - Analyzes with local model (deepseek-r1:1.5b) and cloud model (gpt-oss:20b)
+  - Extracts and cites sources from all results
+  - Synthesizes findings into comprehensive report format
+- Progress updates show current research action and source count
+- Sources displayed as pills with titles and URLs
+- Research responses formatted as comprehensive reports (like ChatGPT Deep Research)
+
 ### Reminders & Notifications
 - "Remind me to [action] tomorrow at [time]" → Creates reminder with in-app notification
 - "Set a reminder for [date] at [time]" → Creates reminder with notification
@@ -309,6 +463,12 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - "Should I do my morning ritual?" → Checks ritual availability
 - "I missed my evening ritual" → Acknowledges and suggests adjustment
 
+### Flow Companion (Phase 10)
+- Reflection bubble appears automatically when triggers fire (drift events, evening ritual, idle detection)
+- "Reflect now" → Triggers manual reflection prompt
+- View reflections in Insights → Overview → Recent Reflections
+- Configure triggers in Settings → Flow Companion
+
 ### Automation
 - "I keep creating the same task" → Suggests SmartAutomationEngine template
 - "Automate my weekly standup" → Creates automation rule
@@ -324,9 +484,22 @@ Aurora's mission: Transform content creation from a time-consuming chore into an
 - Show users what changed (titles, counts, scheduled times)
 - Provide step-by-step progress in single response when performing multi-step operations
 
-### Reflection vs. Execution Routing
-- **EXECUTION queries** (action-oriented): "Create a task", "Create an artifact", "Delete old tasks" → Route through AIActionRouter, execute immediately, report status
-- **REFLECTION queries** (introspective): "What patterns do you see?", "How's my productivity?", "What am I focusing on?" → Use AIReflectionService to analyze AnalyticsEngine data, provide insights, suggest Insights Dashboard tabs
+### Reflection vs. Execution Routing (Phase 6.1+)
+- **Dual-Mode Architecture** - Aurora has two distinct processing modes:
+  - **EXECUTION Mode** (action-oriented): "Create a task", "Create an artifact", "Delete old tasks" → Route through AIActionRouter, execute immediately, report status
+  - **REFLECTION Mode** (introspective): "What patterns do you see?", "How's my productivity?", "What am I focusing on?" → Use AIReflectionService to analyze AnalyticsEngine data, provide insights, suggest Insights Dashboard tabs
+- **Intent Detection Order** - Checks reflection intent FIRST, then execution intent
+- **10 Reflection Intents:**
+  - `productivityPatterns` - Task completion, CPS scores, priorities
+  - `emotionalTrends` - Emotional valence, trends, journal entries
+  - `focusEffectiveness` - Focus session stats, completion rates
+  - `learningProgress` - AI feedback events, learning score
+  - `recurringThemes` - Memory Graph themes, concept tracking
+  - `cognitiveState` - Current cognitive mode (Deep Work/Flow/High Energy)
+  - `weekOverview` / `monthOverview` - Comprehensive synthesis
+  - `detectedPatterns` - Combines productivity + themes
+  - `workingStyle` - Combines productivity + focus + emotional
+- **Key Distinction**: Reflection analyzes data and provides insights. Execution takes action and modifies workspace state.
 
 ### Emotional Awareness
 - Pay attention to "Emotional Memory" section in recall context
@@ -632,7 +805,7 @@ When adding new capabilities or making significant changes:
 
 ## Summary
 
-**Aurora is a fully self-aware AI assistant spanning 9 development phases plus Quality of Life enhancements, capable of:**
+**Aurora is a fully self-aware AI assistant spanning 10 development phases plus Quality of Life enhancements, capable of:**
 - ✅ Understanding workspace context with emotional memory
 - ✅ Ranking priorities dynamically (CPS)
 - ✅ Tracking deep work sessions (Focus Mode)
@@ -651,8 +824,17 @@ When adding new capabilities or making significant changes:
 - ✅ Quick access via Aurora Spotlight overlay (Cmd+Shift+A)
 - ✅ **Complete offline operation via Airplane Mode** - Full cognition loop works identically with zero network access
 - ✅ **Adaptive Model Selection** - Automatically switches between Ollama models based on task complexity (coding, vision, complex analysis)
+- ✅ **Reflection vs Execution Routing (Phase 6.1+)** - Dual-mode architecture distinguishing introspective analysis from action commands
+- ✅ **Flow Companion (Phase 10)** - Floating reflection bubble with contextual prompts, meta-reflection processing, and CPS integration
 
 **She serves as a true cognitive operating system—one that anticipates, adapts, and grows with users.** 🧠✨
+
+**Additional Capabilities:**
+- ✅ **Research Mode** - Deep research with multi-query web search, multi-model analysis, and comprehensive report synthesis
+- ✅ **Model Warmup Service** - Pre-warms models on startup for faster responses with intelligent caching
+- ✅ **Web Search Service** - Deep research with multiple related searches and source extraction
+- ✅ **Core Response Architecture** - Tone-aware response abstraction with Hybrid Bridge routing
+- ✅ **Advanced Tone Services** - AuroraToneKit, AuroraLuminara, AuroraEcosphericLayer, AuroraMetaSymphony for emotional-cognitive tone management
 
 ---
 

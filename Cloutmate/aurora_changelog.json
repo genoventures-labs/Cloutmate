@@ -1,7 +1,252 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-16T01:49:57.928831Z",
+  "lastUpdated": "2025-11-16T17:19:31.668916Z",
   "entries": [
+    {
+      "id": "e535b520-4ef4-4981-ace4-16460312066e",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Cloutmate App",
+      "changeType": "improved",
+      "description": "Improved Cloutmate App",
+      "impact": "Enhances Cloutmate App performance or features",
+      "userFacing": false,
+      "tags": [],
+      "commitHash": null
+    },
+    {
+      "id": "90b2bcbd-c828-47a8-a13c-7e816cc789a2",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Aimessage",
+      "changeType": "modified",
+      "description": "Updated Aimessage",
+      "impact": "Affects Aimessage functionality",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e3309dde-5660-46ad-bdfe-55c96c849c7d",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Aisettings",
+      "changeType": "improved",
+      "description": "Improved Aisettings",
+      "impact": "Enhances Aisettings performance or features",
+      "userFacing": false,
+      "tags": [
+        "ollama",
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "3423e367-c872-4f65-a4b5-f1293c27fa7f",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Memory Summary",
+      "changeType": "improved",
+      "description": "Compression mode used for generating memory summaries",
+      "impact": "Enhances Memory Summary performance or features",
+      "userFacing": false,
+      "tags": [
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "70873520-4125-40ff-be67-0b01477762e0",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Model Tier Map",
+      "changeType": "improved",
+      "description": "Represents a local model tier with its capabilities",
+      "impact": "Enhances Model Tier Map performance or features",
+      "userFacing": false,
+      "tags": [
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "1b62411e-40ae-4d0c-ad7c-b4b6abfe837c",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Conversation Flow",
+      "changeType": "improved",
+      "description": "Tracks conversation flow arc state",
+      "impact": "Enhances Conversation Flow performance or features",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "backend",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b81626b2-1262-4ab7-a354-f2562d3c7e2c",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Core Response",
+      "changeType": "improved",
+      "description": "Converts AIMessage array to ConversationMessage array",
+      "impact": "Enhances Core Response performance or features",
+      "userFacing": true,
+      "tags": [
+        "ollama",
+        "backend",
+        "concurrency",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "5db642c4-e81a-49bb-b506-071ece2c2946",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Hybrid Bridge",
+      "changeType": "modified",
+      "description": "Fetch available models from Ollama Cloud API",
+      "impact": "Affects Hybrid Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "system-prompt",
+        "ollama",
+        "backend",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "f988a084-9b84-48b7-8e1a-f1bfc328b3ad",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Memory Compression",
+      "changeType": "improved",
+      "description": "Compression bundle containing all metadata for a compressed memory",
+      "impact": "Enhances Memory Compression performance or features",
+      "userFacing": true,
+      "tags": [
+        "ollama",
+        "backend",
+        "concurrency",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "82bfffe9-d431-414c-8887-7563fdc49474",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Model Routing Engine",
+      "changeType": "improved",
+      "description": "Selects the best model for a given input with casual detection and cooldown",
+      "impact": "Enhances Model Routing Engine performance or features",
+      "userFacing": false,
+      "tags": [
+        "concurrency",
+        "ollama",
+        "model",
+        "backend",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "1cb2d250-daf9-45a0-8380-8e889b758c5c",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Model Warmup",
+      "changeType": "improved",
+      "description": "Starts the warmup protocol for all models",
+      "impact": "Enhances Model Warmup performance or features",
+      "userFacing": true,
+      "tags": [
+        "ollama",
+        "backend",
+        "model",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "bf4f463e-fb1e-4e44-98c3-7aacac2858cc",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Ollama Bridge",
+      "changeType": "modified",
+      "description": "Simple message type for conversation history (replaces ModelContent)",
+      "impact": "Affects Ollama Bridge functionality",
+      "userFacing": true,
+      "tags": [
+        "concurrency",
+        "system-prompt",
+        "ollama",
+        "backend",
+        "service"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "5c08a678-2d36-4ad6-9211-3e17e61ad562",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Aiassistant",
+      "changeType": "improved",
+      "description": "Converts structured execution results to conversational format",
+      "impact": "Enhances Aiassistant performance or features",
+      "userFacing": false,
+      "tags": [
+        "concurrency",
+        "ui",
+        "ollama",
+        "model",
+        "data"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "41536c20-e35e-437b-9024-a00d3f6a6e41",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Message Bubble",
+      "changeType": "improved",
+      "description": "Normalize spacing to ensure proper rendering - fixes collapsed spaces after punctuation",
+      "impact": "Enhances Message Bubble performance or features",
+      "userFacing": false,
+      "tags": [
+        "ui",
+        "ollama",
+        "frontend",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "7378d3fd-b047-48b0-94da-f68b421a3d51",
+      "date": "2025-11-16T17:19:31.662636Z",
+      "version": "0.8",
+      "feature": "Settings",
+      "changeType": "improved",
+      "description": "Improved Settings",
+      "impact": "Enhances Settings performance or features",
+      "userFacing": true,
+      "tags": [
+        "ui",
+        "frontend"
+      ],
+      "commitHash": null
+    },
     {
       "id": "cd16561a-ddee-4151-afbc-06d395e35dc0",
       "date": "2025-11-16T01:49:57.899978Z",
@@ -12,7 +257,7 @@
       "impact": "Enhances Cloutmate App performance or features",
       "userFacing": false,
       "tags": [],
-      "commitHash": null
+      "commitHash": "974685a5c6ff7321d534ae809a3b9fe0825b65df"
     },
     {
       "id": "70f8b0d2-2311-4c0d-a356-5ef047b08a88",

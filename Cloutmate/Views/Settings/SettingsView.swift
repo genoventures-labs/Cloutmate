@@ -49,9 +49,9 @@ private extension SettingsView {
             trailingAccessory: {
                 Text(selectedEntry.title)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
-                        }
-                    )
+                    .foregroundStyle(glassColorSystem.textSecondary())
+            }
+        )
     }
     
     @ViewBuilder
@@ -85,74 +85,72 @@ private extension SettingsView {
     
     @ViewBuilder
     var settingsSidebar: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            ForEach(settingsSidebarGroups) { group in
-                DisclosureGroup(
-                    isExpanded: binding(for: group),
-                    content: {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(group.entries) { entry in
-                                sidebarButton(for: entry)
+        ScrollView {
+            VStack(spacing: 18) {
+                ForEach(settingsSidebarGroups) { group in
+                    DashboardTile(accent: glassColorSystem.emotionalAccent()) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: group.id.iconName)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(glassColorSystem.emotionalAccent())
+                                Text(group.id.title)
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
+                                Spacer()
+                                Button(action: {
+                                    withAnimation(GlassMotion.Easing.spring) {
+                                        if collapsedGroupIDs.contains(group.id) {
+                                            collapsedGroupIDs.remove(group.id)
+                                        } else {
+                                            collapsedGroupIDs.insert(group.id)
+                                        }
+                                    }
+                                }) {
+                                    Image(systemName: collapsedGroupIDs.contains(group.id) ? "chevron.right" : "chevron.down")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(glassColorSystem.textSecondary())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            
+                            if !collapsedGroupIDs.contains(group.id) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    ForEach(group.entries) { entry in
+                                        sidebarButton(for: entry)
+                                    }
+                                }
+                                .padding(.top, 4)
                             }
                         }
-                        .padding(.top, 6)
-                    },
-                    label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: group.id.iconName)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(glassColorSystem.emotionalAccent())
-                            Text(group.id.title)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                )
-                .padding(.horizontal, 14)
-                .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .fill(glassColorSystem.backgroundSecondary().opacity(0.32))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .stroke(glassColorSystem.borderColor().opacity(0.65), lineWidth: 0.8)
-                        )
-                )
-                .animation(.easeInOut(duration: 0.22), value: collapsedGroupIDs)
-            }
-            
-            Spacer()
-        }
-    }
-    
-    func binding(for group: SettingsSidebarGroup) -> Binding<Bool> {
-        Binding(
-            get: { !collapsedGroupIDs.contains(group.id) },
-            set: { expanded in
-                if expanded {
-                    collapsedGroupIDs.remove(group.id)
-                } else {
-                    collapsedGroupIDs.insert(group.id)
                 }
             }
-        )
+            .padding()
+        }
     }
     
     @ViewBuilder
     func sidebarButton(for entry: SettingsEntry) -> some View {
         let isSelected = selectedEntry == entry
         Button {
-            selectedEntry = entry
+            withAnimation(GlassMotion.Easing.spring) {
+                selectedEntry = entry
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: entry.icon)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(isSelected ? glassColorSystem.textPrimary() : .secondary)
+                    .foregroundStyle(isSelected ? glassColorSystem.textPrimary() : glassColorSystem.textSecondary())
                 Text(entry.title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(isSelected ? glassColorSystem.textPrimary() : .secondary)
+                    .foregroundStyle(isSelected ? glassColorSystem.textPrimary() : glassColorSystem.textSecondary())
                 Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(glassColorSystem.emotionalAccent())
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -173,9 +171,8 @@ private extension SettingsView {
                             )
                     )
             )
-                        }
+        }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: selectedEntry)
     }
     
     func sectionIntro(for entry: SettingsEntry) -> some View {
@@ -186,16 +183,17 @@ private extension SettingsView {
                     .frame(width: 44, height: 44)
                 Image(systemName: entry.icon)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(glassColorSystem.emotionalAccent())
+                    .foregroundStyle(glassColorSystem.emotionalAccent())
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.title)
                     .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
                 if let subtitle = entry.subtitle {
                     Text(subtitle)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(glassColorSystem.textSecondary())
                 }
             }
         }
@@ -206,11 +204,12 @@ private extension SettingsView {
                         HStack(alignment: .center) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("Aurora Reactive Theme Engine")
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                    Text(themeManager.isEnabled ? "ARTE actively adapts colors, motion, and lighting." : "Enable ARTE for adaptive moods, gradients, and motion.")
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
+                                Text(themeManager.isEnabled ? "ARTE actively adapts colors, motion, and lighting." : "Enable ARTE for adaptive moods, gradients, and motion.")
                                     .font(.footnote)
-                                    .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                                    .foregroundStyle(glassColorSystem.textSecondary())
+                                    .fixedSize(horizontal: false, vertical: true)
                             }
                             Spacer()
                             Toggle("", isOn: $themeManager.isEnabled)
@@ -223,23 +222,24 @@ private extension SettingsView {
                         if themeManager.isEnabled {
                             HStack(spacing: 12) {
                                 Image(systemName: themeManager.currentState.iconName)
-                        .font(.system(size: 28))
-                                    .foregroundColor(glassColorSystem.emotionalAccent())
-                        .frame(width: 40, height: 40)
+                                    .font(.system(size: 28))
+                                    .foregroundStyle(glassColorSystem.emotionalAccent())
+                                    .frame(width: 40, height: 40)
                                     .background(
                                         Circle()
-                                .fill(glassColorSystem.emotionalAccent().opacity(0.18))
+                                            .fill(glassColorSystem.emotionalAccent().opacity(0.18))
                                     )
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(themeManager.currentState.displayName)
-                            .font(.system(size: 14, weight: .semibold))
-                        Text("Confidence \(Int(themeManager.confidence * 100))% · Intensity \(Int(themeManager.intensity * 100))%")
-                            .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(glassColorSystem.textPrimary())
+                                    Text("Confidence \(Int(themeManager.confidence * 100))% · Intensity \(Int(themeManager.intensity * 100))%")
+                                        .font(.caption)
+                                        .foregroundStyle(glassColorSystem.textSecondary())
                                 }
                                 Spacer()
                             }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
 
             GlassDivider()
@@ -248,13 +248,15 @@ private extension SettingsView {
                             ARTESettingsView()
                                 .navigationTitle("Aurora Theme Engine")
                         } label: {
-                HStack(spacing: 6) {
-                    Text("Open full ARTE controls")
+                            HStack(spacing: 6) {
+                                Text("Open full ARTE controls")
                                     .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
+                                    .foregroundStyle(glassColorSystem.textSecondary())
                             }
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                         .buttonStyle(.plain)
                     }
@@ -264,8 +266,8 @@ private extension SettingsView {
                         let settings = RitualSettings.shared
         return V2GlassControlStack(spacing: 18) {
             Text("Keep your rituals synchronized across morning, evening, and weekly cadences.")
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
+                .font(.footnote)
+                .foregroundStyle(glassColorSystem.textSecondary())
                 .fixedSize(horizontal: false, vertical: true)
             
             GlassDivider()
@@ -289,19 +291,19 @@ private extension SettingsView {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(glassColorSystem.emotionalAccent())
+                        .foregroundStyle(glassColorSystem.emotionalAccent())
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Test Nudge")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(glassColorSystem.textPrimary())
+                            .foregroundStyle(glassColorSystem.textPrimary())
                         Text("Preview how Aurora's nudges appear")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(glassColorSystem.textSecondary())
                     }
                     Spacer()
                     Image(systemName: "arrow.right.circle.fill")
                         .font(.system(size: 16))
-                        .foregroundColor(glassColorSystem.emotionalAccent())
+                        .foregroundStyle(glassColorSystem.emotionalAccent())
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
@@ -322,13 +324,15 @@ private extension SettingsView {
                             RitualSettingsView()
                                 .navigationTitle("Rituals & Nudges")
                         } label: {
-                HStack(spacing: 6) {
-                    Text("Open ritual controls")
+                            HStack(spacing: 6) {
+                                Text("Open ritual controls")
                                     .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
+                                    .foregroundStyle(glassColorSystem.textSecondary())
                             }
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
                         }
                         .buttonStyle(.plain)
                     }
@@ -338,55 +342,59 @@ private extension SettingsView {
         V2GlassControlStack(spacing: 16) {
             Text("Pause before dramatic context switches and keep focused work uninterrupted.")
                 .font(.footnote)
-                            .foregroundColor(.secondary)
-                        
+                .foregroundStyle(glassColorSystem.textSecondary())
+            
             GlassDivider()
             
-                        Toggle(isOn: $contextGuardEnabled) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Context switch guard")
+            Toggle(isOn: $contextGuardEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Context switch guard")
                         .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(glassColorSystem.textPrimary())
                     Text(contextGuardEnabled ? "Aurora will confirm intent before leaving your current workspace." : "Switch tabs instantly without guardrails.")
                         .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .onChange(of: contextGuardEnabled) { _, newValue in
-                            ContextGuardSettings.shared.isGuardEnabled = newValue
-                        }
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                }
+            }
+            .toggleStyle(.switch)
+            .onChange(of: contextGuardEnabled) { _, newValue in
+                ContextGuardSettings.shared.isGuardEnabled = newValue
+            }
             
             GlassDivider()
             
-                        NavigationLink {
-                            TemporalIntelligenceSettingsView()
-                                .navigationTitle("Temporal Intelligence")
-                        } label: {
+            NavigationLink {
+                TemporalIntelligenceSettingsView()
+                    .navigationTitle("Temporal Intelligence")
+            } label: {
                 HStack(spacing: 6) {
                     Text("Open temporal controls")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                        }
-                        .buttonStyle(.plain)
-                    }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(glassColorSystem.textSecondary())
                 }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .buttonStyle(.plain)
+        }
+    }
                 
     func ritualRow(title: String, value: String, systemImage: String, highlight: Color? = nil) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: systemImage)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(glassColorSystem.emotionalAccent())
+                .foregroundStyle(glassColorSystem.emotionalAccent())
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(glassColorSystem.textPrimary())
                 Text(value)
                     .font(.caption)
-                    .foregroundColor(highlight ?? .secondary)
-                    }
+                    .foregroundStyle(highlight ?? glassColorSystem.textSecondary())
+            }
             Spacer()
         }
     }

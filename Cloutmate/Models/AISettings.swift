@@ -49,7 +49,7 @@ final class AISettings {
     var selectedOllamaModel: String {
         get {
             // Always return default model - actual model selection happens automatically in OllamaBridgeService
-            return "gemma3:1b"
+            return "gemma3:4b"
         }
     }
     
