@@ -15,7 +15,7 @@ actor HybridBridgeService {
     static let shared = HybridBridgeService()
     
     private let localBaseURL = "http://localhost:11434"
-    private let cloudBaseURL = "https://api.ollama.cloud/v1"
+    private let cloudBaseURL = "https://ollama.com"
     
     private var consecutiveTimeouts: [String: Int] = [:] // Track timeouts per model
     private var healthCheckStatus: HealthCheckStatus = .unknown
@@ -34,7 +34,7 @@ actor HybridBridgeService {
     
     /// Fetch available models from Ollama Cloud API
     func fetchAvailableCloudModels(apiKey: String) async throws -> [String] {
-        guard let url = URL(string: "\(cloudBaseURL)/models") else {
+        guard let url = URL(string: "\(cloudBaseURL)/api/tags") else {
             throw HybridBridgeError.invalidURL
         }
         
@@ -452,6 +452,172 @@ actor HybridBridgeService {
         }
     }
     
+    // MARK: - Research Mode with Web Search
+    
+    func generateCloudResponseWithAppContextAndWebSearch(
+        for input: String,
+        appContext: String,
+        payloadContext: AIPayloadContext? = nil,
+        conversationMessages: [ConversationMessage]? = nil,
+        currentMessageStyle: TypingStyle? = nil,
+        userStyleProfile: UserPreferences? = nil,
+        confidence: ConfidenceSnapshot? = nil,
+        model: String,
+        apiKey: String,
+        useThinking: Bool = false,
+        enableWebSearch: Bool = false,
+        modelContext: ModelContext,
+        onProgressUpdate: ((String, Int) -> Void)? = nil
+    ) async throws -> (response: String, thinking: String?, webSearchResults: WebSearchResults?) {
+        // Step 1: Perform web search if enabled (ALWAYS do this first, even if cloud fails later)
+        var webSearchResults: WebSearchResults? = nil
+        var enhancedAppContext = appContext
+        var enhancedInput = input
+        
+        if enableWebSearch {
+            do {
+                // Emit progress: starting deep research
+                await MainActor.run {
+                    onProgressUpdate?("Starting deep research...", 0)
+                }
+                
+                print("[HybridBridgeService] Research mode: Performing deep research for query: \(input)")
+                
+                // Use deep research instead of simple search for comprehensive results
+                let webSearch = try await WebSearchService.shared.deepResearch(
+                    query: input,
+                    apiKey: apiKey,
+                    maxResultsPerQuery: 10, // Get max results per query
+                    onProgressUpdate: { query, resultCount in
+                        // Progress callback - update with each search query
+                        await MainActor.run {
+                            // Truncate query if too long
+                            let truncatedQuery = query.count > 40 ? String(query.prefix(37)) + "..." : query
+                            onProgressUpdate?(truncatedQuery, resultCount)
+                        }
+                    }
+                )
+                
+                webSearchResults = WebSearchResults(from: webSearch)
+                
+                print("[HybridBridgeService] Research mode: Deep research completed, found \(webSearchResults?.results.count ?? 0) results from multiple queries")
+                
+                // Emit progress: deep research completed with result count
+                if let results = webSearchResults {
+                    let sourceCount = results.results.count
+                    await MainActor.run {
+                        onProgressUpdate?("Deep research complete", sourceCount)
+                    }
+                    
+                    // Add comprehensive web search results to context
+                    if !results.results.isEmpty {
+                        var webContext = "\n\nComprehensive web research results (from multiple related searches):\n"
+                        
+                        // Include more results for deep research (up to 10 instead of 5)
+                        let resultsToInclude = min(results.results.count, 10)
+                        for (index, item) in results.results.prefix(resultsToInclude).enumerated() {
+                            webContext += "\n\(index + 1). \(item.title)\n"
+                            webContext += "   URL: \(item.url)\n"
+                            if let snippet = item.snippet {
+                                // Include more of the snippet for deep research
+                                let snippetToInclude = snippet.count > 300 ? String(snippet.prefix(300)) + "..." : snippet
+                                webContext += "   \(snippetToInclude)\n"
+                            }
+                        }
+                        
+                        // Add note about total sources if we have more
+                        if results.results.count > resultsToInclude {
+                            webContext += "\n... and \(results.results.count - resultsToInclude) additional sources found in deep research.\n"
+                        }
+                        
+                        enhancedAppContext += webContext
+                        print("[HybridBridgeService] Research mode: Added \(resultsToInclude) web search results to context (from \(results.results.count) total sources)")
+                    }
+                }
+            } catch {
+                // If web search fails, continue without it (but log it)
+                print("[HybridBridgeService] Deep research failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    onProgressUpdate?("Deep research unavailable, continuing without it...", 0)
+                }
+            }
+        }
+        
+        // Step 2: Build prompt with app context
+        let systemPrompt = buildSystemPromptWithAppContext(
+            appContext: enhancedAppContext,
+            payloadContext: payloadContext,
+            confidence: confidence,
+            currentMessageStyle: currentMessageStyle,
+            userStyleProfile: userStyleProfile
+        )
+        
+        let historyText = buildConversationHistoryText(from: conversationMessages ?? [])
+        
+        let fullPrompt = """
+\(systemPrompt)
+
+\(historyText)
+
+User: \(enhancedInput)
+
+Aurora:
+"""
+        
+        // Step 3: Make cloud request with thinking if enabled
+        // Wrap in error handling to preserve web search results even if cloud request fails
+        var response: String = ""
+        var thinking: String? = nil
+        
+        do {
+            if useThinking {
+                // For thinking-enabled requests, we need to use a different approach
+                // Ollama Cloud may support thinking through options parameter
+                response = try await makeCloudRequestWithThinking(
+                    model: model,
+                    prompt: fullPrompt,
+                    apiKey: apiKey,
+                    timeout: 120.0
+                )
+                // Extract thinking if present (would need to parse from response)
+                // For now, thinking extraction would need API support
+            } else {
+                response = try await makeCloudRequest(
+                    model: model,
+                    prompt: fullPrompt,
+                    apiKey: apiKey,
+                    timeout: 120.0
+                )
+            }
+        } catch {
+            // If cloud request fails, log it but still return web search results
+            // This allows research mode to continue with local model + web search
+            print("[HybridBridgeService] Cloud request failed: \(error.localizedDescription)")
+            // Return empty response - CoreResponseService will handle synthesizing from local + web search
+            response = ""
+            thinking = nil
+            // webSearchResults are preserved and will be returned
+        }
+        
+        return (response, thinking, webSearchResults)
+    }
+    
+    private func makeCloudRequestWithThinking(
+        model: String,
+        prompt: String,
+        apiKey: String,
+        timeout: TimeInterval
+    ) async throws -> String {
+        // Similar to makeCloudRequest but with thinking options
+        // For now, use standard request - Ollama Cloud may need special handling for thinking
+        return try await makeCloudRequest(
+            model: model,
+            prompt: prompt,
+            apiKey: apiKey,
+            timeout: timeout
+        )
+    }
+    
     private func makeCloudRequest(
         model: String,
         prompt: String,
@@ -459,9 +625,9 @@ actor HybridBridgeService {
         timeout: TimeInterval,
         images: [String]? = nil // Base64-encoded images for vision models
     ) async throws -> String {
-        // Ollama Cloud API uses /chat/completions endpoint for vision models (OpenAI-compatible)
-        // Fallback to /chat if /chat/completions doesn't work
-        let endpoint = images != nil ? "/chat/completions" : "/generate"
+        // Ollama Cloud API uses /api/chat/completions endpoint for vision models (OpenAI-compatible)
+        // For regular models, use /api/generate endpoint
+        let endpoint = images != nil ? "/api/chat/completions" : "/api/generate"
         guard let url = URL(string: "\(cloudBaseURL)\(endpoint)") else {
             throw HybridBridgeError.invalidURL
         }
@@ -952,4 +1118,5 @@ enum HybridBridgeError: LocalizedError {
         }
     }
 }
+
 

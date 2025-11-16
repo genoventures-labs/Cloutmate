@@ -115,7 +115,10 @@ struct AIAssistantSpotlightOverlay: View {
         case .focusSession:
             NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
             NotificationCenter.default.post(name: .openEntity, object: result.id)
-        }
+        case .event:
+            NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.calendar)
+            NotificationCenter.default.post(name: .openEntity, object: result.id)
+}
         dismiss()
     }
 }
@@ -160,7 +163,8 @@ struct AIAssistantSearchResultRow: View {
         case .reminder: return "bell.fill"
         case .inboxItem: return "tray.fill"
         case .focusSession: return "timer"
-        }
+        case .event: return "calendar"
+}
     }
 }
 

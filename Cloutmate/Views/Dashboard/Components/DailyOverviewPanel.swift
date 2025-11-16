@@ -94,14 +94,14 @@ struct FocusGravitySummaryCard: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+        DashboardTile(accent: .kosmicBlue) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
                     Image(systemName: "gauge.with.dots.needle.67percent")
-                        .font(.system(size: 18))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.kosmicBlue)
                     Text("Focus Gravity")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                 }
                 
@@ -114,7 +114,7 @@ struct FocusGravitySummaryCard: View {
                         ForEach(priorityItems.prefix(3)) { item in
                             HStack {
                                 Text(item.title)
-                                    .font(.subheadline)
+                                    .font(.system(.subheadline, design: .rounded))
                                     .foregroundColor(glassColorSystem.textPrimary())
                                     .lineLimit(1)
                                 Spacer()
@@ -132,17 +132,15 @@ struct FocusGravitySummaryCard: View {
                         Image(systemName: "clock")
                             .font(.caption)
                             .foregroundColor(.kosmicPurple)
-                        Text("Next Priority Window: \(windowStart, style: .time)")
+                        Text("Next priority window • \(windowStart, style: .time)")
                             .font(.caption)
                             .foregroundColor(glassColorSystem.textSecondary())
                     }
-                    .padding(.top, 4)
+                    .padding(.top, 6)
                 }
             }
-            .padding(16)
         }
-        .scaleEffect(isHovered ? 1.015 : 1.0)
-        .shadow(color: isHovered ? Color.kosmicPurple.opacity(0.2) : Color.black.opacity(0.05), radius: isHovered ? 8 : 3)
+        .glassHoverEffect(scale: isHovered ? 1.02 : 1.0)
         .onTapGesture(perform: onTap)
     }
 }
@@ -167,32 +165,29 @@ struct ARTEMoodPulseCard: View {
     }
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12, tintColor: stateColor.opacity(0.1)) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+        DashboardTile(accent: stateColor) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
                     Image(systemName: currentState.iconName)
-                        .font(.system(size: 18))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(stateColor)
                     Text("ARTE Mood Pulse")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                 }
                 
                 Text(currentState.displayName)
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 26, weight: .semibold, design: .rounded))
                     .foregroundColor(stateColor)
                 
                 Text("You've maintained a steady \(currentState.displayName.lowercased()) energy since yesterday.")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(glassColorSystem.textSecondary())
                     .italic()
                     .lineLimit(2)
             }
-            .padding(16)
         }
-        .scaleEffect(isHovered ? 1.015 : 1.0)
-        .shadow(color: isHovered ? stateColor.opacity(0.2) : Color.black.opacity(0.05), radius: isHovered ? 8 : 3)
+        .glassHoverEffect(scale: isHovered ? 1.02 : 1.0)
         .onTapGesture(perform: onTap)
     }
 }
@@ -229,22 +224,22 @@ struct PredictiveCognitionCard: View {
     }
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
+        DashboardTile(accent: .kosmicPurple) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 10) {
                     Image(systemName: "brain.head.profile")
-                        .font(.system(size: 18))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.kosmicPurple)
                     Text("Cognitive Forecast")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                 }
                 
                 if let forecast = forecast {
-                    // Fatigue risk meter
+                    VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Fatigue Risk")
+                                Text("Fatigue risk")
                                 .font(.caption)
                                 .foregroundColor(glassColorSystem.textSecondary())
                             Spacer()
@@ -256,14 +251,14 @@ struct PredictiveCognitionCard: View {
                         
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(Color.gray.opacity(0.2))
+                                    RoundedRectangle(cornerRadius: 3)
+                                        .fill(Color.white.opacity(0.08))
                                     .frame(height: 6)
                                 
-                                RoundedRectangle(cornerRadius: 2)
+                                    RoundedRectangle(cornerRadius: 3)
                                     .fill(
                                         LinearGradient(
-                                            colors: [driftColor.opacity(0.6), driftColor],
+                                                colors: [driftColor.opacity(0.5), driftColor],
                                             startPoint: .leading,
                                             endPoint: .trailing
                                         )
@@ -274,27 +269,26 @@ struct PredictiveCognitionCard: View {
                         .frame(height: 6)
                     }
                     
-                    // Peak Focus window
                     if let windowStart = forecast.nextFocusWindowStart,
                        let windowEnd = forecast.nextFocusWindowEnd {
-                        HStack {
-                            Image(systemName: "sparkles")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Focus window")
+                                    .font(.caption)
+                                    .foregroundColor(glassColorSystem.textSecondary())
+                                Text("\(windowStart, style: .time) – \(windowEnd, style: .time)")
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .foregroundColor(glassColorSystem.textPrimary())
+                            }
+                        }
+                        
+                        HStack(spacing: 6) {
+                            Image(systemName: "waveform.path")
                                 .font(.caption)
-                                .foregroundColor(.kosmicGreen)
-                            Text("Peak Focus: \(windowStart, style: .time) - \(windowEnd, style: .time)")
+                                .foregroundColor(driftColor)
+                            Text("Cognitive drift: \(driftLevel)")
                                 .font(.caption)
                                 .foregroundColor(glassColorSystem.textSecondary())
                         }
-                    }
-                    
-                    // Cognitive Drift indicator
-                    HStack {
-                        Image(systemName: "waveform.path")
-                            .font(.caption)
-                            .foregroundColor(driftColor)
-                        Text("Cognitive Drift: \(driftLevel)")
-                            .font(.caption)
-                            .foregroundColor(glassColorSystem.textSecondary())
                     }
                 } else {
                     Text("No forecast available")
@@ -302,10 +296,8 @@ struct PredictiveCognitionCard: View {
                         .foregroundColor(glassColorSystem.textSecondary())
                 }
             }
-            .padding(16)
         }
-        .scaleEffect(isHovered ? 1.015 : 1.0)
-        .shadow(color: isHovered ? Color.kosmicPurple.opacity(0.2) : Color.black.opacity(0.05), radius: isHovered ? 8 : 3)
+        .glassHoverEffect(scale: isHovered ? 1.02 : 1.0)
         .onTapGesture(perform: onTap)
     }
 }

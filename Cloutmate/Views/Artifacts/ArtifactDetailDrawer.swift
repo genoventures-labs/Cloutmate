@@ -1,3 +1,24 @@
+    private func insightRow<Content: View>(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.kosmicPurple)
+                .frame(width: 20)
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title.uppercased())
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+                content()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
 //
 //  ArtifactDetailDrawer.swift
 //  Cloutmate
@@ -80,50 +101,37 @@ struct ArtifactDetailDrawer: View {
         max(0.25, min(0.95, draft.confidenceScore))
     }
     
+    private var accentGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.kosmicBlue.opacity(0.35 + accentIntensity * 0.4),
+                Color.kosmicPurple.opacity(0.3 + accentIntensity * 0.35)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                accentBar
-                
-                VStack(spacing: 0) {
-                    headerSection
-                    Divider().opacity(0.08)
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            overviewCard
-                            contentCard
-                            tagsCard
-                            assetLinksCard
-                        }
-                        .padding(.vertical, 24)
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: 720, alignment: .leading)
-                    }
-                    .background(glassColorSystem.backgroundColor())
-                }
-                
-                Divider().opacity(0.08)
-                
-                analyticsSidebar
-            }
-            .background(glassColorSystem.backgroundColor())
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        saveChanges()
-                        dismiss()
-                    }
-                    .disabled(!draft.canCommit)
-                    .buttonStyle(.borderedProminent)
-                }
-            }
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    detailsSection
+                    contentSection
+                    tagsSection
+                    linkedContextSection
+                    analyticsSection
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 960, minHeight: 660)
         }
-        .frame(minWidth: 1080, minHeight: 680)
+        .onEscape {
+            dismiss()
+        }
         .onAppear {
             loadAssociations()
             loadLinkedEntities()
@@ -141,175 +149,217 @@ struct ArtifactDetailDrawer: View {
     
     // MARK: - Layout
     
-    private var accentBar: some View {
-        LinearGradient(
-            colors: [
-                Color.kosmicBlue.opacity(accentIntensity),
-                Color.kosmicPurple.opacity(accentIntensity * 0.85)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(width: 5)
-        .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 0)
-    }
-    
-    private var headerSection: some View {
-        GlassPanel(tier: .overlay, cornerRadius: 0) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    TextField("Artifact Title", text: $draft.title)
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.bold)
-                        .textFieldStyle(.plain)
-                        .focused($isContentFocused, equals: false)
-                    
-                    Spacer()
-                    
-                    modeToggle
-                }
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("Artifact Title", text: $draft.title)
+                    .font(.system(.title2, design: .rounded))
+                    .fontWeight(.semibold)
+                    .textFieldStyle(.plain)
+                    .drawerFocusGlow()
                 
                 HStack(spacing: 12) {
-                    stateControl
-                    formatControl
-                    
-                    associationChips
-                    
-                    Spacer()
-                    
-                    publicationControl
-                }
-            }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 20)
-        }
-    }
-    
-    private var overviewCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 18) {
-                SectionHeader(
-                    title: "Artifact Overview",
-                    subtitle: "Define the intent and outcome for Aurora",
-                    icon: "square.grid.2x2"
-                )
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    if draft.projectId == nil && draft.areaId == nil {
-                        Text("Link this artifact to a Project or Area to surface it in weekly reviews.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    metadataPill(
+                        title: draft.state.displayName,
+                        icon: "flag.fill",
+                        tint: .kosmicBlue.opacity(0.8)
+                    )
+                    metadataPill(
+                        title: draft.format.displayName,
+                        icon: "doc.richtext",
+                        tint: .kosmicPurple.opacity(0.8)
+                    )
                     
                     if let project = associatedProject {
-                        associationChip(icon: "folder", color: .kosmicBlue, title: project.title, label: "Project")
+                        metadataPill(
+                            title: project.title,
+                            icon: "folder.fill",
+                            tint: .kosmicBlue.opacity(0.6)
+                        )
                     }
                     
                     if let area = associatedArea {
-                        associationChip(icon: "rectangle.3.group", color: .kosmicGreen, title: area.title, label: "Area")
+                        metadataPill(
+                            title: area.title,
+                            icon: "rectangle.grid.2x2",
+                            tint: .kosmicGreen.opacity(0.6)
+                        )
                     }
                 }
             }
-            .padding(20)
-        }
-    }
-    
-    private var contentCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionHeader(
-                    title: mode == .capture ? "Quick Capture" : "Crafted Content",
-                    subtitle: mode == .capture ? "Capture raw thoughts with mentions for later refinement" : "Polish the artifact before publishing",
-                    icon: mode == .capture ? "pencil.line" : "sparkles"
-                )
-                
-                MentionTextEditor(
-                    text: $draft.content,
-                    placeholder: mode == .capture ? "Quick capture idea…" : "Write your artifact…",
-                    excludeObjectId: artifact.id,
-                    excludeObjectType: .artifact
-                ) { ids, types in
-                    draft.linkedEntityIds = ids
-                    draft.linkedEntityTypes = types
+            
+            Spacer(minLength: 24)
+            
+            VStack(spacing: 12) {
+                GlassButton(
+                    "Close",
+                    icon: "xmark",
+                    style: .standard,
+                    role: .surface
+                ) {
+                    dismiss()
                 }
-                .frame(minHeight: mode == .capture ? 240 : 320)
-                .cornerRadius(14)
+                .keyboardShortcut(.escape, modifiers: [])
+                
+                GlassButton(
+                    "Save Changes",
+                    icon: "tray.and.arrow.down.fill",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    saveChanges()
+                    dismiss()
+                }
+                .disabled(!draft.canCommit)
+                .keyboardShortcut(.return, modifiers: [])
             }
-            .padding(20)
         }
     }
     
-    private var tagsCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionHeader(
-                    title: "Tags",
-                    subtitle: "Categorize this artifact for future retrieval",
-                    icon: "number"
-                )
-                
-                if !draft.tags.isEmpty {
-                    NoteTagFlowLayout(spacing: 8) {
-                        ForEach(draft.tags, id: \.self) { tag in
-                            HStack(spacing: 6) {
-                                Text("#\(tag)")
-                                    .font(.caption)
-                                Button {
-                                    removeTag(tag)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.caption2)
+    private var detailsSection: some View {
+        DrawerSection(title: "Details", icon: "slider.horizontal.3") {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 16) {
+                GridRow {
+                    detailField(title: "Composer Mode") {
+                        Picker("Mode", selection: $mode) {
+                            Text("Capture").tag(ComposerMode.capture)
+                            Text("Craft").tag(ComposerMode.craft)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    
+                    detailField(title: "Format") {
+                        Menu {
+                            Picker("Format", selection: $draft.format) {
+                                ForEach(OutputFormat.allCases, id: \.self) { format in
+                                    Text(format.displayName).tag(format)
                                 }
-                                .buttonStyle(.plain)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.kosmicBlue.opacity(0.14))
-                            .foregroundColor(.kosmicBlue)
-                            .cornerRadius(8)
+                            .pickerStyle(.inline)
+                        } label: {
+                            metaBadge(icon: "doc.richtext", title: draft.format.displayName)
+                        }
+                        .menuStyle(.borderlessButton)
+                    }
+                }
+                
+                GridRow {
+                    detailField(title: "State") {
+                        Menu {
+                            Picker("State", selection: $draft.state) {
+                                ForEach(ArtifactState.allCases, id: \.self) { state in
+                                    Text(state.displayName).tag(state)
+                                }
+                            }
+                            .pickerStyle(.inline)
+                        } label: {
+                            metaBadge(icon: "flag", title: draft.state.displayName)
+                        }
+                        .menuStyle(.borderlessButton)
+                    }
+                    
+                    detailField(title: draft.publishedAt == nil ? "Publish" : "Published") {
+                        publicationControl
+                    }
+                }
+                
+                GridRow {
+                    detailField(title: "Associations") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let project = associatedProject {
+                                associationChip(icon: "folder", color: .kosmicBlue, title: project.title, label: "Project")
+                            }
+                            
+                            if let area = associatedArea {
+                                associationChip(icon: "rectangle.grid.2x2", color: .kosmicGreen, title: area.title, label: "Area")
+                            }
+                            
+                            if associatedProject == nil && associatedArea == nil {
+                                Text("Link to a project or area for surfaced reviews.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
-                } else {
-                    Text("Add tags to map this artifact inside Aurora’s knowledge graph.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    .gridCellColumns(2)
                 }
-                
-                HStack(spacing: 10) {
-                    TextField("Add tag", text: $newTagText)
-                        .textFieldStyle(.plain)
-                        .onSubmit(addTag)
-                    
-                    Button(action: addTag) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.kosmicBlue)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(glassColorSystem.glassTint(for: .surface).opacity(0.35))
-                .cornerRadius(10)
             }
-            .padding(20)
         }
     }
     
-    private var assetLinksCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionHeader(
-                    title: "Linked Context",
-                    subtitle: "Entities connected through mentions",
-                    icon: "link"
-                )
+    private var contentSection: some View {
+        DrawerSection(
+            title: mode == .capture ? "Quick Capture" : "Crafted Content",
+            icon: mode == .capture ? "pencil.line" : "sparkles",
+            subtitle: mode == .capture ? "Capture raw thoughts with mentions for later refinement" : "Polish the artifact before publishing"
+        ) {
+            MentionTextEditor(
+                text: $draft.content,
+                placeholder: mode == .capture ? "Quick capture idea…" : "Write your artifact…",
+                excludeObjectId: artifact.id,
+                excludeObjectType: .artifact
+            ) { ids, types in
+                draft.linkedEntityIds = ids
+                draft.linkedEntityTypes = types
+            }
+            .frame(minHeight: mode == .capture ? 240 : 320)
+            .drawerFocusGlow()
+        }
+    }
+    
+    private var tagsSection: some View {
+        DrawerSection(title: "Tags", icon: "number", subtitle: "Categorize this artifact for future retrieval") {
+            if !draft.tags.isEmpty {
+                NoteTagFlowLayout(spacing: 8) {
+                    ForEach(draft.tags, id: \.self) { tag in
+                        HStack(spacing: 6) {
+                            Text("#\(tag)")
+                                .font(.caption)
+                            Button {
+                                removeTag(tag)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption2)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.kosmicBlue.opacity(0.14))
+                        .foregroundColor(.kosmicBlue)
+                        .cornerRadius(8)
+                    }
+                }
+            } else {
+                Text("Add tags to map this artifact inside Aurora’s knowledge graph.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            HStack(spacing: 10) {
+                TextField("Add tag", text: $newTagText)
+                    .textFieldStyle(.plain)
+                    .onSubmit(addTag)
                 
-                if linkedTasks.isEmpty && linkedProjects.isEmpty && linkedAreas.isEmpty && linkedNotes.isEmpty {
-                    Text("Mention tasks, projects, areas, or notes using @ to create dynamic links.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                } else {
+                Button(action: addTag) {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundColor(.kosmicBlue)
+                }
+                .buttonStyle(.plain)
+                .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            .drawerFocusGlow()
+        }
+    }
+    
+    private var linkedContextSection: some View {
+        DrawerSection(title: "Linked Context", icon: "link", subtitle: "Entities connected through mentions") {
+            if linkedTasks.isEmpty && linkedProjects.isEmpty && linkedAreas.isEmpty && linkedNotes.isEmpty {
+                Text("Mention tasks, projects, areas, or notes using @ to create dynamic links.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 14) {
                     if !linkedProjects.isEmpty {
                         LinkedEntityGroup(title: "Projects", icon: "folder", color: .kosmicPurple, items: linkedProjects.map(\.title))
                     }
@@ -324,151 +374,82 @@ struct ArtifactDetailDrawer: View {
                     }
                 }
             }
-            .padding(20)
         }
     }
     
-    private var analyticsSidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        SectionHeader(title: "Confidence Score", subtitle: "Aurora’s confidence in this artifact", icon: "chart.bar.xaxis")
-                        
-                        VStack(alignment: .leading, spacing: 8) {
-                            ProgressView(value: draft.confidenceScore)
-                                .progressViewStyle(.linear)
-                            
-                            Text("\(Int(draft.confidenceScore * 100))% confident")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+    private var analyticsSection: some View {
+        Group {
+            DrawerSection(title: "Aurora Insights", icon: "sparkles") {
+                VStack(alignment: .leading, spacing: 18) {
+                    insightRow(
+                        title: "Confidence Score",
+                        icon: "shield.lefthalf.fill",
+                        content: {
+                            Text("\(Int(draft.confidenceScore * 100))% confidence")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(.kosmicPurple)
                         }
-                    }
-                    .padding(18)
-                }
-                
-                GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionHeader(title: "Sentiment", subtitle: "Aurora’s tonal analysis", icon: "face.smiling")
-                        
-                        if let sentiment = draft.sentimentSummary, !sentiment.isEmpty {
-                            Text(sentiment)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        } else {
-                            Text("Sentiment analysis will appear after Aurora reviews this artifact.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    )
+                    
+                    insightRow(
+                        title: "Sentiment",
+                        icon: "face.smiling",
+                        content: {
+                            Text(
+                                draft.sentimentSummary?.isEmpty == false
+                                ? draft.sentimentSummary!
+                                : "Sentiment analysis will appear after Aurora reviews this artifact."
+                            )
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         }
-                    }
-                    .padding(18)
-                }
-                
-                GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        SectionHeader(title: "Aurora Notes", subtitle: "Internal observations and guidance", icon: "sparkles")
-                        
-                        TextEditor(text: Binding(
-                            get: { draft.auroraNotes ?? "" },
-                            set: { draft.auroraNotes = $0.isEmpty ? nil : $0 }
-                        ))
-                        .frame(minHeight: 120)
-                        .background(glassColorSystem.glassTint(for: .surface).opacity(0.2))
-                        .cornerRadius(12)
-                    }
-                    .padding(18)
-                }
-                
-                GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        SectionHeader(title: "History", subtitle: "Timeline for this artifact", icon: "clock")
-                        
-                        timelineRow(icon: "calendar.badge.plus", label: "Created", value: draft.createdAt.formatted(date: .abbreviated, time: .shortened))
-                        timelineRow(icon: "calendar.badge.clock", label: "Updated", value: draft.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        
-                        if let publishedAt = draft.publishedAt {
-                            timelineRow(icon: "calendar.badge.checkmark", label: "Published", value: publishedAt.formatted(date: .abbreviated, time: .shortened))
+                    )
+                    
+                    insightRow(
+                        title: "Aurora Notes",
+                        icon: "wand.and.stars",
+                        content: {
+                            Text(
+                                draft.auroraNotes?.isEmpty == false
+                                ? draft.auroraNotes!
+                                : "Aurora will populate notes after processing this artifact."
+                            )
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         }
+                    )
+                }
+            }
+            
+            DrawerSection(title: "History", icon: "clock.badge") {
+                VStack(alignment: .leading, spacing: 8) {
+                    timelineRow(icon: "calendar.badge.plus", label: "Created", value: draft.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    timelineRow(icon: "calendar.badge.clock", label: "Updated", value: draft.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                    
+                    if let publishedAt = draft.publishedAt {
+                        timelineRow(icon: "calendar.badge.checkmark", label: "Published", value: publishedAt.formatted(date: .abbreviated, time: .shortened))
                     }
-                    .padding(18)
                 }
-            }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 16)
-        }
-        .frame(width: 320)
-        .background(glassColorSystem.backgroundColor())
-    }
-    
-    private var modeToggle: some View {
-        Picker("Mode", selection: $mode) {
-            Text("Capture").tag(ComposerMode.capture)
-            Text("Craft").tag(ComposerMode.craft)
-        }
-        .pickerStyle(.segmented)
-        .frame(width: 180)
-    }
-    
-    private var stateControl: some View {
-        Menu {
-            Picker("State", selection: $draft.state) {
-                ForEach(ArtifactState.allCases, id: \.self) { state in
-                    Text(state.displayName).tag(state)
-                }
-            }
-            .pickerStyle(.inline)
-        } label: {
-            metaBadge(icon: "flag", title: "State", value: draft.state.displayName)
-        }
-        .menuStyle(.borderlessButton)
-    }
-    
-    private var formatControl: some View {
-        Menu {
-            Picker("Format", selection: $draft.format) {
-                ForEach(OutputFormat.allCases, id: \.self) { format in
-                    Text(format.displayName).tag(format)
-                }
-            }
-            .pickerStyle(.inline)
-        } label: {
-            metaBadge(icon: "doc.richtext", title: "Format", value: draft.format.displayName)
-        }
-        .menuStyle(.borderlessButton)
-    }
-    
-    private var associationChips: some View {
-        HStack(spacing: 8) {
-            if let project = associatedProject {
-                associationChip(icon: "folder", color: .kosmicBlue, title: project.title, label: "Project")
-            }
-            if let area = associatedArea {
-                associationChip(icon: "rectangle.grid.2x2", color: .kosmicGreen, title: area.title, label: "Area")
             }
         }
     }
     
     // MARK: - Helpers
     
-    private func metaBadge(icon: String, title: String, value: String, interactive: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.caption.weight(.semibold))
-                Text(title.uppercased())
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(interactive ? .kosmicBlue : .secondary)
-            }
-            Text(value)
+    private func metaBadge(icon: String, title: String, tint: Color = .secondary) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption.weight(.semibold))
+            Text(title)
                 .font(.caption.weight(.semibold))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(glassColorSystem.glassTint(for: .surface).opacity(interactive ? 0.5 : 0.3))
+                .fill(glassColorSystem.cardColor().opacity(0.45))
         )
+        .foregroundStyle(tint)
     }
     
     private func associationChip(icon: String, color: Color, title: String, label: String) -> some View {
@@ -487,6 +468,32 @@ struct ArtifactDetailDrawer: View {
         .padding(.vertical, 8)
         .background(color.opacity(0.12))
         .cornerRadius(10)
+    }
+    
+    private func metadataPill(title: String, icon: String, tint: Color) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2)
+            Text(title)
+                .font(.caption)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(tint.opacity(0.18))
+        .clipShape(Capsule())
+        .foregroundColor(tint)
+    }
+    
+    private func detailField<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+            content()
+        }
     }
     
     private func timelineRow(icon: String, label: String, value: String) -> some View {
@@ -518,13 +525,17 @@ struct ArtifactDetailDrawer: View {
     private var publicationControl: some View {
         Group {
             if let publishedAt = draft.publishedAt {
-                metaBadge(icon: "calendar.badge.clock", title: "Published", value: publishedAt.formatted(date: .abbreviated, time: .omitted))
+                metaBadge(
+                    icon: "calendar.badge.clock",
+                    title: publishedAt.formatted(date: .abbreviated, time: .omitted),
+                    tint: .kosmicPurple
+                )
             } else {
                 Button {
                     draft.publishedAt = Date()
                     draft.state = .published
                 } label: {
-                    metaBadge(icon: "calendar.badge.plus", title: "Publish", value: "Mark as shipped", interactive: true)
+                    metaBadge(icon: "calendar.badge.plus", title: "Mark as shipped", tint: .kosmicBlue)
                 }
                 .buttonStyle(.plain)
             }

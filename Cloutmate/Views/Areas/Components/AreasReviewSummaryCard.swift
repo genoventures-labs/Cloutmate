@@ -14,23 +14,23 @@ struct AreasReviewSummaryCard: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 18) {
+        DashboardTile(accent: .orange) {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Image(systemName: "calendar.badge.exclamationmark")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(items.count) area\(items.count == 1 ? "" : "s") need review")
                             .font(.headline)
-                            .foregroundColor(glassColorSystem.textPrimary())
+                            .foregroundStyle(glassColorSystem.textPrimary())
                         
                         if let nextUpcoming = items.min(by: { ($0.1.overdueDays ?? 0) > ($1.1.overdueDays ?? 0) }) {
                             let reason = nextUpcoming.1.reason
                             Text(reason)
                                 .font(.caption)
-                                .foregroundColor(glassColorSystem.textSecondary())
+                                .foregroundStyle(glassColorSystem.textSecondary())
                                 .lineLimit(2)
                         }
                     }
@@ -47,7 +47,7 @@ struct AreasReviewSummaryCard: View {
                                 .font(.caption.weight(.semibold))
                             Image(systemName: "arrow.forward.circle.fill")
                         }
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(
@@ -70,18 +70,18 @@ struct AreasReviewSummaryCard: View {
                             HStack(spacing: 14) {
                                 Image(systemName: area.categoryIcon ?? "rectangle.stack.fill")
                                     .font(.system(size: 18, weight: .medium))
-                                    .foregroundColor(colorAccent(for: area))
+                                    .foregroundStyle(colorAccent(for: area))
                                     .frame(width: 24, height: 24)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(area.title)
                                         .font(.callout.weight(.semibold))
-                                        .foregroundColor(glassColorSystem.textPrimary())
+                                        .foregroundStyle(glassColorSystem.textPrimary())
                                         .lineLimit(1)
                                     
                                     Text(status.reason)
                                         .font(.caption)
-                                        .foregroundColor(glassColorSystem.textSecondary())
+                                        .foregroundStyle(glassColorSystem.textSecondary())
                                         .lineLimit(2)
                                 }
                                 
@@ -101,14 +101,13 @@ struct AreasReviewSummaryCard: View {
                     }
                 }
             }
-            .padding(20)
         }
     }
     
     private func badge(title: String, color: Color) -> some View {
         Text(title.uppercased())
             .font(.caption2.weight(.semibold))
-            .foregroundColor(color)
+            .foregroundStyle(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(color.opacity(0.12))
@@ -156,8 +155,10 @@ struct AreasReviewSummaryCard: View {
         nextReviewDate: Date()
     )
     
-    AreasReviewSummaryCard(
-        items: [(area1, status1), (area2, status2), (area3, status3)],
+    let items: [(Area, AreaReviewStatus)] = [(area1, status1), (area2, status2), (area3, status3)]
+    
+    return AreasReviewSummaryCard(
+        items: items,
         onSelect: { _ in }
     )
     .environmentObject(GlassColorSystem())

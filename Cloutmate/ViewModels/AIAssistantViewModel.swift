@@ -54,8 +54,41 @@ final class AIAssistantViewModel {
     @ObservationIgnored private var lastUserMessage: (text: String, image: ImageAttachmentService.ImageAttachment?, document: DocumentAttachmentService.DocumentAttachment?)?
     @ObservationIgnored private var messagePayloadCache: [UUID: ResendPayload] = [:]
     
+    // Research mode state
+    @ObservationIgnored private var isResearchMode: Bool = false
+    
+    // Research progress tracking
+    var currentResearchAction: String? = nil
+    var currentResearchSourceCount: Int = 0
+    
     var canRetry: Bool {
         lastUserMessage != nil
+    }
+    
+    var researchModeActive: Bool {
+        isResearchMode
+    }
+    
+    func clearResearchMode() {
+        isResearchMode = false
+        clearResearchProgress()
+    }
+    
+    func setResearchMode(_ active: Bool) {
+        isResearchMode = active
+        if !active {
+            clearResearchProgress()
+        }
+    }
+    
+    func updateResearchProgress(action: String, sourceCount: Int = 0) {
+        currentResearchAction = action
+        currentResearchSourceCount = sourceCount
+    }
+    
+    func clearResearchProgress() {
+        currentResearchAction = nil
+        currentResearchSourceCount = 0
     }
     
     // Linked context from @ mentions
@@ -206,6 +239,9 @@ final class AIAssistantViewModel {
     // MARK: - Methods
     
     func initializeConversation(modelContext: ModelContext) {
+        // Clear research mode when starting a new conversation
+        clearResearchMode()
+        
         if currentConversation == nil {
             let conversation = AIConversation(title: "Chat \(Date().formatted(date: .abbreviated, time: .omitted))")
             modelContext.insert(conversation)
@@ -237,11 +273,31 @@ final class AIAssistantViewModel {
         image: ImageAttachmentService.ImageAttachment? = nil,
         document: DocumentAttachmentService.DocumentAttachment? = nil
     ) {
-        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedImage = image ?? pendingImageAttachment
         let resolvedDocument = document ?? pendingDocumentAttachment
 
         guard !trimmedText.isEmpty || resolvedImage != nil || resolvedDocument != nil else { return }
+        
+        // Detect /research command - check both text and existing state (from slash drawer)
+        if researchModeActive {
+            // Already set via slash drawer, just ensure it stays active
+            // Remove /research from text if it exists (user might have typed it)
+            if trimmedText.contains("/research") || trimmedText.hasPrefix("/research ") || trimmedText == "/research" {
+                trimmedText = trimmedText.replacingOccurrences(of: "/research", with: "")
+                    .replacingOccurrences(of: "/research ", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        } else if trimmedText.contains("/research") || trimmedText.hasPrefix("/research ") || trimmedText == "/research" {
+            // Detect /research in text
+            setResearchMode(true)
+            // Remove /research from text
+            trimmedText = trimmedText.replacingOccurrences(of: "/research", with: "")
+                .replacingOccurrences(of: "/research ", with: "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Don't clear research mode here - it stays active until response completes
+        // This allows the pill to remain visible during research
 
         if resolvedImage != nil && resolvedDocument != nil {
             let warning = AIMessage(
@@ -256,8 +312,14 @@ final class AIAssistantViewModel {
         }
         
         // Initialize conversation if needed
+        // Preserve research mode during initialization
+        let researchModeWasActive = researchModeActive
         if currentConversation == nil {
             initializeConversation(modelContext: modelContext)
+            // Restore research mode if it was active before initialization
+            if researchModeWasActive {
+                setResearchMode(true)
+            }
             // Ensure conversation is saved before proceeding
             do {
                 try modelContext.save()
@@ -283,16 +345,18 @@ final class AIAssistantViewModel {
             return
         }
         
-        // Analyze emotional tone of user message
-        let emotionalSourceText = !text.isEmpty ? text : (resolvedDocument?.textPreview ?? "")
+        // Analyze emotional tone of user message (use trimmedText if available and non-empty, otherwise use original text)
+        let messageContentForStorage = (!trimmedText.isEmpty) ? trimmedText : text
+        let emotionalSourceText = !messageContentForStorage.isEmpty ? messageContentForStorage : (resolvedDocument?.textPreview ?? "")
         let emotionalSnapshot = EmotionAnalyzer.analyzeTone(text: emotionalSourceText)
         
         let userMessage = AIMessage(
             role: "user",
-            content: text,
+            content: messageContentForStorage,
             emotion: emotionalSnapshot.primaryEmotion.rawValue,
             emotionScore: emotionalSnapshot.valence,
-            emotionIntensity: emotionalSnapshot.intensity
+            emotionIntensity: emotionalSnapshot.intensity,
+            wasSentInResearchMode: researchModeActive
         )
         if let attachment = resolvedImage {
             userMessage.imageData = attachment.data
@@ -312,7 +376,7 @@ final class AIAssistantViewModel {
         messages.append(userMessage)
         currentConversation?.messages?.append(userMessage)
         messagePayloadCache[userMessage.id] = ResendPayload(
-            text: text,
+            text: messageContentForStorage,
             image: resolvedImage,
             document: resolvedDocument
         )
@@ -325,15 +389,15 @@ final class AIAssistantViewModel {
         }
         
         let typingStyle: TypingStyle
-        if !trimmedText.isEmpty {
-            typingStyle = StyleAnalyzer.analyzeStyle(text: text)
+        if !messageContentForStorage.isEmpty {
+            typingStyle = StyleAnalyzer.analyzeStyle(text: messageContentForStorage)
         } else {
             typingStyle = TypingStyle.neutral
         }
         let stylePreferences = fetchOrCreatePreferences(modelContext: modelContext)
         applyStyleSample(typingStyle, to: stylePreferences)
         stylePreferences.lastUserEmotion = emotionalSnapshot.primaryEmotion.rawValue
-        let topicSource = !text.isEmpty ? text : (resolvedDocument?.textPreview ?? "")
+        let topicSource = !messageContentForStorage.isEmpty ? messageContentForStorage : (resolvedDocument?.textPreview ?? "")
         if let topic = StyleAnalyzer.primaryTopic(from: topicSource) {
             stylePreferences.lastConversationTopic = topic
         }
@@ -351,8 +415,23 @@ final class AIAssistantViewModel {
         // Cancel any existing task
         currentResponseTask?.cancel()
         
+        // Capture conversation ID and research mode state at task start
+        // This prevents cross-conversation updates and ensures research mode state is preserved
+        let taskConversationId = currentConversation?.id
+        let taskResearchMode = researchModeActive // Capture research mode state NOW, before async execution
+        
         // Create new task and store it
-        let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
+        let task: _Concurrency.Task<Void, Never> = _Concurrency.Task { [weak self] in
+            guard let self = self else { return }
+            
+            // Verify this task is still relevant to current conversation
+            // If user switched conversations, this task should not update UI
+            if self.currentConversation?.id != taskConversationId {
+                // User switched conversations - don't update UI for this task
+                print("[AIAssistantViewModel] Task completed but conversation changed - skipping UI update")
+                return
+            }
+            
             if let attachment = resolvedDocument {
                     updateActivity(.analyzingDocument)
                 await handleDocumentMessage(
@@ -379,15 +458,21 @@ final class AIAssistantViewModel {
                 )
                 return
             }
-            if await handlePendingOperationIfNeeded(with: text, modelContext: modelContext, isFirstMessage: isFirstMessage) {
+            if await handlePendingOperationIfNeeded(with: messageContentForStorage, modelContext: modelContext, isFirstMessage: isFirstMessage) {
                 return
             }
             // DISABLED: Creation intent detection is too aggressive and constantly asks about creating tasks
             // Only create items when explicitly requested through conversational flow
             
             // Try preference update intent
-            if let prefUpdate = try? await coreResponseService.inferPreferenceUpdate(input: text) {
+            if let prefUpdate = try? await coreResponseService.inferPreferenceUpdate(input: messageContentForStorage) {
                 await MainActor.run {
+                    // Verify conversation hasn't changed
+                    if self.currentConversation?.id != taskConversationId {
+                        print("[AIAssistantViewModel] Conversation changed during preference update - skipping")
+                        return
+                    }
+                    
                     // Fetch or create preferences
                     let prefs: UserPreferences
                     prefs = fetchOrCreatePreferences(modelContext: modelContext)
@@ -406,26 +491,43 @@ final class AIAssistantViewModel {
                     messages.append(confirm)
                     currentConversation?.messages?.append(confirm)
                 }
+                
+                // Verify conversation hasn't changed before processing
+                if await MainActor.run(body: { self.currentConversation?.id != taskConversationId }) {
+                    print("[AIAssistantViewModel] Conversation changed before processMessage - skipping")
+                    return
+                }
+                
                     currentActivity = .generatingResponse
                 await processMessage(
-                    text,
+                    messageContentForStorage,
                     modelContext: modelContext,
                     isFirstMessage: isFirstMessage,
                     currentStyle: typingStyle,
-                    styleProfile: stylePreferences
+                    styleProfile: stylePreferences,
+                    taskConversationId: taskConversationId,
+                    taskResearchMode: taskResearchMode
                 )
                 return
             }
             
             // REMOVED: Scheduling intent picker - will auto-schedule in processMessage if needed
             
+            // Verify conversation hasn't changed before processing
+            if await MainActor.run(body: { self.currentConversation?.id != taskConversationId }) {
+                print("[AIAssistantViewModel] Conversation changed before processMessage - skipping")
+                return
+            }
+            
                 updateActivity(.generatingResponse)
             await processMessage(
-                text,
+                messageContentForStorage,
                 modelContext: modelContext,
                 isFirstMessage: isFirstMessage,
                 currentStyle: typingStyle,
-                styleProfile: stylePreferences
+                styleProfile: stylePreferences,
+                taskConversationId: taskConversationId,
+                taskResearchMode: taskResearchMode
             )
         }
         currentResponseTask = task
@@ -436,7 +538,9 @@ final class AIAssistantViewModel {
         modelContext: ModelContext,
         isFirstMessage: Bool = false,
         currentStyle: TypingStyle? = nil,
-        styleProfile: UserPreferences? = nil
+        styleProfile: UserPreferences? = nil,
+        taskConversationId: UUID? = nil,
+        taskResearchMode: Bool = false
     ) async {
         do {
             // Check for REFLECTION intent first (introspective queries about patterns/state)
@@ -591,9 +695,13 @@ final class AIAssistantViewModel {
                 }
             }
             
+            // Only update activity if NOT in research mode (research mode uses its own progress indicator)
+            if !taskResearchMode {
             updateActivity(.generatingResponse)
+            }
             
-            let (appContext, payloadContext, conversationModelContent) = try await buildAIContext(
+            // Build AI context - transition state will be added after tone detection
+            var (appContext, payloadContext, conversationModelContent) = try await buildAIContext(
                 for: text,
                 modelContext: modelContext,
                 currentStyle: currentStyle,
@@ -681,6 +789,35 @@ final class AIAssistantViewModel {
                 conversationId: nil
             )
             
+            // Step 0: Ensure the selected model is ready before processing (non-blocking)
+            // Show "Getting things ready" message if warmup is needed
+            let selectedModel = routingDecision.model
+            let needsWarmup = !ModelWarmupService.shared.checkModelReady(selectedModel)
+            
+            if needsWarmup {
+                await MainActor.run {
+                    // Show warmup message using existing status system
+                    updateActivity(.warmingUp)
+                    updateStatus("Getting things ready...")
+                }
+                
+                // Ensure model is ready (non-blocking - shows progress messages)
+                await ModelWarmupService.shared.ensureModelsReady(
+                    models: [selectedModel],
+                    progressHandler: { [weak self] message in
+                        // progressHandler is already called on MainActor by ModelWarmupService
+                        // Since AIAssistantViewModel is @MainActor, we can call methods directly
+                        self?.updateStatus(message)
+                    }
+                )
+                
+                // Clear warmup status after warmup completes
+                await MainActor.run {
+                    clearStatus()
+                }
+            }
+            
+            // Also check with OllamaBridge for on-demand loading if ModelWarmupService check passed
             if !(await OllamaBridgeService.shared.isModelReady(routingDecision.model)) {
                 await MainActor.run {
                     updateActivity(.warmingUp)
@@ -711,11 +848,307 @@ final class AIAssistantViewModel {
                 }
             }
             
+            // Only update activity if NOT in research mode (research mode uses its own progress indicator)
             await MainActor.run {
+                if !taskResearchMode {
                 updateActivity(.generatingResponse)
+                }
             }
             
-            var result = try await coreResponseService.generateResponseWithAppContext(
+            // Determine tone context based on conversation context
+            let toneContext: AuroraTone? = await MainActor.run {
+                // Check for emotional state from ARTE
+                if let glassSystem = GlassColorSystem.active {
+                    return AuroraToneKit.tone(for: glassSystem.emotionalState)
+                }
+                // Check time of day
+                let hour = Calendar.current.component(.hour, from: Date())
+                let timeOfDay: TimeOfDayContext = {
+                    switch hour {
+                    case 5..<9: return .morning
+                    case 9..<12: return .lateMorning
+                    case 12..<14: return .midday
+                    case 14..<17: return .afternoon
+                    case 17..<21: return .evening
+                    default: return .night
+                    }
+                }()
+                return AuroraToneKit.tone(for: timeOfDay)
+            }
+            
+            // Extract user's last 3 messages and Aurora's last 2 tones for prediction
+            let (userMessages, auroraTones): ([String], [AuroraTone]) = await MainActor.run {
+                // Get user's last 3 messages
+                let userMessages = messages
+                    .filter { ($0.role ?? "") == "user" }
+                    .suffix(3)
+                    .compactMap { $0.content }
+                
+                // Get Aurora's last 2 tones
+                let assistantMessages = messages.filter { ($0.role ?? "") == "assistant" }
+                let auroraTones = assistantMessages
+                    .suffix(2)
+                    .compactMap { message -> AuroraTone? in
+                        guard let toneString = message.tone else { return nil }
+                        return AuroraTone(rawValue: toneString)
+                    }
+                
+                return (userMessages, auroraTones)
+            }
+            
+            // Get historical accuracy data, reliability profiles, and temporal emotional memory for adaptive weighting
+            // Extract async calls outside MainActor.run
+            let accuracyScores = ToneForecastService.shared.allToneAccuracyScores(modelContext: modelContext)
+            
+            // Build adaptive bias factors for potential transitions
+            var biasFactors: [String: Double] = [:]
+            if let lastTone = auroraTones.last {
+                for tone in AuroraTone.allCases {
+                    if tone != lastTone {
+                        let biasFactor = ToneForecastService.shared.adaptiveBiasFactor(
+                            predicted: lastTone,
+                            actual: tone,
+                            modelContext: modelContext
+                        )
+                        let pairKey = "\(lastTone.rawValue)_\(tone.rawValue)"
+                        biasFactors[pairKey] = biasFactor
+                    }
+                }
+            }
+            
+            // Get reliability profiles for all tones
+            let allProfiles = await ToneFeedbackReinforcementEngine.shared.getAllProfiles(modelContext: modelContext)
+            var profilesDict: [AuroraTone: ToneReliabilityProfile] = [:]
+            for profile in allProfiles {
+                if let tone = profile.toneValue {
+                    profilesDict[tone] = profile
+                }
+            }
+            
+            // Get temporal emotional memory context
+            let momentumForecast = await TemporalEmotionalMemory.shared.forecastEmotionalMomentum(modelContext: modelContext)
+            let rollingBaseline = await TemporalEmotionalMemory.shared.rollingAverageBaseline(days: 7, modelContext: modelContext)
+            
+            // Convert TemporalEmotionalTrend to EmotionalTrend
+            let emotionalMomentum: (momentum: Double, trend: EmotionalTrend, confidence: Double) = {
+                let trend: EmotionalTrend = {
+                    switch momentumForecast.trend {
+                    case .positive: return .improving
+                    case .negative: return .declining
+                    case .neutral: return .stable
+                    }
+                }()
+                return (momentumForecast.momentum, trend, momentumForecast.confidence)
+            }()
+            
+            let toneAccuracyScores: [AuroraTone: Double]? = accuracyScores.isEmpty ? nil : accuracyScores
+            let adaptiveBiasFactors: [String: Double]? = biasFactors.isEmpty ? nil : biasFactors
+            let reliabilityProfiles: [AuroraTone: ToneReliabilityProfile]? = profilesDict.isEmpty ? nil : profilesDict
+            
+            // Get ERI for tone weighting adjustment
+            let eriIndex = await AuroraEcosphericLayer.shared.getCurrentERI(modelContext: modelContext)
+            
+            // Predict next tone based on conversation patterns with historical accuracy, reliability, temporal emotional memory, and ERI weighting
+            let tonePrediction = AuroraToneKit.predictNextTone(
+                userMessages: userMessages,
+                auroraTones: auroraTones,
+                toneAccuracyScores: toneAccuracyScores,
+                adaptiveBiasFactors: adaptiveBiasFactors,
+                reliabilityProfiles: reliabilityProfiles,
+                emotionalMomentum: emotionalMomentum,
+                rollingBaseline: rollingBaseline,
+                eriIndex: eriIndex
+            )
+            
+            // Extract previous tone from conversation history for blending
+            let previousTone: AuroraTone? = await MainActor.run {
+                // Get the last assistant message's tone
+                let assistantMessages = messages.filter { ($0.role ?? "") == "assistant" }
+                guard let lastMessage = assistantMessages.last,
+                      let toneString = lastMessage.tone,
+                      let previous = AuroraTone(rawValue: toneString) else {
+                    return nil
+                }
+                return previous
+            }
+            
+            // Get AECI for default tone bias
+            let aecIndex = await EmotionalContinuityEngine.shared.getCurrentAECI(modelContext: modelContext)
+            let defaultToneBias = EmotionalContinuityEngine.shared.getDefaultToneBias(aecIndex: aecIndex)
+            
+            // Use prediction to bias tone selection if confidence is high enough
+            // Also consider AECI default tone bias if no strong prediction
+            let biasedToneContext: AuroraTone? = {
+            // First, check if we have a strong prediction
+            if let predicted = tonePrediction.predictedTone,
+               tonePrediction.confidence >= 0.6 {
+                // If prediction differs from current tone context, use it as bias
+                // Blend prediction with current context based on confidence
+                if let current = toneContext, predicted != current {
+                    // High confidence (>0.8) = use prediction directly
+                    // Medium confidence (0.6-0.8) = blend with current
+                    if tonePrediction.confidence >= 0.8 {
+                        return predicted
+                    } else {
+                        // Blend: favor prediction but keep some current context
+                        return predicted // For now, use prediction if confidence is reasonable
+                    }
+                } else if toneContext == nil {
+                    // No current tone - use prediction
+                    return predicted
+                }
+            }
+            
+            // If no strong prediction, use AECI default tone bias if available
+            if let defaultBias = defaultToneBias, toneContext == nil {
+                return defaultBias
+            }
+            
+            return toneContext
+        }()
+            
+            // Detect tone transition and blend if needed
+            // Also track transition state for gradual memory weighting
+            // Use biased tone context if prediction was applied
+            let (blendedTone, transitionState): (AuroraTone?, ToneTransitionState?) = await MainActor.run {
+                let effectiveToneContext = biasedToneContext ?? toneContext
+                guard let currentTone = effectiveToneContext else { return (effectiveToneContext, nil) }
+                guard let previous = previousTone, previous != currentTone else {
+                    // Check if we're in an active transition
+                    if let lastState = currentConversation?.toneTransitionState, lastState.isActive {
+                        // Continue the transition
+                        let nextTurn = lastState.transitionTurn + 1
+                        if nextTurn < 3 {
+                            // Still transitioning - use transition tone
+                            let fromTone = lastState.fromToneValue ?? previousTone ?? currentTone
+                            let toTone = lastState.toToneValue ?? currentTone
+                            let transition = AuroraToneKit.transitionTone(from: fromTone, to: toTone)
+                            let intensity = lastState.transitionIntensity
+                            let updatedState = ToneTransitionState(
+                                fromTone: lastState.fromToneValue ?? currentTone,
+                                toTone: lastState.toToneValue ?? currentTone,
+                                transitionTone: transition,
+                                transitionTurn: nextTurn,
+                                transitionIntensity: intensity
+                            )
+                            return (transition, updatedState)
+                        } else {
+                            // Transition complete - use target tone
+                            currentConversation?.toneTransitionState = nil
+                            return (currentTone, nil)
+                        }
+                    }
+                    return (currentTone, nil)
+                }
+                
+                // New transition detected
+                let transition = AuroraToneKit.transitionTone(from: previous, to: currentTone)
+                let intensity = AuroraToneKit.calculateTransitionIntensity(from: previous, to: currentTone)
+                let newState = ToneTransitionState(
+                    fromTone: previous,
+                    toTone: currentTone,
+                    transitionTone: transition,
+                    transitionTurn: 0, // Start of transition
+                    transitionIntensity: intensity
+                )
+                return (transition, newState)
+            }
+            
+            // Store transition state in conversation and add to payload context metadata
+            await MainActor.run {
+                currentConversation?.toneTransitionState = transitionState
+                
+                // Add transition state to payload context metadata for memory weighting
+                if let transition = transitionState,
+                   let transitionData = try? JSONEncoder().encode(transition),
+                   let transitionString = String(data: transitionData, encoding: .utf8) {
+                    payloadContext.metadata["toneTransitionState"] = transitionString
+                }
+            }
+            
+            // Use blended tone for response generation
+            let effectiveTone = blendedTone ?? toneContext
+            
+            // Use prediction to bias response generation
+            let predictedNextTone: AuroraTone? = tonePrediction.confidence >= 0.6 ? tonePrediction.predictedTone : nil
+            
+            // Check if research mode is active
+            // Use the captured state from when sendMessage was called, not current state
+            // This ensures research mode applies even if state changes during async execution
+            let isResearchActive = taskResearchMode
+            
+            var result: (response: String, thinking: String?, modelUsed: String)
+            var researchSources: [ResearchSource]? = nil
+            
+            if isResearchActive {
+                // Use research mode
+                // Don't update activity to .generatingResponse or .searching - we only show research progress
+                // updateActivity(.searching) // Removed - we don't want to trigger ThinkingIndicator
+                
+                // Step 0: Ensure research models are ready before processing (non-blocking)
+                // Show "Getting things ready" message if warmup is needed
+                let researchModels = ["deepseek-r1:1.5b", "gpt-oss:20b"]
+                
+                // Check if any research models need warmup
+                let needsWarmup = !researchModels.allSatisfy { ModelWarmupService.shared.checkModelReady($0) }
+                
+                if needsWarmup {
+                    await MainActor.run {
+                        clearResearchProgress()
+                        updateResearchProgress(action: "Getting things ready...", sourceCount: 0)
+                    }
+                    
+                    // Ensure all research models are ready (non-blocking - shows progress messages)
+                    await ModelWarmupService.shared.ensureModelsReady(
+                        models: researchModels,
+                        progressHandler: { [weak self] message in
+                            // progressHandler is already called on MainActor by ModelWarmupService
+                            // Since AIAssistantViewModel is @MainActor, we can call methods directly
+                            self?.updateResearchProgress(action: message, sourceCount: 0)
+                        }
+                    )
+                }
+                
+                // Initialize research progress tracking - show initial state immediately
+                await MainActor.run {
+                    clearResearchProgress()
+                    // Set initial progress to show indicator immediately
+                    updateResearchProgress(action: "Starting research...", sourceCount: 0)
+                }
+                
+                do {
+                    let researchResult = try await coreResponseService.generateResearchResponse(
+                        for: userInputWithWebSearch,
+                        appContext: appContext,
+                        payloadContext: payloadContext,
+                        conversationMessages: conversationMessages,
+                        currentMessageStyle: currentStyle,
+                        userStyleProfile: styleProfile,
+                        confidence: confidenceSnapshot,
+                        toneContext: effectiveTone,
+                        modelContext: modelContext,
+                        onProgressUpdate: { [weak self] action, sourceCount in
+                            // Callback is already invoked on MainActor from services
+                            self?.updateResearchProgress(action: action, sourceCount: sourceCount)
+                        }
+                    )
+                
+                    result = (researchResult.response, researchResult.thinking, researchResult.modelUsed)
+                    researchSources = researchResult.sources
+                } catch {
+                    // If research fails, provide error message but don't crash
+                    print("[AIAssistantViewModel] Research mode error: \(error.localizedDescription)")
+                    result = ("Research mode encountered an error: \(error.localizedDescription). Please try again or check your model availability.", nil, "Research Mode")
+                    researchSources = []
+                }
+                
+                // Clear research mode after use (whether successful or failed)
+                await MainActor.run {
+                    clearResearchMode()
+                }
+            } else {
+                // Normal response
+                result = try await coreResponseService.generateResponseWithAppContext(
                 for: userInputWithWebSearch,
                 appContext: appContext,
                 payloadContext: payloadContext,
@@ -724,8 +1157,11 @@ final class AIAssistantViewModel {
                 userStyleProfile: styleProfile,
                 confidence: confidenceSnapshot,
                 modelContext: modelContext,
-                preselectedDecision: routingDecision
+                preselectedDecision: routingDecision,
+                toneContext: effectiveTone,
+                predictedNextTone: predictedNextTone
             )
+            }
             
             var response = result.response
             
@@ -768,6 +1204,7 @@ final class AIAssistantViewModel {
                 return thinking
             }()
             
+            // Store the effective (blended) tone in message metadata for visual styling
             let assistantMessage = AIMessage(
                 role: "assistant",
                 content: response,
@@ -776,10 +1213,21 @@ final class AIAssistantViewModel {
                 webSearchConfidence: webSearchConfidenceScore,
                 thinkingContent: limitedThinkingContent,
                 modelUsed: result.modelUsed,
-                wasThinking: result.thinking != nil && !result.thinking!.isEmpty
+                wasThinking: result.thinking != nil && !result.thinking!.isEmpty,
+                tone: effectiveTone?.rawValue,
+                researchSources: researchSources
             )
             
             await MainActor.run {
+                // Double-check conversation hasn't changed before updating UI
+                // This prevents cross-conversation updates when user switches conversations mid-task
+                // If taskConversationId is provided, verify current conversation matches it
+                if let taskId = taskConversationId, self.currentConversation?.id != taskId {
+                    let currentIdString = self.currentConversation?.id.uuidString ?? "nil"
+                    print("[AIAssistantViewModel] Conversation changed before message update (task: \(taskId), current: \(currentIdString)) - skipping UI update")
+                    return
+                }
+                
                 modelContext.insert(assistantMessage)
                 messages.append(assistantMessage)
                 currentConversation?.messages?.append(assistantMessage)
@@ -789,6 +1237,98 @@ final class AIAssistantViewModel {
                 clearStatus()
                 currentSourceModel = nil // Clear source model
                 currentResponseTask = nil // Clear task reference
+                
+                // Record tone prediction outcome for feedback reinforcement
+                if let predicted = predictedNextTone,
+                   let actual = effectiveTone {
+                    let outcomeSentiment = ToneForecastService.shared.inferOutcomeSentiment(
+                        predictedTone: predicted,
+                        actualTone: actual,
+                        userMessage: text
+                    )
+                    
+                    ToneForecastService.shared.recordPrediction(
+                        predictedTone: predicted,
+                        actualTone: actual,
+                        outcomeSentiment: outcomeSentiment,
+                        predictionConfidence: tonePrediction.confidence,
+                        conversationId: currentConversation?.id,
+                        messageId: assistantMessage.id,
+                        modelContext: modelContext
+                    )
+                    
+                    // Track conversation batch and process if complete
+                    if let conversationId = currentConversation?.id {
+                        let batchComplete = ToneFeedbackReinforcementEngine.shared.trackTurn(conversationId: conversationId)
+                        if batchComplete {
+                            // Process batch asynchronously
+                            _Concurrency.Task {
+                                await ToneFeedbackReinforcementEngine.shared.processBatch(
+                                    conversationId: conversationId,
+                                    modelContext: modelContext
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Update temporal emotional memory epochs
+                    _Concurrency.Task {
+                        let today = Date()
+                        let dailyEpoch = await TemporalEmotionalMemory.shared.createOrUpdateDailyEpoch(
+                            for: today,
+                            modelContext: modelContext
+                        )
+                        await TemporalEmotionalMemory.shared.aggregateMetricsIntoEpoch(
+                            epoch: dailyEpoch,
+                            modelContext: modelContext
+                        )
+                        
+                        let weeklyEpoch = await TemporalEmotionalMemory.shared.createOrUpdateWeeklyEpoch(
+                            for: today,
+                            modelContext: modelContext
+                        )
+                        await TemporalEmotionalMemory.shared.aggregateMetricsIntoEpoch(
+                            epoch: weeklyEpoch,
+                            modelContext: modelContext
+                        )
+                        
+                        // Calculate and update AECI weekly
+                        if let aecHistory = await EmotionalContinuityEngine.shared.calculateWeeklyAECI(modelContext: modelContext) {
+                            // Update GlassColorSystem with AECI
+                            await MainActor.run {
+                                if let glassSystem = GlassColorSystem.active {
+                                    glassSystem.updateAECI(aecHistory.aecIndex, category: aecHistory.category)
+                                }
+                            }
+                        }
+                        
+                        // Calculate and update ERI
+                        if let eriHistory = await AuroraEcosphericLayer.shared.calculateERI(modelContext: modelContext) {
+                            // Update GlassColorSystem with ERI
+                            await MainActor.run {
+                                if let glassSystem = GlassColorSystem.active {
+                                    glassSystem.updateERI(eriHistory.eriIndex, category: eriHistory.category)
+                                }
+                            }
+                        }
+                        
+                        // Calculate and update ERS
+                        if let ersHistory = await AuroraMetaSymphony.shared.calculateERS(modelContext: modelContext) {
+                            // Update GlassColorSystem with ERS
+                            await MainActor.run {
+                                if let glassSystem = GlassColorSystem.active {
+                                    glassSystem.updateERS(ersHistory.ersIndex, category: ersHistory.category)
+                                }
+                            }
+                        }
+                        
+                        // Calculate and update Luminance Field
+                        if let lfHistory = await AuroraLuminara.shared.calculateLuminanceField(modelContext: modelContext) {
+                            // LF automatically updates visual parameters
+                            // No need to update GlassColorSystem as it's handled by LuminanceFieldVisualizer
+                        }
+                    }
+                }
                 
                 // Save after adding messages
                 try? modelContext.save()
@@ -818,7 +1358,7 @@ final class AIAssistantViewModel {
             if isOllamaError {
                 errorContent = error.localizedDescription
             } else {
-                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `gemma3:4b` model is available."
+                errorContent = "I'm having trouble connecting to the AI service. Please check that Ollama is running and the `gemma3:1b` model is available."
             }
             
             // Handle errors
@@ -2371,6 +2911,9 @@ final class AIAssistantViewModel {
             }
         }
         
+        // Determine tone for reflection (use pattern recognition or insightful)
+        let reflectionTone = AuroraTone.patternRecognition
+        
         // Format as Aurora's thoughtful response
         let fullResponse = """
         💭 **Reflection on your patterns and progress**
@@ -2383,7 +2926,12 @@ final class AIAssistantViewModel {
         """
         
         let attributedResponse = convertMarkdownToAttributedString(fullResponse)
-        let assistantMessage = AIMessage(role: "assistant", content: attributedResponse, chartData: chartData)
+        let assistantMessage = AIMessage(
+            role: "assistant",
+            content: attributedResponse,
+            chartData: chartData,
+            tone: reflectionTone.rawValue
+        )
         
         await MainActor.run {
             modelContext.insert(assistantMessage)
@@ -3076,6 +3624,26 @@ final class AIAssistantViewModel {
     }
     
     func clearMessages() {
+        // Clear research mode when clearing messages (new chat)
+        clearResearchMode()
+        
+        // Cancel any active response task
+        currentResponseTask?.cancel()
+        currentResponseTask = nil
+        
+        // Cancel activity debounce task
+        activityDebounceTask?.cancel()
+        activityDebounceTask = nil
+        
+        // Reset all status/activity indicators - don't persist across chats
+        isLoading = false
+        errorMessage = nil
+        currentActivity = .thinking
+        debouncedActivity = .thinking
+        currentStatus = nil
+        currentSourceModel = nil
+        isFirstActivityUpdate = true
+        
         messages.removeAll()
         currentConversation = nil
         selectedConversation = nil
@@ -3165,7 +3733,28 @@ final class AIAssistantViewModel {
     // MARK: - Conversation Management
     
     func loadConversation(_ conversation: AIConversation, modelContext: ModelContext) -> Bool {
+        // Cancel any active response task
+        currentResponseTask?.cancel()
+        currentResponseTask = nil
+        
+        // Cancel activity debounce task
+        activityDebounceTask?.cancel()
+        activityDebounceTask = nil
+        
+        // Reset all status/activity indicators - don't persist across conversations
+        isLoading = false
+        errorMessage = nil
+        currentActivity = .thinking
+        debouncedActivity = .thinking
+        currentStatus = nil
+        currentSourceModel = nil
+        isFirstActivityUpdate = true
+        
         pendingOperation = nil
+        
+        // Clear research mode when switching conversations - it's per-conversation
+        clearResearchMode()
+        
         // Check if there are unsaved messages in the current conversation
         if let current = currentConversation, !messages.isEmpty {
             // Check if messages have been saved

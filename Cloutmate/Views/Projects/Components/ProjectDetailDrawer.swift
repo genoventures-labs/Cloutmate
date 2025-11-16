@@ -160,6 +160,7 @@ struct ProjectDetailDrawer: View {
                 }
             }
         }
+        .onEscape { cancel() }
         .frame(minWidth: 600, minHeight: 500)
         .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
@@ -198,6 +199,7 @@ struct ProjectDetailDrawer: View {
                     .fontWeight(.semibold)
                     .textFieldStyle(.plain)
                     .focused($isTitleFocused)
+                    .drawerFocusGlow()
                 
                 HStack(spacing: 12) {
                     Label(draft.status.displayName, systemImage: "chart.bar.doc.horizontal")
@@ -212,7 +214,7 @@ struct ProjectDetailDrawer: View {
                     }
                     
                     if hasDueDate, let dueDate = draft.dueDate {
-                        Label(dueDate, systemImage: "calendar")
+                        Label(dueDate.formatted(date: .abbreviated, time: .omitted), systemImage: "calendar")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -261,9 +263,7 @@ struct ProjectDetailDrawer: View {
                 draft.linkedEntityTypes = types
             }
             .frame(minHeight: 220)
-            .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(10)
+            .drawerFocusGlow()
         }
     }
     
@@ -320,9 +320,7 @@ struct ProjectDetailDrawer: View {
         DrawerSection(title: "Tags", icon: "tag.fill", subtitle: "Use commas to separate tags") {
             TextField("e.g., work, priority", text: $tagsText)
                 .textFieldStyle(.plain)
-                .padding(10)
-                .background(.ultraThinMaterial)
-                .cornerRadius(8)
+                .drawerFocusGlow()
         }
     }
     

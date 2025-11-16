@@ -38,18 +38,25 @@ struct UnifiedAIAssistantView: View {
     @State private var isRecording = false
     @State private var voiceInputText = ""
     @FocusState private var isInputFocused: Bool
-    @State private var showCreateSheet = false
-    @State private var contextualCreateTab: TabIdentifier = .home
-    @State private var chatScrollProxy: ScrollViewProxy?
+    @State private var attachedContextLabels: [String] = []
+    @State private var contextManuallyDetached = false
+    @State private var attachedTab: TabIdentifier?
+    @State private var attachedProjects: [UUID] = []
+    @State private var attachedTasks: [UUID] = []
+    @State private var messageFlags: [String: Bool] = [:]
     
+    // Drawer states
+    @State private var showTabDrawer = false
+    @State private var showProjectDrawer = false
+    @State private var showTaskDrawer = false
+
     private let voiceService = VoiceTranscriptionService.shared
+    private let aiSettings = AISettings.shared
     @State private var imagePasteObserver: NSObjectProtocol?
-    
-    private let chatBottomAnchor = "ai-chat-bottom-anchor"
     
     // ARTE gradient colors based on emotional state
     private var arteGradientColors: [Color] {
-        let palette = EmotionalPalette.palette(for: themeManager.currentState)
+        _ = EmotionalPalette.palette(for: themeManager.currentState)
         switch themeManager.currentState {
         case .focused:
             return [Color(red: 0.0, green: 0.2, blue: 0.4), Color(red: 0.0, green: 0.3, blue: 0.5)]
@@ -63,358 +70,505 @@ struct UnifiedAIAssistantView: View {
             return [Color(red: 0.2, green: 0.15, blue: 0.2), Color(red: 0.25, green: 0.2, blue: 0.25)]
         }
     }
-    
-    // MARK: - View Components
-    
-    private var sidebarView: some View {
-        AIAssistantSidebar(
-            conversations: conversations,
-            selectedConversation: viewModel.currentConversation,
-            searchText: $viewModel.searchText,
-            selectedDateFilter: $viewModel.selectedDateFilter,
-            selectedTags: $viewModel.selectedTags,
-            onConversationTap: { conversation in
-                handleConversationTap(conversation)
-            },
-            onRename: { conversation in
-                conversationToRename = conversation
-                newTitle = conversation.title ?? ""
-                showRenameAlert = true
-            },
-            onDelete: { conversation in
-                conversationToDelete = conversation
-                showDeleteAlert = true
-            },
-            onTogglePin: { conversation in
-                viewModel.togglePin(conversation, modelContext: modelContext)
-                toastMessage = conversation.isPinned ? "Conversation unpinned" : "Conversation pinned"
-            },
-            onRefreshSummary: { conversation in
-                let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
-                    await viewModel.refreshSummary(conversation, modelContext: modelContext)
-                }
-                _ = task
-            },
-            onExportToDraft: { conversation in
-                if let messages = conversation.messages, !messages.isEmpty {
-                    let messagesArray: [AIMessage] = Array(messages)
-                    let conversationRef: AIConversation = conversation
-                    let result: Bool = viewModel.exportToDraft(messages: messagesArray, conversation: conversationRef, modelContext: modelContext)
-                    _ = result
-                    toastMessage = "Exported to Drafts!"
-                }
-            }
-        )
-        .frame(minWidth: 250, idealWidth: 280)
-        .environment(\.glassTier, .contentCard)
+
+    private var drawerVisible: Bool {
+        false // Drawers are now shown inside AuroraChatContainer, not as overlays
     }
     
-    private var mainChatArea: some View {
-        VStack(spacing: 0) {
-            chatHeader
-            Divider()
-            conversationPane
-            Divider()
-            toolbarView
-            Divider()
-            messageComposerView
+    private var contextLabelsWithTab: [String] {
+        var labels = attachedContextLabels
+        if let tab = attachedTab {
+            labels.insert(tab.rawValue, at: 0)
         }
-        .frame(minWidth: 500)
-    }
-    
-    private var chatHeader: some View {
-        AIAssistantHeaderView(
-            onSearch: {
-                showSpotlight = true
-            },
-            onNewChat: {
-                if !viewModel.messages.isEmpty {
-                    showUnsavedAlert = true
-                } else {
-                    viewModel.clearMessages()
-                }
-            },
-            onSettings: {
-                showAuroraPreferences = true
-            },
-            selectedFilter: $viewModel.selectedDateFilter
-        )
-        .environment(\.glassTier, .overlay)
-    }
-    
-    private var conversationPane: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottomTrailing) {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 8) {
-                            if viewModel.messages.isEmpty {
-                                welcomeView
-                            } else {
-                                ForEach(viewModel.messages) { message in
-                                    MessageBubble(
-                                        message: message,
-                                        onEdit: { editedMessage, newContent in
-                                            viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
-                                        },
-                                        onCopy: { _ in },
-                                        onResend: { assistantMessage in
-                                            viewModel.resendAssistantMessage(assistantMessage, modelContext: modelContext)
-                                        },
-                                    canResend: viewModel.canResendPayload(for: message)
-                                    )
-                                    .id(message.id)
-                                }
-                            }
-                            
-                            if viewModel.isLoading {
-                                ThinkingIndicator(
-                                    activity: viewModel.displayedActivity,
-                                    sourceModel: viewModel.currentSourceModel,
-                                    statusMessage: viewModel.currentStatus
-                                )
-                                .padding()
-                            } else if !viewModel.messages.isEmpty {
-                                IdleIndicator()
-                                    .padding(.top, 8)
-                            }
-                            
-                            Color.clear
-                                .frame(height: 1)
-                                .id(chatBottomAnchor)
-                                .background(
-                                    GeometryReader { bottomGeo in
-                                        Color.clear.preference(
-                                            key: ChatScrollOffsetPreferenceKey.self,
-                                            value: bottomGeo.frame(in: .named("chatScroll")).minY
-                                        )
-                                    }
-                                )
-                        }
-                        .padding(.vertical, 16)
-                        .padding(.bottom, 60)
-                    }
-                    .coordinateSpace(name: "chatScroll")
-                    .onAppear {
-                        chatScrollProxy = proxy
-                    }
-                    .onChange(of: viewModel.messages.count) { _, _ in
-                        if viewModel.isScrolledToBottom {
-                            scrollToBottom(animated: true)
-                        }
-                    }
-                    .onChange(of: viewModel.currentConversation?.id) { _, _ in
-                        scrollToBottom(animated: false)
-                    }
-                }
-                .onPreferenceChange(ChatScrollOffsetPreferenceKey.self) { bottomOffset in
-                    let containerHeight = geometry.size.height
-                    let isAtBottom = bottomOffset <= containerHeight + 32
-                    if viewModel.isScrolledToBottom != isAtBottom {
-                        viewModel.isScrolledToBottom = isAtBottom
-                    }
-                }
-                
-                VStack(alignment: .trailing, spacing: 16) {
-                    if viewModel.messages.count >= 10 {
-                        summarizeButton
-                    }
-                    
-                    ScrollToBottomButton(isVisible: !viewModel.isScrolledToBottom) {
-                        scrollToBottom(animated: true)
-                    }
-                }
-                .padding(.trailing, 24)
-                .padding(.bottom, 32)
+        
+        // Add project names
+        for projectId in attachedProjects {
+            var descriptor = FetchDescriptor<Project>(predicate: #Predicate { $0.id == projectId })
+            descriptor.fetchLimit = 1
+            if let project = try? modelContext.fetch(descriptor).first {
+                labels.append(project.title)
             }
-            .background(
-                LinearGradient(
-                    colors: arteGradientColors,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .opacity(0.1)
+        }
+        
+        // Add task names
+        for taskId in attachedTasks {
+            var descriptor = FetchDescriptor<Task>(predicate: #Predicate { $0.id == taskId })
+            descriptor.fetchLimit = 1
+            if let task = try? modelContext.fetch(descriptor).first {
+                labels.append(task.title)
+            }
+        }
+        
+        return labels
+    }
+
+    @ViewBuilder
+    private var overlayDrawers: some View {
+        if showTabDrawer {
+            TabAttachmentDrawer(
+                isPresented: $showTabDrawer,
+                onSelectTab: { tab in
+                    attachTab(tab)
+                    removeSlashCommandFromText("/tab")
+                    showTabDrawer = false
+                }
             )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
         }
-        .environment(\.glassTier, .background)
+        
+        if showProjectDrawer {
+            ProjectAttachmentDrawer(
+                isPresented: $showProjectDrawer,
+                onSelectProject: { project in
+                    attachProject(project)
+                    removeSlashCommandFromText("/project")
+                    showProjectDrawer = false
+                }
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+        
+        if showTaskDrawer {
+            TaskAttachmentDrawer(
+                isPresented: $showTaskDrawer,
+                onSelectTask: { task in
+                    attachTask(task)
+                    removeSlashCommandFromText("/task")
+                    showTaskDrawer = false
+                }
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+        
+        // AuroraCreateSheet will be shown in AuroraChatContainer, docked to bottom
     }
     
-    private var summarizeButton: some View {
-        Button(action: {
-            let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
-                await viewModel.generateChatSummary()
-            }
-            _ = task
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: "doc.text.magnifyingglass")
-                Text("Summarize Chat")
-            }
-            .font(.subheadline)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .background(.ultraThinMaterial)
-            .foregroundColor(.primary)
-            .cornerRadius(20)
-            .shadow(color: .black.opacity(0.2), radius: 10)
-        }
-        .buttonStyle(.plain)
-        .padding(.trailing, 16)
-        .padding(.bottom, 80)
+    @State private var isCollapsed = false
+    @State private var collapseWorkItem: DispatchWorkItem?
+    @State private var isHoveringPanel = false
+
+    private var accentColor: Color {
+        Color.kosmicBlue
     }
-    
-    private var toolbarView: some View {
-        AIAssistantToolbar(
+
+    private var glowColor: Color {
+        Color.kosmicPurple
+    }
+
+    private var collapseSubtitle: String {
+        if viewModel.isLoading {
+            return "Aurora is thinking..."
+        }
+        if let title = viewModel.currentConversation?.title, !title.isEmpty {
+            return title
+        }
+        return "Tap to resume conversation"
+    }
+
+    @ViewBuilder
+    private var expandedChatView: some View {
+        let warmupService = ModelWarmupService.shared
+        
+        ZStack {
+            // Show warmup message if not ready
+            if warmupService.isWarmingUp || !warmupService.isReady {
+                WarmupWelcomeView(
+                    message: warmupService.warmupMessage,
+                    progress: warmupService.warmupProgress.isEmpty ? nil : warmupService.warmupProgress
+                )
+                .transition(.opacity)
+            } else {
+        AuroraChatContainer(
             viewModel: viewModel,
-            isRecording: $isRecording,
-            onSmartRecap: {
-                let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
-                    await viewModel.generateSmartRecap(modelContext: modelContext)
-                }
-                _ = task
+            conversations: conversations,
+            arteGradientColors: arteGradientColors,
+            accentColor: accentColor,
+            glowColor: glowColor,
+            conversationHandlers: conversationHandlers,
+            toolbarHandlers: toolbarHandlers,
+            manualContextLabels: contextLabelsWithTab,
+            headerHandlers: headerHandlers,
+            composerHandlers: composerHandlers,
+            onAttachTab: { tab in
+                attachTab(tab)
             },
-            onExportToDraft: {
-                guard let conversation = viewModel.currentConversation,
-                      let messages = conversation.messages,
-                      !messages.isEmpty else {
-                    toastMessage = "No messages to save"
-                    return
-                }
-                let messagesArray: [AIMessage] = Array(messages)
-                let conversationRef: AIConversation = conversation
-                let result: Bool = viewModel.exportToDraft(messages: messagesArray, conversation: conversationRef, modelContext: modelContext)
-                _ = result
-                toastMessage = "Saved to Drafts!"
+            onDetachTab: {
+                detachTab()
             },
-            onVoiceInput: {
-                toggleVoiceInput()
+            onSlashCommand: { command, range in
+                handleSlashCommand(command, range: range)
             },
-            onToolbarAction: { action in
-                handleToolbarAction(action)
+            messageFlags: messageFlags,
+            showAuroraCreateSheet: showAuroraCreateSheet,
+            createSheetAction: createSheetAction,
+            onCreateSheetComplete: { prompt in
+                viewModel.inputText = prompt
+                sendCurrentMessage()
+                showAuroraCreateSheet = false
+                createSheetAction = nil
             },
-            onWebSearch: {
-                // Insert "@web " into input field and focus it
-                if viewModel.inputText.isEmpty {
-                    viewModel.inputText = "@web "
-                } else {
-                    viewModel.inputText += " @web "
-                }
-                isInputFocused = true
-            }
-        )
-        .environment(\.glassTier, .overlay)
-    }
-    
-    private var messageComposerView: some View {
-        AIMessageComposer(
-            text: $viewModel.inputText,
-            linkedContext: $viewModel.linkedContext,
-            isFocused: $isInputFocused,
+            onCreateSheetDismiss: {
+                showAuroraCreateSheet = false
+                createSheetAction = nil
+            },
             isRecording: $isRecording,
             voiceInputText: $voiceInputText,
-            isLoading: viewModel.isLoading,
-            pendingImageAttachment: viewModel.pendingImageAttachment,
-            pendingDocumentAttachment: viewModel.pendingDocumentAttachment,
-            lastConfidenceScore: viewModel.messages.last(where: { $0.role == "assistant" })?.confidenceScore,
-            canRetry: viewModel.canRetry,
-            onResendLastAssistant: viewModel.canResendLastAssistant ? {
-                viewModel.resendLastAssistant(modelContext: modelContext)
-            } : nil,
-            onSend: {
-                sendCurrentMessage()
-            },
-            onAttachImage: {
-                attachImageFromPicker()
-            },
-            onAttachDocument: {
-                presentDocumentSourceChooser()
-            },
-            onClearImage: {
-                viewModel.clearPendingImage()
-            },
-            onClearDocument: {
-                viewModel.clearPendingDocument()
-            },
-            onStop: {
-                viewModel.stopResponse(modelContext: modelContext)
-            },
-            onRetry: {
-                viewModel.retryLastMessage(modelContext: modelContext)
-            }
+            isInputFocused: $isInputFocused
         )
-        .environment(\.glassTier, .contentCard)
+        .opacity(drawerVisible ? 0 : 1)
+        .allowsHitTesting(!drawerVisible)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: warmupService.isReady)
+                    .onHover { hovering in
+            if warmupService.isReady {
+            isHoveringPanel = hovering
+                        if hovering {
+                cancelCollapseSchedule()
+            } else {
+                scheduleCollapseIfNeeded()
+                }
+            }
+        }
+        .onAppear {
+            if warmupService.isReady {
+            cancelCollapseSchedule()
+            }
+        }
     }
     
-    var body: some View {
-        HSplitView {
-            sidebarView
-            mainChatArea
+    private var conversationHandlers: AuroraChatContainer.ConversationHandlers {
+        .init(
+                            onTap: { conversation in
+                                handleConversationTap(conversation)
+                            },
+                            onRename: { conversation in
+                                conversationToRename = conversation
+                                newTitle = conversation.title ?? ""
+                                showRenameAlert = true
+                            },
+                            onDelete: { conversation in
+                                conversationToDelete = conversation
+                                showDeleteAlert = true
+                            },
+                            onTogglePin: { conversation in
+                                viewModel.togglePin(conversation, modelContext: modelContext)
+                                toastMessage = conversation.isPinned ? "Conversation unpinned" : "Conversation pinned"
+                            },
+                            onRefreshSummary: { conversation in
+                                let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
+                                    await viewModel.refreshSummary(conversation, modelContext: modelContext)
+                                }
+                                _ = task
+                            },
+                            onExportToDraft: { conversation in
+                                if let messages = conversation.messages, !messages.isEmpty {
+                                    let messagesArray: [AIMessage] = Array(messages)
+                                    let conversationRef: AIConversation = conversation
+                                    let result: Bool = viewModel.exportToDraft(messages: messagesArray, conversation: conversationRef, modelContext: modelContext)
+                                    _ = result
+                                    toastMessage = "Exported to Drafts!"
+                                }
+                            }
+        )
+    }
+    
+    private var toolbarHandlers: AuroraChatContainer.ToolbarHandlers {
+        .init(
+                            onSmartRecap: {
+                                let task: _Concurrency.Task<Void, Never> = _Concurrency.Task {
+                                    await viewModel.generateSmartRecap(modelContext: modelContext)
+                                }
+                                _ = task
+                            },
+                            onExportToDraft: {
+                                guard let conversation = viewModel.currentConversation,
+                                      let messages = conversation.messages,
+                                      !messages.isEmpty else {
+                                    toastMessage = "No messages to save"
+                                    return
+                                }
+                                let messagesArray: [AIMessage] = Array(messages)
+                                let conversationRef: AIConversation = conversation
+                                let result: Bool = viewModel.exportToDraft(messages: messagesArray, conversation: conversationRef, modelContext: modelContext)
+                                _ = result
+                                toastMessage = "Saved to Drafts!"
+                            },
+                            onVoiceInput: {
+                                toggleVoiceInput()
+                            },
+                            onToolbarAction: { action in
+                                handleToolbarAction(action)
+                            },
+                            onWebSearch: {
+                                if viewModel.inputText.isEmpty {
+                                    viewModel.inputText = "@web "
+                                } else {
+                                    viewModel.inputText += " @web "
+                                }
+                                isInputFocused = true
+                            },
+                            onLinkContext: {
+                // Replaced with tab attachment - no longer used
+                            },
+                            onToggleOffline: {
+                                aiSettings.airplaneMode.toggle()
+                                toastMessage = aiSettings.airplaneMode ? "Offline cognition active" : "Offline mode disabled"
+                            },
+                            isOffline: {
+                                aiSettings.airplaneMode
+                            }
+        )
+    }
+    
+    private var headerHandlers: AuroraChatContainer.HeaderHandlers {
+        .init(
+                            onSearch: {
+                                showSpotlight = true
+                            },
+                            onNewChat: {
+                                if !viewModel.messages.isEmpty {
+                                    showUnsavedAlert = true
+                                } else {
+                                    // Clear research mode when starting new chat
+                                    viewModel.clearResearchMode()
+                                    viewModel.clearMessages()
+                    contextManuallyDetached = true
+                    attachedContextLabels.removeAll()
+                                }
+                            },
+                            onSettings: {
+                                showAuroraPreferences = true
+                            }
+        )
+    }
+    
+    private var composerHandlers: AuroraChatContainer.ComposerHandlers {
+        .init(
+                            onSend: {
+                                sendCurrentMessage()
+                            },
+                            onAttachImage: {
+                                attachImageFromPicker()
+                            },
+                            onAttachDocument: {
+                                presentDocumentSourceChooser()
+                            },
+                            onClearImage: {
+                                viewModel.clearPendingImage()
+                            },
+                            onClearDocument: {
+                                viewModel.clearPendingDocument()
+                            },
+                            onStop: {
+                                viewModel.stopResponse(modelContext: modelContext)
+                            },
+            onRetry: {
+                viewModel.retryLastMessage(modelContext: modelContext)
+            },
+            onResendLastAssistant: nil,
+            onDetachContext: {
+                detachLinkedContext()
+            },
+            onDetachChip: { chipLabel in
+                detachChip(chipLabel)
+            }
+        )
+    }
+
+    private var mainContent: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Color(.windowBackgroundColor)
+                .ignoresSafeArea()
+
+            Group {
+                if isCollapsed {
+                    collapsedChatView
+                        } else {
+                    expandedChatView
+                }
+            }
+
+            overlayDrawers
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.windowBackgroundColor))
+    }
+    
+    private var collapsedChatView: some View {
+        CollapsedChatView(
+            title: "Aurora",
+            subtitle: collapseSubtitle,
+            onTap: {
+                expandPanel()
+            },
+            onLongPress: {
+                showAuroraPreferences = true
+            },
+            accent: accentColor,
+            glow: glowColor,
+            isRecording: isRecording
+        )
+        .padding(.trailing, 32)
+        .padding(.bottom, 36)
+        .transition(.scale.combined(with: .opacity))
+        .onHover { hovering in
+            if hovering {
+                expandPanel()
+                    }
+                }
+            }
+
+    var body: some View {
+        mainContent
         .onAppear {
             setupVoiceService()
             setupKeyboardHandlers()
             setupImagePasteHandler()
+            scheduleCollapseIfNeeded()
+            refreshAttachedContext()
         }
         .onDisappear {
-            // Clean up notification observer
             if let observer = imagePasteObserver {
                 NotificationCenter.default.removeObserver(observer)
                 imagePasteObserver = nil
             }
+            cancelCollapseSchedule()
         }
         .sheet(isPresented: $showAuroraPreferences) {
-            AIAssistantPreferencesSheet()
+                AIAssistantPreferencesSheet(isPresented: $showAuroraPreferences)
         }
         .sheet(isPresented: $showSpotlight) {
             AIAssistantSpotlightOverlay()
         }
-        .sheet(isPresented: $showAuroraCreateSheet) {
-            if let action = createSheetAction {
-                AuroraCreateSheet(action: action) { prompt in
-                    // Send formatted prompt to Aurora
-                    viewModel.inputText = prompt
-                    sendCurrentMessage()
-                }
-            }
-        }
+        // AuroraCreateSheet removed from .sheet() - now shown as bottom drawer in AuroraChatContainer
         .alert("Unsaved Changes", isPresented: $showUnsavedAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Discard") {
-                if let conversationToLoad = conversationToLoad {
-                    let _ = viewModel.loadConversation(conversationToLoad, modelContext: modelContext)
-                    self.conversationToLoad = nil
-                } else {
-                    viewModel.clearMessages()
-                }
-            }
+                unsavedAlertContent
         } message: {
             Text("You have unsaved messages. Discard and continue?")
         }
         .alert("Rename Conversation", isPresented: $showRenameAlert) {
-            TextField("Title", text: $newTitle)
-            Button("Cancel", role: .cancel) {}
-            Button("Save") {
-                if let conversation = conversationToRename {
-                    viewModel.renameConversation(conversation, newTitle: newTitle, modelContext: modelContext)
-                    toastMessage = "Conversation renamed"
-                }
-            }
+                renameAlertContent
         } message: {
             Text("Enter a new title for this conversation")
         }
         .alert("Delete Conversation", isPresented: $showDeleteAlert) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive) {
-                if let conversation = conversationToDelete {
-                    viewModel.deleteConversation(conversation, modelContext: modelContext)
-                }
-            }
+                deleteAlertContent
         } message: {
             Text("Are you sure you want to delete this conversation? This action cannot be undone.")
         }
         .toast(message: $toastMessage, systemImage: "checkmark.circle.fill")
+        .onChange(of: viewModel.isLoading) { _, _ in
+            scheduleCollapseIfNeeded()
+        }
+        .onChange(of: viewModel.inputText) { _, newValue in
+                handleInputTextChange(newValue)
+            }
+            .onChange(of: isInputFocused) { _, focused in
+                handleInputFocusedChange(focused)
+            }
+            .onChange(of: viewModel.messages.count) { oldValue, newValue in
+                handleMessagesCountChange(oldValue: oldValue, newValue: newValue)
+            }
+            .onChange(of: viewModel.currentConversation?.id) { _, _ in
+                handleConversationIdChange()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("HashtagAutocompleteSelect"))) { notification in
+                if let result = notification.object as? WorkspaceObjectResult {
+                    handleHashtagSelection(result)
+                }
+            }
+    }
+    
+    @ViewBuilder
+    private var unsavedAlertContent: some View {
+        Button("Cancel", role: .cancel) {}
+        Button("Discard") {
+            handleUnsavedDiscard()
+        }
+    }
+    
+    @ViewBuilder
+    private var renameAlertContent: some View {
+        TextField("Title", text: $newTitle)
+        Button("Cancel", role: .cancel) {}
+        Button("Save") {
+            handleRenameSave()
+        }
+    }
+    
+    @ViewBuilder
+    private var deleteAlertContent: some View {
+        Button("Cancel", role: .cancel) {}
+        Button("Delete", role: .destructive) {
+            handleDeleteConfirm()
+        }
+    }
+    
+    private func handleInputTextChange(_ newValue: String) {
+            cancelCollapseSchedule()
+            if isCollapsed && !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                expandPanel()
+            }
+        }
+    
+    private func handleInputFocusedChange(_ focused: Bool) {
+            if focused {
+                cancelCollapseSchedule()
+                if isCollapsed {
+                    expandPanel()
+                }
+            } else {
+                scheduleCollapseIfNeeded()
+            }
+        }
+    
+    private func handleMessagesCountChange(oldValue: Int, newValue: Int) {
+            if isCollapsed && newValue > oldValue {
+                expandPanel()
+            }
+            scheduleCollapseIfNeeded()
+        }
+    
+    private func handleConversationIdChange() {
+            // Clear research mode when conversation changes
+            viewModel.clearResearchMode()
+            
+            if !contextManuallyDetached {
+                attachedContextLabels.removeAll()
+                refreshAttachedContext()
+            }
+    }
+    
+    private func handleUnsavedDiscard() {
+        // Clear research mode when discarding/clearing
+        viewModel.clearResearchMode()
+        
+        if let conversationToLoad = conversationToLoad {
+            let loaded = viewModel.loadConversation(conversationToLoad, modelContext: modelContext)
+            if loaded {
+                attachedContextLabels.removeAll()
+                contextManuallyDetached = false
+                refreshAttachedContext()
+            }
+            self.conversationToLoad = nil
+        } else {
+            viewModel.clearMessages()
+            contextManuallyDetached = true
+            attachedContextLabels.removeAll()
+        }
+    }
+    
+    private func handleRenameSave() {
+        if let conversation = conversationToRename {
+            viewModel.renameConversation(conversation, newTitle: newTitle, modelContext: modelContext)
+            toastMessage = "Conversation renamed"
+        }
+    }
+    
+    private func handleDeleteConfirm() {
+        if let conversation = conversationToDelete {
+            viewModel.deleteConversation(conversation, modelContext: modelContext)
+        }
     }
     
     // MARK: - Welcome View
@@ -454,16 +608,29 @@ struct UnifiedAIAssistantView: View {
     // MARK: - Actions
     
     private func handleConversationTap(_ conversation: AIConversation) {
+        // Clear research mode when switching conversations
+        viewModel.clearResearchMode()
+        
         viewModel.isScrolledToBottom = true
         let loaded = viewModel.loadConversation(conversation, modelContext: modelContext)
         
-        if !loaded {
+        if loaded {
+            contextManuallyDetached = false
+            attachedContextLabels.removeAll()
+            refreshAttachedContext()
+        } else {
             conversationToLoad = conversation
             showUnsavedAlert = true
         }
     }
     
     private func sendCurrentMessage() {
+        // Block sending messages until warmup is complete
+        let warmupService = ModelWarmupService.shared
+        guard warmupService.isReady, !warmupService.isWarmingUp else {
+            return // Silently block - warmup message will be shown
+        }
+        
         let currentText = viewModel.inputText
         let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachment = viewModel.pendingImageAttachment
@@ -478,6 +645,9 @@ struct UnifiedAIAssistantView: View {
             image: attachment,
             document: documentAttachment
         )
+        
+        // Clear flags after sending
+        messageFlags.removeAll()
     }
     
     private func attachImageFromPicker() {
@@ -593,21 +763,6 @@ struct UnifiedAIAssistantView: View {
         _ = task
     }
     
-    private func scrollToBottom(animated: Bool = true) {
-        guard let proxy = chatScrollProxy else { return }
-        let scrollAction = {
-            proxy.scrollTo(chatBottomAnchor, anchor: .bottom)
-        }
-        if animated {
-            withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                scrollAction()
-            }
-        } else {
-            scrollAction()
-        }
-        viewModel.isScrolledToBottom = true
-    }
-    
     private func setupImagePasteHandler() {
         // Remove existing observer if any
         if let observer = imagePasteObserver {
@@ -663,17 +818,33 @@ struct UnifiedAIAssistantView: View {
     
     private func setupKeyboardHandlers() {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            // ⌘+K for search
-            if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers?.lowercased() == "k" {
-                showSpotlight = true
-                return nil
+            guard let characters = event.charactersIgnoringModifiers?.lowercased() else {
+                return event
             }
-            // ⌘+⇧+A for Aurora Spotlight
-            if event.modifierFlags.contains([.command, .shift]) && event.charactersIgnoringModifiers?.lowercased() == "a" {
-                showSpotlight = true
-                return nil
+
+            guard event.modifierFlags.contains(.command) else {
+                return event
             }
-            return event
+
+            switch characters {
+            case "k":
+                togglePanelVisibility()
+                return nil
+            case "m":
+                toggleVoiceInput()
+                return nil
+            case "w":
+                triggerWebShortcut()
+                return nil
+            case "a":
+                if event.modifierFlags.contains(.shift) {
+                    presentDocumentSourceChooser()
+                    return nil
+                }
+                return event
+            default:
+                return event
+            }
         }
     }
     
@@ -699,6 +870,84 @@ struct UnifiedAIAssistantView: View {
         }
     }
     
+    private func linkCurrentContext() {
+        contextManuallyDetached = false
+
+        var addedLabel: String?
+        if let mentionLabel = viewModel.linkedContext.mentionMap.values
+            .map({ $0.displayName })
+            .first(where: { !attachedContextLabels.contains($0) }) {
+            attachedContextLabels.append(mentionLabel)
+            addedLabel = mentionLabel
+        } else if let conversationLabel = conversationContextLabel(),
+                  !attachedContextLabels.contains(conversationLabel) {
+            attachedContextLabels.append(conversationLabel)
+            addedLabel = conversationLabel
+        } else {
+            let stateLabel = "Mode: \(themeManager.currentState.displayName)"
+            if !attachedContextLabels.contains(stateLabel) {
+                attachedContextLabels.append(stateLabel)
+                addedLabel = stateLabel
+            }
+        }
+
+        if let addedLabel {
+            toastMessage = "Linked to \(addedLabel)"
+        } else {
+            toastMessage = "Context already linked"
+        }
+    }
+
+    private func detachLinkedContext() {
+        viewModel.linkedContext.clear()
+        attachedContextLabels.removeAll()
+        attachedTab = nil
+        contextManuallyDetached = true
+    }
+    
+    private func attachTab(_ tab: TabIdentifier) {
+        attachedTab = tab
+    }
+    
+    private func detachTab() {
+        attachedTab = nil
+    }
+    
+    private func handleSlashCommand(_ command: SlashCommand, range: NSRange) {
+        switch command {
+        case .tab:
+            showTabDrawer = true
+            // Text will be removed when tab is selected
+        case .project:
+            showProjectDrawer = true
+            // Text will be removed when project is selected
+        case .task:
+            showTaskDrawer = true
+            // Text will be removed when task is selected
+        case .think:
+            messageFlags["think"] = !(messageFlags["think"] ?? false)
+            removeSlashCommandFromText(range: range)
+        case .web:
+            messageFlags["web"] = !(messageFlags["web"] ?? false)
+            removeSlashCommandFromText(range: range)
+        case .research:
+            viewModel.setResearchMode(true)
+            removeSlashCommandFromText(range: range)
+        }
+    }
+    
+    private func attachProject(_ project: Project) {
+        if !attachedProjects.contains(project.id) {
+            attachedProjects.append(project.id)
+        }
+    }
+    
+    private func attachTask(_ task: Task) {
+        if !attachedTasks.contains(task.id) {
+            attachedTasks.append(task.id)
+        }
+    }
+    
     private func handleToolbarAction(_ action: ToolbarAction) {
         guard !viewModel.isLoading else { return }
         
@@ -717,6 +966,137 @@ struct UnifiedAIAssistantView: View {
         }
     }
     
+    private func handleHashtagSelection(_ result: WorkspaceObjectResult) {
+        // Link the selected content item for Aurora context based on ObjectType
+        let resultId = result.id
+        let resultType = result.type
+        let resultTitle = result.title
+        
+        switch resultType {
+        case .project:
+            var descriptor = FetchDescriptor<Project>(predicate: #Predicate<Project> { project in
+                project.id == resultId
+            })
+            descriptor.fetchLimit = 1
+            if let project = try? modelContext.fetch(descriptor).first {
+                attachProject(project)
+                toastMessage = "Linked to \(resultTitle)"
+            }
+        case .task:
+            var descriptor = FetchDescriptor<Task>(predicate: #Predicate<Task> { task in
+                task.id == resultId
+            })
+            descriptor.fetchLimit = 1
+            if let task = try? modelContext.fetch(descriptor).first {
+                attachTask(task)
+                toastMessage = "Linked to \(resultTitle)"
+            }
+        case .note, .post, .artifact:
+            // Add to context labels for these types
+            if !attachedContextLabels.contains(resultTitle) {
+                attachedContextLabels.append(resultTitle)
+                toastMessage = "Linked to \(resultTitle)"
+            }
+        default:
+            // For other types, add to context labels
+            if !attachedContextLabels.contains(resultTitle) {
+                attachedContextLabels.append(resultTitle)
+                toastMessage = "Linked to \(resultTitle)"
+            }
+        }
+    }
+    
+    private func removeSlashCommandFromText(_ command: String) {
+        // Remove the slash command from the input text
+        let text = viewModel.inputText
+        if let range = text.range(of: command) {
+            let nsRange = NSRange(range, in: text)
+            removeSlashCommandFromText(range: nsRange)
+        }
+    }
+    
+    private func removeSlashCommandFromText(range: NSRange) {
+        // Remove the slash command from the input text using the provided range
+        let text = viewModel.inputText
+        let mutableText = NSMutableString(string: text)
+        if range.location + range.length <= mutableText.length {
+            mutableText.deleteCharacters(in: range)
+            viewModel.inputText = String(mutableText)
+        }
+    }
+    
+    private func replaceSlashCommandWithText(_ replacement: String, range: NSRange) {
+        // Replace the slash command text with the replacement text
+        let text = viewModel.inputText
+        let mutableText = NSMutableString(string: text)
+        if range.location + range.length <= mutableText.length {
+            mutableText.replaceCharacters(in: range, with: replacement)
+            viewModel.inputText = String(mutableText)
+        }
+    }
+    
+    private func detachChip(_ chipLabel: String) {
+        // Check if it's a tab
+        if let tab = TabIdentifier.allCases.first(where: { $0.rawValue == chipLabel }) {
+            if attachedTab == tab {
+                attachedTab = nil
+            }
+            return
+        }
+        
+        // Check if it's a project
+        for projectId in attachedProjects {
+            var descriptor = FetchDescriptor<Project>(predicate: #Predicate { $0.id == projectId })
+            descriptor.fetchLimit = 1
+            if let project = try? modelContext.fetch(descriptor).first, project.title == chipLabel {
+                attachedProjects.removeAll { $0 == projectId }
+                return
+            }
+        }
+        
+        // Check if it's a task
+        for taskId in attachedTasks {
+            var descriptor = FetchDescriptor<Task>(predicate: #Predicate { $0.id == taskId })
+            descriptor.fetchLimit = 1
+            if let task = try? modelContext.fetch(descriptor).first, task.title == chipLabel {
+                attachedTasks.removeAll { $0 == taskId }
+                return
+            }
+        }
+        
+        // If not found, detach all context
+        detachLinkedContext()
+    }
+
+    private func conversationContextLabel() -> String? {
+        guard let conversation = viewModel.currentConversation else { return nil }
+        if let title = conversation.title, !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return title.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let summary = conversation.summary, !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return nil
+    }
+
+    private func refreshAttachedContext() {
+        guard !contextManuallyDetached else { return }
+        guard let conversationLabel = conversationContextLabel() else {
+            if !attachedContextLabels.isEmpty {
+                attachedContextLabels.removeAll()
+            }
+            return
+        }
+        if !attachedContextLabels.contains(conversationLabel) {
+            attachedContextLabels.insert(conversationLabel, at: 0)
+        }
+        attachedContextLabels = attachedContextLabels.reduce(into: [String]()) { result, label in
+            if !result.contains(label) {
+                result.append(label)
+            }
+        }
+    }
+    
     private func completeVoiceInput() {
         let finalText = voiceInputText.trimmingCharacters(in: .whitespacesAndNewlines)
         voiceService.stopTranscribing()
@@ -725,6 +1105,66 @@ struct UnifiedAIAssistantView: View {
         }
         isRecording = false
         voiceInputText = ""
+    }
+
+    // MARK: - Panel Collapse Behaviour
+
+    private func expandPanel() {
+        cancelCollapseSchedule()
+        guard isCollapsed else { return }
+        withAnimation(.easeInOut(duration: 0.28)) {
+            isCollapsed = false
+        }
+    }
+
+    private func scheduleCollapseIfNeeded() {
+        cancelCollapseSchedule()
+        guard !isCollapsed else { return }
+        guard !drawerVisible else { return }
+        guard !isInputFocused else { return }
+        guard !isHoveringPanel else { return }
+        guard !isRecording else { return }
+        guard !viewModel.isLoading else { return }
+        guard viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard !viewModel.messages.isEmpty else { return }
+
+        let workItem = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.32)) {
+                isCollapsed = true
+            }
+        }
+        collapseWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: workItem)
+    }
+
+    private func cancelCollapseSchedule() {
+        collapseWorkItem?.cancel()
+        collapseWorkItem = nil
+    }
+
+    private func collapsePanel() {
+        cancelCollapseSchedule()
+        guard !isCollapsed else { return }
+        withAnimation(.easeInOut(duration: 0.28)) {
+            isCollapsed = true
+        }
+    }
+
+    private func togglePanelVisibility() {
+        if isCollapsed {
+            expandPanel()
+        } else {
+            collapsePanel()
+        }
+    }
+
+    private func triggerWebShortcut() {
+        if viewModel.inputText.isEmpty {
+            viewModel.inputText = "@web "
+        } else {
+            viewModel.inputText += " @web "
+        }
+        isInputFocused = true
     }
 }
 
@@ -740,4 +1180,5 @@ private struct ChatScrollOffsetPreferenceKey: PreferenceKey {
         .modelContainer(for: [AIMessage.self, AIConversation.self])
         .environmentObject(GlassColorSystem())
 }
+
 

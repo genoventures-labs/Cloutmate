@@ -33,7 +33,7 @@ struct ActiveWorkfeedView: View {
             if !priorityProjects.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Ongoing Projects")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                     
                     LazyVStack(spacing: 12) {
@@ -48,10 +48,10 @@ struct ActiveWorkfeedView: View {
             if !priorityTasks.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Active Tasks")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                     
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 12) {
                         ForEach(priorityTasks.prefix(5)) { task in
                             CompactTaskCard(task: task)
                         }
@@ -63,12 +63,12 @@ struct ActiveWorkfeedView: View {
             if !recentArtifacts.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Recent Artifacts")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                     
                     LazyVStack(spacing: 12) {
                         ForEach(recentArtifacts.prefix(3)) { artifact in
-                            CompactArtifactCard(artifact: artifact)
+                            CompactArtifactTile(artifact: artifact)
                         }
                     }
                 }
@@ -76,16 +76,17 @@ struct ActiveWorkfeedView: View {
             
             // Aurora Reflection
             if !auroraReflection.isEmpty {
-                HStack {
+                DashboardTile(accent: .kosmicPurple.opacity(0.85), padding: 18) {
+                    HStack(spacing: 12) {
                     Image(systemName: "sparkles")
                         .font(.caption)
                         .foregroundColor(.kosmicPurple)
                     Text(auroraReflection)
-                        .font(.subheadline)
-                        .foregroundColor(glassColorSystem.textSecondary())
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundColor(glassColorSystem.textPrimary())
                         .italic()
+                    }
                 }
-                .padding(.top, 8)
             }
         }
         .task {
@@ -146,21 +147,26 @@ struct CompactProjectCard: View {
     }
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            HStack(spacing: 12) {
+        DashboardTile(accent: .kosmicBlue.opacity(0.9), padding: 18) {
+            HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(project.title)
-                        .font(.headline)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
                         .foregroundColor(glassColorSystem.textPrimary())
                         .lineLimit(1)
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chart.bar.fill")
+                                .font(.caption)
+                                .foregroundColor(.kosmicBlue)
                         Text("\(Int(completionPercentage * 100))%")
                             .font(.caption)
                             .foregroundColor(.kosmicBlue)
+                        }
                         
                         if let nextTask = nextTask {
-                            Text("• Next: \(nextTask.title)")
+                            Text("Next: \(nextTask.title)")
                                 .font(.caption)
                                 .foregroundColor(glassColorSystem.textSecondary())
                                 .lineLimit(1)
@@ -170,7 +176,6 @@ struct CompactProjectCard: View {
                 
                 Spacer()
             }
-            .padding(12)
         }
     }
 }
@@ -184,48 +189,64 @@ struct CompactTaskCard: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            HStack(spacing: 12) {
+        DashboardTile(accent: taskAccent, padding: 18) {
+            HStack(spacing: 14) {
                 Button {
                     task.status = task.status == .done ? .inProgress : .done
                     try? modelContext.save()
                 } label: {
                     Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 18))
-                        .foregroundColor(task.status == .done ? .kosmicGreen : glassColorSystem.textSecondary())
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(taskAccent)
                 }
                 .buttonStyle(.plain)
                 
+                VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
-                    .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(glassColorSystem.textPrimary())
                     .strikethrough(task.status == .done)
                     .lineLimit(2)
+                    
+                    if let dueDate = task.dueDate {
+                        Text(dueDate, style: .time)
+                            .font(.caption2)
+                            .foregroundColor(glassColorSystem.textSecondary())
+                    }
+                }
                 
                 Spacer()
             }
-            .padding(12)
+        }
+    }
+    
+    private var taskAccent: Color {
+        if task.status == .done { return .kosmicGreen }
+        switch task.priority {
+        case .high: return .orange
+        case .medium: return .kosmicPurple
+        case .low: return .kosmicBlue
         }
     }
 }
 
 // MARK: - Compact Artifact Card
 
-struct CompactArtifactCard: View {
+struct CompactArtifactTile: View {
     let artifact: Artifact
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            HStack(spacing: 12) {
+        DashboardTile(accent: .kosmicPurple.opacity(0.85), padding: 18) {
+            HStack(spacing: 14) {
                 Image(systemName: "doc.text.fill")
-                    .font(.system(size: 16))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.kosmicGreen)
                 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(artifact.title)
-                        .font(.subheadline)
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
                         .foregroundColor(glassColorSystem.textPrimary())
                         .lineLimit(1)
                     
@@ -236,7 +257,6 @@ struct CompactArtifactCard: View {
                 
                 Spacer()
             }
-            .padding(12)
         }
     }
 }

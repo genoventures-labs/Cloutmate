@@ -99,12 +99,19 @@ struct MentionAutocompleteView: View {
                     }
                 }
             }
-            .background(.regularMaterial)
-            .cornerRadius(12)
-            .shadow(color: .black.opacity(0.2), radius: 12, x: 0, y: 4)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(Color.black.opacity(0.6))
+                    )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 8)
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
             )
         }
     }

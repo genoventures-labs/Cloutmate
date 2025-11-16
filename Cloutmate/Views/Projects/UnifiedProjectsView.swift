@@ -13,6 +13,7 @@ struct UnifiedProjectsView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     
     @Query(sort: \CloutmateShared.Project.updatedAt, order: .reverse) private var allProjects: [CloutmateShared.Project]
     @Query private var allTasks: [CloutmateShared.Task]
@@ -21,7 +22,6 @@ struct UnifiedProjectsView: View {
     @State private var selectedViewMode: ProjectViewMode = .list
     @State private var selectedFilter: ProjectFilter = .all
     @State private var searchText = ""
-    @State private var scrollOffset: CGFloat = 0
     @State private var activeProject: Project?
     @State private var isDrawerVisible = false
     @State private var isCreatingProject = false
@@ -33,15 +33,14 @@ struct UnifiedProjectsView: View {
     @State private var detailProject: Project?
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.windowBackgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                headerZone
-                Divider()
-                contentView
-            }
+        ZStack {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+                showsSidebar: false,
+                header: { headerBar },
+                content: { projectsContent },
+                sidebar: { EmptyView() }
+            )
             .opacity(isDrawerVisible ? 0 : 1)
             
             if isDrawerVisible {
@@ -157,11 +156,6 @@ struct UnifiedProjectsView: View {
         isSelectionMode || !selectedProjectIDs.isEmpty
     }
     
-    var headerOpacity: Double {
-        let threshold: CGFloat = 50
-        return scrollOffset > threshold ? 1.0 : max(0.3, Double(scrollOffset / threshold))
-    }
-    
     private func projectSelectionActions() -> [SelectionActionBar.Action] {
         var actions: [SelectionActionBar.Action] = []
         
@@ -194,7 +188,7 @@ struct UnifiedProjectsView: View {
     }
     
     private func toggleSelectionMode() {
-        guard selectedViewMode != .timeline else { return }
+        guard selectedViewMode != .roadmap else { return }
         if isSelectionMode || !selectedProjectIDs.isEmpty {
             clearSelection()
         } else if !filteredProjects.isEmpty {
@@ -297,6 +291,26 @@ struct UnifiedProjectsView: View {
                 isSelectionMode = false
             }
         }
+    }
+    
+    private func persistProjectOrder(_ projects: [Project]) {
+        let base = Date()
+        for (offset, project) in projects.enumerated() {
+            project.updatedAt = base.addingTimeInterval(Double(projects.count - offset))
+        }
+        try? modelContext.save()
+    }
+    
+    private func handleProjectStatusChange(_ project: Project, status: ProjectStatus) {
+        project.status = status
+        switch status {
+        case .completed:
+            project.archivedAt = Date()
+        case .active, .paused:
+            project.archivedAt = nil
+        }
+        project.updatedAt = Date()
+        try? modelContext.save()
     }
     
     private func requestFocusSession(for project: Project) {
@@ -481,134 +495,179 @@ struct UnifiedProjectsView: View {
         project.updatedAt = Date()
     }
     
-    // MARK: - Header Zone
+    // MARK: - Header & Layout
     
-    private var headerZone: some View {
-        HStack(alignment: .top, spacing: 20) {
-            // Title & Count
-            VStack(alignment: .leading, spacing: 4) {
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Projects",
+            subtitle: headerSubtitle,
+            trailingAccessory: {
                 HStack(spacing: 12) {
-                    Text("Projects")
-                        .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(glassColorSystem.textPrimary())
-                    
-                    if activeProjectsCount > 0 {
-                        Text("\(activeProjectsCount) active")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.kosmicBlue.opacity(0.2))
-                            .foregroundColor(.kosmicBlue)
-                            .cornerRadius(8)
-                    }
+                    viewModeSelector
+                    selectionToggleButton
+                    quickAddButton
                 }
+            }
+        )
+    }
+    
+    private var headerSubtitle: String {
+        let total = filteredProjects.count
+        if total == 0 {
+            return "No projects yet — let’s start something new."
+        }
+        return "\(activeProjectsCount) active • \(total) total"
+    }
+    
+    @ViewBuilder
+    private var projectsContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            filterPanel
+            
+            if isSelectionActive {
+                selectionBar
+            }
+            
+            modeScrollContainer
+        }
+    }
+    
+    private var filterPanel: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .center, spacing: 14) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.kosmicBlue.opacity(0.22), .kosmicPurple.opacity(0.2)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 42, height: 42)
+                            .overlay(
+                                Circle()
+                                    .stroke(glassColorSystem.borderColor().opacity(0.5), lineWidth: 0.6)
+                            )
+                        
+                        Image(systemName: "sparkles.rectangle.stack")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.kosmicBlue)
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Line up your next focus arc")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                        Text(headerSubtitle)
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textSecondary())
             }
             
             Spacer()
             
-            // Filter Dropdown
-            Menu {
-                ForEach(ProjectFilter.allCases, id: \.self) { filter in
-                    Button(action: {
-                        selectedFilter = filter
-                        ProjectHaptics.playSelection()
-                    }) {
-                        Label(filter.displayName, systemImage: selectedFilter == filter ? "checkmark" : "")
+                    GlassButton("Reset", icon: "arrow.uturn.backward", style: .pill, role: .surface) {
+                        withAnimation(GlassMotion.Easing.spring) {
+                            selectedFilter = .all
+                            searchText = ""
+                        }
                     }
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.caption)
-                    Text(selectedFilter.displayName)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                    Image(systemName: "chevron.down")
-                        .font(.caption2)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
-                .foregroundColor(glassColorSystem.textPrimary())
-                .cornerRadius(8)
-            }
-            .buttonStyle(.plain)
-            
-            // View Selector
-            HStack(spacing: 4) {
-                ForEach(ProjectViewMode.allCases, id: \.self) { mode in
-                    Button(action: {
-                        selectedViewMode = mode
-                        ProjectHaptics.playSelection()
-                    }) {
-                        Image(systemName: mode.icon)
-                            .font(.caption)
-                            .foregroundColor(selectedViewMode == mode ? .kosmicBlue : glassColorSystem.textSecondary())
-                            .frame(width: 32, height: 32)
+                    .accessibilityLabel("Reset filters")
+                    }
+                
+                GlassDivider()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Search")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                    
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(glassColorSystem.textSecondary().opacity(0.75))
+                        
+                        TextField("Search projects", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.system(.subheadline, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                        
+                        if !searchText.isEmpty {
+                            GlassButton(icon: "xmark.circle.fill", style: .iconOnly, role: .surface) {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    searchText = ""
+                                }
+                            }
+                            .accessibilityLabel("Clear search")
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                             .background(
-                                selectedViewMode == mode ?
-                                Color.kosmicBlue.opacity(0.2) :
-                                glassColorSystem.glassTint(for: .surface).opacity(0.2)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(glassColorSystem.backgroundSecondary().opacity(0.35))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(glassColorSystem.borderColor().opacity(0.55), lineWidth: 0.6)
                             )
-                            .cornerRadius(6)
+                    )
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Status")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(ProjectFilter.allCases, id: \.self) { filter in
+                                FilterPill(
+                                    title: filter.displayName,
+                                    isSelected: selectedFilter == filter,
+                                    action: {
+                                        withAnimation(GlassMotion.Easing.spring) {
+                                            selectedFilter = filter
+                ProjectHaptics.playSelection()
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 2)
                     }
-                    .buttonStyle(.plain)
                 }
             }
-            
-            GlassButton(
-                icon: isSelectionActive ? "checkmark.circle.fill" : "checkmark.circle",
-                style: .iconOnly,
-                role: .surface
-            ) {
-                toggleSelectionMode()
-            }
-            .accessibilityLabel(isSelectionActive ? "Exit selection mode" : "Enter selection mode")
-            .help(isSelectionActive ? "Done Selecting" : "Select Projects")
-            .opacity(selectedViewMode == .timeline ? 0.5 : 1.0)
-            .disabled(selectedViewMode == .timeline)
-            
-            // Quick Create Button
-            Button(action: {
-                startCreatingProject()
-                ProjectHaptics.playSelection()
-            }) {
-                Image(systemName: "plus")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 32)
-                    .background(Color.kosmicBlue)
-                    .cornerRadius(6)
-            }
-            .buttonStyle(.plain)
-            .help("Create New Project (⌘N)")
+            .padding(24)
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
-        .background(
-            GlassPanel(tier: .overlay, cornerRadius: 0) {
-                EmptyView()
-            }
-            .ignoresSafeArea(edges: .top)
-        )
     }
     
-    // MARK: - Content View
+    private var selectionBar: some View {
+        SelectionActionBar(
+            count: visibleSelectedProjectCount,
+            itemLabel: "Project",
+            actions: projectSelectionActions(),
+            onCancel: { clearSelection() },
+            onSelectAll: selectedViewMode == .roadmap ? nil : { toggleSelectAll() },
+            totalItems: selectedViewMode == .roadmap ? nil : filteredProjects.count
+        )
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
     
-    @ViewBuilder
-    private var contentView: some View {
-        ScrollViewReader { proxy in
+    private var modeScrollContainer: some View {
+        ScrollViewReader { _ in
             ScrollView {
                 VStack(spacing: 0) {
-                    GeometryReader { geometry in
-                        Color.clear
-                            .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
-                    }
-                    .frame(height: 0)
-                    
-                    Group {
+                    activeModeView
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 24)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var activeModeView: some View {
                         switch selectedViewMode {
                         case .list:
                             ProjectListView(
@@ -622,7 +681,10 @@ struct UnifiedProjectsView: View {
                                 onProjectEdit: { project in openEditDrawer(for: project) },
                                 onDuplicateProject: { project in duplicateProject(project) },
                                 onArchiveProject: { project in archiveProject(project) },
-                                onDeleteProject: { project in deleteProject(project) }
+                            onDeleteProject: { project in deleteProject(project) },
+                            onReorderProjects: { reordered in persistProjectOrder(reordered) },
+                            onMoveProjectToStatus: { project, status in handleProjectStatusChange(project, status: status) },
+                            fetchProjectByID: { id in allProjects.first(where: { $0.id == id }) }
                             )
                         case .board:
                             ProjectBoardView(
@@ -638,8 +700,8 @@ struct UnifiedProjectsView: View {
                                 onArchiveProject: { project in archiveProject(project) },
                                 onDeleteProject: { project in deleteProject(project) }
                             )
-                        case .timeline:
-                            ProjectTimelineView(
+        case .roadmap:
+            ProjectRoadmapView(
                                 projects: filteredProjects,
                                 tasks: allTasks,
                                 areas: allAreas,
@@ -658,15 +720,74 @@ struct UnifiedProjectsView: View {
                             )
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 24)
+    
+    private var viewModeSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(ProjectViewMode.allCases, id: \.self, content: modeButton)
+        }
+    }
+    
+    @ViewBuilder
+    private func modeButton(for mode: ProjectViewMode) -> some View {
+        let isSelected = selectedViewMode == mode
+        Button {
+            selectedViewMode = mode
+            ProjectHaptics.playSelection()
+        } label: {
+            Image(systemName: mode.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : glassColorSystem.textSecondary())
+                .frame(width: 28, height: 28)
+                .background {
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.kosmicBlue, .kosmicPurple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(glassColorSystem.cardColor().opacity(0.35))
+                        }
                 }
             }
-            .coordinateSpace(name: "scroll")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = -value
-            }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(glassColorSystem.borderColor().opacity(0.5), lineWidth: 0.6)
+                )
         }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+    }
+    
+    private var selectionToggleButton: some View {
+        GlassButton(
+            icon: isSelectionActive ? "checkmark.circle.fill" : "checkmark.circle",
+            style: .iconOnly,
+            role: .surface
+        ) {
+            toggleSelectionMode()
+        }
+        .accessibilityLabel(isSelectionActive ? "Exit selection mode" : "Enter selection mode")
+        .help(isSelectionActive ? "Done Selecting" : "Select Projects")
+        .opacity(selectedViewMode == .roadmap ? 0.4 : 1.0)
+        .disabled(selectedViewMode == .roadmap)
+    }
+    
+    private var quickAddButton: some View {
+        GlassButton(
+            icon: "plus",
+            style: .iconOnly,
+            tintColor: .kosmicPurple
+        ) {
+            startCreatingProject()
+            ProjectHaptics.playSelection()
+        }
+        .help("Create New Project (⌘N)")
     }
 }
 

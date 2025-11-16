@@ -51,7 +51,7 @@ struct EmotionAnalyticsView: View {
                 
                 // Mood Distribution Wheel
                 if !moodWeights.isEmpty {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicPurple.opacity(0.85), padding: 24) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Mood Distribution")
                                 .font(.system(.headline, design: .rounded))
@@ -60,15 +60,13 @@ struct EmotionAnalyticsView: View {
                             MoodDistributionWheel(weights: moodWeights)
                                 .frame(height: 200)
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
                 
                 // Weekly Sentiment Arc
                 if !dailySentiment.isEmpty {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicGreen.opacity(0.75), padding: 24) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Weekly Sentiment Arc")
                                 .font(.system(.headline, design: .rounded))
@@ -117,14 +115,12 @@ struct EmotionAnalyticsView: View {
                             }
                             .frame(height: 180)
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
                 
                 // Reflection Frequency
-                GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                DashboardTile(accent: .kosmicPurple.opacity(0.8), padding: 24) {
                     VStack(alignment: .leading, spacing: 16) {
                         HStack {
                             Image(systemName: "book.fill")
@@ -143,15 +139,12 @@ struct EmotionAnalyticsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(20)
                 }
                 .padding(.horizontal, 20)
-                .floatLift()
                 
                 // Aurora's Comment Card
                 if !auroraComment.isEmpty {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicPurple.opacity(0.9), padding: 24) {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Image(systemName: "sparkles")
@@ -166,10 +159,8 @@ struct EmotionAnalyticsView: View {
                                 .foregroundColor(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
             }
             .padding(.bottom, 40)

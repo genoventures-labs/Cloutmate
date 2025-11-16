@@ -69,6 +69,7 @@ enum TabIdentifier: String, CaseIterable, Comparable {
 
 struct MainWindowView: View {
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
 
     @State private var selectedTab: TabIdentifier = .home
     @State private var previousTab: TabIdentifier = .home
@@ -87,13 +88,21 @@ struct MainWindowView: View {
     @State private var showQuickCapture = false
     @State private var showInboxCapture = false
     @State private var showVoiceMemo = false
+    @State private var sidebarStateBeforeSettings: Bool?
     
     var body: some View {
         let hasOverlay = isContextualCreateVisible || showQuickCapture || showVoiceMemo || showInboxCapture
         
         ZStack {
-        mainContent
+            mainContent
                 .opacity(hasOverlay ? 0 : 1)
+                .background(
+                    ZStack {
+                        glassColorSystem.backgroundColor()
+                        glassColorSystem.emotionalBackgroundShift()
+                    }
+                    .ignoresSafeArea()
+                )
             
             if isContextualCreateVisible {
                 ContextualCreateDrawer(
@@ -133,7 +142,7 @@ struct MainWindowView: View {
                 // Keyboard shortcuts
                 setupKeyboardShortcuts()
             }
-            .onChange(of: selectedTab) { _, _ in
+            .onChange(of: selectedTab) { oldValue, newValue in
                 FlowTriggersService.shared.updateActivity()
                 if isContextualCreateVisible {
                     withAnimation(GlassMotion.Easing.modalOpen) {
@@ -154,6 +163,16 @@ struct MainWindowView: View {
                     withAnimation(GlassMotion.Easing.modalOpen) {
                         showInboxCapture = false
                     }
+                }
+                
+                if newValue == .settings {
+                    if sidebarStateBeforeSettings == nil {
+                        sidebarStateBeforeSettings = sidebarCollapsed
+                    }
+                    sidebarCollapsed = true
+                } else if oldValue == .settings, let previousState = sidebarStateBeforeSettings {
+                    sidebarCollapsed = previousState
+                    sidebarStateBeforeSettings = nil
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("UserActivity"))) { _ in
@@ -239,6 +258,11 @@ struct MainWindowView: View {
             .overlay(alignment: .bottomTrailing) {
                 ReflectionBubbleView()
                     .padding(20)
+            }
+            .onChange(of: sidebarCollapsed) { _, newValue in
+                if selectedTab == .settings && !newValue {
+                    sidebarCollapsed = true
+                }
             }
     }
     

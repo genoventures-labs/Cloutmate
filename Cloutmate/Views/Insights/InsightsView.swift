@@ -16,6 +16,7 @@ import AppKit
 
 struct InsightsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var selectedTimeRange: AnalyticsTimeRange = .thisWeek
     @State private var currentSnapshot: AnalyticsSnapshot?
@@ -34,8 +35,13 @@ struct InsightsView: View {
     @State private var graphActivityMessage: String = "Building memory graph…"
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Unified Header
+        V2GlassContentScaffold(
+            accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+            showsSidebar: false,
+            header: { headerBar },
+            content: {
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 28) {
             InsightsHeaderView(
                 selectedTimeRange: $selectedTimeRange,
                 selectedViewType: $selectedViewType,
@@ -43,14 +49,20 @@ struct InsightsView: View {
                 onExport: handleExport
             )
             
-            // Unified Dashboard
             UnifiedInsightsView(
                 snapshot: currentSnapshot,
                 timeRange: selectedTimeRange,
                 searchText: searchText,
                 selectedViewType: selectedViewType
             )
-        }
+                        .frame(minHeight: 520, alignment: .top)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 32)
+                }
+            },
+            sidebar: { EmptyView() }
+        )
         .task {
             await loadAnalytics()
             await checkMemoryGraphData()
@@ -81,6 +93,13 @@ struct InsightsView: View {
                 }
             }
         }
+    }
+    
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Insights",
+            subtitle: "Aurora’s reflection of how you work, learn, and focus."
+        )
     }
     
     // MARK: - Time Range Picker
@@ -525,7 +544,7 @@ struct InsightsView: View {
             // Export Options
             HStack(spacing: 12) {
                 Button {
-                    exportWeeklyReflection()
+                    exportWeeklyReflection(as: .markdown)
                 } label: {
                     HStack {
                         Image(systemName: "square.and.arrow.up")

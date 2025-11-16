@@ -17,6 +17,8 @@ enum NotesGroupingMode: String, CaseIterable {
 
 struct UnifiedNotesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query(sort: \CloutmateShared.Note.updatedAt, order: .reverse) private var allNotes: [CloutmateShared.Note]
     
@@ -32,7 +34,6 @@ struct UnifiedNotesView: View {
     @State private var isSelectionMode = false
     @State private var selectedNoteIDs: Set<UUID> = []
     
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFocused: Bool
     
     private var filteredNotes: [Note] {
@@ -142,15 +143,26 @@ struct UnifiedNotesView: View {
         filteredNotes.filter { selectedNoteIDs.contains($0.id) }
     }
     
+    private var headerSubtitle: String {
+        let count = filteredNotes.count
+        if count == 0 {
+            return "No notes"
+        } else if count == 1 {
+            return "1 note • \(taggedNotesCount) tagged"
+        } else {
+            return "\(count) notes • \(taggedNotesCount) tagged"
+        }
+    }
+    
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.windowBackgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                headerView
-                contentView
-            }
+        ZStack {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+                showsSidebar: false,
+                header: { headerBar },
+                content: { notesContent },
+                sidebar: { EmptyView() }
+            )
             .opacity(isDrawerVisible ? 0 : 1)
             
             if let note = activeNote, isDrawerVisible {
@@ -207,25 +219,201 @@ struct UnifiedNotesView: View {
         }
     }
     
-    private var headerView: some View {
-        NotesHeaderView(
-            searchText: $searchText,
-            selectedFilter: $selectedFilter,
-            isSelectionMode: $isSelectionMode,
-            selectedViewMode: $selectedViewMode,
-            totalNotes: totalActiveNotes,
-            taggedNotes: taggedNotesCount,
-            selectionCount: visibleSelectedNoteCount,
-            onCreate: startCreatingNote,
-            onToggleSelection: toggleSelectionMode
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Notes",
+            subtitle: headerSubtitle,
+            trailingAccessory: {
+                HStack(spacing: 12) {
+                    viewModeSelector
+                    selectionToggleButton
+                    quickAddButton
+                }
+            }
         )
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+    }
+    
+    private var viewModeSelector: some View {
+        HStack(spacing: 8) {
+            ForEach(NotesViewMode.allCases, id: \.self) { mode in
+                modeButton(for: mode)
+            }
+        }
+    }
+    
+    private func modeButton(for mode: NotesViewMode) -> some View {
+        let isSelected = selectedViewMode == mode
+        let backgroundFill: some ShapeStyle = isSelected ? 
+            AnyShapeStyle(AuroraPalette.linearGradient(for: colorScheme).opacity(0.85)) :
+            AnyShapeStyle(glassColorSystem.backgroundElevated().opacity(0.4))
+        let strokeColor: Color = isSelected ? 
+            Color.white.opacity(0.3) : 
+            glassColorSystem.borderColor().opacity(0.3)
+        let strokeWidth: CGFloat = isSelected ? 1.2 : 0.8
+        
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedViewMode = mode
+            }
+        } label: {
+            Image(systemName: mode.icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : glassColorSystem.textSecondary())
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(backgroundFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(strokeColor, lineWidth: strokeWidth)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(mode.displayName)
+    }
+    
+    private var selectionToggleButton: some View {
+        GlassButton(
+            nil,
+            icon: isSelectionActive ? "checkmark.circle.fill" : "checkmark.circle",
+            style: .iconOnly,
+            role: .surface
+        ) {
+            toggleSelectionMode()
+        }
+        .accessibilityLabel(isSelectionActive ? "Exit selection mode" : "Enter selection mode")
+    }
+    
+    private var quickAddButton: some View {
+        GlassButton(
+            "New Note",
+            icon: "plus",
+            style: .pill,
+            role: .primary
+        ) {
+            startCreatingNote()
+        }
     }
     
     @ViewBuilder
-    private var contentView: some View {
+    private var notesContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            filterPanel
+            activeModeView
+        }
+        .animation(.easeInOut(duration: 0.24), value: selectedViewMode)
+    }
+    
+    private var filterPanel: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 18) {
+                searchField
+                filterChipRow
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 22)
+        }
+    }
+    
+    private var searchField: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(glassColorSystem.textSecondary().opacity(0.75))
+            
+            TextField("Search thoughts or tags…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(.body, design: .rounded))
+                .foregroundColor(glassColorSystem.textPrimary())
+                .disableAutocorrection(true)
+                .focused($isSearchFocused)
+            
+            if !searchText.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(glassColorSystem.backgroundElevated().opacity(0.28))
+        )
+    }
+    
+    private var filterChipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(NotesFilter.allCases, id: \.self) { filter in
+                    filterChip(for: filter)
+                }
+            }
+        }
+    }
+    
+    private func filterChip(for filter: NotesFilter) -> some View {
+        let isActive = selectedFilter == filter
+        
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedFilter = filter
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: filterIcon(for: filter))
+                    .font(.system(size: 13, weight: .semibold))
+                Text(filter.rawValue)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(filterAccentColor(for: filter).opacity(isActive ? 0.26 : 0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(filterAccentColor(for: filter).opacity(isActive ? 0.55 : 0.24), lineWidth: isActive ? 1.4 : 1)
+            )
+            .foregroundStyle(isActive ? Color.white : glassColorSystem.textSecondary())
+            .shadow(color: filterAccentColor(for: filter).opacity(isActive ? 0.20 : 0.0), radius: isActive ? 12 : 0, y: isActive ? 6 : 0)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(filter.rawValue) filter")
+    }
+    
+    private func filterIcon(for filter: NotesFilter) -> String {
+        switch filter {
+        case .all: return "list.bullet"
+        case .tagged: return "tag.fill"
+        case .recent: return "clock.fill"
+        case .aiSummaries: return "sparkles"
+        case .archived: return "archivebox.fill"
+        }
+    }
+    
+    private func filterAccentColor(for filter: NotesFilter) -> Color {
+        switch filter {
+        case .all: return .kosmicBlue
+        case .tagged: return .kosmicPurple
+        case .recent: return .orange
+        case .aiSummaries: return .pink
+        case .archived: return .gray
+        }
+    }
+    
+    @ViewBuilder
+    private var activeModeView: some View {
         if sortedNotes.isEmpty {
             emptyState
         } else {
@@ -266,8 +454,8 @@ struct UnifiedNotesView: View {
                     onNoteSendToTasks: sendNoteToTask,
                     onSelectionToggle: toggleNoteSelection
                 )
-            case .table:
-                NotesTableView(
+            case .board:
+                NotesBoardView(
                     notes: sortedNotes,
                     selectionMode: isSelectionActive,
                     selectedNoteIDs: selectedNoteIDs,
@@ -283,8 +471,8 @@ struct UnifiedNotesView: View {
                     onNoteSendToTasks: sendNoteToTask,
                     onSelectionToggle: toggleNoteSelection
                 )
-            case .compact:
-                NotesCompactView(
+            case .timeline:
+                NotesTimelineView(
                     notes: sortedNotes,
                     selectionMode: isSelectionActive,
                     selectedNoteIDs: selectedNoteIDs,

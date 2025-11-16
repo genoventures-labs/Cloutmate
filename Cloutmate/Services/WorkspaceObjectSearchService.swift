@@ -765,5 +765,147 @@ class WorkspaceObjectSearchService {
             return recurrence.interval == 1 ? "Yearly" : "Every \(recurrence.interval) years"
         }
     }
+    
+    /// Search workspace objects by hashtag/tag
+    /// Searches Posts, Notes, Projects, and Artifacts by their tags arrays
+    /// If query is empty or "*", returns all items with tags
+    func searchByHashtag(
+        query: String,
+        modelContext: ModelContext,
+        limit: Int = 20
+    ) -> [WorkspaceObjectResult] {
+        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let showAll = trimmedQuery.isEmpty || trimmedQuery == "*"
+        let lowerQuery = showAll ? "" : trimmedQuery.lowercased()
+        var results: [WorkspaceObjectResult] = []
+        
+        // Search Projects by tags
+        let projectDescriptor = FetchDescriptor<CloutmateShared.Project>()
+        if let projects = try? modelContext.fetch(projectDescriptor) {
+            for project in projects {
+                // If showAll, include all projects with tags; otherwise match query
+                let shouldInclude = showAll ? !project.tags.isEmpty : calculateTagMatchScore(tags: project.tags, query: lowerQuery) > 0
+                if shouldInclude {
+                    let tagMatchScore = showAll ? 1.0 : calculateTagMatchScore(tags: project.tags, query: lowerQuery)
+                    let subtitle = project.status.displayName + (project.goal != nil ? " · \(String(project.goal!.prefix(40)))" : "")
+                    results.append(WorkspaceObjectResult(
+                        id: project.id,
+                        type: .project,
+                        title: project.title,
+                        subtitle: subtitle,
+                        matchScore: tagMatchScore
+                    ))
+                }
+            }
+        }
+        
+        // Search Notes by tags
+        let noteDescriptor = FetchDescriptor<CloutmateShared.Note>()
+        if let notes = try? modelContext.fetch(noteDescriptor) {
+            for note in notes {
+                // If showAll, include all notes with tags; otherwise match query
+                let shouldInclude = showAll ? !note.tags.isEmpty : calculateTagMatchScore(tags: note.tags, query: lowerQuery) > 0
+                if shouldInclude {
+                    let tagMatchScore = showAll ? 1.0 : calculateTagMatchScore(tags: note.tags, query: lowerQuery)
+                    var subtitle = String(note.markdown.prefix(50))
+                    subtitle = cleanDescription(subtitle)
+                    if subtitle.isEmpty {
+                        subtitle = "No description available"
+                    }
+                    results.append(WorkspaceObjectResult(
+                        id: note.id,
+                        type: .note,
+                        title: note.title,
+                        subtitle: subtitle,
+                        matchScore: tagMatchScore
+                    ))
+                }
+            }
+        }
+        
+        // Search Posts by tags
+        let postDescriptor = FetchDescriptor<CloutmateShared.Post>()
+        if let posts = try? modelContext.fetch(postDescriptor) {
+            for post in posts {
+                // If showAll, include all posts with tags; otherwise match query
+                let shouldInclude = showAll ? !post.tags.isEmpty : calculateTagMatchScore(tags: post.tags, query: lowerQuery) > 0
+                if shouldInclude {
+                    let tagMatchScore = showAll ? 1.0 : calculateTagMatchScore(tags: post.tags, query: lowerQuery)
+                    let subtitle = post.postStatus.displayName
+                    results.append(WorkspaceObjectResult(
+                        id: post.id,
+                        type: .post,
+                        title: post.caption.isEmpty ? "Empty Post" : String(post.caption.prefix(50)),
+                        subtitle: subtitle,
+                        matchScore: tagMatchScore
+                    ))
+                }
+            }
+        }
+        
+        // Search Artifacts by tags
+        let artifactDescriptor = FetchDescriptor<CloutmateShared.Artifact>()
+        if let artifacts = try? modelContext.fetch(artifactDescriptor) {
+            for artifact in artifacts {
+                // If showAll, include all artifacts with tags; otherwise match query
+                let shouldInclude = showAll ? !artifact.tags.isEmpty : calculateTagMatchScore(tags: artifact.tags, query: lowerQuery) > 0
+                if shouldInclude {
+                    let tagMatchScore = showAll ? 1.0 : calculateTagMatchScore(tags: artifact.tags, query: lowerQuery)
+                    var subtitle = artifact.format.displayName
+                    if let projectId = artifact.projectId {
+                        subtitle += " · Linked to project"
+                        if let project = fetchProject(by: projectId, context: modelContext) {
+                            subtitle += " \(project.title)"
+                        }
+                    }
+                    results.append(WorkspaceObjectResult(
+                        id: artifact.id,
+                        type: .artifact,
+                        title: artifact.title.isEmpty ? artifact.format.displayName : artifact.title,
+                        subtitle: subtitle,
+                        matchScore: tagMatchScore
+                    ))
+                }
+            }
+        }
+        
+        // Sort by match score (highest first) and limit results
+        return results
+            .sorted { $0.matchScore > $1.matchScore }
+            .prefix(limit)
+            .map { $0 }
+    }
+    
+    /// Calculate match score for tags array against query
+    /// Returns 0.0 - 1.0, where 1.0 is exact tag match
+    private func calculateTagMatchScore(tags: [String], query: String) -> Double {
+        guard !tags.isEmpty else { return 0.0 }
+        
+        let lowerQuery = query.lowercased()
+        var bestScore: Double = 0.0
+        
+        for tag in tags {
+            let lowerTag = tag.lowercased()
+            
+            // Exact tag match
+            if lowerTag == lowerQuery {
+                bestScore = max(bestScore, 1.0)
+            }
+            // Tag starts with query
+            else if lowerTag.hasPrefix(lowerQuery) {
+                bestScore = max(bestScore, 0.9)
+            }
+            // Tag contains query
+            else if lowerTag.contains(lowerQuery) {
+                bestScore = max(bestScore, 0.7)
+            }
+            // Query contains tag (partial match)
+            else if lowerQuery.contains(lowerTag) {
+                bestScore = max(bestScore, 0.5)
+            }
+        }
+        
+        return bestScore
+    }
 }
 

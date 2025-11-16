@@ -9,13 +9,13 @@ import SwiftUI
 import CloutmateShared
 
 enum ProjectViewMode: String, CaseIterable {
-    case list, board, timeline, gallery
+    case list, board, roadmap, gallery
     
     var icon: String {
         switch self {
         case .list: return "list.bullet"
         case .board: return "square.grid.2x2"
-        case .timeline: return "timeline.selection"
+        case .roadmap: return "chart.bar.doc.horizontal"
         case .gallery: return "photo.on.rectangle"
         }
     }

@@ -13,8 +13,9 @@ import CloutmateShared
 struct ContextualCreateDrawer: View {
     @Binding var isPresented: Bool
     @Environment(\.modelContext) private var modelContext
-    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     let currentTab: TabIdentifier
     
@@ -31,42 +32,39 @@ struct ContextualCreateDrawer: View {
         return currentTab
     }
     
+    private var accentGradient: LinearGradient {
+        AuroraPalette.linearGradient(for: colorScheme)
+    }
+    
     var body: some View {
-        NavigationStack {
-            HStack(spacing: 0) {
-                gradientSidebar
-                
+        Group {
+            if isPresented {
+                GeometryReader { geometry in
+                    ZStack(alignment: .trailing) {
+                        // Backdrop
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                closeDrawer()
+                            }
+                            .transition(.opacity)
+                        
+                        // Drawer
                 VStack(spacing: 0) {
-                    header
-                        .padding()
-                        .background(.ultraThinMaterial)
-                    
-            ScrollView {
-                VStack(spacing: 20) {
-                            actionGrid
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 24)
-                    }
-                    .background(glassColorSystem.backgroundColor())
-                }
+                            V2DrawerScaffold(
+                                accentGradient: accentGradient,
+                                showsSidebar: false,
+                                header: { headerContent },
+                                content: { drawerContent },
+                                sidebar: { EmptyView() }
+                            )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(glassColorSystem.backgroundColor())
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        closeDrawer()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                        .frame(width: 680)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     }
-                    .keyboardShortcut(.escape, modifiers: [])
                 }
-            }
-        }
-        .frame(minWidth: 600, minHeight: 500)
-        .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
             setupEmotionalTinting()
             loadSmartDefaults()
@@ -75,28 +73,38 @@ struct ContextualCreateDrawer: View {
             restoreEmotionalState()
         }
     }
-    
-    private var gradientSidebar: some View {
-        RoundedRectangle(cornerRadius: 0, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [glassColorSystem.emotionalAccent().opacity(0.85), glassColorSystem.emotionalAccent().opacity(0.35)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            )
-            .frame(width: 4)
+        }
     }
     
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private var headerContent: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
             Text("Create")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundColor(glassColorSystem.textPrimary())
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                
             Text("Choose what to create")
-                .font(.subheadline)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
                 .foregroundStyle(glassColorSystem.textSecondary())
         }
+            
+            Spacer()
+            
+            GlassButton(
+                nil,
+                icon: "xmark",
+                style: .iconOnly,
+                role: .surface
+            ) {
+                closeDrawer()
+            }
+            .accessibilityLabel("Close")
+        }
+    }
+    
+    @ViewBuilder
+    private var drawerContent: some View {
+        actionGrid
     }
     
     private var actionGrid: some View {
@@ -125,60 +133,60 @@ struct ContextualCreateDrawer: View {
         switch effectiveTab {
         case .inbox:
             return [
-                CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .kosmicBlue),
-                CreateAction(type: "New Note", icon: "note.text", color: .kosmicPurple),
+                CreateAction(type: "Quick Capture", icon: "bolt.fill", color: Color.kosmicBlue),
+                CreateAction(type: "New Note", icon: "note.text", color: Color.kosmicPurple),
                 CreateAction(type: "Voice Memo", icon: "mic.fill", color: .orange)
             ]
         case .notes:
             return [
-                CreateAction(type: "New Note", icon: "note.text", color: .kosmicPurple),
-                CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .kosmicBlue),
+                CreateAction(type: "New Note", icon: "note.text", color: Color.kosmicPurple),
+                CreateAction(type: "Quick Capture", icon: "bolt.fill", color: Color.kosmicBlue),
                 CreateAction(type: "Voice Memo", icon: "mic.fill", color: .orange)
             ]
         case .tasks:
             return [
-                CreateAction(type: "Task", icon: "checkmark.circle.fill", color: .kosmicBlue),
-                CreateAction(type: "Subtask", icon: "list.bullet", color: .kosmicGreen),
-                CreateAction(type: "Routine Builder", icon: "arrow.triangle.2.circlepath", color: .kosmicPurple)
+                CreateAction(type: "Task", icon: "checkmark.circle.fill", color: Color.kosmicBlue),
+                CreateAction(type: "Subtask", icon: "list.bullet", color: Color.kosmicGreen),
+                CreateAction(type: "Routine Builder", icon: "arrow.triangle.2.circlepath", color: Color.kosmicPurple)
             ]
         case .drafts:
             return [
-                CreateAction(type: "New Draft", icon: "doc.text", color: .kosmicPurple),
-                CreateAction(type: "Draft From AI", icon: "sparkles", color: .kosmicBlue),
-                CreateAction(type: "Draft From Note", icon: "note.text", color: .kosmicGreen)
+                CreateAction(type: "New Draft", icon: "doc.text", color: Color.kosmicPurple),
+                CreateAction(type: "Draft From AI", icon: "sparkles", color: Color.kosmicBlue),
+                CreateAction(type: "Draft From Note", icon: "note.text", color: Color.kosmicGreen)
             ]
         case .projects:
             return [
-                CreateAction(type: "New Project", icon: "folder.fill", color: .kosmicBlue)
+                CreateAction(type: "New Project", icon: "folder.fill", color: Color.kosmicBlue)
             ]
         case .posts:
             return [
-                CreateAction(type: "New Artifact", icon: "doc.text.fill", color: .kosmicBlue),
+                CreateAction(type: "New Artifact", icon: "doc.text.fill", color: Color.kosmicBlue),
                 CreateAction(type: "Quick Capture", icon: "bolt.fill", color: .orange)
             ]
         case .resources:
             return [
-                CreateAction(type: "Import Resource", icon: "square.and.arrow.down", color: .kosmicBlue),
-                CreateAction(type: "Save Link", icon: "link", color: .kosmicPurple),
-                CreateAction(type: "Capture Text", icon: "text.cursor", color: .kosmicGreen)
+                CreateAction(type: "Import Resource", icon: "square.and.arrow.down", color: Color.kosmicBlue),
+                CreateAction(type: "Save Link", icon: "link", color: Color.kosmicPurple),
+                CreateAction(type: "Capture Text", icon: "text.cursor", color: Color.kosmicGreen)
             ]
         case .calendar:
             return [
-                CreateAction(type: "New Task", icon: "checkmark.circle.fill", color: .kosmicBlue),
-                CreateAction(type: "Reflection", icon: "brain.head.profile", color: .kosmicPurple),
-                CreateAction(type: "Journal Entry", icon: "book.fill", color: .kosmicGreen)
+                CreateAction(type: "New Task", icon: "checkmark.circle.fill", color: Color.kosmicBlue),
+                CreateAction(type: "Reflection", icon: "brain.head.profile", color: Color.kosmicPurple),
+                CreateAction(type: "Journal Entry", icon: "book.fill", color: Color.kosmicGreen)
             ]
         case .journal:
             return [
-                CreateAction(type: "Morning Reflection", icon: "sunrise.fill", color: .kosmicBlue),
-                CreateAction(type: "Evening Reflection", icon: "moon.fill", color: .kosmicPurple),
-                CreateAction(type: "Free Write", icon: "pencil", color: .kosmicGreen)
+                CreateAction(type: "Morning Reflection", icon: "sunrise.fill", color: Color.kosmicBlue),
+                CreateAction(type: "Evening Reflection", icon: "moon.fill", color: Color.kosmicPurple),
+                CreateAction(type: "Free Write", icon: "pencil", color: Color.kosmicGreen)
             ]
         default:
             return [
-                CreateAction(type: "New Note", icon: "note.text", color: .kosmicPurple),
-                CreateAction(type: "Task", icon: "checkmark.circle.fill", color: .kosmicBlue),
-                CreateAction(type: "New Project", icon: "folder.fill", color: .kosmicGreen)
+                CreateAction(type: "New Note", icon: "note.text", color: Color.kosmicPurple),
+                CreateAction(type: "Task", icon: "checkmark.circle.fill", color: Color.kosmicBlue),
+                CreateAction(type: "New Project", icon: "folder.fill", color: Color.kosmicGreen)
             ]
         }
     }
@@ -295,46 +303,35 @@ struct CreateActionButton: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
+        DashboardTile(accent: action.color) {
         Button(action: onTap) {
             VStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(action.color.opacity(0.15))
-                        .frame(width: 56, height: 56)
-                    
                     Image(systemName: action.icon)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(action.color)
-                }
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(action.color)
+                        .frame(width: 56, height: 56)
                 
                 VStack(spacing: 4) {
                     Text(action.type)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.primary)
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
                     
                     if isMostUsed {
                         Text("✨ Most used")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                                .foregroundStyle(glassColorSystem.textSecondary())
                     } else if isRecentlyCreated {
                         Text("🕐 Recently created")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                                .foregroundStyle(glassColorSystem.textSecondary())
                     }
                 }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(isMostUsed ? glassColorSystem.cardElevated() : glassColorSystem.cardColor())
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isMostUsed ? action.color.opacity(0.3) : Color.clear, lineWidth: 2)
-                    )
-            )
         }
         .buttonStyle(.plain)
+        }
         .scaleEffect(isMostUsed ? 1.02 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isMostUsed)
     }

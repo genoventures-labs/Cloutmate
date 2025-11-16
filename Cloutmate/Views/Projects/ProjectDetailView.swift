@@ -15,6 +15,7 @@ struct ProjectDetailView: View {
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     
     @Query private var allTasks: [Task]
     @Query private var allNotes: [Note]
@@ -23,6 +24,7 @@ struct ProjectDetailView: View {
     
     @State private var selectedTab: DetailTab = .overview
     @State private var focusMetrics: ProjectFocusMetrics?
+    @State private var isSidebarHovered = false
     
     var projectTasks: [Task] {
         allTasks.filter { $0.projectId == project.id }
@@ -88,8 +90,8 @@ struct ProjectDetailView: View {
             focusMetrics = ProjectFocusGravityService.shared.focusMetrics(for: project, modelContext: modelContext)
         }
         .onKeyPress(.escape) {
-            // Close detail view
-            return .ignored
+            dismiss()
+            return .handled
         }
     }
     
@@ -118,7 +120,7 @@ struct ProjectDetailView: View {
                         }
                     }
                     
-                    if let goal = project.goal {
+                    if let goal = formattedText(from: project.goal) {
                         Text(goal)
                             .font(.body)
                             .foregroundColor(.secondary)
@@ -128,8 +130,20 @@ struct ProjectDetailView: View {
                 Spacer()
                 
                 // Focus Ring Indicator
-                if let metrics = focusMetrics {
-                    FocusRingIndicator(metrics: metrics)
+                HStack(spacing: 12) {
+                    if let metrics = focusMetrics {
+                        FocusRingIndicator(metrics: metrics)
+                    }
+                    
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
                 }
             }
             
@@ -139,36 +153,22 @@ struct ProjectDetailView: View {
                 let total = projectTasks.count
                 let progress = Double(completed) / Double(total)
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                HStack(spacing: 16) {
+                    ProgressRingView(
+                        progress: progress,
+                        label: "\(completed)/\(total)",
+                        isComplete: progress >= 0.999
+                    )
+                    
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("Progress")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(completed)/\(total) tasks")
-                            .font(.caption)
+                        Text(progress >= 0.999 ? "All tasks complete" : "On track")
+                            .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundColor(.kosmicBlue)
+                            .foregroundColor(progress >= 0.999 ? .kosmicPurple : .kosmicBlue)
                     }
-                    
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color.secondary.opacity(0.1))
-                                .frame(height: 8)
-                            
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.kosmicBlue, .kosmicPurple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geometry.size.width * CGFloat(progress), height: 8)
-                        }
-                    }
-                    .frame(height: 8)
                 }
             }
         }
@@ -181,8 +181,10 @@ struct ProjectDetailView: View {
         HStack(spacing: 0) {
             ForEach(DetailTab.allCases, id: \.self) { tab in
                 Button(action: {
-                    selectedTab = tab
-                    ProjectHaptics.playSelection()
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        selectedTab = tab
+                        ProjectHaptics.playSelection()
+                    }
                 }) {
                     HStack(spacing: 6) {
                         Image(systemName: tab.icon)
@@ -206,23 +208,27 @@ struct ProjectDetailView: View {
     
     // MARK: - Tab Content
     
-    @ViewBuilder
     private var tabContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                switch selectedTab {
-                case .overview:
-                    overviewContent
-                case .tasks:
-                    tasksContent
-                case .artifacts:
-                    artifactsContent
-                case .focusLog:
-                    focusLogContent
+        ZStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    switch selectedTab {
+                    case .overview:
+                        overviewContent
+                    case .tasks:
+                        tasksContent
+                    case .artifacts:
+                        artifactsContent
+                    case .focusLog:
+                        focusLogContent
+                    }
                 }
+                .padding(20)
             }
-            .padding(20)
+            .id(selectedTab)
+            .transition(.opacity)
         }
+        .animation(.easeInOut(duration: 0.35), value: selectedTab)
     }
     
     // MARK: - Overview Content
@@ -230,7 +236,7 @@ struct ProjectDetailView: View {
     private var overviewContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Context
-            if let goal = project.goal {
+            if let goal = formattedText(from: project.goal) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Goal")
                         .font(.headline)
@@ -460,7 +466,16 @@ struct ProjectDetailView: View {
             }
             .padding(16)
         }
-        .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
+        .background(
+            glassColorSystem.glassTint(for: .surface)
+                .opacity(isSidebarHovered ? 0.42 : 0.3)
+                .animation(.easeInOut(duration: 0.25), value: isSidebarHovered)
+        )
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isSidebarHovered = hovering
+            }
+        }
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -473,9 +488,74 @@ struct ProjectDetailView: View {
             return "\(minutes)m"
         }
     }
+    
+    private func formattedText(from raw: String?) -> String? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let display = MentionService.shared.convertToDisplayNames(
+            text: raw,
+            modelContext: modelContext
+        )
+        return MentionParser.stripTerminators(from: display)
+    }
 }
 
 // MARK: - Supporting Views
+
+struct ProgressRingView: View {
+    let progress: Double
+    let label: String
+    let isComplete: Bool
+    
+    @State private var pulse = false
+    
+    private var normalizedProgress: Double {
+        min(max(progress, 0), 1)
+    }
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.secondary.opacity(0.15), lineWidth: 8)
+            
+            Circle()
+                .trim(from: 0, to: normalizedProgress)
+                .stroke(
+                    AngularGradient(
+                        gradient: Gradient(colors: [.kosmicBlue, .kosmicPurple, .kosmicBlue]),
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                )
+                .rotationEffect(.degrees(-90))
+                .shadow(color: .kosmicPurple.opacity(0.2), radius: 6, x: 0, y: 4)
+                .animation(.easeInOut(duration: 0.6), value: normalizedProgress)
+            
+            Text(label)
+                .font(.caption.bold())
+                .foregroundColor(.primary)
+        }
+        .frame(width: 68, height: 68)
+        .scaleEffect(isComplete ? (pulse ? 1.06 : 1.0) : 1.0)
+        .animation(
+            isComplete
+                ? .easeInOut(duration: 1.4).repeatForever(autoreverses: true)
+                : .default,
+            value: pulse
+        )
+        .onAppear {
+            if isComplete {
+                pulse = true
+            }
+        }
+        .onChange(of: isComplete) { _, newValue in
+            if newValue {
+                pulse = true
+            } else {
+                pulse = false
+            }
+        }
+    }
+}
 
 struct FocusRingIndicator: View {
     let metrics: ProjectFocusMetrics

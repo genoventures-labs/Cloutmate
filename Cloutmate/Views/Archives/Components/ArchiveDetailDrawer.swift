@@ -16,6 +16,7 @@ struct ArchiveDetailDrawer: View {
     let onRestore: () -> Void
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     @State private var reflection: ArchiveReflection?
@@ -23,7 +24,11 @@ struct ArchiveDetailDrawer: View {
     @State private var relatedEdges: [MemoryEdge] = []
     @State private var isLoading = true
     
-    private var drawerWidth: CGFloat { 480 }
+    private var drawerWidth: CGFloat { 520 }
+    
+    private var accentGradient: LinearGradient {
+        AuroraPalette.linearGradient(for: colorScheme)
+    }
     
     var body: some View {
         Group {
@@ -31,7 +36,7 @@ struct ArchiveDetailDrawer: View {
                 GeometryReader { geometry in
                     ZStack(alignment: .trailing) {
                         // Backdrop
-                        Color.black.opacity(0.2)
+                        Color.black.opacity(0.3)
                             .ignoresSafeArea()
                             .onTapGesture {
                                 withAnimation(GlassMotion.Easing.modalOpen) {
@@ -42,29 +47,17 @@ struct ArchiveDetailDrawer: View {
                         
                         // Drawer
                         VStack(spacing: 0) {
-                            // Header
-                            headerSection
-                            
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 20) {
-                                    if isLoading {
-                                        ProgressView()
-                                            .frame(maxWidth: .infinity)
-                                            .padding()
-                                    } else {
-                                        summarySection
-                                        moodHistorySection
-                                        reflectionSection
-                                        auroraCommentarySection
-                                    }
-                                }
-                                .padding()
-                            }
+                            V2DrawerScaffold(
+                                accentGradient: accentGradient,
+                                showsSidebar: false,
+                                header: { headerContent },
+                                content: { drawerContent },
+                                sidebar: { EmptyView() }
+                            )
                         }
                         .frame(width: drawerWidth)
                         .frame(maxHeight: .infinity, alignment: .top)
-                        .background(.ultraThinMaterial)
-                        .transition(.move(edge: .trailing))
+                        .transition(.move(edge: .trailing).combined(with: .opacity))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                     }
                 }
@@ -75,12 +68,12 @@ struct ArchiveDetailDrawer: View {
         }
     }
     
-    private var headerSection: some View {
+    private var headerContent: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(archiveItem.title)
-                    .font(.system(.title2, design: .rounded))
-                    .fontWeight(.bold)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
                 
                 HStack(spacing: 8) {
                     Text(archiveItem.entityType)
@@ -88,13 +81,13 @@ struct ArchiveDetailDrawer: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(entityColor.opacity(0.2))
-                        .foregroundColor(entityColor)
+                        .foregroundStyle(entityColor)
                         .cornerRadius(6)
                     
                     if let createdAt = getCreatedAt() {
                         Text("Created \(createdAt, style: .date)")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(glassColorSystem.textSecondary())
                     }
                 }
             }
@@ -106,26 +99,45 @@ struct ArchiveDetailDrawer: View {
                     "Restore",
                     icon: "arrow.counterclockwise",
                     style: .standard,
+                    role: .primary,
                     tintColor: .kosmicBlue
                 ) {
                     onRestore()
+                    withAnimation(GlassMotion.Easing.modalOpen) {
                     isPresented = false
                 }
+                }
                 
-                Button(action: {
+                GlassButton(
+                    nil,
+                    icon: "xmark",
+                    style: .iconOnly,
+                    role: .surface
+                ) {
                     withAnimation(GlassMotion.Easing.modalOpen) {
                         isPresented = false
                     }
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
                 }
-                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
             }
         }
+    }
+    
+    @ViewBuilder
+    private var drawerContent: some View {
+        if isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity)
         .padding()
-        .background(.ultraThinMaterial)
+        } else {
+            VStack(alignment: .leading, spacing: 24) {
+                summarySection
+                moodHistorySection
+                reflectionSection
+                auroraCommentarySection
+            }
+            .padding(.vertical, 8)
+        }
     }
     
     private var entityColor: Color {
@@ -149,36 +161,26 @@ struct ArchiveDetailDrawer: View {
     }
     
     private var summarySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Summary")
-                .font(.headline)
-            
+        DrawerSection(title: "Summary", icon: "doc.text") {
             if let reflectionText = reflection?.reflectionText {
                 Text(reflectionText)
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
             } else {
                 Text("No summary available")
                     .font(.body)
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
                     .italic()
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
     }
     
     private var moodHistorySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Mood History Timeline")
-                .font(.headline)
-            
+        DrawerSection(title: "Mood History Timeline", icon: "chart.line.uptrend.xyaxis") {
             if toneTimeline.isEmpty {
                 Text("No mood history available")
                     .font(.caption)
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
                     .italic()
             } else {
                 // Mini sparkline visualization
@@ -192,59 +194,37 @@ struct ArchiveDetailDrawer: View {
                 .frame(height: 40)
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
     }
     
     private var reflectionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Reflection Notes")
-                .font(.headline)
-            
+        DrawerSection(title: "Reflection Notes", icon: "note.text") {
             if let reflectionText = reflection?.reflectionText {
                 Text(reflectionText)
                     .font(.body)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
             } else {
                 Text("No reflection available")
                     .font(.body)
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
                     .italic()
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
     }
     
     private var auroraCommentarySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .foregroundColor(.kosmicPurple)
-                Text("Aurora Commentary")
-                    .font(.headline)
-            }
-            
+        DrawerSection(title: "Aurora Commentary", icon: "sparkles") {
             if let commentary = reflection?.auroraCommentary, !commentary.isEmpty {
                 Text(commentary)
                     .font(.body)
-                    .foregroundColor(.kosmicPurple.opacity(0.9))
+                    .foregroundStyle(Color.kosmicPurple.opacity(0.9))
                     .italic()
             } else {
                 Text("No commentary available")
                     .font(.body)
-                    .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
                     .italic()
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
     }
     
     private func loadData() async {

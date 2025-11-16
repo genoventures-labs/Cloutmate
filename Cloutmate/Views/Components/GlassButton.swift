@@ -20,6 +20,7 @@ struct GlassButton: View {
     @State private var isHovered = false
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityGlassManager) private var accessibilityManager
     
     enum ButtonStyle {
@@ -54,6 +55,7 @@ struct GlassButton: View {
                 .background(buttonBackground)
                 .clipShape(style == .iconOnly ? AnyShapeWrapper(Circle()) : AnyShapeWrapper(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)))
                 .overlay(buttonBorder)
+                .overlay(glowReflection, alignment: .bottom)
                 .scaleEffect(isPressed ? 0.97 : 1.0)
                 .opacity(isPressed ? 0.8 : 1.0)
                 .shadow(
@@ -170,6 +172,33 @@ struct GlassButton: View {
     
     private var shadowY: CGFloat {
         isHovered ? 3 : 2
+    }
+    
+    @ViewBuilder
+    private var glowReflection: some View {
+        if (role == .primary || role == .accent) && style != .iconOnly {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    AuroraPalette.linearGradient(
+                        for: colorScheme,
+                        start: .leading,
+                        end: .trailing
+                    )
+                )
+                .opacity(glowOpacity)
+                .blur(radius: 22)
+                .scaleEffect(x: 1.25, y: 1.55)
+                .offset(y: cornerRadius * 1.2)
+                .allowsHitTesting(false)
+        } else {
+            EmptyView()
+        }
+    }
+    
+    private var glowOpacity: Double {
+        if isPressed { return 0.55 }
+        if isHovered { return 0.32 }
+        return 0.22
     }
 }
 

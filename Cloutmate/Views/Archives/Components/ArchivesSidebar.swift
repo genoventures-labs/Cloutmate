@@ -15,12 +15,16 @@ struct ArchivesSidebar: View {
     @Binding var selectedToneFilter: EmotionalState?
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     @State private var mostCommonTone: EmotionalState?
     @State private var avgFocusSessionLength: TimeInterval?
     @State private var reflectionDensity: Double?
     @State private var auroraNotes: String?
+    @State private var isFiltersExpanded = true
+    @State private var isInsightsExpanded = true
+    @State private var isAuroraExpanded = true
     
     enum DateRangeFilter: String, CaseIterable, Identifiable {
         case thisWeek = "This Week"
@@ -33,34 +37,54 @@ struct ArchivesSidebar: View {
     
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(spacing: 18) {
                 filtersSection
                 insightsSection
                 auroraNotesSection
             }
             .padding()
         }
-        .frame(width: 240)
-        .background(glassColorSystem.backgroundElevated())
         .task {
             await loadInsights()
         }
     }
     
     private var filtersSection: some View {
+        DashboardTile(accent: .kosmicBlue) {
         VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.kosmicBlue)
             Text("Filters")
-                .font(.headline)
-            
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    Spacer()
+                    Button(action: {
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                            isFiltersExpanded.toggle()
+                        }
+                    }) {
+                        Image(systemName: isFiltersExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                if isFiltersExpanded {
+                    VStack(alignment: .leading, spacing: 16) {
             // Type filter
             VStack(alignment: .leading, spacing: 8) {
                 Text("By Type")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                                .foregroundStyle(glassColorSystem.textSecondary())
                 
-                ForEach(ArchiveFilter.allCases) { filter in
+                            ForEach(ArchiveFilter.allCases, id: \.id) { filter in
                     Button(action: {
+                                    withAnimation(GlassMotion.Easing.spring) {
                         selectedTypeFilter = filter
+                                    }
                     }) {
                         HStack {
                             Text(filter.rawValue)
@@ -69,26 +93,29 @@ struct ArchivesSidebar: View {
                             if selectedTypeFilter == filter {
                                 Image(systemName: "checkmark")
                                     .font(.caption)
-                                    .foregroundColor(.kosmicBlue)
+                                                .foregroundStyle(.kosmicBlue)
                             }
                         }
-                        .foregroundColor(selectedTypeFilter == filter ? .primary : .secondary)
+                                    .foregroundStyle(selectedTypeFilter == filter ? glassColorSystem.textPrimary() : glassColorSystem.textSecondary())
                     }
                     .buttonStyle(.plain)
                 }
             }
             
             Divider()
+                            .opacity(0.3)
             
             // Date range filter
             VStack(alignment: .leading, spacing: 8) {
                 Text("By Date Range")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                                .foregroundStyle(glassColorSystem.textSecondary())
                 
                 ForEach(DateRangeFilter.allCases) { range in
                     Button(action: {
+                                    withAnimation(GlassMotion.Easing.spring) {
                         selectedDateRange = range
+                                    }
                     }) {
                         HStack {
                             Text(range.rawValue)
@@ -97,25 +124,28 @@ struct ArchivesSidebar: View {
                             if selectedDateRange == range {
                                 Image(systemName: "checkmark")
                                     .font(.caption)
-                                    .foregroundColor(.kosmicBlue)
+                                                .foregroundStyle(.kosmicBlue)
                             }
                         }
-                        .foregroundColor(selectedDateRange == range ? .primary : .secondary)
+                                    .foregroundStyle(selectedDateRange == range ? glassColorSystem.textPrimary() : glassColorSystem.textSecondary())
                     }
                     .buttonStyle(.plain)
                 }
             }
             
             Divider()
+                            .opacity(0.3)
             
             // ARTE tone filter
             VStack(alignment: .leading, spacing: 8) {
                 Text("By ARTE Tone")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                                .foregroundStyle(glassColorSystem.textSecondary())
                 
                 Button(action: {
+                                withAnimation(GlassMotion.Easing.spring) {
                     selectedToneFilter = nil
+                                }
                 }) {
                     HStack {
                         Text("All Tones")
@@ -124,16 +154,18 @@ struct ArchivesSidebar: View {
                         if selectedToneFilter == nil {
                             Image(systemName: "checkmark")
                                 .font(.caption)
-                                .foregroundColor(.kosmicBlue)
+                                            .foregroundStyle(.kosmicBlue)
                         }
                     }
-                    .foregroundColor(selectedToneFilter == nil ? .primary : .secondary)
+                                .foregroundStyle(selectedToneFilter == nil ? glassColorSystem.textPrimary() : glassColorSystem.textSecondary())
                 }
                 .buttonStyle(.plain)
                 
                 ForEach(EmotionalState.allCases, id: \.rawValue) { tone in
                     Button(action: {
+                                    withAnimation(GlassMotion.Easing.spring) {
                         selectedToneFilter = tone
+                                    }
                     }) {
                         HStack {
                             Text(tone.displayName)
@@ -142,35 +174,56 @@ struct ArchivesSidebar: View {
                             if selectedToneFilter == tone {
                                 Image(systemName: "checkmark")
                                     .font(.caption)
-                                    .foregroundColor(.kosmicBlue)
+                                                .foregroundStyle(.kosmicBlue)
                             }
                         }
-                        .foregroundColor(selectedToneFilter == tone ? .primary : .secondary)
+                                    .foregroundStyle(selectedToneFilter == tone ? glassColorSystem.textPrimary() : glassColorSystem.textSecondary())
                     }
                     .buttonStyle(.plain)
                 }
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
+                    .padding(.top, 4)
+                }
+            }
+        }
     }
     
     private var insightsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        DashboardTile(accent: .kosmicPurple) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.kosmicPurple)
             Text("Insights")
-                .font(.headline)
-            
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    Spacer()
+                    Button(action: {
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                            isInsightsExpanded.toggle()
+                        }
+                    }) {
+                        Image(systemName: isInsightsExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                if isInsightsExpanded {
+                    VStack(alignment: .leading, spacing: 16) {
             // Most Common Completion Tone
             if let tone = mostCommonTone {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Most Common Completion Tone")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                                    .foregroundStyle(glassColorSystem.textSecondary())
                     Text(tone.displayName)
                         .font(.subheadline)
                         .fontWeight(.medium)
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                 }
             }
             
@@ -179,10 +232,11 @@ struct ArchivesSidebar: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Average Focus Session Length")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                                    .foregroundStyle(glassColorSystem.textSecondary())
                     Text(formatDuration(avgLength))
                         .font(.subheadline)
                         .fontWeight(.medium)
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                 }
             }
             
@@ -191,43 +245,65 @@ struct ArchivesSidebar: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Reflection Density")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                                    .foregroundStyle(glassColorSystem.textSecondary())
                     Text(String(format: "%.1f%%", density * 100))
                         .font(.subheadline)
                         .fontWeight(.medium)
+                                    .foregroundStyle(glassColorSystem.textPrimary())
+                            }
+                        }
+                        
+                        if mostCommonTone == nil && avgFocusSessionLength == nil && reflectionDensity == nil {
+                            Text("No insights available")
+                                .font(.caption)
+                                .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
+                                .italic()
+                        }
+                    }
+                    .padding(.top, 4)
                 }
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
     }
     
     private var auroraNotesSection: some View {
+        DashboardTile(accent: .kosmicPurple) {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
+                HStack {
                 Image(systemName: "sparkles")
-                    .foregroundColor(.kosmicPurple)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.kosmicPurple)
                 Text("Aurora Notes")
-                    .font(.headline)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    Spacer()
+                    Button(action: {
+                        withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                            isAuroraExpanded.toggle()
+                        }
+                    }) {
+                        Image(systemName: isAuroraExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                    .buttonStyle(.plain)
             }
             
+                if isAuroraExpanded {
             if let notes = auroraNotes {
                 Text(notes)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                            .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("No notes available")
                     .font(.caption)
-                    .foregroundColor(.secondary.opacity(0.6))
+                            .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
                     .italic()
+                    }
+                }
             }
         }
-        .padding()
-        .background(GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            Color.clear
-        })
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {

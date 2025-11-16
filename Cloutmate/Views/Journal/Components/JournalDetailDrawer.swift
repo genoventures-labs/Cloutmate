@@ -141,7 +141,6 @@ struct JournalDetailDrawer: View {
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isContentFocused: Bool
     
     @State private var draft: JournalDraft
@@ -149,9 +148,6 @@ struct JournalDetailDrawer: View {
     @State private var aiSummary: String?
     @State private var isGeneratingSummary = false
     @State private var isSummaryExpanded = true
-    @State private var emotionalState: EmotionalStateDetection?
-    @State private var dailySnapshot: AnalyticsSnapshot?
-    @State private var showAuroraChat = false
     
     @State private var linkedTasks: [Task] = []
     @State private var linkedProjects: [Project] = []
@@ -189,55 +185,29 @@ struct JournalDetailDrawer: View {
     
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                accentBar
-                
-                VStack(spacing: 0) {
-                    headerSection
-                    Divider().opacity(0.08)
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            entryDetailsCard
-                            contentCard
-                            tagsCard
-                            if !linkedTasks.isEmpty || !linkedProjects.isEmpty || !linkedArtifacts.isEmpty {
-                                linkedItemsCard
-                            }
-                            if mode == .create {
-                                templateCard
-                            }
-                        }
-                        .padding(.vertical, 24)
-                        .padding(.horizontal, 24)
-                        .frame(maxWidth: 680, alignment: .leading)
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    detailsSection
+                    contentSection
+                    tagsSection
+                    if hasLinkedItems {
+                        linkedItemsSection
                     }
-                    .background(glassColorSystem.backgroundColor())
-                }
-                
-                if mode == .edit {
-                    Divider().opacity(0.08)
-                    insightsSidebar
-                }
-            }
-            .background(glassColorSystem.backgroundColor())
-            .navigationTitle("Journal Entry")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        cancel()
+                    if mode == .create {
+                        templatesSection
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        commit()
+                    if mode == .edit {
+                        auroraSummarySection
                     }
-                    .keyboardShortcut(.return, modifiers: [])
-                    .disabled(!draft.canCommit)
-                    .buttonStyle(.borderedProminent)
-                }
-            }
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 840, minHeight: 640)
         }
-        .frame(minWidth: 960, minHeight: 640)
+        .onEscape { cancel() }
         .onAppear(perform: handleOnAppear)
         .onChange(of: draft.linkedEntityIds) { _, _ in
             loadLinkedItems()
@@ -247,158 +217,190 @@ struct JournalDetailDrawer: View {
                 resetState()
             }
         }
-        .sheet(isPresented: $showAuroraChat) {
-            if let journal = existingJournal {
-                AuroraJournalChatOverlay(journal: journal, isPresented: $showAuroraChat)
-            }
-        }
     }
     
     // MARK: - Layout Sections
     
-    private var accentBar: some View {
+    private var accentGradient: LinearGradient {
         LinearGradient(
             colors: [
-                Color.kosmicBlue.opacity(accentIntensity),
-                Color.kosmicPurple.opacity(accentIntensity * 0.8)
+                Color.kosmicBlue.opacity(0.35 + accentIntensity * 0.4),
+                Color.kosmicPurple.opacity(0.3 + accentIntensity * 0.3)
             ],
             startPoint: .top,
             endPoint: .bottom
         )
-        .frame(width: 4)
-        .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 0)
     }
     
-    private var headerSection: some View {
-        GlassPanel(tier: .overlay, cornerRadius: 0) {
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 18) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
                     TextField("Journal Title", text: $draft.title)
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.bold)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .textFieldStyle(.plain)
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                        .disableAutocorrection(true)
+                        .drawerFocusGlow()
                     
                     if draft.author == .aurora {
                         AuroraAuthorBadge()
                     }
-                    
-                    Spacer()
                 }
                 
-                HStack(spacing: 12) {
-                    typeControl
-                    moodControl
-                    dateControl
+                HStack(spacing: 14) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 12, weight: .medium))
+                        Text(draft.entryDate.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(glassColorSystem.textSecondary())
                     
-                    Spacer()
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.richtext")
+                            .font(.system(size: 12, weight: .medium))
+                        Text(draft.entryType.rawValue.capitalized)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    
+                    HStack(spacing: 6) {
+                        Image(systemName: "face.smiling")
+                            .font(.system(size: 12, weight: .medium))
+                        Text(draft.mood.rawValue.capitalized)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    
+                    if !draft.tags.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "tag.fill")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("\(draft.tags.count) tag\(draft.tags.count == 1 ? "" : "s")")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                        }
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                    }
                 }
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 18)
+            
+            Spacer()
+            
+            HStack(spacing: 12) {
+                GlassButton(
+                    mode == .create ? "Create Entry" : "Done",
+                    icon: mode == .create ? "plus" : "checkmark",
+                    style: .pill,
+                    role: .primary
+                ) {
+                    commit()
+                }
+                .disabled(!draft.canCommit)
+                .keyboardShortcut(.return, modifiers: [])
+                
+                GlassButton(
+                    nil,
+                    icon: "xmark",
+                    style: .iconOnly,
+                    role: .surface,
+                    tintColor: glassColorSystem.backgroundElevated()
+                ) {
+                    cancel()
+                }
+                .accessibilityLabel("Close")
+                .keyboardShortcut(.escape, modifiers: [])
+            }
         }
     }
     
-    private var entryDetailsCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 18) {
-                SectionHeader(title: "Entry Details", subtitle: "Capture context and framing")
-                
-                if mode == .create {
-                    Text("Choose a template or start freeform. Aurora will adapt the tone and structure.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(spacing: 12) {
+    private var detailsSection: some View {
+        DrawerSection(title: "Entry Details", icon: "slider.horizontal.3") {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 16) {
+                GridRow {
+                    detailField(title: "Entry Type") {
                         Picker("Entry Type", selection: $draft.entryType) {
                             ForEach(JournalEntryType.allCases, id: \.self) { type in
                                 Text(type.rawValue.capitalized).tag(type)
                             }
                         }
                         .pickerStyle(.segmented)
-                        
+                    }
+                    
+                    detailField(title: "Mood") {
                         Picker("Mood", selection: $draft.mood) {
                             ForEach(JournalMood.allCases, id: \.self) { mood in
                                 Text(mood.rawValue.capitalized).tag(mood)
                             }
                         }
                         .pickerStyle(.menu)
-                        .frame(maxWidth: 180)
                     }
-                    
-                    DatePicker(
-                        "Entry Date",
-                        selection: $draft.entryDate,
-                        displayedComponents: [.date]
-                    )
-                    .datePickerStyle(.compact)
+                }
+                
+                GridRow {
+                    detailField(title: "Entry Date") {
+                        DatePicker(
+                            "",
+                            selection: $draft.entryDate,
+                            displayedComponents: [.date]
+                        )
+                        .labelsHidden()
+                    }
+                    .gridCellColumns(2)
                 }
             }
-            .padding(20)
         }
     }
     
-    private var contentCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionHeader(
-                    title: "Content",
-                    subtitle: "Mentions, context links, and reflective narrative",
-                    icon: "square.and.pencil"
-                )
-                
-                MentionTextEditor(
-                    text: $draft.content,
-                    placeholder: "Capture your thoughts…",
-                    excludeObjectId: existingJournal?.id,
-                    excludeObjectType: .journal
-                ) { ids, types in
-                    draft.linkedEntityIds = ids
-                    draft.linkedEntityTypes = types
-                }
-                .frame(minHeight: 260)
-                .focused($isContentFocused)
-                .cornerRadius(14)
+    private var contentSection: some View {
+        DrawerSection(title: "Content", icon: "square.and.pencil", subtitle: "Capture your reflection and context links") {
+            MentionTextEditor(
+                text: $draft.content,
+                placeholder: "Capture your thoughts…",
+                excludeObjectId: existingJournal?.id,
+                excludeObjectType: nil
+            ) { ids, types in
+                draft.linkedEntityIds = ids
+                draft.linkedEntityTypes = types
             }
-            .padding(20)
+            .frame(minHeight: 260)
+            .focused($isContentFocused)
+            .drawerFocusGlow()
         }
     }
     
-    private var tagsCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(
-                    title: "Tags",
-                    subtitle: "Organize this entry with lightweight metadata",
-                    icon: "number"
-                )
-                
+    private var tagsSection: some View {
+        DrawerSection(title: "Tags", icon: "tag.fill") {
+            VStack(alignment: .leading, spacing: 14) {
                 if draft.tags.isEmpty {
                     Text("Add tags to surface this entry in reflections and search.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                if !draft.tags.isEmpty {
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                } else {
                     NoteTagFlowLayout(spacing: 8) {
                         ForEach(draft.tags, id: \.self) { tag in
-                            HStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 Text("#\(tag)")
-                                    .font(.caption)
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
                                 Button {
                                     removeTag(tag)
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
-                                        .font(.caption2)
+                                        .font(.system(size: 11, weight: .semibold))
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.kosmicPurple.opacity(0.12))
-                            .foregroundColor(.kosmicPurple)
-                            .cornerRadius(8)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(glassColorSystem.emotionalAccent().opacity(0.18))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(glassColorSystem.emotionalAccent().opacity(0.35), lineWidth: 0.8)
+                            )
+                            .foregroundStyle(glassColorSystem.emotionalAccent())
                         }
                     }
                 }
@@ -406,59 +408,59 @@ struct JournalDetailDrawer: View {
                 HStack(spacing: 10) {
                     TextField("Add tag", text: $newTagText)
                         .textFieldStyle(.plain)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(glassColorSystem.backgroundElevated().opacity(0.4))
+                        )
                         .onSubmit(addTag)
                     
-                    Button(action: addTag) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.kosmicPurple)
+                    GlassButton(
+                        nil,
+                        icon: "plus",
+                        style: .iconOnly,
+                        role: .accent
+                    ) {
+                        addTag()
                     }
-                    .buttonStyle(.plain)
                     .disabled(newTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(glassColorSystem.glassTint(for: .surface).opacity(0.45))
-                .cornerRadius(10)
+                .drawerFocusGlow()
             }
-            .padding(20)
         }
     }
     
-    private var linkedItemsCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionHeader(
-                    title: "Linked Items",
-                    subtitle: "Context captured from mentions and associations",
-                    icon: "link"
-                )
-                
-                LinkedItemsSection(
-                    tasks: linkedTasks,
-                    projects: linkedProjects,
-                    artifacts: linkedArtifacts
-                )
-            }
-            .padding(20)
+    private var linkedItemsSection: some View {
+        DrawerSection(title: "Linked Items", icon: "link", subtitle: "Mentions captured from this entry") {
+            LinkedItemsSection(
+                tasks: linkedTasks,
+                projects: linkedProjects,
+                artifacts: linkedArtifacts
+            )
         }
     }
     
-    private var templateCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
-            VStack(alignment: .leading, spacing: 16) {
-                SectionHeader(
-                    title: "Templates",
-                    subtitle: "Kick off with guided prompts sourced from Aurora",
-                    icon: "sparkles"
-                )
-                
-                HStack(spacing: 12) {
-                    templateButton(.morning)
-                    templateButton(.evening)
-                    templateButton(.freeWrite)
-                }
+    private var templatesSection: some View {
+        DrawerSection(title: "Templates", icon: "sparkles", subtitle: "Kick off with guided prompts or start freeform") {
+            HStack(spacing: 12) {
+                templateButton(.morning)
+                templateButton(.evening)
+                templateButton(.freeWrite)
             }
-            .padding(20)
+        }
+    }
+    
+    private var auroraSummarySection: some View {
+        DrawerSection(title: "Aurora Summary", icon: "sparkles") {
+            JournalAISummarySection(
+                summary: aiSummary,
+                isGenerating: isGeneratingSummary,
+                isExpanded: $isSummaryExpanded,
+                onRegenerate: generateSummary
+            )
         }
     }
     
@@ -466,10 +468,9 @@ struct JournalDetailDrawer: View {
         Button {
             applyTemplate(template)
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(template.title)
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                    .font(.caption.weight(.semibold))
                 Text(template.content.isEmpty ? "Blank canvas" : template.content)
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -478,151 +479,27 @@ struct JournalDetailDrawer: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
+            .background(glassColorSystem.cardColor().opacity(0.45))
             .cornerRadius(12)
         }
         .buttonStyle(.plain)
     }
     
-    private var insightsSidebar: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                if let journal = existingJournal, let emotionalState {
-                    GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                        ARTEReflectionCard(
-                            journal: journal,
-                            emotionalState: emotionalState,
-                            snapshot: dailySnapshot
-                        )
-                        .padding(20)
-                    }
-                }
-                
-                GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        SectionHeader(
-                            title: "Emotional Radar",
-                            subtitle: "How Aurora perceives your tonal balance",
-                            icon: "circle.grid.cross"
-                        )
-                        MoodRadarChart(
-                            calm: calculateMoodValue(for: .calm),
-                            creative: calculateMoodValue(for: .creative),
-                            chaotic: calculateMoodValue(for: .frustrated),
-                            restless: calculateMoodValue(for: .excited)
-                        )
-                        .frame(height: 200)
-                    }
-                    .padding(20)
-                }
-                
-                GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                    JournalAISummarySection(
-                        summary: aiSummary,
-                        isGenerating: isGeneratingSummary,
-                        isExpanded: $isSummaryExpanded,
-                        onRegenerate: generateSummary
-                    )
-                    .padding(20)
-                }
-                
-                if existingJournal != nil {
-                    GlassPanel(tier: .contentCard, cornerRadius: 18) {
-                        VStack(alignment: .leading, spacing: 16) {
-                            SectionHeader(
-                                title: "Aurora Assistance",
-                                subtitle: "Request coaching or reflective prompts",
-                                icon: "sparkles"
-                            )
-                            
-                            Button {
-                                showAuroraChat = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "message.and.waveform")
-                                    Text("Ask Aurora for a reflection")
-                                }
-                                .font(.caption.weight(.semibold))
-                                .foregroundColor(.white)
-                                .padding(.vertical, 12)
-                                .frame(maxWidth: .infinity)
-                                .background(
-                                    LinearGradient(
-                                        colors: [.kosmicBlue, .kosmicPurple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .cornerRadius(12)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        .padding(20)
-                    }
-                }
-            }
-            .padding(.vertical, 24)
-            .padding(.horizontal, 16)
-        }
-        .frame(width: 320)
-        .background(glassColorSystem.backgroundColor())
+    private var hasLinkedItems: Bool {
+        !linkedTasks.isEmpty || !linkedProjects.isEmpty || !linkedArtifacts.isEmpty
     }
     
-    // MARK: - Controls
     
-    private var typeControl: some View {
-        Menu {
-            Picker("Entry Type", selection: $draft.entryType) {
-                ForEach(JournalEntryType.allCases, id: \.self) { type in
-                    Text(type.rawValue.capitalized).tag(type)
-                }
-            }
-            .pickerStyle(.inline)
-        } label: {
-            metaControlLabel(icon: "doc.richtext", title: draft.entryType.rawValue.capitalized)
-        }
-        .menuStyle(.borderlessButton)
-    }
-    
-    private var moodControl: some View {
-        Menu {
-            Picker("Mood", selection: $draft.mood) {
-                ForEach(JournalMood.allCases, id: \.self) { mood in
-                    Text(mood.rawValue.capitalized).tag(mood)
-                }
-            }
-            .pickerStyle(.inline)
-        } label: {
-            metaControlLabel(icon: "face.smiling", title: draft.mood.rawValue.capitalized)
-        }
-        .menuStyle(.borderlessButton)
-    }
-    
-    private var dateControl: some View {
-        DatePicker(
-            "",
-            selection: $draft.entryDate,
-            displayedComponents: .date
-        )
-        .labelsHidden()
-        .datePickerStyle(.compact)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
-        .cornerRadius(12)
-    }
-    
-    private func metaControlLabel(icon: String, title: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
+    private func detailField<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
                 .font(.caption.weight(.semibold))
-            Text(title)
-                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+            content()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(glassColorSystem.glassTint(for: .surface).opacity(0.3))
-        .cornerRadius(12)
     }
     
     // MARK: - Actions
@@ -665,7 +542,6 @@ struct JournalDetailDrawer: View {
                 isContentFocused = true
             }
         } else {
-            loadARTEData()
             loadLinkedItems()
         }
     }
@@ -692,8 +568,6 @@ struct JournalDetailDrawer: View {
         draft = initialDraft
         newTagText = ""
         aiSummary = initialDraft.aiGeneratedContent
-        emotionalState = nil
-        dailySnapshot = nil
         loadLinkedItems()
     }
     
@@ -711,33 +585,12 @@ struct JournalDetailDrawer: View {
     
     // MARK: - Insights & Analytics
     
-    private func loadARTEData() {
-        guard let journal = existingJournal else { return }
-        
-        Task { @MainActor in
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: journal.entryDate)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? journal.entryDate
-            
-            let snapshot = await AnalyticsEngine.shared.generateSnapshot(
-                for: .custom,
-                customRange: (startOfDay, endOfDay),
-                modelContext: modelContext
-            )
-            dailySnapshot = snapshot
-            
-            let detector = EmotionalStateDetector()
-            emotionalState = detector.detectState(from: snapshot, modelContext: modelContext)
-        }
-    }
-    
     private func generateSummary() {
         guard !isGeneratingSummary, existingJournal != nil else { return }
         
         isGeneratingSummary = true
         
-        Task { @MainActor in
-            defer { isGeneratingSummary = false }
+        _Concurrency.Task {
             do {
                 let descriptor = DocumentDescriptor(
                     text: draft.content,
@@ -760,10 +613,16 @@ struct JournalDetailDrawer: View {
                     confidence: nil
                 )
                 
-                aiSummary = result.summary
-                draft.aiGeneratedContent = result.summary
+                await MainActor.run {
+                    aiSummary = result.summary
+                    draft.aiGeneratedContent = result.summary
+                    isGeneratingSummary = false
+                }
             } catch {
-                aiSummary = "Unable to generate summary: \(error.localizedDescription)"
+                await MainActor.run {
+                    aiSummary = "Unable to generate summary: \(error.localizedDescription)"
+                    isGeneratingSummary = false
+                }
             }
         }
     }
@@ -774,29 +633,6 @@ struct JournalDetailDrawer: View {
         context += "Type: \(draft.entryType.rawValue)\n"
         context += "Date: \(draft.entryDate.formatted(date: .abbreviated, time: .omitted))\n"
         return context
-    }
-    
-    private func calculateMoodValue(for mood: JournalMood) -> Double {
-        if draft.mood == mood {
-            return 0.85
-        }
-        
-        guard let detection = emotionalState else {
-            return 0.35
-        }
-        
-        switch mood {
-        case .calm:
-            return detection.state == .calm ? 0.7 : 0.3
-        case .creative:
-            return detection.state == .reflective ? 0.65 : 0.25
-        case .frustrated:
-            return detection.state == .fatigued ? 0.55 : 0.15
-        case .excited:
-            return detection.state == .energized ? 0.75 : 0.25
-        default:
-            return 0.3
-        }
     }
 }
 
@@ -876,29 +712,23 @@ struct JournalAISummarySection: View {
                         .background(.ultraThinMaterial)
                         .cornerRadius(12)
                     
-                    Button(action: onRegenerate) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Regenerate summary")
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.kosmicPurple)
-                    }
-                    .buttonStyle(.plain)
+                    GlassButton(
+                        "Regenerate summary",
+                        icon: "arrow.clockwise",
+                        style: .standard,
+                        role: .primary,
+                        action: onRegenerate
+                    )
+                    .frame(maxWidth: 220, alignment: .leading)
                 } else {
-                    Button(action: onRegenerate) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "sparkles")
-                            Text("Generate summary with Aurora")
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.kosmicPurple)
-                        .padding()
-                        .frame(maxWidth: .infinity)
-                        .background(Color.kosmicPurple.opacity(0.12))
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(.plain)
+                    GlassButton(
+                        "Generate summary",
+                        icon: "sparkles",
+                        style: .standard,
+                        role: .primary,
+                        action: onRegenerate
+                    )
+                    .frame(maxWidth: 240, alignment: .leading)
                 }
             }
         }

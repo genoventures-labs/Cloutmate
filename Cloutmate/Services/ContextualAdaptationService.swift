@@ -97,6 +97,8 @@ final class ContextualAdaptationService {
             return "You've got some things coming up. Need help planning?"
         case .light:
             return "Looks like a manageable workload. What can we tackle?"
+        case .overloaded:
+            return "You're carrying a lot—let's pause and prioritize the essentials together."
         }
     }
     
@@ -150,6 +152,8 @@ final class ContextualAdaptationService {
                 instructions.append("Workload is moderate—offer support if they ask, otherwise stay conversational.")
             case .light:
                 break
+            case .overloaded:
+                instructions.append("Workload is overloaded—suggest a quick reset and pick the top one or two priorities.")
             }
         }
         
@@ -159,20 +163,5 @@ final class ContextualAdaptationService {
         
         return instructions.joined(separator: "\n- ")
     }
-}
-
-enum TimeOfDayContext {
-    case morning      // 5-9 AM
-    case lateMorning  // 9-12 PM
-    case midday       // 12-2 PM
-    case afternoon    // 2-5 PM
-    case evening      // 5-9 PM
-    case night        // 9 PM - 5 AM
-}
-
-enum WorkloadLevel {
-    case light
-    case moderate
-    case heavy
 }
 

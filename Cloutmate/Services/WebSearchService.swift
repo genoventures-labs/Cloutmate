@@ -2,7 +2,7 @@
 //  WebSearchService.swift
 //  Cloutmate
 //
-//  Web search service using DuckDuckGo HTML search results
+//  Web search service using Ollama Cloud API
 //
 
 import Foundation
@@ -10,40 +10,258 @@ import Foundation
 actor WebSearchService {
     static let shared = WebSearchService()
     
+    private let ollamaWebSearchURL = "https://ollama.com/api/web_search"
+    
     private init() {}
     
-    /// Search the web using DuckDuckGo HTML search
+    /// Perform deep research with multiple related searches
+    /// Generates multiple search queries from the original and aggregates results
+    /// - Parameters:
+    ///   - query: The original search query
+    ///   - apiKey: Ollama Cloud API key
+    ///   - maxResultsPerQuery: Maximum results per query (default 10, max 10)
+    ///   - onProgressUpdate: Optional callback for progress updates (query, resultCount)
+    func deepResearch(query: String, apiKey: String, maxResultsPerQuery: Int = 10, onProgressUpdate: ((String, Int) -> Void)? = nil) async throws -> WebSearchResult {
+        // Generate multiple related search queries for comprehensive research
+        let searchQueries = generateResearchQueries(from: query)
+        print("[WebSearchService] Deep research: Generated \(searchQueries.count) search queries for: \(query)")
+        
+        var allResults: [WebSearchItem] = []
+        var seenURLs = Set<String>()
+        var querySummaries: [String: String?] = [:]
+        
+        // Perform searches for each query
+        for (index, searchQuery) in searchQueries.enumerated() {
+            do {
+                // Update progress
+                await MainActor.run {
+                    onProgressUpdate?("Searched for: \(searchQuery)", allResults.count)
+                }
+                
+                print("[WebSearchService] Deep research: Executing search \(index + 1)/\(searchQueries.count): \(searchQuery)")
+                
+                let searchResult = try await searchWeb(
+                    query: searchQuery,
+                    apiKey: apiKey,
+                    maxResults: maxResultsPerQuery
+                )
+                
+                // Aggregate results, deduplicating by URL
+                for item in searchResult.results {
+                    if !seenURLs.contains(item.url) {
+                        seenURLs.insert(item.url)
+                        allResults.append(item)
+                    }
+                }
+                
+                querySummaries[searchQuery] = searchResult.summary
+                
+                // Update progress with new total
+                await MainActor.run {
+                    onProgressUpdate?("Searched for: \(searchQuery)", allResults.count)
+                }
+                
+                // Small delay between searches to avoid rate limiting
+                if index < searchQueries.count - 1 {
+                    try? await _Concurrency.Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                }
+            } catch {
+                // If one search fails, log and continue with others
+                print("[WebSearchService] Deep research: Search failed for '\(searchQuery)': \(error.localizedDescription)")
+                await MainActor.run {
+                    onProgressUpdate?("Search failed: \(searchQuery)", allResults.count)
+                }
+                continue
+            }
+        }
+        
+        // Generate comprehensive summary from all results
+        let combinedSummary = generateDeepResearchSummary(from: allResults, originalQuery: query, querySummaries: querySummaries)
+        
+        print("[WebSearchService] Deep research: Completed with \(allResults.count) unique results")
+        
+        return WebSearchResult(
+            query: query,
+            results: allResults,
+            summary: combinedSummary
+        )
+    }
+    
+    /// Generate multiple research queries from the original query
+    /// Creates variations that cover different angles and aspects
+    private func generateResearchQueries(from originalQuery: String) -> [String] {
+        var queries: [String] = [originalQuery] // Always include original
+        
+        // Extract key terms from the original query
+        let words = originalQuery.lowercased()
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty && $0.count > 2 }
+            .filter { !["the", "a", "an", "and", "or", "but", "for", "with", "about", "what", "how", "why", "when", "where"].contains($0) }
+        
+        guard !words.isEmpty else { return queries }
+        
+        let keyTerms = Array(words.prefix(5)).joined(separator: " ")
+        
+        // Generate related queries
+        var relatedQueries: [String] = []
+        
+        // 1. "How to" perspective
+        if !originalQuery.lowercased().contains("how to") && !originalQuery.lowercased().hasPrefix("how ") {
+            relatedQueries.append("how to \(keyTerms)")
+        }
+        
+        // 2. "What is" perspective (for concepts/definitions)
+        if !originalQuery.lowercased().contains("what is") && !originalQuery.lowercased().hasPrefix("what ") {
+            relatedQueries.append("what is \(keyTerms)")
+        }
+        
+        // 3. "Best practices" or "guide" perspective
+        relatedQueries.append("\(keyTerms) best practices")
+        relatedQueries.append("\(keyTerms) guide")
+        
+        // 4. "Latest" or "recent" perspective for current information
+        relatedQueries.append("latest \(keyTerms)")
+        relatedQueries.append("recent \(keyTerms)")
+        
+        // 5. "Examples" or "case studies" perspective
+        relatedQueries.append("\(keyTerms) examples")
+        
+        // 6. "Comparison" or "vs" if it seems like a comparison topic
+        if words.count >= 2 && !originalQuery.lowercased().contains("vs") && !originalQuery.lowercased().contains("versus") && !originalQuery.lowercased().contains("compare") {
+            // Only add if it seems like it could be a comparison (has "and" or multiple key terms)
+            if originalQuery.lowercased().contains(" and ") || words.count >= 3 {
+                relatedQueries.append("\(keyTerms) comparison")
+            }
+        }
+        
+        // 7. "Benefits" or "advantages" perspective
+        relatedQueries.append("\(keyTerms) benefits")
+        
+        // Limit to reasonable number of queries (original + up to 8 related = max 9 total)
+        queries.append(contentsOf: Array(relatedQueries.prefix(8)))
+        
+        return queries
+    }
+    
+    /// Generate a comprehensive summary from deep research results
+    private func generateDeepResearchSummary(from results: [WebSearchItem], originalQuery: String, querySummaries: [String: String?]) -> String? {
+        guard !results.isEmpty else { return nil }
+        
+        // Combine summaries from different queries
+        var summaryParts: [String] = []
+        
+        // Add original query summary if available
+        if let originalSummary = querySummaries[originalQuery] ?? nil, !originalSummary.isEmpty {
+            summaryParts.append(originalSummary)
+        }
+        
+        // Add summaries from top results across all queries
+        let topResults = results.prefix(10) // Use more results for deep research
+        for result in topResults {
+            if let snippet = result.snippet, !snippet.isEmpty {
+                // Use snippet but limit length
+                let truncatedSnippet = snippet.count > 200 ? String(snippet.prefix(200)) + "..." : snippet
+                summaryParts.append(truncatedSnippet)
+            } else {
+                summaryParts.append(result.title)
+            }
+        }
+        
+        // If we have many results, create a more comprehensive summary
+        if results.count > 10 {
+            summaryParts.append("Found \(results.count) relevant sources covering various aspects of the topic.")
+        }
+        
+        return summaryParts.joined(separator: " ")
+    }
+    
+    /// Search the web using Ollama Cloud API
     /// This performs actual web searches and returns real results
-    func searchWeb(query: String) async throws -> WebSearchResult {
-        // Use DuckDuckGo HTML search endpoint
-        guard let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: "https://html.duckduckgo.com/html/?q=\(encodedQuery)") else {
+    /// - Parameters:
+    ///   - query: The search query string
+    ///   - apiKey: Ollama Cloud API key (optional, will fetch from AISettings if not provided)
+    ///   - maxResults: Maximum number of results to return (default 5, max 10)
+    func searchWeb(query: String, apiKey: String? = nil, maxResults: Int = 5) async throws -> WebSearchResult {
+        // Get API key from parameter or AISettings
+        let resolvedAPIKey: String?
+        if let providedKey = apiKey {
+            resolvedAPIKey = providedKey
+        } else {
+            resolvedAPIKey = await MainActor.run {
+                AISettings.shared.ollamaCloudAPIKey
+            }
+        }
+        
+        guard let apiKey = resolvedAPIKey, !apiKey.isEmpty else {
+            throw WebSearchError.apiError("Ollama Cloud API key is required for web search")
+        }
+        
+        guard let url = URL(string: ollamaWebSearchURL) else {
             throw WebSearchError.invalidURL
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-        request.timeoutInterval = 10.0 // 10 second timeout
+        // Prepare request body
+        struct WebSearchRequest: Codable {
+            let query: String
+            let max_results: Int?
+        }
+        
+        let requestBody = WebSearchRequest(
+            query: query,
+            max_results: min(max(maxResults, 1), 10) // Clamp between 1 and 10
+        )
+        
+        var urlRequest = URLRequest(url: url)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.timeoutInterval = 30.0 // 30 second timeout for web search
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            urlRequest.httpBody = try JSONEncoder().encode(requestBody)
+        } catch {
+            throw WebSearchError.apiError("Failed to encode request: \(error.localizedDescription)")
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: urlRequest)
             
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw WebSearchError.invalidResponse
             }
             
+            if httpResponse.statusCode == 401 {
+                throw WebSearchError.apiError("Authentication failed. Please check your Ollama Cloud API key.")
+            }
+            
             guard httpResponse.statusCode == 200 else {
-                throw WebSearchError.apiError("HTTP \(httpResponse.statusCode)")
+                let responseBody = String(data: data, encoding: .utf8) ?? "Unable to decode response"
+                throw WebSearchError.apiError("HTTP \(httpResponse.statusCode): \(responseBody)")
             }
             
-            // Parse HTML response
-            guard let html = String(data: data, encoding: .utf8) else {
-                throw WebSearchError.invalidResponse
+            // Parse JSON response
+            struct OllamaWebSearchResponse: Codable {
+                let results: [OllamaSearchResult]
             }
             
-            // Extract search results from HTML
-            let results = parseDuckDuckGoResults(html: html)
+            struct OllamaSearchResult: Codable {
+                let title: String
+                let url: String
+                let content: String
+            }
+            
+            let decoder = JSONDecoder()
+            let ollamaResponse = try decoder.decode(OllamaWebSearchResponse.self, from: data)
+            
+            // Convert Ollama format to our WebSearchItem format
+            // Ollama uses "content" but we use "snippet"
+            let results = ollamaResponse.results.map { ollamaResult in
+                WebSearchItem(
+                    title: ollamaResult.title,
+                    url: ollamaResult.url,
+                    snippet: ollamaResult.content.isEmpty ? nil : ollamaResult.content
+                )
+            }
             
             // If no results found, return empty result instead of throwing error
             // This allows Aurora to continue responding even if search returns nothing
@@ -63,6 +281,10 @@ actor WebSearchService {
                 results: results,
                 summary: summary
             )
+        } catch let decodingError as DecodingError {
+            let errorMessage = "Failed to decode response: \(decodingError.localizedDescription)"
+            print("[WebSearchService] Decoding error: \(errorMessage)")
+            throw WebSearchError.apiError(errorMessage)
         } catch {
             // If search fails, throw error but don't crash
             if error is WebSearchError {
@@ -71,149 +293,6 @@ actor WebSearchService {
                 throw WebSearchError.apiError(error.localizedDescription)
             }
         }
-    }
-    
-    /// Parse DuckDuckGo HTML search results
-    private func parseDuckDuckGoResults(html: String) -> [WebSearchItem] {
-        var results: [WebSearchItem] = []
-        
-        // DuckDuckGo HTML structure can vary, so we'll use multiple patterns
-        // Try to find result containers - they typically have links with class containing "result"
-        
-        // Pattern 1: Look for links with result classes
-        let linkPattern = #"<a[^>]*class="[^"]*result[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#
-        
-        if let regex = try? NSRegularExpression(pattern: linkPattern, options: [.dotMatchesLineSeparators]) {
-            let range = NSRange(html.startIndex..<html.endIndex, in: html)
-            let matches = regex.matches(in: html, options: [], range: range)
-            
-            var seenURLs = Set<String>()
-            
-            for match in matches.prefix(10) { // Get more matches, then filter
-                let url = (html as NSString).substring(with: match.range(at: 1))
-                let titleHTML = (html as NSString).substring(with: match.range(at: 2))
-                let title = stripHTML(from: titleHTML)
-                
-                // Skip if we've seen this URL or if it's not a valid web URL
-                guard !seenURLs.contains(url),
-                      url.hasPrefix("http"),
-                      !title.isEmpty else {
-                    continue
-                }
-                
-                seenURLs.insert(url)
-                
-                // Try to find snippet near this result
-                let snippet = findSnippetNearMatch(match: match, html: html)
-                
-                results.append(WebSearchItem(
-                    title: title,
-                    url: url,
-                    snippet: snippet.isEmpty ? nil : snippet
-                ))
-                
-                if results.count >= 5 {
-                    break
-                }
-            }
-        }
-        
-        // If we didn't get results, try alternative pattern
-        if results.isEmpty {
-            // Pattern 2: Look for any links with href containing http/https
-            let fallbackPattern = #"<a[^>]*href="(https?://[^"]+)"[^>]*>(.*?)</a>"#
-            
-            if let regex = try? NSRegularExpression(pattern: fallbackPattern, options: [.dotMatchesLineSeparators]) {
-                let range = NSRange(html.startIndex..<html.endIndex, in: html)
-                let matches = regex.matches(in: html, options: [], range: range)
-                
-                var seenURLs = Set<String>()
-                
-                for match in matches.prefix(10) {
-                    let url = (html as NSString).substring(with: match.range(at: 1))
-                    let titleHTML = (html as NSString).substring(with: match.range(at: 2))
-                    let title = stripHTML(from: titleHTML)
-                    
-                    // Skip DuckDuckGo internal links and duplicates
-                    guard !seenURLs.contains(url),
-                          !url.contains("duckduckgo.com"),
-                          url.hasPrefix("http"),
-                          title.count > 5, // Filter out very short titles
-                          title.count < 200 else { // Filter out very long titles
-                        continue
-                    }
-                    
-                    seenURLs.insert(url)
-                    
-                    results.append(WebSearchItem(
-                        title: title,
-                        url: url,
-                        snippet: nil
-                    ))
-                    
-                    if results.count >= 5 {
-                        break
-                    }
-                }
-            }
-        }
-        
-        return results
-    }
-    
-    /// Find snippet text near a match
-    private func findSnippetNearMatch(match: NSTextCheckingResult, html: String) -> String {
-        // Look for snippet patterns near the match
-        let matchEnd = match.range.upperBound
-        let searchStart = min(matchEnd, html.count)
-        let searchEnd = min(searchStart + 500, html.count) // Search 500 chars after match
-        
-        guard searchStart < html.count else { return "" }
-        
-        let searchRange = NSRange(location: searchStart, length: searchEnd - searchStart)
-        guard searchRange.location + searchRange.length <= html.count else { return "" }
-        
-        let searchText = (html as NSString).substring(with: searchRange)
-        
-        // Look for snippet patterns
-        let snippetPatterns = [
-            #"<a[^>]*class="[^"]*snippet[^"]*"[^>]*>(.*?)</a>"#,
-            #"<span[^>]*class="[^"]*snippet[^"]*"[^>]*>(.*?)</span>"#,
-            #"<p[^>]*class="[^"]*snippet[^"]*"[^>]*>(.*?)</p>"#
-        ]
-        
-        for pattern in snippetPatterns {
-            if let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) {
-                let range = NSRange(searchText.startIndex..<searchText.endIndex, in: searchText)
-                if let snippetMatch = regex.firstMatch(in: searchText, options: [], range: range) {
-                    let snippetHTML = (searchText as NSString).substring(with: snippetMatch.range(at: 1))
-                    let snippet = stripHTML(from: snippetHTML)
-                    if snippet.count > 20 && snippet.count < 300 {
-                        return snippet
-                    }
-                }
-            }
-        }
-        
-        return ""
-    }
-    
-    /// Strip HTML tags from string
-    private func stripHTML(from html: String) -> String {
-        var text = html
-        // Remove HTML tags
-        if let regex = try? NSRegularExpression(pattern: "<[^>]+>", options: []) {
-            let range = NSRange(text.startIndex..<text.endIndex, in: text)
-            text = regex.stringByReplacingMatches(in: text, options: [], range: range, withTemplate: "")
-        }
-        // Decode HTML entities
-        text = text.replacingOccurrences(of: "&amp;", with: "&")
-        text = text.replacingOccurrences(of: "&lt;", with: "<")
-        text = text.replacingOccurrences(of: "&gt;", with: ">")
-        text = text.replacingOccurrences(of: "&quot;", with: "\"")
-        text = text.replacingOccurrences(of: "&#39;", with: "'")
-        text = text.replacingOccurrences(of: "&nbsp;", with: " ")
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     /// Generate a summary from search results

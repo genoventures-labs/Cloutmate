@@ -15,410 +15,21 @@ import CloutmateShared
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var themeManager = ReactiveThemeManager.shared
+    @State private var selectedEntry: SettingsEntry = .glassEffects
+    @State private var collapsedGroupIDs: Set<SettingsGroup> = []
     @State private var contextGuardEnabled = ContextGuardSettings.shared.isGuardEnabled
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Glass Effects Preferences
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(glassColorSystem.emotionalAccent())
-                            Text("Glass Effects")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    GlassEffectsSection()
-                }
-
-                // ARTE Quick Controls
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "circle.dashed.inset.filled")
-                                .foregroundColor(glassColorSystem.emotionalAccent())
-                            Text("Aurora Theme Engine")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .center) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Aurora Reactive Theme Engine")
-                                    .font(.system(size: 14, weight: .semibold))
-                                Text(themeManager.isEnabled ? "ARTE is actively adapting your workspace." : "ARTE is currently disabled.")
-                                    .font(.footnote)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Toggle("", isOn: $themeManager.isEnabled)
-                                .toggleStyle(.switch)
-                                .onChange(of: themeManager.isEnabled) { _, newValue in
-                                    handleArteToggleChange(newValue)
-                                }
-                        }
-                        .padding(.vertical, 4)
-
-                        if themeManager.isEnabled {
-                            HStack(spacing: 12) {
-                                Image(systemName: themeManager.currentState.iconName)
-                                    .font(.system(size: 24))
-                                    .foregroundColor(glassColorSystem.emotionalAccent())
-                                    .frame(width: 32, height: 32)
-                                    .background(
-                                        Circle()
-                                            .fill(glassColorSystem.emotionalAccent().opacity(0.12))
-                                    )
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(themeManager.currentState.displayName)
-                                        .font(.system(size: 13, weight: .semibold))
-                                    Text("Confidence \(Int(themeManager.confidence * 100))% | Intensity \(Int(themeManager.intensity * 100))%")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
-                                }
-                                Spacer()
-                            }
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(glassColorSystem.emotionalAccent().opacity(0.12))
-                            )
-                        }
-
-                        Divider()
-                            .background(glassColorSystem.dividerColor())
-
-                        NavigationLink {
-                            ARTESettingsView()
-                                .navigationTitle("Aurora Theme Engine")
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("Open Full ARTE Controls")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                            .padding(.vertical, 8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                // AI Assistant Settings
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "brain.head.profile")
-                                .foregroundColor(.kosmicPurple)
-                            Text("AI Assistant")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    AIAssistantSection()
-                }
-                
-                // Rituals & Nudges
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "target")
-                                .foregroundColor(.kosmicBlue)
-                            Text("Rituals & Nudges")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        let settings = RitualSettings.shared
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Morning Ritual")
-                                .font(.subheadline.weight(.semibold))
-                            Text(formatTime(settings.morningTime))
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Evening Reflection")
-                                .font(.subheadline.weight(.semibold))
-                            Text(formatTime(settings.eveningTime))
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Weekly Review")
-                                .font(.subheadline.weight(.semibold))
-                            Text("\(weekdayName(settings.weeklyReviewDay)) \(formatTime(settings.weeklyReviewTime))")
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Smart Nudges")
-                                .font(.subheadline.weight(.semibold))
-                            Text(settings.nudgesEnabled ? "Enabled" : "Disabled")
-                                .font(.footnote)
-                                .foregroundColor(settings.nudgesEnabled ? .kosmicGreen : .secondary)
-                        }
-
-                        NavigationLink {
-                            RitualSettingsView()
-                                .navigationTitle("Rituals & Nudges")
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("Open Ritual Controls")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                            .padding(.vertical, 8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                // Accounts section
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "brain.head.profile.fill")
-                                .foregroundColor(.kosmicPurple)
-                            Text("Predictive Cognition")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Aurora predicts focus patterns and adapts proactively")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        NavigationLink {
-                            PredictiveCognitionSettingsView()
-                                .navigationTitle("Predictive Cognition")
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("Configure Predictions")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                            .padding(.vertical, 8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "hourglass.circle")
-                                .foregroundColor(.kosmicBlue)
-                            Text("Temporal Intelligence")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Adaptive scheduling, calendar sync, and guardrails for focus transitions")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Toggle(isOn: $contextGuardEnabled) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Context switch guard")
-                                    .font(.subheadline.weight(.semibold))
-                                Text(contextGuardEnabled ? "Aurora will pause and double-check before you switch tabs." : "Switch tabs instantly without prompts.")
-                                    .font(.footnote)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .toggleStyle(.switch)
-                        .onChange(of: contextGuardEnabled) { _, newValue in
-                            ContextGuardSettings.shared.isGuardEnabled = newValue
-                        }
-                        NavigationLink {
-                            TemporalIntelligenceSettingsView()
-                                .navigationTitle("Temporal Intelligence")
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text("Open Temporal Controls")
-                                    .font(.system(size: 13, weight: .semibold))
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                            }
-                            .padding(.vertical, 8)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                
-                // Accounts section
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "person.crop.circle")
-                                .foregroundColor(.kosmicBlue)
-                            Text("Connected Accounts")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Social media account connections are no longer available.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Notion Integration
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "externaldrive.badge.icloud")
-                                .foregroundColor(.kosmicPurple)
-                            Text("Notion Integration")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    NotionIntegrationSection()
-                }
-                
-                // Background posting
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "rectangle.stack.badge.play")
-                                .foregroundColor(.kosmicGreen)
-                            Text("Background Posting")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Background posting is no longer available. Social media posting has been removed.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                // Menu Bar App
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "menubar.rectangle")
-                                .foregroundColor(.kosmicBlue)
-                            Text("Menu Bar")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    MenuBarSection()
-                }
-                
-                // Appearance
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "paintbrush.fill")
-                                .foregroundColor(.kosmicPurple)
-                            Text("Appearance")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    AppearanceSection()
-                }
-                
-                // Permissions & Privacy
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "hand.raised.fill")
-                                .foregroundColor(.kosmicGreen)
-                            Text("Permissions & Privacy")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    PermissionsPrivacySection()
-                }
-                
-                // Notifications
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "bell.fill")
-                                .foregroundColor(.yellow)
-                            Text("Notifications")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    NotificationPreferencesSection()
-                }
-                
-                // Data Management
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "folder.fill")
-                                .foregroundColor(.orange)
-                            Text("Data Management")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    DataManagementSection()
-                }
-                
-                // About
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "info.circle.fill")
-                                .foregroundColor(.kosmicBlue)
-                            Text("About")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    AboutSection()
-                }
-                
-                // Flow Companion Settings
-                GlassCard(showHeader: true, headerContent: {
-                    AnyView(
-                        HStack {
-                            Image(systemName: "sparkles")
-                                .foregroundColor(.purple)
-                            Text("Flow Companion")
-                                .font(.headline)
-                        }
-                    )
-                }) {
-                    FlowCompanionSettingsSection()
-                }
-            }
-            .padding(28)
-        }
+        V2GlassContentScaffold(
+            accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+            showsSidebar: true,
+            sidebarWidth: 280,
+            header: { headerView },
+            content: { selectedContent },
+            sidebar: { settingsSidebar }
+        )
         .background(
             ZStack {
                 glassColorSystem.backgroundColor()
@@ -431,6 +42,455 @@ struct SettingsView: View {
 }
 
 private extension SettingsView {
+    var headerView: some View {
+        V2GlassHeaderBar(
+            title: "Settings",
+            subtitle: "Tune Cloutmate’s workspace to match your flow.",
+            trailingAccessory: {
+                Text(selectedEntry.title)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                        }
+                    )
+    }
+    
+    @ViewBuilder
+    var selectedContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            sectionIntro(for: selectedEntry)
+            
+            switch selectedEntry {
+            case .glassEffects:
+                V2GlassControlStack {
+                    GlassEffectsSection()
+                }
+            case .auroraTheme:
+                auroraThemeControls
+            case .aiAssistant:
+                V2GlassControlStack {
+                    AIAssistantSection()
+                }
+            case .rituals:
+                ritualsControls
+            case .contextGuard:
+                contextGuardControls
+            case .notion:
+                V2GlassControlStack {
+                    NotionIntegrationSection()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+    
+    @ViewBuilder
+    var settingsSidebar: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(settingsSidebarGroups) { group in
+                DisclosureGroup(
+                    isExpanded: binding(for: group),
+                    content: {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(group.entries) { entry in
+                                sidebarButton(for: entry)
+                            }
+                        }
+                        .padding(.top, 6)
+                    },
+                    label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: group.id.iconName)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(glassColorSystem.emotionalAccent())
+                            Text(group.id.title)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                )
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(glassColorSystem.backgroundSecondary().opacity(0.32))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .stroke(glassColorSystem.borderColor().opacity(0.65), lineWidth: 0.8)
+                        )
+                )
+                .animation(.easeInOut(duration: 0.22), value: collapsedGroupIDs)
+            }
+            
+            Spacer()
+        }
+    }
+    
+    func binding(for group: SettingsSidebarGroup) -> Binding<Bool> {
+        Binding(
+            get: { !collapsedGroupIDs.contains(group.id) },
+            set: { expanded in
+                if expanded {
+                    collapsedGroupIDs.remove(group.id)
+                } else {
+                    collapsedGroupIDs.insert(group.id)
+                }
+            }
+        )
+    }
+    
+    @ViewBuilder
+    func sidebarButton(for entry: SettingsEntry) -> some View {
+        let isSelected = selectedEntry == entry
+        Button {
+            selectedEntry = entry
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: entry.icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(isSelected ? glassColorSystem.textPrimary() : .secondary)
+                Text(entry.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(isSelected ? glassColorSystem.textPrimary() : .secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        isSelected
+                        ? glassColorSystem.glassTint(for: .primary).opacity(0.24)
+                        : Color.clear
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(
+                                isSelected
+                                ? glassColorSystem.glassTint(for: .primary).opacity(0.45)
+                                : glassColorSystem.borderColor().opacity(0.4),
+                                lineWidth: isSelected ? 1.2 : 0.8
+                            )
+                    )
+            )
+                        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.2), value: selectedEntry)
+    }
+    
+    func sectionIntro(for entry: SettingsEntry) -> some View {
+        HStack(alignment: .center, spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(glassColorSystem.emotionalAccent().opacity(0.16))
+                    .frame(width: 44, height: 44)
+                Image(systemName: entry.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(glassColorSystem.emotionalAccent())
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.title)
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                if let subtitle = entry.subtitle {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+    
+    var auroraThemeControls: some View {
+        V2GlassControlStack(spacing: 18) {
+                        HStack(alignment: .center) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Aurora Reactive Theme Engine")
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    Text(themeManager.isEnabled ? "ARTE actively adapts colors, motion, and lighting." : "Enable ARTE for adaptive moods, gradients, and motion.")
+                                    .font(.footnote)
+                                    .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer()
+                            Toggle("", isOn: $themeManager.isEnabled)
+                                .toggleStyle(.switch)
+                                .onChange(of: themeManager.isEnabled) { _, newValue in
+                                    handleArteToggleChange(newValue)
+                                }
+                        }
+
+                        if themeManager.isEnabled {
+                            HStack(spacing: 12) {
+                                Image(systemName: themeManager.currentState.iconName)
+                        .font(.system(size: 28))
+                                    .foregroundColor(glassColorSystem.emotionalAccent())
+                        .frame(width: 40, height: 40)
+                                    .background(
+                                        Circle()
+                                .fill(glassColorSystem.emotionalAccent().opacity(0.18))
+                                    )
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(themeManager.currentState.displayName)
+                            .font(.system(size: 14, weight: .semibold))
+                        Text("Confidence \(Int(themeManager.confidence * 100))% · Intensity \(Int(themeManager.intensity * 100))%")
+                            .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                            }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
+            GlassDivider()
+
+                        NavigationLink {
+                            ARTESettingsView()
+                                .navigationTitle("Aurora Theme Engine")
+                        } label: {
+                HStack(spacing: 6) {
+                    Text("Open full ARTE controls")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
+    var ritualsControls: some View {
+                        let settings = RitualSettings.shared
+        return V2GlassControlStack(spacing: 18) {
+            Text("Keep your rituals synchronized across morning, evening, and weekly cadences.")
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            
+            GlassDivider()
+
+            VStack(alignment: .leading, spacing: 12) {
+                ritualRow(title: "Morning Ritual", value: formatTime(settings.morningTime), systemImage: "sunrise")
+                GlassDivider()
+                ritualRow(title: "Evening Reflection", value: formatTime(settings.eveningTime), systemImage: "moon.stars")
+                GlassDivider()
+                ritualRow(title: "Weekly Review", value: "\(weekdayName(settings.weeklyReviewDay)) · \(formatTime(settings.weeklyReviewTime))", systemImage: "calendar.badge.clock")
+                GlassDivider()
+                ritualRow(title: "Smart Nudges", value: settings.nudgesEnabled ? "Enabled" : "Disabled", systemImage: "sparkles", highlight: settings.nudgesEnabled ? .kosmicGreen : .secondary)
+                        }
+            
+            GlassDivider()
+            
+            // Test Nudge Button
+            Button {
+                triggerTestNudge()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(glassColorSystem.emotionalAccent())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Test Nudge")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(glassColorSystem.textPrimary())
+                        Text("Preview how Aurora's nudges appear")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(glassColorSystem.emotionalAccent())
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(glassColorSystem.backgroundSecondary().opacity(0.4))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(glassColorSystem.emotionalAccent().opacity(0.3), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+
+            GlassDivider()
+
+                        NavigationLink {
+                            RitualSettingsView()
+                                .navigationTitle("Rituals & Nudges")
+                        } label: {
+                HStack(spacing: 6) {
+                    Text("Open ritual controls")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
+    var contextGuardControls: some View {
+        V2GlassControlStack(spacing: 16) {
+            Text("Pause before dramatic context switches and keep focused work uninterrupted.")
+                .font(.footnote)
+                            .foregroundColor(.secondary)
+                        
+            GlassDivider()
+            
+                        Toggle(isOn: $contextGuardEnabled) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Context switch guard")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(contextGuardEnabled ? "Aurora will confirm intent before leaving your current workspace." : "Switch tabs instantly without guardrails.")
+                        .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: contextGuardEnabled) { _, newValue in
+                            ContextGuardSettings.shared.isGuardEnabled = newValue
+                        }
+            
+            GlassDivider()
+            
+                        NavigationLink {
+                            TemporalIntelligenceSettingsView()
+                                .navigationTitle("Temporal Intelligence")
+                        } label: {
+                HStack(spacing: 6) {
+                    Text("Open temporal controls")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                            }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
+    func ritualRow(title: String, value: String, systemImage: String, highlight: Color? = nil) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(glassColorSystem.emotionalAccent())
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(value)
+                    .font(.caption)
+                    .foregroundColor(highlight ?? .secondary)
+                    }
+            Spacer()
+        }
+    }
+    
+    var settingsSidebarGroups: [SettingsSidebarGroup] {
+        [
+            SettingsSidebarGroup(id: .appearance, entries: [.glassEffects, .auroraTheme]),
+            SettingsSidebarGroup(id: .intelligence, entries: [.aiAssistant, .contextGuard]),
+            SettingsSidebarGroup(id: .rituals, entries: [.rituals]),
+            SettingsSidebarGroup(id: .integrations, entries: [.notion])
+        ]
+    }
+    
+    struct SettingsSidebarGroup: Identifiable {
+        let id: SettingsGroup
+        let entries: [SettingsEntry]
+    }
+    
+    enum SettingsGroup: String, CaseIterable, Identifiable {
+        case appearance
+        case intelligence
+        case rituals
+        case integrations
+        
+        var id: SettingsGroup { self }
+        
+        var title: String {
+            switch self {
+            case .appearance: return "Appearance"
+            case .intelligence: return "Intelligence"
+            case .rituals: return "Rhythms"
+            case .integrations: return "Integrations"
+            }
+        }
+        
+        var iconName: String {
+            switch self {
+            case .appearance: return "paintbrush.pointed"
+            case .intelligence: return "brain.head.profile"
+            case .rituals: return "target"
+            case .integrations: return "link"
+            }
+        }
+    }
+    
+    enum SettingsEntry: String, CaseIterable, Identifiable {
+        case glassEffects
+        case auroraTheme
+        case aiAssistant
+        case rituals
+        case contextGuard
+        case notion
+        
+        var id: String { rawValue }
+        
+        var title: String {
+            switch self {
+            case .glassEffects: return "Glass Effects"
+            case .auroraTheme: return "Aurora Theme Engine"
+            case .aiAssistant: return "AI Assistant"
+            case .rituals: return "Rituals & Nudges"
+            case .contextGuard: return "Context Guard"
+            case .notion: return "Notion Integration"
+            }
+        }
+        
+        var subtitle: String? {
+            switch self {
+            case .glassEffects:
+                return "Adjust blur, tint, and motion for the glassmorphic shell."
+            case .auroraTheme:
+                return "Let Aurora adapt colors and motion depending on how you feel."
+            case .aiAssistant:
+                return "Set how Aurora supports your creative and operational work."
+            case .rituals:
+                return "Review and tweak your daily and weekly rituals."
+            case .contextGuard:
+                return "Decide when Aurora should intercept tab switching."
+            case .notion:
+                return "Connect your Notion workspace for knowledge syncing."
+            }
+        }
+        
+        var icon: String {
+            switch self {
+            case .glassEffects: return "sparkles"
+            case .auroraTheme: return "circle.dashed.inset.filled"
+            case .aiAssistant: return "brain.head.profile"
+            case .rituals: return "target"
+            case .contextGuard: return "hourglass.circle"
+            case .notion: return "externaldrive.badge.icloud"
+                }
+            }
+        
+        var group: SettingsGroup {
+            switch self {
+            case .glassEffects, .auroraTheme: return .appearance
+            case .aiAssistant, .contextGuard: return .intelligence
+            case .rituals: return .rituals
+            case .notion: return .integrations
+            }
+        }
+    }
+    
     func formatTime(_ components: DateComponents) -> String {
         var dateComponents = Calendar.current.dateComponents([.year, .month, .day], from: Date())
         dateComponents.hour = components.hour
@@ -453,6 +513,13 @@ private extension SettingsView {
         } else {
             themeManager.stop()
         }
+    }
+    
+    func triggerTestNudge() {
+        // Trigger actual nudge evaluation to show a real nudge
+        // This will check all nudge conditions and deliver an actual nudge if available
+        // SmartNudgeService is already @MainActor, so we can call it directly
+        SmartNudgeService.shared.forceEvaluateTriggers(modelContext: modelContext)
     }
 }
 

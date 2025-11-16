@@ -24,14 +24,14 @@ struct RitualsSummaryView: View {
     }
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 16) {
+        DashboardTile(accent: .kosmicPurple, padding: 24) {
+            VStack(alignment: .leading, spacing: 18) {
                 HStack {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 18))
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundColor(.kosmicPurple)
                     Text("Rituals & Streaks")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                     
                     Spacer()
@@ -39,16 +39,15 @@ struct RitualsSummaryView: View {
                     Button {
                         showRitualsView = true
                     } label: {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.system(size: 18))
+                        Image(systemName: "arrow.forward.circle.fill")
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.kosmicPurple)
                     }
                     .buttonStyle(.plain)
                 }
                 
                 if let summary = metricsSummary {
-                    // Morning & Evening completion bars
-                    VStack(spacing: 12) {
+                    VStack(spacing: 16) {
                         RitualCompletionBar(
                             title: "Morning",
                             streak: summary.morningStreak,
@@ -66,9 +65,8 @@ struct RitualsSummaryView: View {
                         )
                     }
                     
-                    // Next Nudge forecast
                     if let nextRitual = upcomingRituals.first {
-                        HStack {
+                        HStack(spacing: 8) {
                             Image(systemName: "bell.fill")
                                 .font(.caption)
                                 .foregroundColor(.kosmicPurple)
@@ -83,22 +81,7 @@ struct RitualsSummaryView: View {
                         .foregroundColor(glassColorSystem.textSecondary())
                 }
             }
-            .padding(16)
         }
-        .overlay(
-            // ARTE adaptive icon animation
-            Group {
-                if hasActiveStreak && !reduceMotion {
-                    Circle()
-                        .stroke(reactiveThemeManager.currentState == .energized ? .kosmicGreen : .kosmicBlue, lineWidth: 2)
-                        .frame(width: 24, height: 24)
-                        .opacity(0.3 + pulsePhase * 0.3)
-                        .scaleEffect(1.0 + pulsePhase * 0.1)
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(16)
-        )
         .task {
             await loadData()
         }

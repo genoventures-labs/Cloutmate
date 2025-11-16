@@ -44,8 +44,8 @@ public final class CalendarEvent {
     public var startDate: Date
     public var endDate: Date
     public var allDay: Bool
-    @Attribute(.transformable)
-    public var recurrence: EventRecurrence?
+    @Attribute(.externalStorage)
+    private var recurrenceData: Data?
     public var remindMinutesBefore: Int?
     public var colorHex: String?
     
@@ -75,7 +75,11 @@ public final class CalendarEvent {
         self.startDate = startDate
         self.endDate = endDate
         self.allDay = allDay
-        self.recurrence = recurrence
+        if let recurrence {
+            recurrenceData = try? JSONEncoder().encode(recurrence)
+        } else {
+            recurrenceData = nil
+        }
         self.remindMinutesBefore = remindMinutesBefore
         self.colorHex = colorHex
         self.createdAt = Date()
@@ -87,6 +91,18 @@ public final class CalendarEvent {
     
     public func touch() {
         updatedAt = Date()
+    }
+    
+    public var recurrence: EventRecurrence? {
+        get {
+            guard let recurrenceData else { return nil }
+            return try? JSONDecoder().decode(EventRecurrence.self, from: recurrenceData)
+        }
+        set {
+            recurrenceData = newValue.flatMap { recurrence in
+                try? JSONEncoder().encode(recurrence)
+            }
+        }
     }
 }
 

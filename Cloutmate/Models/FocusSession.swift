@@ -43,6 +43,16 @@ final class FocusSession {
     var calendarEventId: String?
     var wasRescheduled: Bool
     
+    // V2: Luminance Field tracking
+    var lfHistory: [Double] = []        // Array of LF values sampled during session
+    var averageLF: Double?               // Calculated average LF
+    var focusGravityTrend: [Double]?    // Focus consistency over time
+    var stabilityIndex: Double?         // Session stability score
+    var emotionalVariance: Double?      // LF variance (volatility measure)
+    var isPaused: Bool = false           // Pause state
+    var pausedDuration: TimeInterval = 0 // Total paused time
+    var pauseStartTime: Date?            // When pause started
+    
     init(
         objective: String,
         plannedDuration: TimeInterval = 1800,  // Default 30 minutes
@@ -66,6 +76,14 @@ final class FocusSession {
         self.scheduledTime = nil
         self.calendarEventId = nil
         self.wasRescheduled = false
+        self.lfHistory = []
+        self.averageLF = nil
+        self.focusGravityTrend = nil
+        self.stabilityIndex = nil
+        self.emotionalVariance = nil
+        self.isPaused = false
+        self.pausedDuration = 0
+        self.pauseStartTime = nil
     }
     
     var status: FocusSessionStatus {
@@ -73,13 +91,24 @@ final class FocusSession {
         set { statusRaw = newValue.rawValue }
     }
     
-    /// Calculate elapsed time for active session
+    /// Calculate elapsed time for active session (excluding paused time)
     var elapsedTime: TimeInterval {
+        let baseTime: TimeInterval
         if let end = endTime {
-            return end.timeIntervalSince(startTime)
+            baseTime = end.timeIntervalSince(startTime)
         } else {
-            return Date().timeIntervalSince(startTime)
+            baseTime = Date().timeIntervalSince(startTime)
         }
+        
+        // Subtract paused duration
+        let currentPauseTime: TimeInterval
+        if isPaused, let pauseStart = pauseStartTime {
+            currentPauseTime = Date().timeIntervalSince(pauseStart)
+        } else {
+            currentPauseTime = 0
+        }
+        
+        return baseTime - pausedDuration - currentPauseTime
     }
     
     /// Remaining time (if active)
@@ -112,6 +141,19 @@ final class FocusSession {
         let outcomeStr = completed ? "✓ Completed" : "Partial progress"
         let itemsStr = itemsCompleted.isEmpty ? "" : " (\(itemsCompleted.count) items finished)"
         return "\(outcomeStr) • \(durationStr)\(itemsStr)"
+    }
+    
+    /// Effective duration (actual duration minus paused time)
+    var effectiveDuration: TimeInterval {
+        return actualDuration - pausedDuration
+    }
+    
+    /// Percentage of session with stable focus (based on LF variance)
+    var focusStabilityPercentage: Double {
+        guard let trend = focusGravityTrend, !trend.isEmpty else { return 0.0 }
+        // Calculate percentage of time with focus gravity above 0.5
+        let stableCount = trend.filter { $0 >= 0.5 }.count
+        return Double(stableCount) / Double(trend.count)
     }
 }
 

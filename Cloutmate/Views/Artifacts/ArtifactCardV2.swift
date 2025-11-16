@@ -12,7 +12,11 @@ import CloutmateShared
 struct ArtifactCardV2: View {
     let artifact: Artifact
     
-    let onTap: () -> Void
+    let onOpen: () -> Void
+    let onEdit: () -> Void
+    let onDuplicate: () -> Void
+    let onArchive: () -> Void
+    let onDelete: () -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -183,13 +187,31 @@ struct ArtifactCardV2: View {
             isHovered = hovering
         }
         .onTapGesture {
-            onTap()
+            onOpen()
         }
         .task {
             loadARTETone()
         }
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Double tap to open artifact details")
+        .contextMenu {
+            Button("Open") {
+                onOpen()
+            }
+            Button("Edit") {
+                onEdit()
+            }
+            Button("Duplicate", systemImage: "doc.on.doc") {
+                onDuplicate()
+            }
+            Button("Archive", systemImage: "archivebox") {
+                onArchive()
+            }
+            Divider()
+            Button("Delete", role: .destructive) {
+                onDelete()
+            }
+        }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
     
@@ -237,7 +259,14 @@ struct EntityBadge: View {
         state: .draft
     )
     
-    return ArtifactCardV2(artifact: artifact, onTap: {})
+    return ArtifactCardV2(
+        artifact: artifact,
+        onOpen: {},
+        onEdit: {},
+        onDuplicate: {},
+        onArchive: {},
+        onDelete: {}
+    )
         .padding()
         .background(Color(.windowBackgroundColor))
         .environmentObject(GlassColorSystem())

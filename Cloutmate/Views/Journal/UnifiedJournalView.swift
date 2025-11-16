@@ -18,11 +18,14 @@ enum JournalGroupingMode: String, CaseIterable {
 
 struct UnifiedJournalView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query(sort: \Journal.entryDate, order: .reverse) private var allJournals: [Journal]
     
     @State private var searchText: String = ""
     @State private var selectedFilter: JournalFilter = .all
+    @State private var selectedViewMode: JournalViewMode = .list
     @State private var groupingMode: JournalGroupingMode = .byDate
     @State private var activeJournal: Journal?
     @State private var isDrawerVisible = false
@@ -30,12 +33,10 @@ struct UnifiedJournalView: View {
     @State private var activeTemplate: JournalTemplate?
     @State private var pendingJournalDraft: JournalDraft?
     @State private var expandedGroups: Set<String> = []
-    @State private var showTimeline = false
     @State private var focusedJournalIndex: Int?
     @State private var isSelectionMode = false
     @State private var selectedJournalIDs: Set<UUID> = []
     
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var isSearchFocused: Bool
     
     private var filteredJournals: [Journal] {
@@ -126,16 +127,28 @@ struct UnifiedJournalView: View {
         isSelectionMode || !selectedJournalIDs.isEmpty
     }
     
+    private var headerSubtitle: String {
+        let count = filteredJournals.count
+        if count == 0 {
+            return "No entries"
+        } else if count == 1 {
+            return "1 entry"
+        } else {
+            return "\(count) entries"
+        }
+    }
+    
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.windowBackgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                headerView
-                contentView
-            }
+        ZStack {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+                showsSidebar: false,
+                header: { headerBar },
+                content: { journalContent },
+                sidebar: { EmptyView() }
+            )
             .opacity(isDrawerVisible ? 0 : 1)
+            
             
             if isDrawerVisible {
                 if isCreatingJournal, let draft = pendingJournalDraft {
@@ -221,102 +234,284 @@ struct UnifiedJournalView: View {
         }
     }
     
-    private var headerView: some View {
-        JournalHeaderView(
-            searchText: $searchText,
-            selectedFilter: $selectedFilter,
-            isSelectionMode: $isSelectionMode,
-            selectionCount: visibleSelectedJournalCount,
-            onCreate: { startCreatingJournal() },
-            onToggleSelection: toggleSelectionMode
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Journal",
+            subtitle: headerSubtitle,
+            trailingAccessory: {
+                HStack(spacing: 12) {
+                    viewModeSelector
+                    selectionToggleButton
+                    quickAddButton
+                }
+            }
         )
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 12)
+    }
+    
+    private var viewModeSelector: some View {
+        HStack(spacing: 8) {
+            ForEach(JournalViewMode.allCases, id: \.self) { mode in
+                modeButton(for: mode)
+            }
+        }
+    }
+    
+    private func modeButton(for mode: JournalViewMode) -> some View {
+        let isSelected = selectedViewMode == mode
+        let backgroundFill: some ShapeStyle = isSelected ? 
+            AnyShapeStyle(AuroraPalette.linearGradient(for: colorScheme).opacity(0.85)) :
+            AnyShapeStyle(glassColorSystem.backgroundElevated().opacity(0.4))
+        let strokeColor: Color = isSelected ? 
+            Color.white.opacity(0.3) : 
+            glassColorSystem.borderColor().opacity(0.3)
+        let strokeWidth: CGFloat = isSelected ? 1.2 : 0.8
+        
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedViewMode = mode
+            }
+        } label: {
+            Image(systemName: mode.icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : glassColorSystem.textSecondary())
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(backgroundFill)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(strokeColor, lineWidth: strokeWidth)
+                )
+        }
+        .buttonStyle(.plain)
+        .help(mode.displayName)
+    }
+    
+    private var selectionToggleButton: some View {
+        GlassButton(
+            nil,
+            icon: isSelectionActive ? "checkmark.circle.fill" : "checkmark.circle",
+            style: .iconOnly,
+            role: .surface
+        ) {
+            toggleSelectionMode()
+        }
+        .accessibilityLabel(isSelectionActive ? "Exit selection mode" : "Enter selection mode")
+    }
+    
+    private var quickAddButton: some View {
+        GlassButton(
+            "New Entry",
+            icon: "plus",
+            style: .pill,
+            role: .primary
+        ) {
+            startCreatingJournal()
+        }
     }
     
     @ViewBuilder
-    private var contentView: some View {
+    private var journalContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            filterPanel
+            activeModeView
+        }
+        .animation(.easeInOut(duration: 0.24), value: selectedViewMode)
+    }
+    
+    private var filterPanel: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 18) {
+                searchField
+                filterChipRow
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 22)
+        }
+    }
+    
+    private var searchField: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(glassColorSystem.textSecondary().opacity(0.75))
+            
+            TextField("Search reflections or emotions…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(.body, design: .rounded))
+                .foregroundColor(glassColorSystem.textPrimary())
+                .disableAutocorrection(true)
+                .focused($isSearchFocused)
+            
+            if !searchText.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(glassColorSystem.backgroundElevated().opacity(0.28))
+        )
+    }
+    
+    private var filterChipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(JournalFilter.allCases, id: \.self) { filter in
+                    filterChip(for: filter)
+                }
+            }
+        }
+    }
+    
+    private func filterChip(for filter: JournalFilter) -> some View {
+        let isActive = selectedFilter == filter
+        
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedFilter = filter
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: filterIcon(for: filter))
+                    .font(.system(size: 13, weight: .semibold))
+                Text(filter.rawValue)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(filterAccentColor(for: filter).opacity(isActive ? 0.26 : 0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(filterAccentColor(for: filter).opacity(isActive ? 0.55 : 0.24), lineWidth: isActive ? 1.4 : 1)
+            )
+            .foregroundStyle(isActive ? Color.white : glassColorSystem.textSecondary())
+            .shadow(color: filterAccentColor(for: filter).opacity(isActive ? 0.20 : 0.0), radius: isActive ? 12 : 0, y: isActive ? 6 : 0)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(filter.rawValue) filter")
+    }
+    
+    private func filterIcon(for filter: JournalFilter) -> String {
+        switch filter {
+        case .all: return "list.bullet"
+        case .morning: return "sunrise.fill"
+        case .evening: return "moon.fill"
+        case .moodEntries: return "face.smiling"
+        case .aiReflections: return "sparkles"
+        }
+    }
+    
+    private func filterAccentColor(for filter: JournalFilter) -> Color {
+        switch filter {
+        case .all: return .kosmicBlue
+        case .morning: return .orange
+        case .evening: return .kosmicPurple
+        case .moodEntries: return .kosmicGreen
+        case .aiReflections: return .pink
+        }
+    }
+    
+    @ViewBuilder
+    private var activeModeView: some View {
         if sortedJournals.isEmpty {
             emptyState
         } else {
-            ScrollView {
-                ScrollViewReader { proxy in
-                    LazyVStack(spacing: 24) {
-                        // Timeline toggle
-                        if !sortedJournals.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Button(action: {
-                                    if !isSelectionActive {
-                                        showTimeline.toggle()
-                                    }
-                                }) {
-                                    HStack {
-                                        Text("Emotional Timeline")
-                                            .font(.system(.headline, design: .rounded))
-                                            .fontWeight(.semibold)
-                                        
-                                        Spacer()
-                                        
-                                        Image(systemName: showTimeline ? "chevron.down" : "chevron.right")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                
-                                if showTimeline {
-                                    JournalTimelineView(
-                                        journals: sortedJournals,
-                                        onEntryTap: { journal in
-                                            openDrawer(for: journal)
-                                        }
-                                    )
-                                    .transition(.opacity.combined(with: .move(edge: .top)))
+            switch selectedViewMode {
+            case .list:
+                listView
+            case .timeline:
+                timelineView
+            case .gallery:
+                galleryView
+            }
+        }
+    }
+    
+    private var listView: some View {
+        ScrollView {
+            LazyVStack(spacing: 24) {
+                ForEach(groupedJournals, id: \.key) { group in
+                    JournalGroupSection(
+                        title: group.key,
+                        journals: group.journals,
+                        isCollapsed: !expandedGroups.contains(group.key),
+                        onToggleCollapse: {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                if expandedGroups.contains(group.key) {
+                                    expandedGroups.remove(group.key)
+                                } else {
+                                    expandedGroups.insert(group.key)
                                 }
                             }
-                            .padding(.horizontal, 20)
+                        },
+                        onJournalTap: { journal in
+                            openDrawer(for: journal)
+                        },
+                        onJournalEdit: { journal in
+                            openDrawer(for: journal)
+                        },
+                        onJournalDuplicate: { journal in
+                            duplicateJournal(journal)
+                        },
+                        onJournalExport: { journal in
+                            exportJournal(journal)
+                        },
+                        onJournalDelete: { journal in
+                            deleteJournal(journal)
+                        },
+                        selectionMode: isSelectionActive,
+                        selectedJournalIDs: selectedJournalIDs,
+                        onSelectionToggle: { journal in
+                            toggleJournalSelection(journal)
                         }
-                        
-                        // Grouped journals
-                        ForEach(groupedJournals, id: \.key) { group in
-                            JournalGroupSection(
-                                title: group.key,
-                                journals: group.journals,
-                                isCollapsed: !expandedGroups.contains(group.key),
-                                onToggleCollapse: {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                        if expandedGroups.contains(group.key) {
-                                            expandedGroups.remove(group.key)
-                                        } else {
-                                            expandedGroups.insert(group.key)
-                                        }
-                                    }
-                                },
-                                onJournalTap: { journal in
-                                    openDrawer(for: journal)
-                                },
-                                onJournalEdit: { journal in
-                                    openDrawer(for: journal)
-                                },
-                                onJournalDuplicate: { journal in
-                                    duplicateJournal(journal)
-                                },
-                                onJournalExport: { journal in
-                                    exportJournal(journal)
-                                },
-                                onJournalDelete: { journal in
-                                    deleteJournal(journal)
-                                },
-                                selectionMode: isSelectionActive,
-                                selectedJournalIDs: selectedJournalIDs,
-                                onSelectionToggle: { journal in
-                                    toggleJournalSelection(journal)
-                                }
-                            )
-                        }
-                    }
-                    .padding(.vertical, 20)
+                    )
+                }
+            }
+        }
+    }
+    
+    private var timelineView: some View {
+        JournalTimelineView(
+            journals: sortedJournals,
+            onEntryTap: { journal in
+                openDrawer(for: journal)
+            }
+        )
+    }
+    
+    private var galleryView: some View {
+        ScrollView {
+            LazyVGrid(columns: [
+                GridItem(.adaptive(minimum: 320), spacing: 20)
+            ], spacing: 20) {
+                ForEach(sortedJournals) { journal in
+                    JournalCardV2(
+                        journal: journal,
+                        selectionMode: isSelectionActive,
+                        isSelected: selectedJournalIDs.contains(journal.id),
+                        onSelectionToggle: { toggleJournalSelection(journal) },
+                        onTap: { openDrawer(for: journal) },
+                        onEdit: { openDrawer(for: journal) },
+                        onDuplicate: { duplicateJournal(journal) },
+                        onExport: { exportJournal(journal) },
+                        onDelete: { deleteJournal(journal) }
+                    )
                 }
             }
         }
@@ -368,7 +563,6 @@ struct UnifiedJournalView: View {
             clearSelection()
         } else if !filteredJournals.isEmpty {
             isSelectionMode = true
-            showTimeline = false
             if isDrawerVisible {
                 withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                     isDrawerVisible = false
@@ -390,7 +584,6 @@ struct UnifiedJournalView: View {
         } else {
             if !isSelectionMode {
                 isSelectionMode = true
-                showTimeline = false
             }
             selectedJournalIDs.insert(journal.id)
         }
@@ -600,7 +793,6 @@ struct UnifiedJournalView: View {
             selectedJournalIDs = allVisibleIDs
             if !isSelectionMode {
                 isSelectionMode = true
-                showTimeline = false
                 if isDrawerVisible {
                     withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
                         isDrawerVisible = false

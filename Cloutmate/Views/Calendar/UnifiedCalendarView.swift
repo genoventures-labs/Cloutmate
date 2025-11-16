@@ -9,10 +9,46 @@ import SwiftUI
 import SwiftData
 import CloutmateShared
 
+fileprivate enum CalendarEntityFilter: String, CaseIterable, Identifiable {
+    case reminders
+    case artifacts
+    case tasks
+    case events
+    
+    var id: String { rawValue }
+    
+    var label: String {
+        switch self {
+        case .reminders: return "Reminders"
+        case .artifacts: return "Artifacts"
+        case .tasks: return "Tasks"
+        case .events: return "Events"
+        }
+    }
+    
+    var systemImage: String {
+        switch self {
+        case .reminders: return "bell.fill"
+        case .artifacts: return "wand.and.stars"
+        case .tasks: return "checkmark.circle"
+        case .events: return "calendar"
+        }
+    }
+    
+    var accentColor: Color {
+        switch self {
+        case .reminders: return .kosmicBlue
+        case .artifacts: return .kosmicPurple
+        case .tasks: return .kosmicGreen
+        case .events: return .cyan
+        }
+    }
+}
+
 struct UnifiedCalendarView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @StateObject private var glassColorSystem = GlassColorSystem()
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query(sort: \CloutmateShared.Post.scheduledDate) private var posts: [CloutmateShared.Post]
     @Query(sort: \CloutmateShared.Artifact.publishedAt) private var artifacts: [CloutmateShared.Artifact]
     @Query(sort: \CloutmateShared.Task.dueDate) private var tasks: [CloutmateShared.Task]
@@ -35,129 +71,37 @@ struct UnifiedCalendarView: View {
     @State private var showingComposer = false
     @State private var isCreatingEvent = false
     @State private var pendingEventDraft: CalendarEventDraft?
+    @State private var searchText: String = ""
+    @State private var activeEntityFilters: Set<CalendarEntityFilter> = Set(CalendarEntityFilter.allCases)
+    @State private var spotlightTodayOnly = false
+    @State private var highlightFocusWindows = true
     
     private let calendar = Calendar.current
     
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.windowBackgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                calendarHeader
-                calendarContent
-            }
+        ZStack(alignment: .topTrailing) {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: .dark),
+                showsSidebar: true,
+                sidebarWidth: 340,
+                header: {
+                    headerBar
+                },
+                content: {
+                    filterControlPanel
+                    calendarSurface
+                },
+                sidebar: {
+                    sidebarContent
+                }
+            )
             .opacity(hasActiveDrawer ? 0 : 1)
+            .allowsHitTesting(!hasActiveDrawer)
+            .animation(.easeInOut(duration: 0.24), value: hasActiveDrawer)
             
-            if let post = activePost, postDrawerVisible {
-                PostDetailDrawer(
-                    post: post,
-                    isPresented: Binding(
-                        get: { postDrawerVisible },
-                        set: { newValue in
-                            withAnimation(calendarAnimation) {
-                                postDrawerVisible = newValue
-                            }
-                        }
-                    ),
-                    onEdit: { editedPost in
-                        launchComposer(with: CalendarComposerRequest(existingPost: editedPost, prefilledDate: editedPost.scheduledDate))
-                    }
-                )
-                .transition(.move(edge: .trailing))
-            }
-            
-            if let artifact = activeArtifact, artifactDrawerVisible {
-                CalendarArtifactDetailDrawer(
-                    artifact: artifact,
-                    isPresented: Binding(
-                        get: { artifactDrawerVisible },
-                        set: { newValue in
-                            withAnimation(calendarAnimation) {
-                                artifactDrawerVisible = newValue
-                            }
-                        }
-                    )
-                )
-                .transition(.move(edge: .trailing))
-            }
-            
-            if let task = activeTask, taskDrawerVisible {
-                TaskDetailDrawer(
-                    mode: .edit,
-                    existingTask: task,
-                    initialDraft: TaskDraft(task: task),
-                    isPresented: Binding(
-                        get: { taskDrawerVisible },
-                        set: { newValue in
-                            withAnimation(calendarAnimation) {
-                                taskDrawerVisible = newValue
-                                if !newValue {
-                                    activeTask = nil
-                                }
-                            }
-                        }
-                    ),
-                    onCommit: { draft in
-                        update(task, with: draft)
-                        try? modelContext.save()
-                        withAnimation(calendarAnimation) {
-                            taskDrawerVisible = false
-                            activeTask = nil
-                        }
-                    },
-                    onCancel: {
-                        withAnimation(calendarAnimation) {
-                            taskDrawerVisible = false
-                            activeTask = nil
-                        }
-                    }
-                )
-                .environmentObject(glassColorSystem)
-                .transition(.move(edge: .trailing))
-            }
-            
-            if eventDrawerVisible, let draft = pendingEventDraft {
-                CalendarEventDrawer(
-                    mode: isCreatingEvent ? .create : .edit,
-                    existingEvent: activeEvent,
-                    initialDraft: draft,
-                    isPresented: Binding(
-                        get: { eventDrawerVisible },
-                        set: { newValue in
-                            withAnimation(calendarAnimation) {
-                                eventDrawerVisible = newValue
-                                if !newValue {
-                                    resetEventDrawerState()
-                                }
-                            }
-                        }
-                    ),
-                    onCommit: { commitEvent(from: $0) },
-                    onDelete: isCreatingEvent ? nil : deleteActiveEvent,
-                    onCancel: cancelEventEditing,
-                    onAskAurora: { askAuroraForEventSuggestions(using: draft) }
-                )
-                .environmentObject(glassColorSystem)
-                .transition(.move(edge: .trailing))
-            }
-            
-            if dayDrawerVisible {
-                CalendarDayDetailDrawer(
-                    date: selectedDay,
-                    items: dayItems,
-                    isPresented: Binding(
-                        get: { dayDrawerVisible },
-                        set: { newValue in
-                            withAnimation(calendarAnimation) {
-                                dayDrawerVisible = newValue
-                            }
-                        }
-                    ),
-                    onSelect: handleDayItemSelection
-                )
-                .transition(.move(edge: .trailing))
-            }
+            drawerOverlays
+                .padding(.trailing, 12)
+                .padding(.top, 12)
             
             if showingComposer {
                 ComposerDetailDrawer(
@@ -198,8 +142,6 @@ struct UnifiedCalendarView: View {
             )
             openEventDrawer(for: occurrence)
         }
-        .navigationTitle("Calendar")
-        .environmentObject(glassColorSystem)
     }
     
     private var hasActiveDrawer: Bool {
@@ -208,6 +150,784 @@ struct UnifiedCalendarView: View {
     
     private var calendarAnimation: Animation {
         reduceMotion ? .default : GlassMotion.Easing.modalOpen
+    }
+    
+    private var normalizedSearchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Calendar",
+            subtitle: headerSubtitle,
+            leadingAccessory: {
+                CalendarViewToggle(isWeeklyView: $isWeeklyView)
+                    .frame(width: 220)
+            },
+            trailingAccessory: {
+                headerActions
+            }
+        )
+    }
+    
+    private var headerSubtitle: String {
+        if isWeeklyView {
+            return weekDescription(for: selectedDate)
+        } else {
+            return monthDescription(for: selectedDate)
+        }
+    }
+    
+    private func weekDescription(for date: Date) -> String {
+        guard let interval = calendar.dateInterval(of: .weekOfYear, for: date) else {
+            return date.formatted(date: .abbreviated, time: .omitted)
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        let startText = formatter.string(from: interval.start)
+        
+        let endDate = calendar.date(byAdding: .day, value: 6, to: interval.start) ?? interval.end
+        formatter.dateFormat = calendar.component(.year, from: interval.start) == calendar.component(.year, from: endDate) ? "MMM d, yyyy" : "MMM d, yyyy"
+        let endText = formatter.string(from: endDate)
+        
+        return "\(startText) – \(endText)"
+    }
+    
+    private func monthDescription(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: date)
+    }
+    
+    private var headerActions: some View {
+        HStack(spacing: 12) {
+            GlassButton("New Event", icon: "calendar.badge.plus", style: .pill, role: .accent) {
+                startCreatingEvent(at: selectedDate)
+            }
+            
+            GlassButton(icon: "sparkles", style: .iconOnly, role: .surface, tintColor: glassColorSystem.backgroundElevated()) {
+                launchComposer(with: CalendarComposerRequest(prefilledDate: selectedDate))
+            }
+            .help("Open Aurora Composer")
+        }
+    }
+    
+    private var filterControlPanel: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 18) {
+                searchField
+                filterChipRow
+                filterToggleRow
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 22)
+        }
+    }
+    
+    private var searchField: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(glassColorSystem.textSecondary().opacity(0.75))
+            
+            TextField("Search posts, events, tasks, rituals…", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.system(.body, design: .rounded))
+                .foregroundColor(glassColorSystem.textPrimary())
+                .disableAutocorrection(true)
+            
+            if !normalizedSearchQuery.isEmpty {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        searchText = ""
+                    }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(glassColorSystem.backgroundElevated().opacity(0.28))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(glassColorSystem.borderColor().opacity(0.45), lineWidth: 0.9)
+                )
+        )
+    }
+    
+    private var filterChipRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(CalendarEntityFilter.allCases) { filter in
+                    filterChip(for: filter)
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+    
+    private func filterChip(for filter: CalendarEntityFilter) -> some View {
+        let isActive = activeEntityFilters.contains(filter)
+        
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                if isActive && activeEntityFilters.count == 1 {
+                    activeEntityFilters = Set(CalendarEntityFilter.allCases)
+                } else if isActive {
+                    activeEntityFilters.remove(filter)
+                } else {
+                    activeEntityFilters.insert(filter)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: filter.systemImage)
+                    .font(.system(size: 13, weight: .semibold))
+                Text(filter.label)
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(filter.accentColor.opacity(isActive ? 0.26 : 0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(filter.accentColor.opacity(isActive ? 0.55 : 0.24), lineWidth: isActive ? 1.4 : 1)
+            )
+            .foregroundStyle(isActive ? Color.white : glassColorSystem.textSecondary())
+            .shadow(color: filter.accentColor.opacity(isActive ? 0.20 : 0.0), radius: isActive ? 12 : 0, y: isActive ? 6 : 0)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(filter.label) filter")
+        .accessibilityHint(isActive ? "Tap to remove filter" : "Tap to include \(filter.label.lowercased())")
+    }
+    
+    private var filterToggleRow: some View {
+        HStack(spacing: 18) {
+            Toggle(isOn: $spotlightTodayOnly.animation(.easeInOut(duration: 0.2))) {
+                Label("Spotlight today", systemImage: "sun.max")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            }
+            .toggleStyle(.switch)
+            
+            Toggle(isOn: $highlightFocusWindows.animation(.easeInOut(duration: 0.2))) {
+                Label("Highlight focus windows", systemImage: "bolt.fill")
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+            }
+            .toggleStyle(.switch)
+            
+            Spacer()
+        }
+        .tint(.kosmicBlue)
+    }
+    
+    private var calendarSurface: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 30) {
+            VStack(alignment: .leading, spacing: 24) {
+                calendarSurfaceHeader
+                GlassDivider()
+                calendarMainView
+            }
+            .padding(26)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+    
+    private var calendarSurfaceHeader: some View {
+        HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(selectedDate.formatted(date: .long, time: .omitted))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                
+                Text("\(selectedDayItems.count) item\(selectedDayItems.count == 1 ? "" : "s") scheduled")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+            }
+            
+            Spacer()
+            
+            GlassButton("Today", icon: "scope", style: .pill, role: .surface, tintColor: glassColorSystem.backgroundElevated()) {
+                withAnimation(GlassMotion.Easing.spring) {
+                    selectedDate = Date()
+                }
+            }
+            .help("Jump to today")
+        }
+    }
+    
+    @ViewBuilder
+    private var calendarMainView: some View {
+        if isWeeklyView {
+            UnifiedWeeklyCalendarView(
+                posts: posts,
+                artifacts: artifacts,
+                tasks: tasks,
+                events: events,
+                activeFilters: activeEntityFilters,
+                searchQuery: normalizedSearchQuery,
+                selectedDate: $selectedDate,
+                onSelectDay: selectDay,
+                onOpenDayDrawer: openDayDrawer,
+                onOpenPost: openPostDrawer,
+                onOpenArtifact: openArtifactDrawer,
+                onOpenTask: openTaskDrawer,
+                onOpenEvent: openEventDrawer,
+                onCompose: launchComposer
+            )
+        } else {
+            UnifiedMonthlyCalendarView(
+                posts: posts,
+                artifacts: artifacts,
+                tasks: tasks,
+                events: events,
+                activeFilters: activeEntityFilters,
+                searchQuery: normalizedSearchQuery,
+                selectedDate: $selectedDate,
+                onSelectDay: selectDay,
+                onOpenDayDrawer: openDayDrawer,
+                onOpenPost: openPostDrawer,
+                onOpenArtifact: openArtifactDrawer,
+                onOpenTask: openTaskDrawer,
+                onOpenEvent: openEventDrawer,
+                onCompose: launchComposer
+            )
+        }
+    }
+    
+    private var scheduleHighlights: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 20) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(spotlightTodayOnly ? "Today’s Highlights" : "Day Highlights")
+                            .font(.system(size: 17, weight: .semibold, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                        Text(highlightSourceDate.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                    
+                    Spacer()
+                    
+                    if highlightItems.isEmpty {
+                        Text("Nothing scheduled")
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textSecondary().opacity(0.8))
+                    } else {
+                        GlassButton("View drawer", icon: "rectangle.and.text.magnifyingglass", style: .pill, role: .surface, tintColor: glassColorSystem.backgroundElevated()) {
+                            openDayDrawer(for: highlightSourceDate)
+                        }
+                        .help("Open \(highlightSourceDate.formatted(date: .long, time: .omitted)) details")
+                    }
+                }
+                
+                VStack(spacing: 14) {
+                    if highlightItems.isEmpty {
+                        ContentUnavailableView(
+                            "No highlights",
+                            systemImage: "calendar.badge.exclamationmark",
+                            description: Text("You’re clear for now—Aurora will surface new activity here automatically.")
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                    } else {
+                        ForEach(highlightItems.prefix(4)) { item in
+                            highlightRow(for: item)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 22)
+            .padding(.horizontal, 24)
+        }
+    }
+    
+    private var highlightSourceDate: Date {
+        spotlightTodayOnly ? Date() : selectedDate
+    }
+    
+    private var highlightItems: [CalendarDayDetailDrawer.Item] {
+        let items = itemsForDate(highlightSourceDate)
+        if highlightFocusWindows {
+            return items.filter { $0.timestamp != nil }
+        }
+        return items
+    }
+    
+    private func highlightRow(for item: CalendarDayDetailDrawer.Item) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(item.accent.opacity(0.18))
+                    .frame(width: 46, height: 46)
+                    .shadow(color: item.accent.opacity(0.35), radius: 12, y: 6)
+                
+                Image(systemName: item.icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                    .lineLimit(2)
+                
+                Text(item.subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            if let timestamp = item.timestamp {
+                let sameDay = calendar.isDate(timestamp, inSameDayAs: highlightSourceDate)
+                let timestampText = sameDay
+                    ? timestamp.formatted(date: .omitted, time: .shortened)
+                    : timestamp.formatted(date: .abbreviated, time: .shortened)
+                
+                Text(timestampText)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 10)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(item.accent.opacity(0.18))
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(item.accent.opacity(0.32), lineWidth: 1)
+                            )
+                    )
+            }
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(glassColorSystem.backgroundElevated().opacity(0.26))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(glassColorSystem.borderColor().opacity(0.35), lineWidth: 0.8)
+                )
+        )
+    }
+    
+    private var sidebarContent: some View {
+        VStack(spacing: 18) {
+            sidebarSelectedDayCard
+            sidebarUpcomingEventsCard
+            sidebarQuickActions
+        }
+    }
+    
+    private var sidebarSelectedDayCard: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(selectedDate.formatted(date: .complete, time: .omitted))
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    Text("\(selectedDayItems.count) scheduled")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                }
+                
+                if selectedDayItems.isEmpty {
+                    ContentUnavailableView(
+                        "No commitments",
+                        systemImage: "moon.zzz",
+                        description: Text("Relax—nothing on the calendar for this day.")
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(selectedDayItems.prefix(3)) { item in
+                            highlightRow(for: item)
+                        }
+                    }
+                }
+                
+                GlassButton("Open day details", icon: "rectangle.portrait.and.arrow.right", style: .standard, role: .surface, tintColor: glassColorSystem.backgroundElevated()) {
+                    openDayDrawer(for: selectedDate)
+                }
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private var sidebarUpcomingEventsCard: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Up Next")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                
+                if upcomingOccurrences.isEmpty && upcomingTasks.isEmpty {
+                    ContentUnavailableView(
+                        "No upcoming events",
+                        systemImage: "sparkles",
+                        description: Text("Your next two weeks are wide open. Aurora will nudge you when plans appear.")
+                    )
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+                } else {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(upcomingOccurrences.prefix(3), id: \.id) { occurrence in
+                            upcomingEventRow(for: occurrence)
+                        }
+                        
+                        if activeEntityFilters.contains(.tasks) {
+                            ForEach(upcomingTasks.prefix(2), id: \.id) { task in
+                                upcomingTaskRow(for: task)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private var sidebarQuickActions: some View {
+        GlassPanel(tier: .overlay, cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Quick Actions")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                
+                GlassButton("Ask Aurora for a plan", icon: "sparkles", style: .pill, role: .accent) {
+                    NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.aiAssistant)
+                }
+                
+                GlassButton("Capture ritual", icon: "clock.badge.exclamationmark", style: .pill, role: .surface, tintColor: glassColorSystem.backgroundElevated()) {
+                    NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.rituals)
+                }
+                
+                GlassButton("Log reflection", icon: "square.and.pencil", style: .pill, role: .surface, tintColor: glassColorSystem.backgroundElevated()) {
+                    NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.journal)
+                }
+            }
+            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+        }
+    }
+    
+    private var selectedDayItems: [CalendarDayDetailDrawer.Item] {
+        itemsForDate(selectedDate)
+    }
+    
+    private var upcomingOccurrences: [CalendarEventOccurrence] {
+        guard activeEntityFilters.contains(.events) else { return [] }
+        let start = Date()
+        let end = calendar.date(byAdding: .day, value: 14, to: start) ?? start
+        let interval = DateInterval(start: start, end: end)
+        let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: interval)
+        return occurrences
+            .filter { occurrence in
+                normalizedSearchQuery.isEmpty ||
+                matchesQuery(occurrence.event.title) ||
+                matchesQuery(occurrence.event.notes) ||
+                matchesQuery(occurrence.event.location)
+            }
+            .sorted { $0.startDate < $1.startDate }
+    }
+    
+    private var upcomingTasks: [CloutmateShared.Task] {
+        guard activeEntityFilters.contains(.tasks) else { return [] }
+        let now = Date()
+        return tasks
+            .filter { task in
+                guard let due = task.dueDate else { return false }
+                return due >= now
+            }
+            .filter { task in
+                normalizedSearchQuery.isEmpty ||
+                matchesQuery(task.title) ||
+                matchesQuery(task.notes)
+            }
+            .sorted { (lhs, rhs) -> Bool in
+                (lhs.dueDate ?? Date.distantFuture) < (rhs.dueDate ?? Date.distantFuture)
+            }
+    }
+    
+    private func upcomingEventRow(for occurrence: CalendarEventOccurrence) -> some View {
+        Button {
+            openEventDrawer(for: occurrence)
+        } label: {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.cyan.opacity(0.22))
+                    .frame(width: 12, height: 48)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.cyan.opacity(0.35), lineWidth: 1)
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(occurrence.event.title.isEmpty ? "Untitled Event" : occurrence.event.title)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                        .lineLimit(2)
+                    
+                    Text(eventTimeRange(for: occurrence))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                }
+                
+                Spacer()
+                
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.cyan)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(glassColorSystem.backgroundElevated().opacity(0.28))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.cyan.opacity(0.25), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func upcomingTaskRow(for task: CloutmateShared.Task) -> some View {
+        Button {
+            openTaskDrawer(for: task)
+        } label: {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.kosmicGreen.opacity(0.22))
+                    .frame(width: 12, height: 48)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.kosmicGreen.opacity(0.35), lineWidth: 1)
+                    )
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(task.title)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                        .lineLimit(2)
+                    
+                    if let dueDate = task.dueDate {
+                        Text(dueDate.formatted(date: .abbreviated, time: .shortened))
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                }
+                
+                Spacer()
+                
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.kosmicGreen)
+            }
+            .padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(glassColorSystem.backgroundElevated().opacity(0.28))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(Color.kosmicGreen.opacity(0.25), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private func eventTimeRange(for occurrence: CalendarEventOccurrence) -> String {
+        if occurrence.event.allDay {
+            return "All-day"
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        return "\(formatter.string(from: occurrence.startDate)) – \(formatter.string(from: occurrence.endDate))"
+    }
+    
+    private func matchesQuery(_ value: String?) -> Bool {
+        let query = normalizedSearchQuery
+        guard !query.isEmpty else { return true }
+        guard let value = value, !value.isEmpty else { return false }
+        return value.localizedCaseInsensitiveContains(query)
+    }
+    
+    
+    private var postDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { postDrawerVisible },
+            set: { newValue in
+                withAnimation(calendarAnimation) {
+                    postDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private var artifactDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { artifactDrawerVisible },
+            set: { newValue in
+                withAnimation(calendarAnimation) {
+                    artifactDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    private var taskDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { taskDrawerVisible },
+            set: { newValue in
+                withAnimation(calendarAnimation) {
+                    taskDrawerVisible = newValue
+                    if !newValue {
+                        activeTask = nil
+                    }
+                }
+            }
+        )
+    }
+    
+    private var eventDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { eventDrawerVisible },
+            set: { newValue in
+                withAnimation(calendarAnimation) {
+                    eventDrawerVisible = newValue
+                    if !newValue {
+                        resetEventDrawerState()
+                    }
+                }
+            }
+        )
+    }
+    
+    private var dayDrawerBinding: Binding<Bool> {
+        Binding(
+            get: { dayDrawerVisible },
+            set: { newValue in
+                withAnimation(calendarAnimation) {
+                    dayDrawerVisible = newValue
+                }
+            }
+        )
+    }
+    
+    @ViewBuilder
+    private var drawerOverlays: some View {
+        ZStack {
+            postOverlay
+            artifactOverlay
+            taskOverlay
+            eventOverlay
+            dayOverlay
+        }
+    }
+    
+    @ViewBuilder
+    private var postOverlay: some View {
+        if let post = activePost, postDrawerVisible {
+            PostDetailDrawer(
+                post: post,
+                isPresented: postDrawerBinding,
+                onEdit: { editedPost in
+                    launchComposer(with: CalendarComposerRequest(existingPost: editedPost, prefilledDate: editedPost.scheduledDate))
+                }
+            )
+            .transition(.move(edge: .trailing))
+        }
+    }
+    
+    @ViewBuilder
+    private var artifactOverlay: some View {
+        if let artifact = activeArtifact, artifactDrawerVisible {
+            CalendarArtifactDetailDrawer(
+                artifact: artifact,
+                isPresented: artifactDrawerBinding
+            )
+            .transition(.move(edge: .trailing))
+        }
+    }
+    
+    @ViewBuilder
+    private var taskOverlay: some View {
+        if let task = activeTask, taskDrawerVisible {
+            TaskDetailDrawer(
+                mode: .edit,
+                existingTask: task,
+                initialDraft: TaskDraft(task: task),
+                isPresented: taskDrawerBinding,
+                onCommit: { draft in
+                    update(task, with: draft)
+                    try? modelContext.save()
+                    withAnimation(calendarAnimation) {
+                        taskDrawerVisible = false
+                        activeTask = nil
+                    }
+                },
+                onCancel: {
+                    withAnimation(calendarAnimation) {
+                        taskDrawerVisible = false
+                        activeTask = nil
+                    }
+                }
+            )
+            .transition(.move(edge: .trailing))
+        }
+    }
+    
+    @ViewBuilder
+    private var eventOverlay: some View {
+        if eventDrawerVisible {
+            if let draft = pendingEventDraft {
+                CalendarEventDrawer(
+                    mode: isCreatingEvent ? .create : .edit,
+                    existingEvent: activeEvent,
+                    initialDraft: draft,
+                    isPresented: eventDrawerBinding,
+                    onCommit: { commitEvent(from: $0) },
+                    onDelete: isCreatingEvent ? nil : { deleteActiveEvent() },
+                    onCancel: cancelEventEditing,
+                    onAskAurora: { askAuroraForEventSuggestions(using: draft) }
+                )
+                .transition(.move(edge: .trailing))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var dayOverlay: some View {
+        if dayDrawerVisible {
+            CalendarDayDetailDrawer(
+                date: selectedDay,
+                items: dayItems,
+                isPresented: dayDrawerBinding,
+                onSelect: handleDayItemSelection
+            )
+            .transition(.move(edge: .trailing))
+        }
     }
     
     private func update(_ task: CloutmateShared.Task, with draft: TaskDraft) {
@@ -234,69 +954,8 @@ struct UnifiedCalendarView: View {
         task.updatedAt = Date()
     }
     
-    private var calendarHeader: some View {
-        HStack(alignment: .center, spacing: 16) {
-                    CalendarViewToggle(isWeeklyView: $isWeeklyView)
-            
-            Spacer()
-            
-            Button {
-                startCreatingEvent(at: selectedDate)
-            } label: {
-                Label("New Event", systemImage: "plus")
-                    .font(.system(size: 14, weight: .semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(
-                        LinearGradient(
-                            colors: [.kosmicBlue, .kosmicPurple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
-                    .shadow(color: .black.opacity(0.12), radius: 10, y: 6)
-        }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 24)
-        .padding(.bottom, 12)
-    }
-                    
-    private var calendarContent: some View {
-        Group {
-                    if isWeeklyView {
-                        UnifiedWeeklyCalendarView(
-                            posts: posts,
-                            artifacts: artifacts,
-                            tasks: tasks,
-                    events: events,
-                            selectedDate: $selectedDate,
-                    onOpenDay: openDayDrawer,
-                    onOpenPost: openPostDrawer,
-                    onOpenArtifact: openArtifactDrawer,
-                    onOpenTask: openTaskDrawer,
-                    onOpenEvent: openEventDrawer,
-                    onCompose: launchComposer
-                )
-                    } else {
-                        UnifiedMonthlyCalendarView(
-                            posts: posts,
-                            artifacts: artifacts,
-                            tasks: tasks,
-                    events: events,
-                            selectedDate: $selectedDate,
-                    onOpenDay: openDayDrawer,
-                    onOpenPost: openPostDrawer,
-                    onOpenArtifact: openArtifactDrawer,
-                    onOpenTask: openTaskDrawer,
-                    onOpenEvent: openEventDrawer,
-                    onCompose: launchComposer
-                )
-            }
-        }
+    private func selectDay(_ date: Date) {
+        selectedDate = date
     }
     
     private func openDayDrawer(for date: Date) {
@@ -474,45 +1133,63 @@ struct UnifiedCalendarView: View {
     private func itemsForDate(_ date: Date) -> [CalendarDayDetailDrawer.Item] {
         var items: [CalendarDayDetailDrawer.Item] = []
         
-        // Add posts (backward compatibility)
-        let dayPosts = posts.filter { post in
-            if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
-                return true
+        if activeEntityFilters.contains(.reminders) {
+            let dayPosts = posts.filter { post in
+                if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
+                    return true
+                }
+                if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
+                    return true
+                }
+                return false
             }
-            if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
-                return true
+            .filter { post in
+                matchesQuery(post.caption)
             }
-            return false
+            items.append(contentsOf: dayPosts.map { CalendarDayDetailDrawer.Item.post($0) })
         }
-        items.append(contentsOf: dayPosts.map { CalendarDayDetailDrawer.Item.post($0) })
         
-        // Add artifacts
-        let dayArtifacts = artifacts.filter { artifact in
-            if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
-                return true
+        if activeEntityFilters.contains(.artifacts) {
+            let dayArtifacts = artifacts.filter { artifact in
+                if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
+                    return true
+                }
+                if (artifact.artifactState == .published || artifact.artifactState == .final),
+                   calendar.isDate(artifact.createdAt, inSameDayAs: date) {
+                    return true
+                }
+                return false
             }
-            if artifact.artifactState == .published || artifact.artifactState == .final,
-               calendar.isDate(artifact.createdAt, inSameDayAs: date) {
-                return true
+            .filter { artifact in
+                matchesQuery(artifact.title) || matchesQuery(artifact.content)
             }
-            return false
+            items.append(contentsOf: dayArtifacts.map { CalendarDayDetailDrawer.Item.artifact($0) })
         }
-        items.append(contentsOf: dayArtifacts.map { CalendarDayDetailDrawer.Item.artifact($0) })
         
-        // Add tasks
-        let dayTasks = tasks.filter { task in
-            guard let dueDate = task.dueDate else { return false }
-            return calendar.isDate(dueDate, inSameDayAs: date)
+        if activeEntityFilters.contains(.tasks) {
+            let dayTasks = tasks.filter { task in
+                guard let dueDate = task.dueDate else { return false }
+                return calendar.isDate(dueDate, inSameDayAs: date)
+            }
+            .filter { task in
+                matchesQuery(task.title) || matchesQuery(task.notes)
+            }
+            items.append(contentsOf: dayTasks.map { CalendarDayDetailDrawer.Item.task($0) })
         }
-        items.append(contentsOf: dayTasks.map { CalendarDayDetailDrawer.Item.task($0) })
         
-        // Add calendar events (including recurrences)
-        let dayInterval = DateInterval(
-            start: calendar.startOfDay(for: date),
-            end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
-        )
-        let dayOccurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
-        items.append(contentsOf: dayOccurrences.map { CalendarDayDetailDrawer.Item.event($0) })
+        if activeEntityFilters.contains(.events) {
+            let dayInterval = DateInterval(
+                start: calendar.startOfDay(for: date),
+                end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+            )
+            let dayOccurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
+                .filter { occurrence in
+                    matchesQuery(occurrence.event.title) ||
+                    matchesQuery(occurrence.event.notes) ||
+                    matchesQuery(occurrence.event.location)
+                }
+            items.append(contentsOf: dayOccurrences.map { CalendarDayDetailDrawer.Item.event($0) })
+        }
         
         items.sort { lhs, rhs in
             switch (lhs.timestamp, rhs.timestamp) {
@@ -536,8 +1213,11 @@ struct UnifiedWeeklyCalendarView: View {
     let artifacts: [CloutmateShared.Artifact]
     let tasks: [CloutmateShared.Task]
     let events: [CalendarEvent]
+    fileprivate let activeFilters: Set<CalendarEntityFilter>
+    let searchQuery: String
     @Binding var selectedDate: Date
-    let onOpenDay: (Date) -> Void
+    let onSelectDay: (Date) -> Void
+    let onOpenDayDrawer: (Date) -> Void
     let onOpenPost: (CloutmateShared.Post) -> Void
     let onOpenArtifact: (CloutmateShared.Artifact) -> Void
     let onOpenTask: (CloutmateShared.Task) -> Void
@@ -548,15 +1228,23 @@ struct UnifiedWeeklyCalendarView: View {
     
     private let calendar = Calendar.current
     
+    private var normalizedQuery: String {
+        searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func matches(_ value: String?) -> Bool {
+        let query = normalizedQuery
+        guard !query.isEmpty else { return true }
+        guard let value = value, !value.isEmpty else { return false }
+        return value.localizedCaseInsensitiveContains(query)
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             CalendarHeaderView(
                 title: weekRangeText,
                 onPrevious: previousWeek,
-                onNext: nextWeek,
-                onQuickAction: {
-                    onCompose(CalendarComposerRequest(prefilledDate: selectedDate))
-                }
+                onNext: nextWeek
             )
             .glassPanel(tier: .overlay, cornerRadius: 12)
             .padding(.horizontal)
@@ -574,11 +1262,10 @@ struct UnifiedWeeklyCalendarView: View {
                             onTaskClick: onOpenTask,
                             onEventClick: onOpenEvent,
                             onDoubleTap: {
-                                onCompose(CalendarComposerRequest(prefilledDate: date))
+                                onOpenDayDrawer(date)
                             },
                             onDaySelected: {
-                                selectedDate = date
-                                onOpenDay(date)
+                                onSelectDay(date)
                             }
                         )
                     }
@@ -617,41 +1304,63 @@ struct UnifiedWeeklyCalendarView: View {
     private func itemsForDate(_ date: Date) -> [CalendarItem] {
         var items: [CalendarItem] = []
         
-        let dayPosts = posts.filter { post in
-            if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
-                return true
+        if activeFilters.contains(.reminders) {
+            let dayPosts = posts.filter { post in
+                if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
+                    return true
+                }
+                if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
+                    return true
+                }
+                return false
             }
-            if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
-                return true
+            .filter { post in
+                matches(post.caption)
             }
-            return false
+            items.append(contentsOf: dayPosts.map { CalendarItem.post($0) })
         }
-        items.append(contentsOf: dayPosts.map { CalendarItem.post($0) })
         
-        let dayArtifacts = artifacts.filter { artifact in
-            if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
-                return true
+        if activeFilters.contains(.artifacts) {
+            let dayArtifacts = artifacts.filter { artifact in
+                if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
+                    return true
+                }
+                if artifact.artifactState == .published || artifact.artifactState == .final,
+                   calendar.isDate(artifact.createdAt, inSameDayAs: date) {
+                    return true
+                }
+                return false
             }
-            if artifact.artifactState == .published || artifact.artifactState == .final,
-               calendar.isDate(artifact.createdAt, inSameDayAs: date) {
-                return true
+            .filter { artifact in
+                matches(artifact.title) || matches(artifact.content)
             }
-            return false
+            items.append(contentsOf: dayArtifacts.map { CalendarItem.artifact($0) })
         }
-        items.append(contentsOf: dayArtifacts.map { CalendarItem.artifact($0) })
         
-        let dayTasks = tasks.filter { task in
-            guard let dueDate = task.dueDate else { return false }
-            return calendar.isDate(dueDate, inSameDayAs: date)
+        if activeFilters.contains(.tasks) {
+            let dayTasks = tasks.filter { task in
+                guard let dueDate = task.dueDate else { return false }
+                return calendar.isDate(dueDate, inSameDayAs: date)
+            }
+            .filter { task in
+                matches(task.title) || matches(task.notes)
+            }
+            items.append(contentsOf: dayTasks.map { CalendarItem.task($0) })
         }
-        items.append(contentsOf: dayTasks.map { CalendarItem.task($0) })
         
-        let dayInterval = DateInterval(
-            start: calendar.startOfDay(for: date),
-            end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
-        )
-        let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
-        items.append(contentsOf: occurrences.map { CalendarItem.event($0) })
+        if activeFilters.contains(.events) {
+            let dayInterval = DateInterval(
+                start: calendar.startOfDay(for: date),
+                end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+            )
+            let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
+                .filter { occurrence in
+                    matches(occurrence.event.title) ||
+                    matches(occurrence.event.notes) ||
+                    matches(occurrence.event.location)
+                }
+            items.append(contentsOf: occurrences.map { CalendarItem.event($0) })
+        }
         
         items.sort { $0.time < $1.time }
         return items
@@ -675,8 +1384,11 @@ struct UnifiedMonthlyCalendarView: View {
     let artifacts: [CloutmateShared.Artifact]
     let tasks: [CloutmateShared.Task]
     let events: [CalendarEvent]
+    fileprivate let activeFilters: Set<CalendarEntityFilter>
+    let searchQuery: String
     @Binding var selectedDate: Date
-    let onOpenDay: (Date) -> Void
+    let onSelectDay: (Date) -> Void
+    let onOpenDayDrawer: (Date) -> Void
     let onOpenPost: (CloutmateShared.Post) -> Void
     let onOpenArtifact: (CloutmateShared.Artifact) -> Void
     let onOpenTask: (CloutmateShared.Task) -> Void
@@ -687,15 +1399,23 @@ struct UnifiedMonthlyCalendarView: View {
     
     private let calendar = Calendar.current
     
+    private var normalizedQuery: String {
+        searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    private func matches(_ value: String?) -> Bool {
+        let query = normalizedQuery
+        guard !query.isEmpty else { return true }
+        guard let value = value, !value.isEmpty else { return false }
+        return value.localizedCaseInsensitiveContains(query)
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             CalendarHeaderView(
                 title: monthText,
                 onPrevious: previousMonth,
-                onNext: nextMonth,
-                onQuickAction: {
-                    onCompose(CalendarComposerRequest(prefilledDate: selectedDate))
-                }
+                onNext: nextMonth
             )
             .glassPanel(tier: .overlay, cornerRadius: 12)
             .padding(.horizontal)
@@ -722,15 +1442,14 @@ struct UnifiedMonthlyCalendarView: View {
                                 isSelected: calendar.isDate(date, inSameDayAs: selectedDate),
                                 isCurrentMonth: calendar.component(.month, from: date) == calendar.component(.month, from: currentMonth),
                                 onTap: {
-                                        selectedDate = date
-                                    onOpenDay(date)
+                                    onSelectDay(date)
                                 },
                                 onPostTap: onOpenPost,
                                 onArtifactTap: onOpenArtifact,
                                 onTaskTap: onOpenTask,
                                 onEventTap: onOpenEvent,
                                 onCompose: {
-                                    onCompose(CalendarComposerRequest(prefilledDate: date))
+                                    onOpenDayDrawer(date)
                                 }
                             )
                         }
@@ -766,41 +1485,63 @@ struct UnifiedMonthlyCalendarView: View {
     private func itemsForDate(_ date: Date) -> [CalendarItem] {
         var items: [CalendarItem] = []
         
-        let dayPosts = posts.filter { post in
-            if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
-                return true
+        if activeFilters.contains(.reminders) {
+            let dayPosts = posts.filter { post in
+                if let scheduledDate = post.scheduledDate, calendar.isDate(scheduledDate, inSameDayAs: date) {
+                    return true
+                }
+                if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
+                    return true
+                }
+                return false
             }
-            if let publishedDate = post.publishedDate, calendar.isDate(publishedDate, inSameDayAs: date) {
-                return true
+            .filter { post in
+                matches(post.caption)
             }
-            return false
+            items.append(contentsOf: dayPosts.map { CalendarItem.post($0) })
         }
-        items.append(contentsOf: dayPosts.map { CalendarItem.post($0) })
         
-        let dayArtifacts = artifacts.filter { artifact in
-            if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
-                return true
+        if activeFilters.contains(.artifacts) {
+            let dayArtifacts = artifacts.filter { artifact in
+                if let publishedAt = artifact.publishedAt, calendar.isDate(publishedAt, inSameDayAs: date) {
+                    return true
+                }
+                if artifact.artifactState == .published || artifact.artifactState == .final,
+                   calendar.isDate(artifact.createdAt, inSameDayAs: date) {
+                    return true
+                }
+                return false
             }
-            if artifact.artifactState == .published || artifact.artifactState == .final,
-               calendar.isDate(artifact.createdAt, inSameDayAs: date) {
-                return true
+            .filter { artifact in
+                matches(artifact.title) || matches(artifact.content)
             }
-            return false
+            items.append(contentsOf: dayArtifacts.map { CalendarItem.artifact($0) })
         }
-        items.append(contentsOf: dayArtifacts.map { CalendarItem.artifact($0) })
         
-        let dayTasks = tasks.filter { task in
-            guard let dueDate = task.dueDate else { return false }
-            return calendar.isDate(dueDate, inSameDayAs: date)
+        if activeFilters.contains(.tasks) {
+            let dayTasks = tasks.filter { task in
+                guard let dueDate = task.dueDate else { return false }
+                return calendar.isDate(dueDate, inSameDayAs: date)
+            }
+            .filter { task in
+                matches(task.title) || matches(task.notes)
+            }
+            items.append(contentsOf: dayTasks.map { CalendarItem.task($0) })
         }
-        items.append(contentsOf: dayTasks.map { CalendarItem.task($0) })
         
-        let dayInterval = DateInterval(
-            start: calendar.startOfDay(for: date),
-            end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
-        )
-        let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
-        items.append(contentsOf: occurrences.map { CalendarItem.event($0) })
+        if activeFilters.contains(.events) {
+            let dayInterval = DateInterval(
+                start: calendar.startOfDay(for: date),
+                end: calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+            )
+            let occurrences = CalendarEventOccurrenceService.shared.occurrences(for: events, in: dayInterval)
+                .filter { occurrence in
+                    matches(occurrence.event.title) ||
+                    matches(occurrence.event.notes) ||
+                    matches(occurrence.event.location)
+                }
+            items.append(contentsOf: occurrences.map { CalendarItem.event($0) })
+        }
         
         items.sort { $0.time < $1.time }
         return items
@@ -1297,3 +2038,4 @@ struct ArtifactStateBadge: View {
         }
     }
 }
+

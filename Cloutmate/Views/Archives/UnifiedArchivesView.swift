@@ -11,6 +11,9 @@ import CloutmateShared
 
 struct UnifiedArchivesView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     @Query private var projects: [CloutmateShared.Project]
     @Query private var areas: [Area]
@@ -27,9 +30,8 @@ struct UnifiedArchivesView: View {
     @State private var showRestoreMenu = false
     @State private var selectedArchiveItem: ArchiveItem?
     @State private var showDetailDrawer = false
-    
-    @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var sidebarCollapsed = false
+    @State private var scrollOffset: CGFloat = 0
     
     var filteredArchivedItems: [ArchiveItem] {
         var items: [ArchiveItem] = []
@@ -101,30 +103,94 @@ struct UnifiedArchivesView: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Sidebar
-            ArchivesSidebar(
-                selectedTypeFilter: $selectedFilter,
-                selectedDateRange: $selectedDateRange,
-                selectedToneFilter: $selectedToneFilter
+        ZStack {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+                showsSidebar: !sidebarCollapsed,
+                sidebarWidth: 320,
+                header: { headerBar },
+                content: { archivesContent },
+                sidebar: { sidebarContent }
             )
+            .opacity(showDetailDrawer || showReviewSummary ? 0 : 1)
             
-            Divider()
-            
-            // Main content
-            VStack(spacing: 0) {
-                // Header
-                ArchivesHeaderView(
-                    searchText: $searchText,
-                    selectedFilter: $selectedFilter,
-                    showReviewSummary: $showReviewSummary,
-                    showRestoreMenu: $showRestoreMenu
+            // Drawer overlays
+            if showDetailDrawer, let item = selectedArchiveItem {
+                ArchiveDetailDrawer(
+                    archiveItem: item,
+                    isPresented: $showDetailDrawer,
+                    onRestore: {
+                        restoreItem(item)
+                        showDetailDrawer = false
+                    }
                 )
-                .padding()
-                
-                Divider()
-                
-                // Cards grid
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+            
+            if showReviewSummary {
+                ArchiveReviewSheet(isPresented: $showReviewSummary)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(GlassMotion.Easing.spring, value: selectedFilter)
+        .animation(GlassMotion.Easing.spring, value: searchText)
+        .animation(GlassMotion.Easing.spring, value: filteredArchivedItems.count)
+        .animation(GlassMotion.Easing.modalOpen, value: showDetailDrawer)
+        .animation(GlassMotion.Easing.modalOpen, value: showReviewSummary)
+    }
+    
+    // MARK: - Header Bar
+    
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Archives",
+            subtitle: "Everything you've completed, remembered, and learned."
+        ) {
+            // Leading accessory - sidebar toggle
+            Button(action: {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                    sidebarCollapsed.toggle()
+                }
+            }) {
+                Image(systemName: sidebarCollapsed ? "sidebar.right" : "sidebar.left")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .help(sidebarCollapsed ? "Show Sidebar" : "Hide Sidebar")
+        } trailingAccessory: {
+            // Trailing accessory - quick actions
+            HStack(spacing: 12) {
+                GlassButton(
+                    icon: "chart.bar",
+                    style: .iconOnly,
+                    role: .primary,
+                    tintColor: .kosmicBlue,
+                    action: {
+                        showReviewSummary = true
+                    }
+                )
+                .frame(width: 32, height: 32)
+                .help("Review Summary")
+            }
+        }
+    }
+    
+    // MARK: - Content
+    
+    private var archivesContent: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 28) {
+                    GeometryReader { geometry in
+                        Color.clear
+                            .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
+                    }
+                    .frame(height: 0)
+                    
+                    filterPanel
+                    
                 if filteredArchivedItems.isEmpty {
                     ContentUnavailableView(
                         "No Archived Items",
@@ -132,8 +198,8 @@ struct UnifiedArchivesView: View {
                         description: Text("Items you complete or archive will appear here")
                     )
                     .frame(maxHeight: .infinity)
+                        .padding(.top, 100)
                 } else {
-                    ScrollView {
                         LazyVGrid(columns: [
                             GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)
                         ], spacing: 16) {
@@ -142,7 +208,9 @@ struct UnifiedArchivesView: View {
                                     archiveItem: item,
                                     onTap: {
                                         selectedArchiveItem = item
+                                        withAnimation(GlassMotion.Easing.modalOpen) {
                                         showDetailDrawer = true
+                                        }
                                     },
                                     onRestore: {
                                         restoreItem(item)
@@ -154,33 +222,87 @@ struct UnifiedArchivesView: View {
                                 .transition(.opacity.combined(with: .scale))
                             }
                         }
-                        .padding()
                     }
                 }
             }
-        }
-        .background(glassColorSystem.backgroundColor())
-        .sheet(isPresented: $showReviewSummary) {
-            ArchiveReviewSheet(isPresented: $showReviewSummary)
-        }
-        .overlay(
-            Group {
-                if showDetailDrawer, let item = selectedArchiveItem {
-                    ArchiveDetailDrawer(
-                        archiveItem: item,
-                        isPresented: $showDetailDrawer,
-                        onRestore: {
-                            restoreItem(item)
-                            showDetailDrawer = false
-                        }
-                    )
-                    .transition(.move(edge: .trailing))
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollOffset = -value
                 }
             }
+        }
+    
+    // MARK: - Filter Panel
+    
+    private var filterPanel: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 16) {
+                // Search bar
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(glassColorSystem.textSecondary().opacity(0.75))
+                    
+                    TextField("Search memories or milestones…", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    
+                    if !searchText.isEmpty {
+                        GlassButton(icon: "xmark.circle.fill", style: .iconOnly, role: .surface) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                searchText = ""
+                            }
+                        }
+                        .accessibilityLabel("Clear search")
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(glassColorSystem.backgroundSecondary().opacity(0.35))
+        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(glassColorSystem.borderColor().opacity(0.55), lineWidth: 0.6)
+                        )
+                )
+                
+                Spacer()
+                
+                // Filter chips
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(ArchiveFilter.allCases, id: \.self) { filter in
+                            FilterPill(
+                                title: filter.rawValue,
+                                isSelected: selectedFilter == filter,
+                                action: {
+                                    withAnimation(GlassMotion.Easing.spring) {
+                                        selectedFilter = filter
+                                    }
+                                    if !reduceMotion {
+                                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    
+    // MARK: - Sidebar
+    
+    private var sidebarContent: some View {
+        ArchivesSidebar(
+            selectedTypeFilter: $selectedFilter,
+            selectedDateRange: $selectedDateRange,
+            selectedToneFilter: $selectedToneFilter
         )
-        .animation(GlassMotion.Easing.spring, value: selectedFilter)
-        .animation(GlassMotion.Easing.spring, value: searchText)
-        .animation(GlassMotion.Easing.spring, value: filteredArchivedItems.count)
     }
     
     private func restoreItem(_ item: ArchiveItem) {

@@ -11,8 +11,6 @@ struct CalendarHeaderView: View {
     let title: String
     let onPrevious: () -> Void
     let onNext: () -> Void
-    let onQuickAction: () -> Void
-    
     @State private var isHoveredPrevious = false
     @State private var isHoveredNext = false
     
@@ -65,15 +63,6 @@ struct CalendarHeaderView: View {
                     isHoveredNext = hovering
                 }
             }
-            
-            // Quick Actions button
-            GlassButton(
-                icon: "plus",
-                style: .iconOnly,
-                tintColor: .kosmicPurple,
-                action: onQuickAction
-            )
-            .frame(width: 28, height: 28)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 16)
@@ -84,8 +73,7 @@ struct CalendarHeaderView: View {
     CalendarHeaderView(
         title: "November 2025",
         onPrevious: {},
-        onNext: {},
-        onQuickAction: {}
+        onNext: {}
     )
     .padding()
     .environmentObject(GlassColorSystem())

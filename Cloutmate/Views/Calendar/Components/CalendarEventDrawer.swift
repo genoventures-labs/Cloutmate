@@ -80,7 +80,6 @@ struct CalendarEventDrawer: View {
     let onCancel: () -> Void
     let onAskAurora: (() -> Void)?
     
-    @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
@@ -112,6 +111,17 @@ struct CalendarEventDrawer: View {
         _recurrenceEndEnabled = State(initialValue: initialDraft.recurrence?.endDate != nil)
     }
     
+    private var accentGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.kosmicBlue,
+                Color.kosmicPurple
+            ],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+    
     private var recurrenceOption: RecurrenceOption {
         guard let recurrence = draft.recurrence else {
             return .none
@@ -130,51 +140,24 @@ struct CalendarEventDrawer: View {
     
     var body: some View {
         NavigationStack {
-            HStack(spacing: 0) {
-                accentSidebar
-                VStack(spacing: 0) {
-                    header
-                        .padding()
-                        .background(.ultraThinMaterial)
-                    
-                    Divider()
-                    
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            titleSection
-                            scheduleSection
-                            recurrenceSection
-                            reminderSection
-                            notesSection
-                            automationSection
-                        }
-                        .padding(.horizontal, 24)
-                        .padding(.vertical, 24)
-                    }
-                    .background(glassColorSystem.backgroundColor())
-                    
-                    Divider()
-                    
-                    footer
-                        .padding(16)
-                        .background(glassColorSystem.toolbarColor())
-                }
-            }
-            .background(glassColorSystem.backgroundColor())
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        closeDrawerAnimated()
-                        onCancel()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .keyboardShortcut(.escape, modifiers: [])
-                }
-            }
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    scheduleSection
+                    recurrenceSection
+                    reminderSection
+                    notesSection
+                    automationSection
+                    actionsSection
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 560, minHeight: 580)
+            .frame(idealWidth: 780, idealHeight: 660)
         }
-        .frame(minWidth: 520, minHeight: 560)
+        .onEscape { cancel() }
         .onAppear {
             if mode == .create {
                 titleFieldFocused = true
@@ -188,75 +171,116 @@ struct CalendarEventDrawer: View {
         }
     }
     
-    private var accentSidebar: some View {
-        LinearGradient(
-            colors: [.kosmicBlue.opacity(0.9), .kosmicPurple.opacity(0.65)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(width: 4)
+    private func cancel() {
+        closeDrawerAnimated()
+        onCancel()
     }
     
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(mode == .create ? "New Event" : "Edit Event")
-                .font(.system(.title3, design: .rounded))
-                .fontWeight(.semibold)
-                .foregroundColor(glassColorSystem.textPrimary())
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 14) {
+                TextField("Event title", text: $draft.title)
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
+                    .textFieldStyle(.plain)
+                    .focused($titleFieldFocused)
+                    .drawerFocusGlow()
+                
+                HStack(spacing: 10) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("Location", text: $draft.location)
+                        .textFieldStyle(.plain)
+                        .foregroundColor(glassColorSystem.textSecondary())
+                }
+                .drawerFocusGlow()
+                
+                HStack(spacing: 12) {
+                    metadataPill(
+                        title: formattedHeaderDate,
+                        icon: draft.allDay ? "sun.max.fill" : "clock"
+                    )
+                    
+                    if !draft.location.trimmingCharacters(in: .whitespaces).isEmpty {
+                        metadataPill(
+                            title: draft.location,
+                            icon: "mappin.and.ellipse"
+                        )
+                    }
+                    
+                    metadataPill(
+                        title: reminderLabel,
+                        icon: "bell.fill"
+                    )
+                }
+            }
             
-            Text("\(formattedHeaderDate)")
-                .font(.caption)
-                .foregroundColor(glassColorSystem.textSecondary())
-        }
-    }
-    
-    private var titleSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TextField("Event title", text: $draft.title)
-                .textFieldStyle(.plain)
-                .font(.system(.title3, design: .rounded))
-                .fontWeight(.semibold)
-                .foregroundColor(glassColorSystem.textPrimary())
-                .focused($titleFieldFocused)
+            Spacer(minLength: 24)
             
-            TextField("Location", text: $draft.location)
-                .textFieldStyle(.roundedBorder)
-                .foregroundColor(glassColorSystem.textSecondary())
+            VStack(spacing: 12) {
+                GlassButton(
+                    "Cancel",
+                    icon: "xmark",
+                    style: .standard,
+                    role: .surface
+                ) {
+                    cancel()
+                }
+                .keyboardShortcut(.escape, modifiers: [])
+                
+                GlassButton(
+                    mode == .create ? "Create Event" : "Save Changes",
+                    icon: "calendar.badge.checkmark",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    onCommit(draft)
+                    closeDrawerAnimated()
+                }
+                .disabled(!draft.canCommit)
+                .keyboardShortcut(.return, modifiers: [])
+            }
         }
     }
     
     private var scheduleSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Schedule")
-            
-            Toggle(isOn: $draft.allDay) {
-                Label("All-day event", systemImage: "sun.max.fill")
-            }
-            .toggleStyle(.switch)
-            .foregroundColor(glassColorSystem.textSecondary())
-            .onChange(of: draft.allDay) { _, newValue in
-                if newValue {
-                    draft.startDate = calendar.startOfDay(for: draft.startDate)
-                    draft.endDate = calendar.date(byAdding: .day, value: 1, to: draft.startDate) ?? draft.startDate.addingTimeInterval(86400)
+        DrawerSection(title: "Schedule", icon: "calendar") {
+            VStack(alignment: .leading, spacing: 18) {
+                Toggle(isOn: $draft.allDay) {
+                    Label("All-day event", systemImage: "sun.max.fill")
+                        .font(.subheadline)
+                        .foregroundColor(glassColorSystem.textSecondary())
                 }
-            }
-            
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    DatePicker(
-                        "Starts",
-                        selection: $draft.startDate,
-                        displayedComponents: draft.allDay ? [.date] : [.date, .hourAndMinute]
-                    )
-                    .datePickerStyle(.compact)
-                    
-                    DatePicker(
-                        "Ends",
-                        selection: $draft.endDate,
-                        in: draft.startDate...,
-                        displayedComponents: draft.allDay ? [.date] : [.date, .hourAndMinute]
-                    )
-                    .datePickerStyle(.compact)
+                .toggleStyle(.switch)
+                .onChange(of: draft.allDay) { _, newValue in
+                    if newValue {
+                        draft.startDate = calendar.startOfDay(for: draft.startDate)
+                        draft.endDate = calendar.date(byAdding: .day, value: 1, to: draft.startDate) ?? draft.startDate.addingTimeInterval(86400)
+                    }
+                }
+                
+                Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 16) {
+                    GridRow {
+                        detailField(title: "Starts") {
+                            DatePicker(
+                                "",
+                                selection: $draft.startDate,
+                                displayedComponents: draft.allDay ? [.date] : [.date, .hourAndMinute]
+                            )
+                            .labelsHidden()
+                        }
+                        
+                        detailField(title: "Ends") {
+                            DatePicker(
+                                "",
+                                selection: $draft.endDate,
+                                in: draft.startDate...,
+                                displayedComponents: draft.allDay ? [.date] : [.date, .hourAndMinute]
+                            )
+                            .labelsHidden()
+                        }
+                    }
                 }
                 
                 if draft.endDate < draft.startDate {
@@ -269,89 +293,91 @@ struct CalendarEventDrawer: View {
     }
     
     private var recurrenceSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Recurrence")
-            
-            Picker("Repeat", selection: Binding(
-                get: { recurrenceOption },
-                set: { newValue in
-                    applyRecurrenceOption(newValue)
-                }
-            )) {
-                ForEach(RecurrenceOption.allCases) { option in
-                    Text(option.displayName).tag(option)
-                }
-            }
-            .pickerStyle(.segmented)
-            
-            if draft.recurrence != nil {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle(isOn: $recurrenceEndEnabled.animation()) {
-                        Label("Set end date", systemImage: "calendar.badge.exclamationmark")
+        DrawerSection(title: "Recurrence", icon: "arrow.2.squarepath") {
+            VStack(alignment: .leading, spacing: 16) {
+                Picker("Repeat", selection: Binding(
+                    get: { recurrenceOption },
+                    set: { newValue in applyRecurrenceOption(newValue) }
+                )) {
+                    ForEach(RecurrenceOption.allCases) { option in
+                        Text(option.displayName).tag(option)
                     }
-                    .toggleStyle(.switch)
-                    .foregroundColor(glassColorSystem.textSecondary())
-                    .onChange(of: recurrenceEndEnabled) { _, enabled in
-                        if enabled {
-                            updateRecurrenceEndDate(recurrenceEndDate)
-                        } else {
-                            draft.recurrence?.endDate = nil
+                }
+                .pickerStyle(.segmented)
+                
+                if draft.recurrence != nil {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Toggle(isOn: $recurrenceEndEnabled.animation()) {
+                            Text("Set end date")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(glassColorSystem.textSecondary())
+                        }
+                        .toggleStyle(.switch)
+                        .onChange(of: recurrenceEndEnabled) { _, enabled in
+                            if enabled {
+                                updateRecurrenceEndDate(recurrenceEndDate)
+                            } else {
+                                draft.recurrence?.endDate = nil
+                            }
+                        }
+                        
+                        if recurrenceEndEnabled {
+                            DatePicker(
+                                "Ends on",
+                                selection: $recurrenceEndDate,
+                                in: draft.startDate...,
+                                displayedComponents: [.date]
+                            )
+                            .datePickerStyle(.compact)
+                            .onChange(of: recurrenceEndDate) { _, newValue in
+                                updateRecurrenceEndDate(newValue)
+                            }
                         }
                     }
-                    
-                    if recurrenceEndEnabled {
-                        DatePicker(
-                            "Ends on",
-                            selection: $recurrenceEndDate,
-                            in: draft.startDate...,
-                            displayedComponents: [.date]
-                        )
-                        .datePickerStyle(.compact)
-                        .onChange(of: recurrenceEndDate) { _, newValue in
-                            updateRecurrenceEndDate(newValue)
-                        }
-                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }
     
     private var reminderSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Reminder")
-            
-            Menu {
-                Button("None") {
-                    draft.remindMinutesBefore = nil
-                }
-                Divider()
-                ForEach(ReminderOption.allCases) { option in
-                    Button(option.displayName) {
-                        draft.remindMinutesBefore = option.minutesBefore
+        DrawerSection(title: "Reminder", icon: "bell.fill") {
+            VStack(alignment: .leading, spacing: 10) {
+                Menu {
+                    Button("None") {
+                        draft.remindMinutesBefore = nil
                     }
+                    Divider()
+                    ForEach(ReminderOption.allCases) { option in
+                        Button(option.displayName) {
+                            draft.remindMinutesBefore = option.minutesBefore
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text(reminderLabel)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(glassColorSystem.cardColor())
+                    .cornerRadius(12)
                 }
-            } label: {
-                HStack {
-                    Image(systemName: "bell.fill")
-                    Text(reminderLabel)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(glassColorSystem.cardColor())
-                .cornerRadius(8)
+                
+                Text("Choose when to receive a notification before the event begins.")
+                    .font(.caption)
+                    .foregroundColor(glassColorSystem.textSecondary())
             }
         }
     }
     
     private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Notes")
-            
+        DrawerSection(title: "Notes & Mentions", icon: "doc.richtext") {
             MentionTextEditor(
                 text: $draft.notes,
                 placeholder: "Add context, links, or mentions…",
@@ -362,80 +388,48 @@ struct CalendarEventDrawer: View {
                     draft.linkedEntityTypes = types
                 }
             )
-            .frame(minHeight: 140)
-            .background(glassColorSystem.cardColor())
-            .cornerRadius(10)
+            .frame(minHeight: 170)
+            .drawerFocusGlow()
         }
     }
     
     private var automationSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionLabel("Aurora Assistance")
-            
-            Text("Let Aurora suggest ideal scheduling or adjust recurrence based on your patterns.")
-                .font(.caption)
-                .foregroundColor(glassColorSystem.textSecondary())
-            
-            Button {
-                onAskAurora?()
-            } label: {
-                Label("Ask Aurora to schedule", systemImage: "sparkles")
+        DrawerSection(title: "Aurora Assistance", icon: "sparkles") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Let Aurora suggest ideal timing or refine recurrence patterns automatically.")
                     .font(.caption)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(onAskAurora == nil)
-        }
-    }
-    
-    private var footer: some View {
-        HStack {
-            if mode == .edit {
-                Button(role: .destructive) {
-                    onDelete?()
-                    closeDrawerAnimated()
-                } label: {
-                    Label("Delete Event", systemImage: "trash")
+                    .foregroundColor(glassColorSystem.textSecondary())
+                
+                GlassButton(
+                    "Ask Aurora to schedule",
+                    icon: "wand.and.stars",
+                    style: .standard,
+                    role: .surface
+                ) {
+                    onAskAurora?()
                 }
-                .buttonStyle(.borderless)
+                .disabled(onAskAurora == nil)
             }
-            
-            Spacer()
-            
-            Button("Cancel") {
-                closeDrawerAnimated()
-                onCancel()
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 8)
-            
-            Button {
-                onCommit(draft)
-                closeDrawerAnimated()
-            } label: {
-                Text(mode == .create ? "Save Event" : "Update Event")
-                    .fontWeight(.semibold)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 10)
-                    .background(draft.canCommit ? glassColorSystem.accentGradient() : Color.gray.opacity(0.2))
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
-            }
-            .buttonStyle(.plain)
-            .disabled(!draft.canCommit)
         }
     }
     
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(glassColorSystem.textSecondary())
+    private var actionsSection: some View {
+        DrawerSection(title: "Actions", icon: "square.and.arrow.down") {
+            HStack {
+                if mode == .edit {
+                    Button(role: .destructive) {
+                        onDelete?()
+                        closeDrawerAnimated()
+                    } label: {
+                        Label("Delete Event", systemImage: "trash")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red.opacity(0.2))
+                }
+                
+                Spacer()
+            }
+        }
     }
     
     private func applyRecurrenceOption(_ option: RecurrenceOption) {
@@ -487,6 +481,33 @@ struct CalendarEventDrawer: View {
     
     private var calendar: Calendar {
         Calendar.current
+    }
+    
+    private func detailField<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title.uppercased())
+                .font(.caption.weight(.semibold))
+                .foregroundColor(glassColorSystem.textSecondary())
+            content()
+        }
+    }
+    
+    private func metadataPill(title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.12))
+        .clipShape(Capsule())
     }
     
     private enum RecurrenceOption: String, CaseIterable, Identifiable {

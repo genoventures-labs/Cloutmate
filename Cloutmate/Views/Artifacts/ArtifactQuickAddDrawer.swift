@@ -14,6 +14,7 @@ struct ArtifactQuickAddDrawer: View {
     
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     @State private var title = ""
@@ -28,47 +29,101 @@ struct ArtifactQuickAddDrawer: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    headerSection
-                    formatTabs
-                    formFields
-                    createButton
-                }
-                .padding(24)
-                .background(Color(.windowBackgroundColor))
-            }
-            .background(Color(.windowBackgroundColor))
-            .navigationTitle("New Artifact")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        closeDrawer()
-                    }
-                }
-            }
+            V2DrawerScaffold(
+                accentGradient: accentGradient,
+                showsSidebar: false,
+                header: { headerContent },
+                content: {
+                    formatSection
+                    contentSection
+                },
+                sidebar: { EmptyView() }
+            )
+            .frame(minWidth: 840, minHeight: 620)
+            .frame(maxHeight: .infinity)
         }
-        .frame(width: 620, height: 580)
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 isFocused = true
             }
         }
-    }
-    
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Capture your ideas or drafts without breaking flow.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+        .onEscape {
+            closeDrawer()
         }
     }
     
-    private var formatTabs: some View {
-        HStack(spacing: 12) {
-            ForEach(OutputFormat.allCases, id: \.self) { format in
-                formatTabButton(for: format)
+    private var accentGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color.kosmicBlue.opacity(0.4),
+                Color.kosmicPurple.opacity(0.32)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+    
+    private var headerContent: some View {
+        HStack(alignment: .top, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("Artifact Title", text: $title)
+                    .font(.system(.title3, design: .rounded))
+                    .fontWeight(.semibold)
+                    .textFieldStyle(.plain)
+                    .drawerFocusGlow()
+                    .focused($isFocused)
+                
+                Text("Capture your ideas or drafts without breaking flow.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
             }
+            
+            Spacer(minLength: 20)
+            
+            VStack(spacing: 12) {
+                GlassButton(
+                    "Cancel",
+                    icon: "xmark",
+                    style: .standard,
+                    role: .surface
+                ) {
+                    closeDrawer()
+                }
+                .keyboardShortcut(.escape, modifiers: [])
+                
+                GlassButton(
+                    "Create Artifact",
+                    icon: "sparkles",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    createArtifact()
+                }
+                .disabled(!canCreate)
+                .keyboardShortcut(.return, modifiers: [])
+            }
+        }
+    }
+    
+    private var formatSection: some View {
+        DrawerSection(title: "Format", icon: "rectangle.grid.2x2", subtitle: "Choose the best structure for this capture") {
+            HStack(spacing: 12) {
+                ForEach(OutputFormat.allCases, id: \.self) { format in
+                    formatTabButton(for: format)
+                }
+            }
+        }
+    }
+    
+    private var contentSection: some View {
+        DrawerSection(title: "Content", icon: "doc.richtext", subtitle: "Draft your thoughts or paste material here") {
+            MentionTextEditor(
+                text: $content,
+                placeholder: "Draft your thoughts or paste material here…",
+                onMentionsChanged: { _, _ in }
+            )
+            .frame(minHeight: 260)
+            .drawerFocusGlow()
         }
     }
     
@@ -95,7 +150,7 @@ struct ArtifactQuickAddDrawer: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(
                         isSelected ?
-                        glassColorSystem.glassTint(for: .surface).opacity(0.35) :
+                        glassColorSystem.cardColor().opacity(0.35) :
                         Color.clear
                     )
             )
@@ -111,68 +166,6 @@ struct ArtifactQuickAddDrawer: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
-    }
-    
-    private var formFields: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Title")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .textCase(.uppercase)
-                
-                TextField("Enter title…", text: $title)
-                    .textFieldStyle(.plain)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(Color.white.opacity(0.08))
-                            )
-                    )
-                    .font(.system(size: 17, weight: .semibold))
-            }
-            
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Content")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .textCase(.uppercase)
-                
-                MentionTextEditor(
-                    text: $content,
-                    placeholder: "Draft your thoughts or paste material here…",
-                    onMentionsChanged: { _, _ in }
-                )
-                .frame(minHeight: 260)
-                .focused($isFocused)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(Color.white.opacity(0.06))
-                        )
-                )
-            }
-        }
-    }
-    
-    private var createButton: some View {
-        HStack {
-            Spacer()
-            Button {
-                createArtifact()
-            } label: {
-                Label("Create Artifact", systemImage: "sparkles")
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(!canCreate)
-        }
     }
     
     private func createArtifact() {

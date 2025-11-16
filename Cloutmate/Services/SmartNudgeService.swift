@@ -180,6 +180,47 @@ final class SmartNudgeService: ObservableObject {
         }
     }
 
+    /// Force evaluation of triggers for testing - bypasses some guards to show actual nudges
+    func forceEvaluateTriggers(modelContext: ModelContext) {
+        // Check all triggers and deliver the first available actual nudge
+        // This bypasses quiet hours and cooldown for testing purposes
+        if let candidate = checkStaleHighPriority(modelContext: modelContext) {
+            deliver(candidate: candidate, modelContext: modelContext)
+            return
+        }
+
+        if let candidate = checkCaptureVelocity(modelContext: modelContext) {
+            deliver(candidate: candidate, modelContext: modelContext)
+            return
+        }
+
+        if let candidate = checkFatiguedState(modelContext: modelContext) {
+            deliver(candidate: candidate, modelContext: modelContext)
+            return
+        }
+
+        if let candidate = checkExpressOverweight(modelContext: modelContext) {
+            deliver(candidate: candidate, modelContext: modelContext)
+            return
+        }
+        
+        if let candidate = checkRitualReminder(modelContext: modelContext) {
+            deliver(candidate: candidate, modelContext: modelContext)
+            return
+        }
+        
+        // If no actual nudge is available, create a sample one to show the structure
+        logger.info("No actual nudge conditions met - showing sample nudge for testing")
+        deliverPredictiveNudge(
+            trigger: .reflectionReminder,
+            tone: NudgeToneAdapter.shared.tone(for: .reflectionReminder),
+            message: "Time for a moment of reflection.",
+            detail: "This is how Aurora's nudges appear when conditions are met.",
+            metadata: ["source": "test_evaluation", "triggered_from": "settings"],
+            modelContext: modelContext
+        )
+    }
+
     // MARK: - Trigger Checks
 
     private func checkStaleHighPriority(modelContext: ModelContext) -> NudgeCandidate? {
@@ -436,6 +477,107 @@ final class SmartNudgeService: ObservableObject {
         } catch {
             logger.error("Failed to save SmartNudge context: \(error.localizedDescription)")
         }
+    }
+    
+    // MARK: - Focus Mode Nudges
+    
+    /// Check focus stability during active session and deliver nudge if needed
+    func checkFocusStability(
+        session: FocusSession,
+        previousStability: Double?,
+        currentStability: Double,
+        modelContext: ModelContext
+    ) {
+        guard let previous = previousStability else { return }
+        
+        let drop = previous - currentStability
+        if drop > 0.20 { // 20% drop
+            deliverPredictiveNudge(
+                trigger: .reflectionReminder,
+                tone: .gentle,
+                message: "Let's pause and reset your rhythm.",
+                detail: "Your focus stability has dropped. Take a moment to recenter.",
+                metadata: [
+                    "source": "focus_mode",
+                    "session_id": session.id.uuidString,
+                    "stability_drop": String(format: "%.2f", drop)
+                ],
+                modelContext: modelContext
+            )
+        }
+    }
+    
+    /// Check if LF remains high for extended period (deep flow state)
+    func checkDeepFlowState(
+        session: FocusSession,
+        lfHistory: [Double],
+        modelContext: ModelContext
+    ) {
+        guard lfHistory.count >= 20 else { return } // Need at least 20 samples (2.5+ minutes at 8s intervals)
+        
+        let recentLF = Array(lfHistory.suffix(20))
+        let averageLF = recentLF.reduce(0.0, +) / Double(recentLF.count)
+        
+        if averageLF > 0.5 { // High positive LF
+            deliverPredictiveNudge(
+                trigger: .reflectionReminder,
+                tone: .energized,
+                message: "Excellent consistency — you're in deep flow.",
+                detail: "You've maintained high focus for an extended period.",
+                metadata: [
+                    "source": "focus_mode",
+                    "session_id": session.id.uuidString,
+                    "lf_average": String(format: "%.2f", averageLF)
+                ],
+                modelContext: modelContext
+            )
+        }
+    }
+    
+    /// Deliver nudge when session ends early
+    func deliverEarlyEndNudge(
+        session: FocusSession,
+        plannedDuration: TimeInterval,
+        actualDuration: TimeInterval,
+        modelContext: ModelContext
+    ) {
+        let completionRatio = actualDuration / plannedDuration
+        if completionRatio < 0.5 { // Less than 50% of planned time
+            deliverPredictiveNudge(
+                trigger: .reflectionReminder,
+                tone: .gentle,
+                message: "Even short sessions matter. Let's note what pulled you away.",
+                detail: "Understanding interruptions helps improve future focus.",
+                metadata: [
+                    "source": "focus_mode",
+                    "session_id": session.id.uuidString,
+                    "completion_ratio": String(format: "%.2f", completionRatio)
+                ],
+                modelContext: modelContext
+            )
+        }
+    }
+    
+    /// Deliver post-session summary nudge
+    func deliverPostSessionNudge(
+        session: FocusSession,
+        stabilityPercentage: Double,
+        modelContext: ModelContext
+    ) {
+        let message = String(format: "You sustained calm focus for %.0f%% of this session.", stabilityPercentage * 100)
+        
+        deliverPredictiveNudge(
+            trigger: .reflectionReminder,
+            tone: .reflective,
+            message: message,
+            detail: "Take a moment to reflect on what helped you stay focused.",
+            metadata: [
+                "source": "focus_mode",
+                "session_id": session.id.uuidString,
+                "stability_percentage": String(format: "%.2f", stabilityPercentage)
+            ],
+            modelContext: modelContext
+        )
     }
 }
 

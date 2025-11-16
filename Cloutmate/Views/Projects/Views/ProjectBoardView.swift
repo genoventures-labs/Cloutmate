@@ -162,6 +162,7 @@ struct BoardLaneColumn: View {
     @Environment(\.modelContext) private var modelContext
     
     @State private var laneMetrics: ProjectFocusMetrics?
+    @State private var isTargeted = false
     
     var averageFocusIntensity: Double {
         guard let metrics = laneMetrics else { return 0.0 }
@@ -170,49 +171,63 @@ struct BoardLaneColumn: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Lane Header
-            HStack {
-                FocusGravityMarker(
-                    metrics: laneMetrics ?? ProjectFocusMetrics(
-                        cognitiveFocus: lane == .planning ? 0.7 : 0.3,
-                        creativeFlow: lane == .building ? 0.7 : 0.3,
-                        completionEnergy: lane == .reviewing ? 0.7 : 0.3,
-                        lastActiveAt: nil,
-                        avgSessionDuration: 0,
-                        weeklyTrend: []
-                    ),
-                    size: 8
-                )
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [lane.focusColor.opacity(0.8), lane.focusColor.opacity(0.4)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 12, height: 12)
+                    .shadow(color: lane.focusColor.opacity(0.35), radius: 6, y: 2)
                 
                 Text(lane.displayName)
-                    .font(.headline)
+                    .font(.system(.headline, design: .rounded))
                     .fontWeight(.semibold)
                     .foregroundColor(glassColorSystem.textPrimary())
                 
                 Spacer()
                 
-                Text("\(projects.count)")
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(4)
+                Capsule()
+                    .fill(lane.focusColor.opacity(0.12))
+                    .overlay(
+                        Text("\(projects.count)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(lane.focusColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                    )
+                    .frame(height: 24)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(width: 280)
             .background(
-                lane.focusColor.opacity(0.1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(lane.focusColor.opacity(0.08))
                     .overlay(
-                        Rectangle()
-                            .fill(lane.focusColor.opacity(0.2))
-                            .frame(height: 2),
-                        alignment: .top
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(lane.focusColor.opacity(0.18), lineWidth: 1)
                     )
             )
-            .cornerRadius(8)
+            
+            if metrics.hasHighlights {
+                HStack(spacing: 6) {
+                    if metrics.overdueCount > 0 {
+                        ProjectMetricPill(icon: "exclamationmark.triangle.fill", text: "\(metrics.overdueCount) overdue", tint: .red)
+                    }
+                    if metrics.dueSoonCount > 0 {
+                        ProjectMetricPill(icon: "clock.badge.exclamationmark", text: "\(metrics.dueSoonCount) due soon", tint: .orange)
+                    }
+                    if metrics.highPriorityCount > 0 {
+                        ProjectMetricPill(icon: "bolt.fill", text: "\(metrics.highPriorityCount) high priority", tint: .kosmicPurple)
+                    }
+                }
+                .padding(.horizontal, 12)
+            }
             
             // Projects in this lane
             ScrollView {
@@ -229,7 +244,10 @@ struct BoardLaneColumn: View {
                             onEdit: { onProjectEdit(project) },
                             onDuplicate: { onDuplicateProject(project) },
                             onArchive: { onArchiveProject(project) },
-                            onDelete: { onDeleteProject(project) }
+                            onDelete: { onDeleteProject(project) },
+                            onMoveToLane: { targetLane in
+                                onProjectDropped(project, targetLane)
+                            }
                         )
                         .applyIf(!selectionMode) { view in
                             view.draggable(ProjectDragInfo(projectID: project.id))
@@ -242,30 +260,42 @@ struct BoardLaneColumn: View {
                     Button(action: {
                         // Create project with lane status
                     }) {
-                        HStack {
+                        HStack(spacing: 6) {
                             Image(systemName: "plus")
+                                .font(.system(size: 12, weight: .semibold))
+                            Text("Add project")
                                 .font(.caption)
-                            Text("Add Project")
-                                .font(.caption)
+                                .fontWeight(.medium)
                         }
                         .foregroundColor(.secondary)
+                        .padding(.vertical, 10)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
-                        .background(Color.secondary.opacity(0.05))
+                        .background(Color.secondary.opacity(0.06))
                         .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
+                    .padding(.top, projects.isEmpty ? 32 : 12)
                 }
             }
             .frame(height: 600)
         }
         .frame(width: 280)
         .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(lane.focusColor.opacity(isTargeted ? 0.45 : 0), lineWidth: isTargeted ? 3 : 0)
+                .animation(.easeInOut(duration: 0.2), value: isTargeted)
+        )
         .onDrop(of: [.text], delegate: ProjectDropDelegate(
             targetLane: lane,
             projects: allProjects,
             onProjectDropped: onProjectDropped,
-            modelContext: modelContext
+            modelContext: modelContext,
+            onHoverChanged: { hovering in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isTargeted = hovering
+                }
+            }
         ))
         .task {
             // Calculate average metrics for lane
@@ -291,6 +321,11 @@ struct BoardLaneColumn: View {
             }
         }
     }
+    
+    private var metrics: ProjectLaneMetrics {
+        ProjectLaneMetrics(projects: projects, tasks: tasks)
+    }
+
 }
 
 // MARK: - Board Project Card
@@ -307,6 +342,7 @@ struct BoardProjectCard: View {
     let onDuplicate: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
+    let onMoveToLane: (ProjectBoardView.BoardLane) -> Void
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -364,6 +400,16 @@ struct BoardProjectCard: View {
                     .onTapGesture {
                         onSelectionToggle()
                     }
+            } else {
+                ProjectQuickActionBar(
+                    isVisible: isHovered,
+                    onOpen: onOpenDetail,
+                    onEdit: onEdit,
+                    onDuplicate: onDuplicate,
+                    onArchive: onArchive,
+                    onMove: onMoveToLane
+                )
+                .padding(.trailing, 4)
             }
         }
         .onHover { hovering in
@@ -372,18 +418,27 @@ struct BoardProjectCard: View {
         .onTapGesture {
             if selectionMode {
                 onSelectionToggle()
+            } else {
+                onOpenDetail()
             }
         }
         .onTapGesture(count: 2) {
             if selectionMode {
                 onSelectionToggle()
             } else {
-                onOpenDetail()
+                onEdit()
             }
         }
         .contextMenu {
             Button("Open") { onOpenDetail() }
             Button("Edit") { onEdit() }
+            Menu("Move to") {
+                ForEach(ProjectBoardView.BoardLane.allCases, id: \.self) { lane in
+                    Button(lane.displayName) {
+                        onMoveToLane(lane)
+                    }
+                }
+            }
             Button("Duplicate", systemImage: "doc.on.doc") { onDuplicate() }
             Button("Archive", systemImage: "archivebox") { onArchive() }
             Divider()
@@ -411,22 +466,40 @@ struct ProjectDropDelegate: DropDelegate {
     let projects: [Project]
     let onProjectDropped: (Project, ProjectBoardView.BoardLane) -> Void
     let modelContext: ModelContext
+    let onHoverChanged: (Bool) -> Void
+    
+    func validateDrop(info: DropInfo) -> Bool {
+        onHoverChanged(true)
+        return info.hasItemsConforming(to: [.text])
+    }
+    
+    func dropEntered(info: DropInfo) {
+        onHoverChanged(true)
+    }
+    
+    func dropExited(info: DropInfo) {
+        onHoverChanged(false)
+    }
     
     func performDrop(info: DropInfo) -> Bool {
         guard let itemProvider = info.itemProviders(for: [.text]).first else {
+            onHoverChanged(false)
             return false
         }
         
         _ = itemProvider.loadTransferable(type: ProjectDragInfo.self) { result in
             guard case .success(let dragInfo) = result else {
+                onHoverChanged(false)
                 return
             }
             
             _Concurrency.Task { @MainActor in
                 guard let project = projects.first(where: { $0.id == dragInfo.projectID }) else {
+                    onHoverChanged(false)
                     return
                 }
                 onProjectDropped(project, targetLane)
+                onHoverChanged(false)
             }
         }
         
@@ -434,3 +507,123 @@ struct ProjectDropDelegate: DropDelegate {
     }
 }
 
+private struct ProjectMetricPill: View {
+    let icon: String
+    let text: String
+    let tint: Color
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(tint)
+            Text(text)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(tint.opacity(0.08))
+        .clipShape(Capsule())
+    }
+}
+
+private struct ProjectLaneMetrics {
+    let overdueCount: Int
+    let dueSoonCount: Int
+    let highPriorityCount: Int
+    
+    var hasHighlights: Bool {
+        overdueCount > 0 || dueSoonCount > 0 || highPriorityCount > 0
+    }
+    
+    init(projects: [Project], tasks: [Task]) {
+        let projectIDs = Set(projects.map(\.id))
+        let relatedTasks = tasks.filter { task in
+            guard let projectId = task.projectId else { return false }
+            return projectIDs.contains(projectId)
+        }
+        
+        let now = Date()
+        let calendar = Calendar.current
+        
+        overdueCount = relatedTasks.filter { task in
+            guard let dueDate = task.dueDate else { return false }
+            return dueDate < now && task.status != .done
+        }.count
+        
+        dueSoonCount = relatedTasks.filter { task in
+            guard let dueDate = task.dueDate else { return false }
+            guard dueDate >= now else { return false }
+            let days = calendar.dateComponents([.day], from: now, to: dueDate).day ?? 0
+            return days <= 3 && task.status != .done
+        }.count
+        
+        highPriorityCount = relatedTasks.filter { task in
+            task.priority == .high && task.status != .done
+        }.count
+    }
+}
+
+private struct ProjectQuickActionBar: View {
+    let isVisible: Bool
+    let onOpen: () -> Void
+    let onEdit: () -> Void
+    let onDuplicate: () -> Void
+    let onArchive: () -> Void
+    let onMove: (ProjectBoardView.BoardLane) -> Void
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            TaskBoardQuickActionButton(systemName: "eye.fill", tint: Color.primary, action: onOpen)
+            TaskBoardQuickActionButton(systemName: "pencil", tint: .kosmicBlue, action: onEdit)
+            TaskBoardQuickActionButton(systemName: "doc.on.doc", tint: .kosmicPurple, action: onDuplicate)
+            
+            Menu {
+                ForEach(ProjectBoardView.BoardLane.allCases, id: \.self) { lane in
+                    Button(lane.displayName) {
+                        onMove(lane)
+                    }
+                }
+            } label: {
+                QuickActionGlyph(systemName: "arrow.triangle.2.circlepath", tint: Color.secondary)
+            }
+            .menuStyle(.borderlessButton)
+            
+            TaskBoardQuickActionButton(systemName: "archivebox", tint: .orange, action: onArchive)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.14), radius: 8, y: 4)
+        .opacity(isVisible ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: isVisible)
+        .allowsHitTesting(isVisible)
+    }
+}
+
+private struct TaskBoardQuickActionButton: View {
+    let systemName: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            QuickActionGlyph(systemName: systemName, tint: tint)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct QuickActionGlyph: View {
+    let systemName: String
+    let tint: Color
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(6)
+    }
+}

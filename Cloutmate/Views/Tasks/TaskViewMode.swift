@@ -9,13 +9,13 @@ import SwiftUI
 import CloutmateShared
 
 enum TaskViewMode: String, CaseIterable {
-    case list, board, timeline, gallery
+    case list, board, planner, gallery
     
     var icon: String {
         switch self {
         case .list: return "list.bullet"
         case .board: return "square.grid.2x2"
-        case .timeline: return "timeline.selection"
+        case .planner: return "chart.bar.doc.horizontal"
         case .gallery: return "photo.on.rectangle"
         }
     }

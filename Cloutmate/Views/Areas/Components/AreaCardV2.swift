@@ -58,18 +58,19 @@ struct AreaCardV2: View {
     }
     
     var body: some View {
+        DashboardTile(accent: accentColor) {
         VStack(alignment: .leading, spacing: 12) {
             // Top Row: Icon, Title, Menu
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: iconName)
                     .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(accentColor)
+                        .foregroundStyle(accentColor)
                     .frame(width: 32, height: 32)
                 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(area.title)
                         .font(.headline)
-                        .foregroundColor(glassColorSystem.textPrimary())
+                            .foregroundStyle(glassColorSystem.textPrimary())
                         .lineLimit(2)
                     
                     if isReviewDue, let onReview {
@@ -85,7 +86,7 @@ struct AreaCardV2: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.orange.opacity(0.16))
-                            .foregroundColor(.orange)
+                                .foregroundStyle(.orange)
                             .cornerRadius(6)
                         }
                         .buttonStyle(.plain)
@@ -112,7 +113,7 @@ struct AreaCardV2: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(glassColorSystem.textSecondary())
+                            .foregroundStyle(glassColorSystem.textSecondary())
                         .frame(width: 24, height: 24)
                 }
                 .buttonStyle(.plain)
@@ -122,7 +123,7 @@ struct AreaCardV2: View {
             if let notes = area.notes, !notes.isEmpty {
                 Text(notes)
                     .font(.caption)
-                    .foregroundColor(glassColorSystem.textSecondary())
+                        .foregroundStyle(glassColorSystem.textSecondary())
                     .lineLimit(3)
             }
             
@@ -157,11 +158,11 @@ struct AreaCardV2: View {
                 if let lastReview = area.lastReviewDate {
                     Text("Reviewed \(lastReview, style: .relative)")
                         .font(.caption2)
-                        .foregroundColor(glassColorSystem.textTertiary())
+                            .foregroundStyle(glassColorSystem.textTertiary())
                 } else {
                     Text("Never reviewed")
                         .font(.caption2)
-                        .foregroundColor(glassColorSystem.textTertiary())
+                            .foregroundStyle(glassColorSystem.textTertiary())
                 }
                 
                 Spacer()
@@ -169,18 +170,7 @@ struct AreaCardV2: View {
                 StabilityScoreBadge(score: stabilityScore)
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            GlassPanel(tier: .contentCard, cornerRadius: 12) {
-                EmptyView()
-            }
-        )
-        .shadow(
-            color: isHovered ? Color.kosmicBlue.opacity(0.2) : Color.black.opacity(0.05),
-            radius: isHovered ? 12 : 4,
-            y: isHovered ? 8 : 2
-        )
+        }
         .scaleEffect(reduceMotion ? 1.0 : (isHovered ? 1.015 : 1.0))
         .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: isHovered)
         .onHover { hovering in

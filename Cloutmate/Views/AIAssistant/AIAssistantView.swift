@@ -42,10 +42,11 @@ struct AIAssistantView: View {
     @State private var scrollOffset: CGFloat = 0
     @State private var headerOpacity: Double = 1.0
     @State private var showAuroraPreferences = false
-    @State private var showSpotlight = false
     @State private var showAuroraCreateSheet = false
     @State private var createSheetAction: ToolbarAction?
     @State private var chatScrollProxy: ScrollViewProxy?
+    @State private var showDocumentSourceDrawer = false
+    @State private var showDocumentURLDrawer = false
     
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
@@ -74,13 +75,6 @@ struct AIAssistantView: View {
             setupVoiceService()
             setupKeyboardHandlers()
             setupNotifications()
-        }
-        .sheet(isPresented: $showAuroraPreferences) {
-            AIAssistantPreferencesSheet()
-                }
-        .sheet(isPresented: $showSpotlight) {
-            AuroraSpotlightView()
-                .frame(width: 600, height: 500)
         }
         .alert("Unsaved Changes", isPresented: $showUnsavedAlert) {
             Button("Cancel", role: .cancel) {}
@@ -121,25 +115,44 @@ struct AIAssistantView: View {
     }
     
     private var drawerVisible: Bool {
-        showContextualCreateSheet || showAuroraCreateSheet
+        // showAuroraCreateSheet removed - now handled in AuroraChatContainer
+        showContextualCreateSheet || showAuroraPreferences || showDocumentSourceDrawer || showDocumentURLDrawer
     }
     
     @ViewBuilder
     private var overlayDrawers: some View {
         if showContextualCreateSheet {
             ContextualCreateDrawer(isPresented: $showContextualCreateSheet, currentTab: contextualCreateTab)
-                .transition(.move(edge: .trailing))
+                .transition(.move(edge: .trailing).combined(with: .opacity))
         }
         
-        if showAuroraCreateSheet, let action = createSheetAction {
-            AuroraDrawer(isPresented: $showAuroraCreateSheet, title: "Create With Aurora", icon: "square.and.pencil") {
-                AuroraCreateSheet(action: action) { prompt in
-                    viewModel.inputText = prompt
-                    sendCurrentMessage(modelContext: modelContext)
+        
+        if showAuroraPreferences {
+            AIAssistantPreferencesSheet(isPresented: $showAuroraPreferences)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+        
+        if showDocumentSourceDrawer {
+            DocumentSourceDrawer(
+                isPresented: $showDocumentSourceDrawer,
+                onSelectFromComputer: {
+                    attachDocumentFromPicker()
+                },
+                onSelectFromURL: {
+                    showDocumentURLDrawer = true
                 }
-                .padding(.horizontal, -24)
-            }
-            .transition(.move(edge: .trailing))
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+        
+        if showDocumentURLDrawer {
+            DocumentURLDrawer(
+                isPresented: $showDocumentURLDrawer,
+                onImport: { url in
+                    attachDocumentFromURL(url)
+                }
+            )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         }
     }
     
@@ -295,7 +308,7 @@ struct AIAssistantView: View {
             // Header with scroll fade
             AIAssistantHeaderView(
                 onSearch: {
-                    showSpotlight = true
+                    AuroraSpotlightWindowController.shared.show()
                 },
                 onNewChat: {
                     if !viewModel.messages.isEmpty {
@@ -329,10 +342,10 @@ struct AIAssistantView: View {
                                             onEdit: { editedMessage, newContent in
                                                 viewModel.editAndRegenerateMessage(editedMessage, newContent: newContent, modelContext: modelContext)
                                             },
-                                            onCopy: { _ in },
-                                            onResend: { assistantMessage in
-                                                viewModel.resendAssistantMessage(assistantMessage, modelContext: modelContext)
-                                            },
+                                        onCopy: { _ in },
+                                        onResend: { assistantMessage in
+                                            viewModel.resendAssistantMessage(assistantMessage, modelContext: modelContext)
+                                        },
                                         canResend: viewModel.canResendPayload(for: message)
                                         )
                                         .id(message.id)
@@ -341,12 +354,25 @@ struct AIAssistantView: View {
                                 }
                                 
                                 if viewModel.isLoading {
+                                    // When research mode is active, ONLY show research progress indicator
+                                    // Never show "Crafting response" ThinkingIndicator in research mode
+                                    if viewModel.researchModeActive {
+                                        // Show progress indicator if we have an action, otherwise show "Starting research..."
+                                        let action = viewModel.currentResearchAction ?? "Starting research..."
+                                        ResearchProgressIndicator(
+                                            action: action,
+                                            sourceCount: viewModel.currentResearchSourceCount
+                                        )
+                                        .padding()
+                                    } else {
+                                        // Only show ThinkingIndicator when NOT in research mode
                                     ThinkingIndicator(
                                         activity: viewModel.displayedActivity,
                                         sourceModel: viewModel.currentSourceModel,
                                         statusMessage: viewModel.currentStatus
                                     )
                                     .padding()
+                                    }
                                 } else if !viewModel.messages.isEmpty {
                                     IdleIndicator()
                                         .padding(.top, 8)
@@ -482,6 +508,7 @@ struct AIAssistantView: View {
                 pendingDocumentAttachment: viewModel.pendingDocumentAttachment,
                 lastConfidenceScore: viewModel.messages.last(where: { $0.role == "assistant" })?.confidenceScore,
                 canRetry: viewModel.canRetry,
+                isResearchMode: viewModel.researchModeActive,
                 onResendLastAssistant: viewModel.canResendLastAssistant ? {
                     viewModel.resendLastAssistant(modelContext: modelContext)
                 } : nil,
@@ -612,9 +639,9 @@ struct AIAssistantView: View {
         // Handle action
         switch action {
         case .createTask, .createProject, .createNote, .createReminder:
-            // Show create sheet for these actions
-            createSheetAction = action
-            showAuroraCreateSheet = true
+            // AuroraCreateSheet removed - now handled in AuroraChatContainer as bottom drawer
+            // These actions are handled in UnifiedAIAssistantView
+            break
             
         case .analyzeDocument:
             presentDocumentSourceChooser()
@@ -625,24 +652,7 @@ struct AIAssistantView: View {
     }
 
     private func presentDocumentSourceChooser() {
-        _Concurrency.Task { @MainActor in
-            let alert = NSAlert()
-            alert.messageText = "Add Document"
-            alert.informativeText = "Choose how you want to bring this document into the chat."
-            alert.addButton(withTitle: "From Computer")
-            alert.addButton(withTitle: "From URL")
-            alert.addButton(withTitle: "Cancel")
-            alert.alertStyle = .informational
-            let response = alert.runModal()
-            switch response {
-            case .alertFirstButtonReturn:
-                attachDocumentFromPicker()
-            case .alertSecondButtonReturn:
-                promptDocumentURL()
-            default:
-                break
-            }
-        }
+        showDocumentSourceDrawer = true
     }
 
     private func attachImageFromPicker() {
@@ -748,22 +758,7 @@ struct AIAssistantView: View {
 
     @MainActor
     private func promptDocumentURL() {
-        let alert = NSAlert()
-        alert.messageText = "Import Document from URL"
-        alert.informativeText = "Paste a link to a PDF, Markdown, or text file."
-        alert.addButton(withTitle: "Import")
-        alert.addButton(withTitle: "Cancel")
-        let inputField = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
-        inputField.placeholderString = "https://example.com/report.pdf"
-        alert.accessoryView = inputField
-        let response = alert.runModal()
-        guard response == .alertFirstButtonReturn else { return }
-        let value = inputField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: value), !value.isEmpty else {
-            toastMessage = "That URL doesn't look right."
-            return
-        }
-        attachDocumentFromURL(url)
+        showDocumentURLDrawer = true
     }
 
     private func handleImagePaste(_ image: NSImage) {

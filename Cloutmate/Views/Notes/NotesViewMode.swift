@@ -12,16 +12,16 @@ enum NotesViewMode: String, CaseIterable {
     case cards = "Cards"
     case list = "List"
     case grid = "Grid"
-    case table = "Table"
-    case compact = "Compact"
+    case board = "Board"
+    case timeline = "Timeline"
     
     var icon: String {
         switch self {
         case .cards: return "rectangle.stack"
         case .list: return "list.bullet"
         case .grid: return "square.grid.2x2"
-        case .table: return "tablecells"
-        case .compact: return "list.bullet.rectangle"
+        case .board: return "rectangle.3.group"
+        case .timeline: return "chart.line.uptrend.xyaxis"
         }
     }
     

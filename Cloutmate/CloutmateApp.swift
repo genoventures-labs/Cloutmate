@@ -42,6 +42,12 @@ struct CloutmateApp: App {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color.clear)
                     .onAppear {
+                        // FIRST: Start model warmup before any other processes
+                        _Concurrency.Task { @MainActor in
+                            let context = CloutmateApp.sharedModelContainer.mainContext
+                            await ModelWarmupService.shared.startWarmup(modelContext: context)
+                            
+                            // Only start other processes after warmup completes
                         startPublishingTimer()
                         checkAndRunMigration()
                         registerGlobalHotkey()
@@ -61,6 +67,7 @@ struct CloutmateApp: App {
                         _Concurrency.Task {
                             let apiKey = AISettings.shared.ollamaCloudAPIKey
                             _ = await HybridBridgeService.shared.performHealthCheck(apiKey: apiKey)
+                            }
                         }
                     }
             }
@@ -146,6 +153,13 @@ struct CloutmateApp: App {
                     NotificationCenter.default.post(name: NSNotification.Name("AuroraToolbarAction"), object: ToolbarAction.analyzeImage)
                 }
                 .keyboardShortcut("6", modifiers: [.command, .shift])
+            }
+            
+            // Suppress text editing menu warnings by explicitly managing Format menu
+            // This prevents AppKit from auto-generating orphaned submenus
+            CommandMenu("Format") {
+                // Empty - prevents automatic menu generation issues
+                // Text editing functionality is handled directly in text views
             }
         }
     }
@@ -335,6 +349,40 @@ struct CloutmateApp: App {
             // Start ReactiveThemeManager
             let context = CloutmateApp.sharedModelContainer.mainContext
             themeManager.start(modelContext: context)
+            glassColorSystem.updateEmotionalState(themeManager.currentState, intensity: themeManager.intensity)
+            glassColorSystem.emotionalIntensity = themeManager.intensity
+            SidebarToneSyncService.shared.prime(with: themeManager.currentState, intensity: themeManager.intensity)
+            
+            // Initialize AECI
+            let aecIndex = await EmotionalContinuityEngine.shared.getCurrentAECI(modelContext: context)
+            let aecHistory = await EmotionalContinuityEngine.shared.calculateWeeklyAECI(modelContext: context)
+            if let history = aecHistory {
+                glassColorSystem.updateAECI(history.aecIndex, category: history.category)
+            } else {
+                glassColorSystem.updateAECI(aecIndex, category: .neutral)
+            }
+            
+            // Initialize ERI
+            let eriIndex = await AuroraEcosphericLayer.shared.getCurrentERI(modelContext: context)
+            let eriHistory = await AuroraEcosphericLayer.shared.calculateERI(modelContext: context)
+            if let history = eriHistory {
+                glassColorSystem.updateERI(history.eriIndex, category: history.category)
+            } else {
+                glassColorSystem.updateERI(eriIndex, category: .neutral)
+            }
+            
+            // Initialize ERS
+            let ersIndex = await AuroraMetaSymphony.shared.getCurrentERS(modelContext: context)
+            let ersHistory = await AuroraMetaSymphony.shared.calculateERS(modelContext: context)
+            if let history = ersHistory {
+                glassColorSystem.updateERS(history.ersIndex, category: history.category)
+            } else {
+                glassColorSystem.updateERS(ersIndex, category: .neutral)
+            }
+            
+            // Initialize Luminance Field
+            let lfIndex = await AuroraLuminara.shared.getCurrentLF(modelContext: context)
+            _ = await AuroraLuminara.shared.calculateLuminanceField(modelContext: context)
             
             // Subscribe to theme changes to update GlassColorSystem
             // Debounce to prevent rapid UI update cycles
@@ -343,6 +391,7 @@ struct CloutmateApp: App {
                 .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
                 .sink { [weak glassColorSystem] state in
                     glassColorSystem?.updateEmotionalState(state, intensity: themeManager.intensity)
+                    SidebarToneSyncService.shared.prime(with: state, intensity: themeManager.intensity)
                 }
                 .store(in: &themeManager.cancellables)
             
@@ -447,6 +496,14 @@ extension CloutmateApp {
             RitualCompletion.self,
             WeeklyReview.self,
             SmartNudge.self,
+            // Tone prediction feedback
+            ToneForecastMetrics.self,
+            ToneReliabilityProfile.self,
+            EmotionEpoch.self,
+            AECIHistory.self,
+            ERIHistory.self,
+            ERSHistory.self,
+            LFHistory.self,
             // Phase 9 models (Predictive Cognition)
             FocusForecast.self,
             DriftEvent.self,

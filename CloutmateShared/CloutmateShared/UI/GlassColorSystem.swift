@@ -217,11 +217,13 @@ public final class GlassColorSystem: ObservableObject {
         // Listen for system appearance changes
         NotificationCenter.default.publisher(for: NSNotification.Name("NSInterfaceThemeChangedNotification"))
             .sink { [weak self] _ in
-                _Concurrency.Task { @MainActor in
+                guard let self = self else { return }
+                _Concurrency.Task { @MainActor [weak self] in
+                    guard let self = self else { return }
                     // Only update if using system theme
                     let appearanceMode = UserDefaults.standard.string(forKey: "appearanceMode") ?? "system"
                     if appearanceMode == "system" {
-                        self?.updateColorScheme()
+                        self.updateColorScheme()
                     }
                 }
             }

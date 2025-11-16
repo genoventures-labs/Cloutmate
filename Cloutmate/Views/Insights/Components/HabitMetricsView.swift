@@ -47,22 +47,25 @@ struct HabitMetricsView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
                 
+                // Behavior Shifts Section
+                BehaviorShiftsView(timeRange: timeRange)
+                    .padding(.top, 8)
+                
                 // Task Completion Rate Ring
                 if let snapshot = snapshot {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    let clampedCompletionRate = min(max(snapshot.completionRate, 0), 1)
+                    DashboardTile(accent: .kosmicGreen.opacity(0.85), padding: 24) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Task Completion Rate")
                                 .font(.system(.headline, design: .rounded))
                                 .foregroundColor(.primary)
                             
                             ZStack {
-                                // Background ring
                                 Circle()
                                     .stroke(Color.secondary.opacity(0.2), lineWidth: 12)
                                 
-                                // Progress ring
                                 Circle()
-                                    .trim(from: 0, to: snapshot.completionRate)
+                                    .trim(from: 0, to: clampedCompletionRate)
                                     .stroke(
                                         LinearGradient(
                                             colors: [Color.kosmicGreen, Color.kosmicGreen.opacity(0.6)],
@@ -72,11 +75,10 @@ struct HabitMetricsView: View {
                                         style: StrokeStyle(lineWidth: 12, lineCap: .round)
                                     )
                                     .rotationEffect(.degrees(-90))
-                                    .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: snapshot.completionRate)
+                                    .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: clampedCompletionRate)
                                 
-                                // Center text
                                 VStack(spacing: 4) {
-                                    Text("\(Int(snapshot.completionRate * 100))%")
+                                    Text("\(Int(clampedCompletionRate * 100))%")
                                         .font(.system(.title, design: .rounded))
                                         .fontWeight(.bold)
                                         .foregroundColor(.primary)
@@ -88,15 +90,13 @@ struct HabitMetricsView: View {
                             }
                             .frame(height: 150)
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
                 
                 // Ritual Consistency Bars
                 if !ritualBreakdown.isEmpty {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicGreen.opacity(0.8), padding: 24) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Ritual Consistency")
                                 .font(.system(.headline, design: .rounded))
@@ -140,15 +140,13 @@ struct HabitMetricsView: View {
                                 }
                             }
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
                 
                 // Project Momentum Dots
                 if !activeProjects.isEmpty {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicBlue.opacity(0.8), padding: 24) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Project Momentum")
                                 .font(.system(.headline, design: .rounded))
@@ -163,15 +161,13 @@ struct HabitMetricsView: View {
                                 .padding(.horizontal, 4)
                             }
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
                 
                 // Streak Tracker
                 if let snapshot = snapshot {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicGreen.opacity(0.8), padding: 24) {
                         VStack(alignment: .leading, spacing: 16) {
                             Text("Streak Tracker")
                                 .font(.system(.headline, design: .rounded))
@@ -191,15 +187,13 @@ struct HabitMetricsView: View {
                                 )
                             }
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
                 
                 // "Good Day" Summary Banner
                 if showGoodDayBanner {
-                    GlassPanel(tier: .overlay, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicGreen.opacity(0.75), padding: 20) {
                         HStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.kosmicGreen)
@@ -217,10 +211,8 @@ struct HabitMetricsView: View {
                             
                             Spacer()
                         }
-                        .padding(20)
                     }
                     .padding(.horizontal, 20)
-                    .floatLift()
                 }
             }
             .padding(.bottom, 40)

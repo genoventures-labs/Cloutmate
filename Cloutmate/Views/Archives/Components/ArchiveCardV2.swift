@@ -65,28 +65,15 @@ struct ArchiveCardV2: View {
     }
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+        DashboardTile(accent: entityColor) {
             VStack(alignment: .leading, spacing: 12) {
                 headerRow
                 bodySection
                 footerRow
             }
-            .padding(16)
         }
-        .applyIf(!reduceMotion) { view in
-            view.floatLift()
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [entityColor.opacity(0.3), entityColor.opacity(0.1)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: isHovered ? 1.5 : 0.5
-                )
-        )
+        .scaleEffect(reduceMotion ? 1.0 : (isHovered ? 1.015 : 1.0))
+        .animation(reduceMotion ? nil : GlassMotion.Easing.spring, value: isHovered)
         .contentShape(Rectangle())
         .onHover { hovering in
             isHovered = hovering
@@ -123,7 +110,7 @@ struct ArchiveCardV2: View {
             // Entity icon
             Image(systemName: entityIcon)
                 .font(.title3)
-                .foregroundColor(entityColor)
+                .foregroundStyle(entityColor)
                 .frame(width: 32, height: 32)
             
             VStack(alignment: .leading, spacing: 6) {
@@ -131,7 +118,7 @@ struct ArchiveCardV2: View {
                 Text(archiveItem.title)
                     .font(.system(.headline, design: .rounded))
                     .fontWeight(.bold)
-                    .foregroundColor(.primary)
+                .foregroundStyle(glassColorSystem.textPrimary())
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                 
                 // Tag badges
@@ -144,7 +131,7 @@ struct ArchiveCardV2: View {
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(entityColor.opacity(0.15))
-                                    .foregroundColor(entityColor)
+                                    .foregroundStyle(entityColor)
                                     .cornerRadius(6)
                             }
                         }
@@ -160,7 +147,7 @@ struct ArchiveCardV2: View {
                     Button(action: onRestore) {
                         Image(systemName: "arrow.counterclockwise")
                             .font(.caption)
-                            .foregroundColor(.kosmicBlue)
+                            .foregroundStyle(.kosmicBlue)
                             .padding(6)
                             .background(Color.kosmicBlue.opacity(0.1))
                             .clipShape(Circle())
@@ -171,7 +158,7 @@ struct ArchiveCardV2: View {
                     Button(action: onDelete) {
                         Image(systemName: "trash")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundStyle(.red)
                             .padding(6)
                             .background(Color.red.opacity(0.1))
                             .clipShape(Circle())
@@ -188,7 +175,7 @@ struct ArchiveCardV2: View {
             // Excerpt
             Text(excerpt)
                 .font(.callout)
-                .foregroundColor(.secondary)
+                .foregroundStyle(glassColorSystem.textSecondary())
                 .lineLimit(2)
             
             // Captured Insight (Aurora summary)
@@ -196,10 +183,10 @@ struct ArchiveCardV2: View {
                 HStack(alignment: .top, spacing: 6) {
                     Image(systemName: "sparkles")
                         .font(.caption2)
-                        .foregroundColor(.kosmicPurple)
+                        .foregroundStyle(Color.kosmicPurple)
                     Text(commentary)
                         .font(.caption)
-                        .foregroundColor(.kosmicPurple.opacity(0.9))
+                        .foregroundStyle(Color.kosmicPurple.opacity(0.9))
                         .italic()
                         .lineLimit(1)
                 }
@@ -231,7 +218,7 @@ struct ArchiveCardV2: View {
                 .frame(height: 4)
             Text(tone.displayName)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundStyle(glassColorSystem.textSecondary())
         }
     }
     
@@ -241,10 +228,10 @@ struct ArchiveCardV2: View {
             HStack(spacing: 4) {
                 Image(systemName: "clock")
                     .font(.caption2)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
                 Text(archivedDateString)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
             }
             
             Spacer()
@@ -254,10 +241,10 @@ struct ArchiveCardV2: View {
                 HStack(spacing: 4) {
                     Image(systemName: "folder.fill")
                         .font(.caption2)
-                        .foregroundColor(.kosmicBlue)
+                        .foregroundStyle(.kosmicBlue)
                     Text("From Project")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(glassColorSystem.textSecondary())
                 }
             }
         }

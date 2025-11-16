@@ -15,9 +15,10 @@ final class SidebarToneSyncService {
     static let shared = SidebarToneSyncService()
     
     private(set) var currentGradient: LinearGradient
-    private(set) var gradientOpacity: Double = 1.0
+    private(set) var gradientOpacity: Double = 0.4
     
     private var cancellables = Set<AnyCancellable>()
+    private var bindingCancellable: AnyCancellable?
     private var toneStabilizationTimer: Timer?
     
     private init() {
@@ -31,12 +32,7 @@ final class SidebarToneSyncService {
     // MARK: - ARTE Observation
     
     private func observeARTEState() {
-        ReactiveThemeManager.shared.$currentState
-            .receive(on: RunLoop.main)
-            .sink { [weak self] newState in
-                self?.updateGradient(for: newState)
-            }
-            .store(in: &cancellables)
+        bindToThemeManager()
     }
     
     // MARK: - Gradient Updates
@@ -64,6 +60,28 @@ final class SidebarToneSyncService {
                 self.gradientOpacity = 0.4
             }
         }
+    }
+    
+    // MARK: - Priming
+    
+    func prime(with state: EmotionalState, intensity: Double) {
+        toneStabilizationTimer?.invalidate()
+        currentGradient = Self.gradientForState(state)
+        withAnimation(.easeInOut(duration: 0.25)) {
+            gradientOpacity = 0.4 + (0.2 * min(1.0, intensity))
+        }
+        resetStabilizationTimer()
+    }
+    
+    @MainActor
+    func bindToThemeManager() {
+        ReactiveThemeManager.shared.$currentState
+            .combineLatest(ReactiveThemeManager.shared.$intensity)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state, intensity in
+                self?.prime(with: state, intensity: intensity)
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Gradient Mapping

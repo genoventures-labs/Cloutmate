@@ -323,44 +323,39 @@ struct MentionDetailPopover: View {
         }
     }
     
+    @ViewBuilder
     private var eventContent: some View {
-        Group {
-            if let event = fetchEvent() {
-                VStack(alignment: .leading, spacing: 8) {
-                    let formatter = DateFormatter()
-                    formatter.dateStyle = .medium
-                    formatter.timeStyle = event.allDay ? .none : .short
-                    
-                    Label(
-                        event.allDay ? "All-day" : "\(formatter.string(from: event.startDate)) – \(formatter.string(from: event.endDate))",
-                        systemImage: event.allDay ? "sun.max.fill" : "clock"
-                    )
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    
-                    if let location = event.location, !location.isEmpty {
-                        Label(location, systemImage: "mappin.and.ellipse")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    if let recurrence = event.recurrence {
-                        Label(recurrenceDescription(for: recurrence), systemImage: "arrow.2.squarepath")
-                            .font(.caption)
-                            .foregroundColor(.cyan)
-                    }
-                    
-                    if let notes = event.notes, !notes.isEmpty {
-                        Text(String(notes.prefix(160)))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .lineLimit(3)
-                    }
+        if let event = fetchEvent() {
+            VStack(alignment: .leading, spacing: 8) {
+                Label(
+                    eventTimeDescription(for: event),
+                    systemImage: eventTimeIcon(for: event)
+                )
+                .font(.caption)
+                .foregroundColor(.secondary)
+                
+                if let location = event.location, !location.isEmpty {
+                    Label(location, systemImage: "mappin.and.ellipse")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-            } else {
-                Text("Cannot load event details")
-                    .foregroundStyle(.secondary)
+                
+                if let recurrence = event.recurrence {
+                    Label(recurrenceDescription(for: recurrence), systemImage: "arrow.2.squarepath")
+                        .font(.caption)
+                        .foregroundColor(.cyan)
+                }
+                
+                if let notes = event.notes, !notes.isEmpty {
+                    Text(String(notes.prefix(160)))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                }
             }
+        } else {
+            Text("Cannot load event details")
+                .foregroundStyle(.secondary)
         }
     }
     
@@ -438,6 +433,8 @@ struct MentionDetailPopover: View {
             tab = .inbox
         case .focusSession:
             tab = .focusMode
+        case .event:
+            tab = .calendar
         }
         
         NotificationCenter.default.post(name: .switchTab, object: tab)
@@ -560,6 +557,8 @@ struct MentionDetailPopover: View {
             return fetchFocusSession()?.objective ?? ""
         case .event:
             return fetchEvent()?.notes ?? ""
+        case .event:
+            return fetchEvent()?.notes ?? ""
         }
     }
     
@@ -594,6 +593,22 @@ struct MentionDetailPopover: View {
         let formatter = DateFormatter()
         formatter.locale = Locale.current
         return formatter.weekdaySymbols[value - 1]
+    }
+    
+    private func eventTimeDescription(for event: CalendarEvent) -> String {
+        if event.allDay {
+            return "All-day"
+        }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        let start = formatter.string(from: event.startDate)
+        let end = formatter.string(from: event.endDate)
+        return "\(start) – \(end)"
+    }
+    
+    private func eventTimeIcon(for event: CalendarEvent) -> String {
+        event.allDay ? "sun.max.fill" : "clock"
     }
     
     @ViewBuilder

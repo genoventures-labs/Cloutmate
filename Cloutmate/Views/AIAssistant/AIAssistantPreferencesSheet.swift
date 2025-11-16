@@ -9,127 +9,148 @@ import SwiftUI
 import CloutmateShared
 
 struct AIAssistantPreferencesSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    @Binding var isPresented: Bool
     @State private var aiSettings = AISettings.shared
     
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
+    private var accentGradient: LinearGradient {
+        AuroraPalette.linearGradient(for: colorScheme)
+    }
+    
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 32))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.kosmicBlue, .kosmicPurple],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Aurora Preferences")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                Text("Configure your AI assistant")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+        Group {
+            if isPresented {
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottom) {
+                        // Backdrop
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                closeDrawer()
                             }
-                        }
-                    }
-                    .padding(.bottom, 8)
-                    
-                    Divider()
-                    
-                    // AI Features Toggle
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle(isOn: Binding(
-                            get: { aiSettings.isAIEnabled },
-                            set: { aiSettings.isAIEnabled = $0 }
-                        )) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "sparkles")
-                                    .foregroundColor(.kosmicBlue)
-                                Text("Enable AI Features")
-                                    .font(.body)
-                            }
-                        }
+                            .transition(.opacity)
                         
-                        Text("When enabled, Aurora can help you create tasks, projects, notes, analyze documents, and have conversations.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Divider()
-                    
-                    // Airplane Mode
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle(isOn: Binding(
-                            get: { aiSettings.airplaneMode },
-                            set: { aiSettings.airplaneMode = $0 }
-                        )) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "airplane")
-                                    .foregroundColor(.kosmicPurple)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Airplane Mode")
-                                        .font(.body)
-                                    Text("Disable network access. Aurora runs entirely locally.")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
+                        // Drawer slides up from bottom
+                        VStack(spacing: 0) {
+                            V2DrawerScaffold(
+                                accentGradient: accentGradient,
+                                showsSidebar: false,
+                                header: { headerContent },
+                                content: { drawerContent },
+                                sidebar: { EmptyView() }
+                            )
                         }
-                        
-                        if aiSettings.airplaneMode {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.caption)
-                                Text("Aurora is running in offline mode.")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                    
-                    Divider()
-                    
-                    // Model Info (Read-only)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "brain.head.profile")
-                                .foregroundColor(.kosmicPurple)
-                            Text("AI Model")
-                                .font(.body)
-                        }
-                        
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.caption)
-                            Text("Aurora automatically selects the best model for each task. Gemma3 covers conversations and images, Gwen3 handles deep reasoning, and Granite keeps memories tidy in the background.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding(24)
-            }
-            .frame(width: 500, height: 600)
-            .navigationTitle("Aurora Preferences")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") {
-                        dismiss()
+                        .frame(maxHeight: geometry.size.height * 0.75)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
                 }
             }
         }
     }
+    
+    private func closeDrawer() {
+        withAnimation(GlassMotion.Easing.modalOpen) {
+            isPresented = false
+        }
+    }
+    
+    private var headerContent: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Aurora Preferences")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                
+                Text("Configure your AI assistant")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+            }
+            
+            Spacer()
+            
+            GlassButton(
+                nil,
+                icon: "xmark",
+                style: .iconOnly,
+                role: .surface
+            ) {
+                closeDrawer()
+            }
+            .accessibilityLabel("Close")
+        }
+    }
+    
+    @ViewBuilder
+    private var drawerContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // AI Features Toggle
+            DrawerSection(title: "AI Features", icon: "sparkles") {
+                Toggle(isOn: Binding(
+                    get: { aiSettings.isAIEnabled },
+                    set: { aiSettings.isAIEnabled = $0 }
+                )) {
+                    Text("Enable AI Features")
+                        .font(.body)
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                }
+                
+                Text("When enabled, Aurora can help you create tasks, projects, notes, analyze documents, and have conversations.")
+                    .font(.caption)
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    .padding(.top, 4)
+            }
+            
+            // Airplane Mode
+            DrawerSection(title: "Airplane Mode", icon: "airplane") {
+                Toggle(isOn: Binding(
+                    get: { aiSettings.airplaneMode },
+                    set: { aiSettings.airplaneMode = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Airplane Mode")
+                            .font(.body)
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                        Text("Disable network access. Aurora runs entirely locally.")
+                            .font(.caption)
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                }
+                
+                if aiSettings.airplaneMode {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                        Text("Aurora is running in offline mode.")
+                            .font(.caption)
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                    .padding(.top, 4)
+                }
+            }
+            
+            // Model Info (Read-only)
+            DrawerSection(title: "AI Model", icon: "brain.head.profile") {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                    Text("Aurora automatically selects the best model for each task. Gemma3 covers conversations and images, Gwen3 handles deep reasoning, and Granite keeps memories tidy in the background.")
+                        .font(.caption)
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
 }
 
 #Preview {
-    AIAssistantPreferencesSheet()
+    @Previewable @State var isPresented = true
+    AIAssistantPreferencesSheet(isPresented: $isPresented)
+        .environmentObject(GlassColorSystem())
 }

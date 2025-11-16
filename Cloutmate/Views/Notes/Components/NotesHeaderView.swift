@@ -111,8 +111,8 @@ struct NotesHeaderView: View {
             viewModeButton(.cards)
             viewModeButton(.list)
             viewModeButton(.grid)
-            viewModeButton(.table)
-            viewModeButton(.compact)
+            viewModeButton(.board)
+            viewModeButton(.timeline)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)

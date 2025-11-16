@@ -26,44 +26,49 @@ struct InsightsHeaderView: View {
     @Binding var searchText: String
     let onExport: (InsightsExportFormat) -> Void
     
-    @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @Environment(\.accessibilityGlassManager) private var accessibilityManager
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var scrollOffset: CGFloat = 0
     
     var body: some View {
-        GeometryReader { geometry in
-            VStack(spacing: 16) {
-                // Title and Subline
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Insights")
-                        .font(.system(.title3, design: .rounded))
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+        GlassPanel(tier: .contentCard, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Insights")
+                            .font(.system(.title3, design: .rounded))
+                            .fontWeight(.semibold)
+                        Text("Aurora's reflection of your patterns and focus")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
                     
-                    Text("Aurora's reflection of your patterns and focus")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    Spacer(minLength: 12)
+                    
+                    exportButton
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // Search Bar
+                GlassDivider()
+                
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
-                        .font(.system(size: 14))
-                    
                     TextField("Search focus trends, reflections…", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(.body, design: .rounded))
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-                .glassPanel(tier: .contentCard, cornerRadius: 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
+                )
                 
-                // Filter Controls
-                VStack(spacing: 12) {
-                    // Timeframe filters
+                GlassDivider()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Timeframe")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach([AnalyticsTimeRange.today, .thisWeek, .thisMonth, .thisYear], id: \.self) { range in
@@ -71,35 +76,7 @@ struct InsightsHeaderView: View {
                                     title: range.displayName,
                                     isSelected: selectedTimeRange == range,
                                     action: {
-                                        if reduceMotion {
-                                            selectedTimeRange = range
-                                        } else {
-                                            withAnimation(GlassMotion.Easing.spring) {
-                                                selectedTimeRange = range
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 2)
-                    }
-                    
-                    // View type filters
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(InsightsViewType.allCases, id: \.self) { viewType in
-                                FilterPill(
-                                    title: viewType.rawValue,
-                                    isSelected: selectedViewType == viewType,
-                                    action: {
-                                        if reduceMotion {
-                                            selectedViewType = viewType
-                                        } else {
-                                            withAnimation(GlassMotion.Easing.spring) {
-                                                selectedViewType = viewType
-                                            }
-                                        }
+                                        updateTimeRange(to: range)
                                     }
                                 )
                             }
@@ -108,66 +85,86 @@ struct InsightsHeaderView: View {
                     }
                 }
                 
-                // Quick Export Button
-                HStack {
-                    Spacer()
-                    Menu {
-                        Button {
-                            onExport(.pdf)
-                        } label: {
-                            Label("Export as PDF", systemImage: "doc.richtext")
-                        }
-                        
-                        Button {
-                            onExport(.markdown)
-                        } label: {
-                            Label("Export as Markdown", systemImage: "doc.text")
-                        }
-                    } label: {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Perspective")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 14, weight: .semibold))
-                            Text("Export")
-                                .font(.system(size: 13, weight: .semibold))
+                            ForEach(InsightsViewType.allCases, id: \.self) { viewType in
+                                FilterPill(
+                                    title: viewType.rawValue,
+                                    isSelected: selectedViewType == viewType,
+                                    action: {
+                                        updateViewType(to: viewType)
+                                    }
+                                )
+                            }
                         }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 10)
-                        .background(
-                            LinearGradient(
-                                colors: [.kosmicBlue, .kosmicPurple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                            .clipShape(Capsule())
-                        )
-                        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+                        .padding(.horizontal, 2)
                     }
-                    .menuStyle(.borderlessButton)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
-            .background(
-                GlassPanel(tier: .overlay, cornerRadius: 0) {
-                    LinearGradient(
-                        colors: [Color.kosmicBlue.opacity(0.1), Color.kosmicPurple.opacity(0.05)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                }
-            )
-            .background(
-                GeometryReader { proxy in
-                    SwiftUI.Color.clear
-                        .preference(key: ScrollOffsetPreferenceKey.self, value: proxy.frame(in: .named("scroll")).minY)
-                }
-            )
-            .opacity(max(0.7, 1.0 - abs(scrollOffset) / 200.0))
+            .padding(24)
         }
-        .frame(height: 220)
-        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-            scrollOffset = value
+    }
+    
+    private var exportButton: some View {
+        Menu {
+            Button {
+                onExport(.pdf)
+            } label: {
+                Label("Export as PDF", systemImage: "doc.richtext")
+            }
+            
+            Button {
+                onExport(.markdown)
+            } label: {
+                Label("Export as Markdown", systemImage: "doc.text")
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Export")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                LinearGradient(
+                    colors: [.kosmicBlue, .kosmicPurple],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .clipShape(Capsule())
+            )
+            .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+        }
+        .menuStyle(.borderlessButton)
+    }
+    
+    private func updateTimeRange(to range: AnalyticsTimeRange) {
+        guard selectedTimeRange != range else { return }
+        if reduceMotion {
+            selectedTimeRange = range
+        } else {
+            withAnimation(GlassMotion.Easing.spring) {
+                selectedTimeRange = range
+            }
+        }
+    }
+    
+    private func updateViewType(to viewType: InsightsViewType) {
+        guard selectedViewType != viewType else { return }
+        if reduceMotion {
+            selectedViewType = viewType
+        } else {
+            withAnimation(GlassMotion.Easing.spring) {
+                selectedViewType = viewType
+            }
         }
     }
 }

@@ -28,6 +28,10 @@ struct MentionInputField: View {
     var excludeObjectId: UUID? = nil // ID of object to exclude from autocomplete
     var excludeObjectType: ObjectType? = nil // Type of object to exclude
     var onLinkingStateChanged: ((Bool) -> Void)? = nil // Callback for typing state
+    var onSlashCommand: ((SlashCommand, NSRange) -> Void)? = nil // Callback for slash command selection
+    var onAutocompleteVisibilityChanged: ((Bool, Bool, Bool, CGPoint, [WorkspaceObjectResult], [WorkspaceObjectResult], [SlashCommand], Int, Int, Int, ObjectType?) -> Void)? = nil // Callback for autocomplete visibility and data (showMention, showHashtag, showSlash, cursorPosition, mentionResults, hashtagResults, slashCommands, mentionSelectedIndex, hashtagSelectedIndex, slashSelectedIndex, activeTabFilter)
+    var onSelectMentionResult: ((WorkspaceObjectResult) -> Void)? = nil // Callback for mention result selection
+    var onSelectSlashCommand: ((SlashCommand) -> Void)? = nil // Callback for slash command selection from overlay
     
     @Environment(\.modelContext) private var modelContext
     @State private var showAutocomplete = false
@@ -37,16 +41,30 @@ struct MentionInputField: View {
     @State private var currentMentionRange: NSRange? = nil
     @State private var searchDebounceTask: _Concurrency.Task<Void, Never>?
     
+    // Slash command state
+    @State private var showSlashAutocomplete = false
+    @State private var slashCommands: [SlashCommand] = []
+    @State private var slashSelectedIndex = 0
+    @State private var currentSlashCommand: String? = nil
+    @State private var currentSlashCommandRange: NSRange? = nil
+    
+    // Hashtag state
+    @State private var showHashtagAutocomplete = false
+    @State private var hashtagResults: [WorkspaceObjectResult] = []
+    @State private var hashtagSelectedIndex = 0
+    @State private var currentHashtag: String? = nil
+    @State private var currentHashtagRange: NSRange? = nil
+    
     @State private var isMultiLine = false
     @State private var textViewRef: MentionTextView? = nil
     @State private var cursorPosition: CGPoint = .zero
     @State private var activeTabFilter: ObjectType? = nil // Track active tab filter
     @State private var isLinkingConfirmed = false // Track if link was just confirmed
     @State private var isCurrentLinkingState = false // Track linking state for callbacks
+    @State private var isHashtagLinkingConfirmed = false // Track if hashtag link was just confirmed
     
     var body: some View {
-        // Use overlay approach to position autocomplete relative to text view
-            MentionNSTextView(
+        MentionNSTextView(
                 text: $text,
                 isFocused: $isFocused,
                 placeholder: placeholder,
@@ -62,46 +80,91 @@ struct MentionInputField: View {
                 autocompleteResults: $autocompleteResults,
                 selectedIndex: $selectedIndex,
                 onSelectAutocomplete: selectCurrentResult,
+                onSelectHashtagResult: selectCurrentHashtagResult,
                 linkedContext: $linkedContext,
             isEnabled: isEnabled,
             textViewRef: $textViewRef,
             modelContext: modelContext,
-            cursorPosition: $cursorPosition
+            cursorPosition: $cursorPosition,
+            showSlashAutocomplete: $showSlashAutocomplete,
+            slashCommands: $slashCommands,
+            slashSelectedIndex: $slashSelectedIndex,
+            onSelectSlashCommand: onSelectSlashCommand,
+            showHashtagAutocomplete: $showHashtagAutocomplete,
+            hashtagResults: $hashtagResults,
+            hashtagSelectedIndex: $hashtagSelectedIndex
             )
             .allowsHitTesting(true)
-        .overlay(alignment: .topLeading) {
-            // Autocomplete overlay - positioned below the cursor, outside the editing line
-            if showAutocomplete && !autocompleteResults.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    Color.clear
-                        .frame(height: cursorPosition.y + 24)
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            MentionAutocompleteView(
-                                results: autocompleteResults,
-                                onSelect: { result in
-                                    selectResult(result)
-                                },
-                                selectedIndex: $selectedIndex,
-                                tabFilter: activeTabFilter
-                            )
-                            .frame(maxWidth: 400)
-                            .onChange(of: selectedIndex) { _, newIndex in
-                                // Scroll to selected item
-                                withAnimation {
-                                    proxy.scrollTo(newIndex, anchor: .center)
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 300)
-                        .offset(x: cursorPosition.x)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .allowsHitTesting(true)
-                        .zIndex(1000) // Ensure it's above other content
-                    }
+            .onChange(of: showAutocomplete) { _, newValue in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: showHashtagAutocomplete) { _, newValue in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: showSlashAutocomplete) { _, newValue in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: cursorPosition) { _, newValue in
+                if showAutocomplete || showHashtagAutocomplete || showSlashAutocomplete {
+                    notifyAutocompleteVisibility()
                 }
             }
-        }
+            .onChange(of: autocompleteResults) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: hashtagResults) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: slashCommands) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: selectedIndex) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: hashtagSelectedIndex) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: slashSelectedIndex) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onChange(of: activeTabFilter) { _, _ in
+                notifyAutocompleteVisibility()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("MentionAutocompleteSelect"))) { notification in
+                if let result = notification.object as? WorkspaceObjectResult {
+                    selectResult(result)
+                }
+            }
+            // Note: HashtagAutocompleteSelect notification is handled by UnifiedAIAssistantView
+            // We don't need to handle it here since selectHashtagResult is called directly
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SlashAutocompleteSelect"))) { notification in
+                if let command = notification.object as? SlashCommand {
+                    selectSlashCommand(command)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DismissAutocomplete"))) { _ in
+                withAnimation {
+                    showAutocomplete = false
+                    showHashtagAutocomplete = false
+                    showSlashAutocomplete = false
+                }
+            }
+    }
+    
+    private func notifyAutocompleteVisibility() {
+        onAutocompleteVisibilityChanged?(
+            showAutocomplete && !autocompleteResults.isEmpty,
+            showHashtagAutocomplete && !hashtagResults.isEmpty,
+            showSlashAutocomplete && !slashCommands.isEmpty,
+            cursorPosition,
+            autocompleteResults,
+            hashtagResults,
+            slashCommands,
+            selectedIndex,
+            hashtagSelectedIndex,
+            slashSelectedIndex,
+            activeTabFilter
+        )
     }
     
     private func updateLinkingState(_ linking: Bool) {
@@ -114,6 +177,143 @@ struct MentionInputField: View {
     private func handleTextChange(_ newValue: String) {
         // Cancel previous debounce task
         searchDebounceTask?.cancel()
+        
+        // If we just confirmed a hashtag link, skip hashtag detection to prevent re-opening
+        if isHashtagLinkingConfirmed {
+            // Reset flag after a brief delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.isHashtagLinkingConfirmed = false
+            }
+            return
+        }
+        
+        // Check for slash commands first (before mention detection)
+        if let textView = textViewRef {
+            let cursorLocation = textView.selectedRange().location
+            let textBeforeCursor = String(newValue.prefix(cursorLocation))
+            
+            // Check if cursor is after a "/"
+            if let lastSlashIndex = textBeforeCursor.lastIndex(of: "/") {
+                let afterSlash = String(textBeforeCursor[textBeforeCursor.index(after: lastSlashIndex)...])
+                
+                // Check if there's a space or newline after / (means command ended)
+                if let spaceIndex = afterSlash.firstIndex(where: { $0.isWhitespace || $0.isNewline }) {
+                    // Command ended - hide autocomplete
+                    currentSlashCommand = nil
+                    currentSlashCommandRange = nil
+                    withAnimation {
+                        showSlashAutocomplete = false
+                    }
+                    // Continue with mention detection
+                } else {
+                    // We're in a slash command context
+                    let commandText = afterSlash.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let nsString = newValue as NSString
+                    let slashLocation = nsString.range(of: "/", options: .backwards, range: NSRange(location: 0, length: cursorLocation)).location
+                    
+                    if slashLocation != NSNotFound {
+                        currentSlashCommandRange = NSRange(location: slashLocation, length: cursorLocation - slashLocation)
+                        currentSlashCommand = commandText.isEmpty ? "" : commandText
+                        
+                        // Filter commands based on input
+                        if commandText.isEmpty {
+                            slashCommands = Array(SlashCommand.allCases)
+                        } else {
+                            slashCommands = SlashCommand.allCases.filter { command in
+                                command.rawValue.lowercased().hasPrefix(commandText.lowercased())
+                            }
+                        }
+                        
+                        slashSelectedIndex = 0
+                        updateCursorPosition(textView: textView)
+                        
+                        withAnimation {
+                            showSlashAutocomplete = !slashCommands.isEmpty
+                            showAutocomplete = false // Hide mention autocomplete
+                        }
+                        return // Don't process mentions when in slash command mode
+                    }
+                }
+            } else {
+                // No slash command found - hide slash autocomplete if it was showing
+                if showSlashAutocomplete {
+                    withAnimation {
+                        showSlashAutocomplete = false
+                    }
+                }
+                currentSlashCommand = nil
+                currentSlashCommandRange = nil
+            }
+            
+            // Check for hashtag detection (after slash, before mention)
+            if let lastHashIndex = textBeforeCursor.lastIndex(of: "#") {
+                let afterHash = String(textBeforeCursor[textBeforeCursor.index(after: lastHashIndex)...])
+                
+                // Check if there's a space or newline after # (means hashtag ended)
+                if let spaceIndex = afterHash.firstIndex(where: { $0.isWhitespace || $0.isNewline }) {
+                    // Hashtag ended - hide autocomplete
+                    currentHashtag = nil
+                    currentHashtagRange = nil
+                    withAnimation {
+                        showHashtagAutocomplete = false
+                    }
+                    // Continue with mention detection
+                } else {
+                    // We're in a hashtag context
+                    let hashtagText = afterHash.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let nsString = newValue as NSString
+                    let hashLocation = nsString.range(of: "#", options: .backwards, range: NSRange(location: 0, length: cursorLocation)).location
+                    
+                    if hashLocation != NSNotFound {
+                        currentHashtagRange = NSRange(location: hashLocation, length: cursorLocation - hashLocation)
+                        currentHashtag = hashtagText.isEmpty ? "" : hashtagText
+                        
+                        // Perform hashtag search immediately (no debounce needed for empty query to show all)
+                        hashtagSelectedIndex = 0
+                        updateCursorPosition(textView: textView)
+                        
+                        if hashtagText.isEmpty {
+                            // Empty query - show all tagged items immediately
+                            performHashtagSearch(query: "") // Empty query shows all tagged items
+                            withAnimation {
+                                showHashtagAutocomplete = !hashtagResults.isEmpty
+                                showAutocomplete = false // Hide mention autocomplete
+                                showSlashAutocomplete = false // Hide slash autocomplete
+                            }
+                        } else {
+                            // Non-empty query - debounce search
+                            searchDebounceTask = _Concurrency.Task {
+                                try? await _Concurrency.Task.sleep(nanoseconds: 200_000_000)
+                                if !_Concurrency.Task.isCancelled {
+                                    await MainActor.run {
+                                        performHashtagSearch(query: hashtagText)
+                                        withAnimation {
+                                            showHashtagAutocomplete = !hashtagResults.isEmpty
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            withAnimation {
+                                showHashtagAutocomplete = !hashtagResults.isEmpty
+                                showAutocomplete = false // Hide mention autocomplete
+                                showSlashAutocomplete = false // Hide slash autocomplete
+                            }
+                        }
+                        return // Don't process mentions when in hashtag mode
+                    }
+                }
+            } else {
+                // No hashtag found - hide hashtag autocomplete if it was showing
+                if showHashtagAutocomplete {
+                    withAnimation {
+                        showHashtagAutocomplete = false
+                    }
+                }
+                currentHashtag = nil
+                currentHashtagRange = nil
+            }
+        }
         
         // Get cursor position from text view
         guard let textView = textViewRef else {
@@ -270,6 +470,19 @@ struct MentionInputField: View {
                     }
                 }
             }
+        }
+        
+        // Check if there's an "@" before cursor - if not, hide mention autocomplete
+        if !textBeforeCursor.contains("@") {
+            // No "@" found - hide mention autocomplete if it was showing
+            if showAutocomplete {
+                withAnimation {
+                    showAutocomplete = false
+                }
+            }
+            currentMention = nil
+            currentMentionRange = nil
+            updateLinkingState(false)
         }
         
         // Find mention at cursor position (only if cursor is INSIDE a mention, not after)
@@ -466,6 +679,33 @@ struct MentionInputField: View {
         selectedIndex = 0
     }
     
+    private func performHashtagSearch(query: String) {
+        // Search by hashtag/tag
+        let results = WorkspaceObjectSearchService.shared.searchByHashtag(
+            query: query,
+            modelContext: modelContext,
+            limit: 20
+        )
+        
+        // Filter out the current object being edited
+        var filteredResults = results
+        if let excludeId = excludeObjectId, let excludeType = excludeObjectType {
+            filteredResults = results.filter { result in
+                !(result.id == excludeId && result.type == excludeType)
+            }
+        }
+        
+        var seenIds = Set<UUID>()
+        hashtagResults = filteredResults.filter { result in
+            if seenIds.contains(result.id) {
+                return false
+            }
+            seenIds.insert(result.id)
+            return true
+        }
+        hashtagSelectedIndex = 0
+    }
+    
     private func updateCursorPosition(textView: MentionTextView) {
         let selectedRange = textView.selectedRange()
         guard selectedRange.location != NSNotFound else {
@@ -498,7 +738,92 @@ struct MentionInputField: View {
         cursorPosition = point
     }
     
-    private func selectResult(_ result: WorkspaceObjectResult) {
+    func selectSlashCommand(_ command: SlashCommand) {
+        // Also call the callback if provided
+        onSelectSlashCommand?(command)
+        
+        guard let commandRange = currentSlashCommandRange else { return }
+        
+        // Call the callback with the command and range
+        onSlashCommand?(command, commandRange)
+        
+        // Hide autocomplete
+        withAnimation {
+            showSlashAutocomplete = false
+        }
+        
+        currentSlashCommand = nil
+        currentSlashCommandRange = nil
+    }
+    
+    private func selectHashtagResult(_ result: WorkspaceObjectResult) {
+        guard let hashtagRange = currentHashtagRange else { return }
+        
+        // Mark as confirmed BEFORE making changes to prevent recursive detection
+        isHashtagLinkingConfirmed = true
+        
+        // Post notification AFTER setting the flag to prevent re-detection
+        // This notification is handled by UnifiedAIAssistantView, not MentionInputField
+        NotificationCenter.default.post(
+            name: NSNotification.Name("HashtagAutocompleteSelect"),
+            object: result
+        )
+        
+        // Remove the "#hashtag" text from input (like slash commands)
+        if let textView = textViewRef {
+            let nsRange = NSRange(location: hashtagRange.location, length: hashtagRange.length)
+            if nsRange.location + nsRange.length <= textView.string.count {
+                // Temporarily disable delegate to prevent recursive updates
+                let originalDelegate = textView.delegate
+                textView.delegate = nil
+                
+                // Remove the hashtag text
+                textView.replaceCharacters(in: nsRange, with: "")
+                
+                // Move cursor to the location where hashtag was
+                let newCursorPosition = nsRange.location
+                textView.setSelectedRange(NSRange(location: newCursorPosition, length: 0))
+                
+                // Re-enable delegate
+                textView.delegate = originalDelegate
+                
+                // Update text binding - this will trigger handleTextChange, but isHashtagLinkingConfirmed will prevent re-detection
+                // Only update once with the display text (no need to convert to structured format here)
+                let updatedText = textView.string
+                text = updatedText
+            }
+        } else {
+            // Fallback: remove from text binding
+            let nsString = text as NSString
+            if hashtagRange.location + hashtagRange.length <= nsString.length {
+                let mutableText = NSMutableString(string: text)
+                mutableText.deleteCharacters(in: hashtagRange)
+                let updatedText = String(mutableText)
+                text = updatedText
+            }
+        }
+        
+        // Hide autocomplete IMMEDIATELY
+        showHashtagAutocomplete = false
+        currentHashtag = nil
+        currentHashtagRange = nil
+        hashtagSelectedIndex = 0
+        
+        // Reset confirmation flag after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.isHashtagLinkingConfirmed = false
+        }
+    }
+    
+    private func selectCurrentHashtagResult() {
+        guard hashtagSelectedIndex < hashtagResults.count else { return }
+        selectHashtagResult(hashtagResults[hashtagSelectedIndex])
+    }
+    
+    private     func selectResult(_ result: WorkspaceObjectResult) {
+        // Also call the callback if provided
+        onSelectMentionResult?(result)
+        
         guard let mention = currentMention else { return }
         
         // Insert display name (user-friendly) instead of structured format
@@ -602,11 +927,21 @@ struct MentionNSTextView: NSViewRepresentable {
     @Binding var autocompleteResults: [WorkspaceObjectResult]
     @Binding var selectedIndex: Int
     var onSelectAutocomplete: () -> Void
+    var onSelectHashtagResult: () -> Void
     @Binding var linkedContext: LinkedContext
     var isEnabled: Bool = true
     @Binding var textViewRef: MentionTextView?
     var modelContext: ModelContext
     @Binding var cursorPosition: CGPoint
+    // Slash command bindings
+    @Binding var showSlashAutocomplete: Bool
+    @Binding var slashCommands: [SlashCommand]
+    @Binding var slashSelectedIndex: Int
+    var onSelectSlashCommand: ((SlashCommand) -> Void)?
+    // Hashtag bindings
+    @Binding var showHashtagAutocomplete: Bool
+    @Binding var hashtagResults: [WorkspaceObjectResult]
+    @Binding var hashtagSelectedIndex: Int
     
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -668,9 +1003,34 @@ struct MentionNSTextView: NSViewRepresentable {
         textView.autocompleteResults = { self.autocompleteResults }
         textView.selectedIndex = { self.selectedIndex }
         textView.onSelectAutocomplete = onSelectAutocomplete
+        textView.onSelectHashtagResult = onSelectHashtagResult
         textView.onUpdateSelectedIndex = { newIndex in
             DispatchQueue.main.async {
                 self.selectedIndex = newIndex
+            }
+        }
+        // Slash command callbacks
+        textView.showSlashAutocomplete = { self.showSlashAutocomplete }
+        textView.slashCommands = { self.slashCommands }
+        textView.slashSelectedIndex = { self.slashSelectedIndex }
+        textView.onSelectSlashCommand = {
+            if self.slashSelectedIndex < self.slashCommands.count {
+                self.onSelectSlashCommand?(self.slashCommands[self.slashSelectedIndex])
+            }
+        }
+        textView.onUpdateSlashSelectedIndex = { newIndex in
+            DispatchQueue.main.async {
+                self.slashSelectedIndex = newIndex
+            }
+        }
+        // Hashtag callbacks
+        textView.showHashtagAutocomplete = { self.showHashtagAutocomplete }
+        textView.hashtagResults = { self.hashtagResults }
+        textView.hashtagSelectedIndex = { self.hashtagSelectedIndex }
+        textView.onSelectHashtagResult = onSelectHashtagResult
+        textView.onUpdateHashtagSelectedIndex = { newIndex in
+            DispatchQueue.main.async {
+                self.hashtagSelectedIndex = newIndex
             }
         }
         
@@ -776,9 +1136,34 @@ struct MentionNSTextView: NSViewRepresentable {
         textView.autocompleteResults = { self.autocompleteResults }
         textView.selectedIndex = { self.selectedIndex }
         textView.onSelectAutocomplete = onSelectAutocomplete
+        textView.onSelectHashtagResult = onSelectHashtagResult
         textView.onUpdateSelectedIndex = { newIndex in
             DispatchQueue.main.async {
                 self.selectedIndex = newIndex
+            }
+        }
+        // Slash command callbacks
+        textView.showSlashAutocomplete = { self.showSlashAutocomplete }
+        textView.slashCommands = { self.slashCommands }
+        textView.slashSelectedIndex = { self.slashSelectedIndex }
+        textView.onSelectSlashCommand = {
+            if self.slashSelectedIndex < self.slashCommands.count {
+                self.onSelectSlashCommand?(self.slashCommands[self.slashSelectedIndex])
+            }
+        }
+        textView.onUpdateSlashSelectedIndex = { newIndex in
+            DispatchQueue.main.async {
+                self.slashSelectedIndex = newIndex
+            }
+        }
+        // Hashtag callbacks
+        textView.showHashtagAutocomplete = { self.showHashtagAutocomplete }
+        textView.hashtagResults = { self.hashtagResults }
+        textView.hashtagSelectedIndex = { self.hashtagSelectedIndex }
+        textView.onSelectHashtagResult = onSelectHashtagResult
+        textView.onUpdateHashtagSelectedIndex = { newIndex in
+            DispatchQueue.main.async {
+                self.hashtagSelectedIndex = newIndex
             }
         }
         
@@ -925,6 +1310,18 @@ final class MentionTextView: NSTextView {
     var selectedIndex: (() -> Int)?
     var onSelectAutocomplete: (() -> Void)?
     var onUpdateSelectedIndex: ((Int) -> Void)?
+    // Slash command callbacks
+    var showSlashAutocomplete: (() -> Bool)?
+    var slashCommands: (() -> [SlashCommand])?
+    var slashSelectedIndex: (() -> Int)?
+    var onSelectSlashCommand: (() -> Void)?
+    var onUpdateSlashSelectedIndex: ((Int) -> Void)?
+    // Hashtag callbacks
+    var showHashtagAutocomplete: (() -> Bool)?
+    var hashtagResults: (() -> [WorkspaceObjectResult])?
+    var hashtagSelectedIndex: (() -> Int)?
+    var onSelectHashtagResult: (() -> Void)?
+    var onUpdateHashtagSelectedIndex: ((Int) -> Void)?
     var linkedContext: LinkedContext = LinkedContext()
     
     override func awakeFromNib() {
@@ -974,30 +1371,96 @@ final class MentionTextView: NSTextView {
         
         // Handle Return key
         if event.keyCode == 36 { // Return key
-            // Check if autocomplete is showing - if so, select it
-            if let showAutocomplete = showAutocomplete, showAutocomplete(),
-               let autocompleteResults = autocompleteResults, !autocompleteResults().isEmpty {
-                // Autocomplete is showing - select current item
-                onSelectAutocomplete?()
-                return // Don't insert newline
+            let hasShift = event.modifierFlags.contains(.shift)
+            
+            // Check slash commands first
+            if let showSlashAutocomplete = showSlashAutocomplete, showSlashAutocomplete(),
+               let slashCommands = slashCommands, !slashCommands().isEmpty {
+                onSelectSlashCommand?()
+                return
             }
             
-            // No autocomplete - normal Enter behavior: insert newline
-            super.insertNewline(nil)
-            // Ensure cursor is visible after inserting newline
-            DispatchQueue.main.async {
-                self.scrollRangeToVisible(self.selectedRange())
+            // Then check hashtag autocomplete
+            if let showHashtagAutocomplete = showHashtagAutocomplete, showHashtagAutocomplete(),
+               let hashtagResults = hashtagResults, !hashtagResults().isEmpty {
+                onSelectHashtagResult?()
+                return
             }
-            return // Don't call super for Return key
+            
+            // Then check mention autocomplete
+            if let showAutocomplete = showAutocomplete, showAutocomplete(),
+               let autocompleteResults = autocompleteResults, !autocompleteResults().isEmpty {
+                onSelectAutocomplete?()
+                return
+            }
+            
+            if hasShift {
+                super.insertNewline(nil)
+                DispatchQueue.main.async {
+                    self.scrollRangeToVisible(self.selectedRange())
+                }
+            } else {
+                onSubmit?()
+            }
+            return
         } else if event.keyCode == 53 { // Escape key
+            // Check slash commands first
+            if let showSlashAutocomplete = showSlashAutocomplete, showSlashAutocomplete() {
+                // Close slash autocomplete - handled by delegate
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("DismissAutocomplete"),
+                    object: nil
+                )
+                super.keyDown(with: event)
+                return
+            }
+            
+            // Check hashtag autocomplete
+            if let showHashtagAutocomplete = showHashtagAutocomplete, showHashtagAutocomplete() {
+                // Close hashtag autocomplete - handled by delegate
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("DismissAutocomplete"),
+                    object: nil
+                )
+                super.keyDown(with: event)
+                return
+            }
+            
             if let showAutocomplete = showAutocomplete, showAutocomplete() {
-                // Close autocomplete - handled by delegate
+                // Close mention autocomplete - handled by delegate
                 super.keyDown(with: event)
             } else {
                 super.keyDown(with: event)
             }
             return
         } else if event.keyCode == 126 || event.keyCode == 125 { // Up/Down arrow keys
+            // Check slash commands first
+            if let showSlashAutocomplete = showSlashAutocomplete, showSlashAutocomplete(),
+               let slashCommands = slashCommands, !slashCommands().isEmpty,
+               let slashSelectedIndex = slashSelectedIndex {
+                let currentIndex = slashSelectedIndex()
+                if event.keyCode == 126 { // Up arrow
+                    onUpdateSlashSelectedIndex?(max(0, currentIndex - 1))
+                } else { // Down arrow
+                    onUpdateSlashSelectedIndex?(min(slashCommands().count - 1, currentIndex + 1))
+                }
+                return // Don't call super for arrow keys when autocomplete is showing
+            }
+            
+            // Then check hashtag autocomplete
+            if let showHashtagAutocomplete = showHashtagAutocomplete, showHashtagAutocomplete(),
+               let hashtagResults = hashtagResults, !hashtagResults().isEmpty,
+               let hashtagSelectedIndex = hashtagSelectedIndex {
+                let currentIndex = hashtagSelectedIndex()
+                if event.keyCode == 126 { // Up arrow
+                    onUpdateHashtagSelectedIndex?(max(0, currentIndex - 1))
+                } else { // Down arrow
+                    onUpdateHashtagSelectedIndex?(min(hashtagResults().count - 1, currentIndex + 1))
+                }
+                return // Don't call super for arrow keys when autocomplete is showing
+            }
+            
+            // Then check mention autocomplete
             if let showAutocomplete = showAutocomplete, showAutocomplete(),
                let autocompleteResults = autocompleteResults, !autocompleteResults().isEmpty,
                let selectedIndex = selectedIndex {

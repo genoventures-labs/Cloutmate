@@ -16,6 +16,7 @@ struct TaskTimelineView: View {
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var hoveredTaskID: UUID?
     
@@ -56,6 +57,13 @@ struct TaskTimelineView: View {
         tasks.filter { $0.dueDate != nil || $0.createdAt != nil }
     }
     
+    private var axisTickCount: Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.month], from: dateRange.start, to: dateRange.end)
+        let months = max(components.month ?? 1, 1)
+        return min(max(months, 3), 8)
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             if positionedTasks.isEmpty {
@@ -77,8 +85,36 @@ struct TaskTimelineView: View {
     @ViewBuilder
     private func timelineContent(trackWidth: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            timelineBackdrop(width: trackWidth)
-            timelineBaseline(width: trackWidth)
+            TimelineTrackBackground(
+                width: trackWidth,
+                height: TimelineLayout.trackHeight,
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme)
+            )
+            
+            let densityPoints = densityRibbonPoints(for: trackWidth)
+            if densityPoints.count >= 2 {
+                TimelineDensityRibbon(
+                    points: densityPoints,
+                    baselineY: TimelineLayout.baselineY,
+                    fillGradient: Gradient(colors: [
+                        Color.kosmicBlue.opacity(0.16),
+                        Color.kosmicPurple.opacity(0.12),
+                        Color.kosmicPurple.opacity(0.05)
+                    ]),
+                    strokeGradient: Gradient(colors: [
+                        Color.kosmicBlue.opacity(0.85),
+                        Color.kosmicPurple.opacity(0.85)
+                    ])
+                )
+                .blendMode(.screen)
+                .allowsHitTesting(false)
+            }
+            
+            TimelineAxis(
+                width: trackWidth,
+                tickCount: axisTickCount,
+                tickHeight: TimelineLayout.tickHeight
+            )
             
             ForEach(positionedTasks) { positioned in
                 TimelineTaskMarker(
@@ -99,59 +135,39 @@ struct TaskTimelineView: View {
             }
         }
         .padding(.vertical, 8)
-    }
-    
-    private func timelineBackdrop(width: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 26, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.08),
-                        Color.white.opacity(0.02)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+        .overlay(alignment: .topLeading) {
+            TimelineDateRangeLabel(
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                alignment: .leading
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.04)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: .black.opacity(0.08), radius: 18, y: 14)
-            .frame(
-                width: width - (TimelineLayout.horizontalPadding * 1.2),
-                height: TimelineLayout.connectionHeight + 110
-            )
-            .offset(
-                x: TimelineLayout.horizontalPadding * 0.6,
-                y: TimelineLayout.baselineY - (TimelineLayout.connectionHeight / 2) - 32
-            )
-            .allowsHitTesting(false)
-    }
-    
-    private func timelineBaseline(width: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY))
-            path.addLine(to: CGPoint(x: width - TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY))
+            .padding(.leading, 28)
+            .padding(.top, 12)
         }
-        .stroke(
-            LinearGradient(
-                colors: [.kosmicBlue.opacity(0.9), .kosmicPurple.opacity(0.9)],
-                startPoint: .leading,
-                endPoint: .trailing
-            ),
-            style: StrokeStyle(lineWidth: 2, lineCap: .round)
-        )
+    }
+    
+    private func densityRibbonPoints(for width: CGFloat) -> [TimelineDensityRibbon.Point] {
+        let calendar = Calendar.current
+        let buckets = tasksWithDates.reduce(into: [Date: Int]()) { partial, task in
+            let bucketDate = calendar.startOfDay(for: task.dueDate ?? task.createdAt)
+            partial[bucketDate, default: 0] += 1
+        }
+        guard !buckets.isEmpty else { return [] }
+        
+        let sortedKeys = buckets.keys.sorted()
+        let maxCount = max(buckets.values.max() ?? 1, 1)
+        let usableWidth = width - (TimelineLayout.horizontalPadding * 2)
+        
+        return sortedKeys.map { date in
+            let offset = date.timeIntervalSince(dateRange.start)
+            let total = dateRange.end.timeIntervalSince(dateRange.start)
+            let ratio = total == 0 ? 0.5 : min(max(CGFloat(offset / total), 0), 1)
+            let x = TimelineLayout.horizontalPadding + ratio * usableWidth
+            let normalized = CGFloat(buckets[date] ?? 0) / CGFloat(maxCount)
+            let amplitude: CGFloat = 78
+            let y = TimelineLayout.baselineY - max(normalized, 0.08) * amplitude
+            return TimelineDensityRibbon.Point(x: x, y: y)
+        }
     }
     
     private var emptyState: some View {

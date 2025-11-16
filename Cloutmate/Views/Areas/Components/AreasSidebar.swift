@@ -35,35 +35,49 @@ struct AreasSidebar: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
                 // Overall Stability Index
-                DashboardSectionPanel(
-                    title: "Overall Stability Index",
-                    icon: "gauge.with.dots.needle.67percent",
-                    accent: .kosmicGreen,
-                    isCollapsed: Binding(
-                        get: { !isStabilityExpanded },
-                        set: { isStabilityExpanded = !$0 }
-                    )
-                ) {
+                DashboardTile(accent: stabilityColor) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "gauge.with.dots.needle.67percent")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(stabilityColor)
+                            Text("Overall Stability Index")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .foregroundStyle(glassColorSystem.textPrimary())
+                            Spacer()
+                            Button(action: {
+                                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                                    isStabilityExpanded.toggle()
+                                }
+                            }) {
+                                Image(systemName: isStabilityExpanded ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(glassColorSystem.textSecondary())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        if isStabilityExpanded {
                     VStack(spacing: 12) {
                         Text("\(Int(overallStability))")
                             .font(.system(size: 48, weight: .bold))
-                            .foregroundColor(stabilityColor)
+                                    .foregroundStyle(stabilityColor)
                             .contentTransition(.numericText())
                             .animation(reduceMotion ? nil : .spring(duration: 0.3), value: overallStability)
                         
                         Text("Stability Score")
                             .font(.caption)
-                            .foregroundColor(glassColorSystem.textSecondary())
+                                    .foregroundStyle(glassColorSystem.textSecondary())
                         
                         if overallStability >= 70 {
                             HStack(spacing: 4) {
                                 Image(systemName: "arrow.up.circle.fill")
-                                    .foregroundColor(.kosmicGreen)
+                                            .foregroundStyle(.kosmicGreen)
                                 Text("Trending positive")
                                     .font(.caption)
-                                    .foregroundColor(.kosmicGreen)
+                                            .foregroundStyle(.kosmicGreen)
                             }
                             .padding(.top, 4)
                         }
@@ -71,12 +85,6 @@ struct AreasSidebar: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
                 }
-                .onTapGesture {
-                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                        isStabilityExpanded.toggle()
-                    }
-                    if !reduceMotion {
-                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
                     }
                 }
                 .accessibilityLabel("Overall Stability Index: \(Int(overallStability))")
@@ -84,15 +92,29 @@ struct AreasSidebar: View {
                 .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                 
                 // Focus Gravity Trend Chart
-                DashboardSectionPanel(
-                    title: "Focus Gravity Trend",
-                    icon: "chart.line.uptrend.xyaxis",
-                    accent: .kosmicBlue,
-                    isCollapsed: Binding(
-                        get: { !isTrendExpanded },
-                        set: { isTrendExpanded = !$0 }
-                    )
-                ) {
+                DashboardTile(accent: .kosmicBlue) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "chart.line.uptrend.xyaxis")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.kosmicBlue)
+                            Text("Focus Gravity Trend")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .foregroundStyle(glassColorSystem.textPrimary())
+                            Spacer()
+                            Button(action: {
+                                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                                    isTrendExpanded.toggle()
+                                }
+                            }) {
+                                Image(systemName: isTrendExpanded ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(glassColorSystem.textSecondary())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        if isTrendExpanded {
                     if focusGravityTrend.isEmpty {
                         ContentUnavailableView(
                             "No Trend Data",
@@ -130,29 +152,37 @@ struct AreasSidebar: View {
                         }
                     }
                 }
-                .onTapGesture {
-                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                        isTrendExpanded.toggle()
-                    }
-                    if !reduceMotion {
-                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
                     }
                 }
                 
                 // Areas Needing Review
-                DashboardSectionPanel(
-                    title: "Areas Needing Review",
-                    icon: "exclamationmark.circle.fill",
-                    accent: .red,
-                    isCollapsed: Binding(
-                        get: { !isReviewExpanded },
-                        set: { isReviewExpanded = !$0 }
-                    )
-                ) {
+                DashboardTile(accent: .red) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.red)
+                            Text("Areas Needing Review")
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .foregroundStyle(glassColorSystem.textPrimary())
+                            Spacer()
+                            Button(action: {
+                                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                                    isReviewExpanded.toggle()
+                                }
+                            }) {
+                                Image(systemName: isReviewExpanded ? "chevron.down" : "chevron.right")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(glassColorSystem.textSecondary())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        
+                        if isReviewExpanded {
                     if areasNeedingReview.isEmpty {
                         Text("All areas are up to date")
                             .font(.caption)
-                            .foregroundColor(glassColorSystem.textTertiary())
+                                    .foregroundStyle(glassColorSystem.textTertiary())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.vertical, 8)
                     } else {
@@ -164,7 +194,7 @@ struct AreasSidebar: View {
                                     HStack {
                                         Text(area.title)
                                             .font(.body)
-                                            .foregroundColor(glassColorSystem.textPrimary())
+                                                    .foregroundStyle(glassColorSystem.textPrimary())
                                             .lineLimit(1)
                                         
                                         Spacer()
@@ -172,11 +202,11 @@ struct AreasSidebar: View {
                                         if let lastReview = area.lastReviewDate {
                                             Text(lastReview, style: .relative)
                                                 .font(.caption2)
-                                                .foregroundColor(glassColorSystem.textTertiary())
+                                                        .foregroundStyle(glassColorSystem.textTertiary())
                                         } else {
                                             Text("Never")
                                                 .font(.caption2)
-                                                .foregroundColor(.red)
+                                                        .foregroundStyle(.red)
                                         }
                                     }
                                     .padding(.vertical, 4)
@@ -187,46 +217,35 @@ struct AreasSidebar: View {
                             if areasNeedingReview.count > 5 {
                                 Text("+\(areasNeedingReview.count - 5) more")
                                     .font(.caption)
-                                    .foregroundColor(glassColorSystem.textTertiary())
+                                            .foregroundStyle(glassColorSystem.textTertiary())
                                     .padding(.top, 4)
                             }
                         }
                     }
                 }
-                .onTapGesture {
-                    withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                        isReviewExpanded.toggle()
-                    }
-                    if !reduceMotion {
-                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
                     }
                 }
                 
                 // Aurora Insight Card
                 if !auroraInsight.isEmpty {
-                    GlassPanel(tier: .contentCard, cornerRadius: 12) {
+                    DashboardTile(accent: .kosmicPurple) {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "sparkles")
-                                    .foregroundColor(.kosmicPurple)
+                                    .foregroundStyle(Color.kosmicPurple)
                                 Text("Aurora Insight")
-                                    .font(.headline)
-                                    .foregroundColor(glassColorSystem.textPrimary())
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                             }
                             
                             Text(auroraInsight)
                                 .font(.body)
-                                .foregroundColor(glassColorSystem.textSecondary())
+                                .foregroundStyle(glassColorSystem.textSecondary())
                         }
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
-            .padding(16)
         }
-        .frame(width: 280)
-        .background(glassColorSystem.backgroundColor())
         .task {
             await updateStabilityMetrics()
             loadAuroraInsight()

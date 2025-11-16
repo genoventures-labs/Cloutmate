@@ -389,6 +389,159 @@ Items finished: \(session.itemsCompleted.count)
             timestamp: session.endTime ?? session.startTime
         )
     }
+    
+    // MARK: - V2: Pause/Resume
+    
+    /// Pause the active session
+    func pauseSession(modelContext: ModelContext) throws {
+        guard let session = getActiveSession(modelContext: modelContext) else {
+            throw FocusSessionError.noActiveSession
+        }
+        
+        guard !session.isPaused else {
+            return // Already paused
+        }
+        
+        session.isPaused = true
+        session.pauseStartTime = Date()
+        
+        do {
+            try modelContext.save()
+            logger.info("Focus session paused: \(session.id.uuidString)")
+            NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
+        } catch {
+            logger.error("Failed to pause session: \(error.localizedDescription)")
+            throw FocusSessionError.saveFailed
+        }
+    }
+    
+    /// Resume a paused session
+    func resumeSession(modelContext: ModelContext) throws {
+        guard let session = getActiveSession(modelContext: modelContext) else {
+            throw FocusSessionError.noActiveSession
+        }
+        
+        guard session.isPaused, let pauseStart = session.pauseStartTime else {
+            return // Not paused
+        }
+        
+        let pauseDuration = Date().timeIntervalSince(pauseStart)
+        session.pausedDuration += pauseDuration
+        session.isPaused = false
+        session.pauseStartTime = nil
+        
+        do {
+            try modelContext.save()
+            logger.info("Focus session resumed: \(session.id.uuidString)")
+            NotificationCenter.default.post(name: .focusSessionStatusChanged, object: session)
+        } catch {
+            logger.error("Failed to resume session: \(error.localizedDescription)")
+            throw FocusSessionError.saveFailed
+        }
+    }
+    
+    // MARK: - V2: LF Recording
+    
+    /// Record a Luminance Field value for the active session
+    func recordLFValue(_ value: Double, for session: FocusSession, modelContext: ModelContext) {
+        guard session.status == .active else { return }
+        
+        session.lfHistory.append(value)
+        
+        // Calculate average LF
+        if !session.lfHistory.isEmpty {
+            session.averageLF = session.lfHistory.reduce(0.0, +) / Double(session.lfHistory.count)
+        }
+        
+        // Calculate emotional variance (standard deviation)
+        if session.lfHistory.count >= 2 {
+            let mean = session.averageLF ?? 0.0
+            let variance = session.lfHistory.map { pow($0 - mean, 2) }.reduce(0.0, +) / Double(session.lfHistory.count)
+            session.emotionalVariance = sqrt(variance)
+        }
+        
+        // Calculate focus gravity trend (rolling window of last 5 minutes)
+        updateFocusGravityTrend(for: session)
+        
+        do {
+            try modelContext.save()
+        } catch {
+            logger.error("Failed to save LF value: \(error.localizedDescription)")
+        }
+    }
+    
+    /// Update focus gravity trend for session
+    private func updateFocusGravityTrend(for session: FocusSession) {
+        guard session.lfHistory.count >= 2 else {
+            session.focusGravityTrend = []
+            return
+        }
+        
+        // Use rolling window: last 5 minutes of data
+        // For simplicity, use last 10 LF values (assuming ~30s intervals)
+        let windowSize = min(10, session.lfHistory.count)
+        let recentValues = Array(session.lfHistory.suffix(windowSize))
+        
+        // Calculate stability: inverse of variance
+        let mean = recentValues.reduce(0.0, +) / Double(recentValues.count)
+        let variance = recentValues.map { pow($0 - mean, 2) }.reduce(0.0, +) / Double(recentValues.count)
+        let stability = 1.0 / (1.0 + variance) // Normalize to 0-1 range
+        
+        // Update trend array
+        if session.focusGravityTrend == nil {
+            session.focusGravityTrend = []
+        }
+        session.focusGravityTrend?.append(stability)
+        
+        // Keep trend to reasonable size (last 100 points)
+        if let trend = session.focusGravityTrend, trend.count > 100 {
+            session.focusGravityTrend = Array(trend.suffix(100))
+        }
+    }
+    
+    // MARK: - V2: Session Metrics
+    
+    /// Calculate comprehensive session metrics
+    func calculateSessionMetrics(for session: FocusSession, modelContext: ModelContext) -> FocusSessionMetrics {
+        // Calculate stability index
+        let stabilityIndex: Double
+        if let trend = session.focusGravityTrend, !trend.isEmpty {
+            // Average of focus gravity trend
+            stabilityIndex = trend.reduce(0.0, +) / Double(trend.count) * 100.0
+        } else {
+            // Fallback: use LF variance (inverse)
+            if let variance = session.emotionalVariance {
+                stabilityIndex = max(0, min(100, (1.0 - variance) * 100.0))
+            } else {
+                stabilityIndex = 50.0 // Default neutral
+            }
+        }
+        
+        session.stabilityIndex = stabilityIndex
+        
+        return FocusSessionMetrics(
+            averageLF: session.averageLF ?? 0.0,
+            stabilityIndex: stabilityIndex,
+            emotionalVariance: session.emotionalVariance ?? 0.0,
+            focusGravityTrend: session.focusGravityTrend ?? [],
+            focusStabilityPercentage: session.focusStabilityPercentage
+        )
+    }
+    
+    /// Calculate streak (consecutive days with completed sessions)
+    func calculateStreak(modelContext: ModelContext) -> Int {
+        return getStreakCount(modelContext: modelContext)
+    }
+}
+
+// MARK: - V2: Focus Session Metrics
+
+struct FocusSessionMetrics {
+    let averageLF: Double
+    let stabilityIndex: Double
+    let emotionalVariance: Double
+    let focusGravityTrend: [Double]
+    let focusStabilityPercentage: Double
 }
 
 // MARK: - Flow Hold Settings

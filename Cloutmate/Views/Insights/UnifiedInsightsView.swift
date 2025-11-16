@@ -54,11 +54,7 @@ struct UnifiedInsightsView: View {
                 scrollOffset = value
             }
         }
-        .background(
-            GlassPanel(tier: .background, cornerRadius: 0) {
-                Color(.windowBackgroundColor)
-            }
-        )
+        .background(Color.clear)
     }
 }
 

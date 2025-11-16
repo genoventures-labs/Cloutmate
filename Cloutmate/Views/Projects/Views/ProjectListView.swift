@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 import CloutmateShared
 
 struct ProjectListView: View {
@@ -21,34 +22,180 @@ struct ProjectListView: View {
     let onDuplicateProject: (Project) -> Void
     let onArchiveProject: (Project) -> Void
     let onDeleteProject: (Project) -> Void
+    let onReorderProjects: ([Project]) -> Void
+    let onMoveProjectToStatus: (Project, ProjectStatus) -> Void
+    let fetchProjectByID: (UUID) -> Project?
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
-    @Environment(\.modelContext) private var modelContext
+    
+    @State private var orderedProjects: [Project]
+    @State private var draggingProjectID: UUID?
+    @State private var dropTargetProjectID: UUID?
+    @State private var dropTargetStatus: ProjectStatus?
+    
+    init(
+        projects: [Project],
+        tasks: [Task],
+        areas: [Area],
+        selectionMode: Bool,
+        selectedProjectIDs: Set<UUID>,
+        onSelectionToggle: @escaping (Project) -> Void,
+        onProjectDetail: @escaping (Project) -> Void,
+        onProjectEdit: @escaping (Project) -> Void,
+        onDuplicateProject: @escaping (Project) -> Void,
+        onArchiveProject: @escaping (Project) -> Void,
+        onDeleteProject: @escaping (Project) -> Void,
+        onReorderProjects: @escaping ([Project]) -> Void,
+        onMoveProjectToStatus: @escaping (Project, ProjectStatus) -> Void,
+        fetchProjectByID: @escaping (UUID) -> Project?
+    ) {
+        self.projects = projects
+        self.tasks = tasks
+        self.areas = areas
+        self.selectionMode = selectionMode
+        self.selectedProjectIDs = selectedProjectIDs
+        self.onSelectionToggle = onSelectionToggle
+        self.onProjectDetail = onProjectDetail
+        self.onProjectEdit = onProjectEdit
+        self.onDuplicateProject = onDuplicateProject
+        self.onArchiveProject = onArchiveProject
+        self.onDeleteProject = onDeleteProject
+        self.onReorderProjects = onReorderProjects
+        self.onMoveProjectToStatus = onMoveProjectToStatus
+        self.fetchProjectByID = fetchProjectByID
+        _orderedProjects = State(initialValue: projects)
+    }
     
     var body: some View {
         if projects.isEmpty {
             emptyState
         } else {
+            VStack(spacing: 18) {
+                if draggingProjectID != nil {
+                    statusDropTargets
+                }
+                
             LazyVStack(spacing: 12) {
-                ForEach(projects) { project in
-                    ProjectListCard(
+                    projectCards
+                }
+                .onDrop(
+                    of: [.text],
+                    delegate: ProjectListDropDelegate(
+                        targetProject: nil,
+                        projects: $orderedProjects,
+                        draggingProjectID: $draggingProjectID,
+                        dropTargetProjectID: $dropTargetProjectID,
+                        fetchProject: fetchProjectByID,
+                        onReorder: { reordered in
+                            orderedProjects = reordered
+                            onReorderProjects(reordered)
+                        }
+                    )
+                )
+            }
+            .onChange(of: projects.map(\.id)) { _ in
+                orderedProjects = projects
+            }
+        }
+    }
+    
+    private var projectCards: some View {
+        ForEach(orderedProjects, id: \.id) { project in
+            projectCard(for: project)
+        }
+    }
+    
+    private func projectCard(for project: Project) -> some View {
+        let projectTasks = tasks.filter { $0.projectId == project.id }
+        let isSelected = selectedProjectIDs.contains(project.id)
+        let isDragged = draggingProjectID == project.id
+        let isDropHighlight = dropTargetProjectID == project.id
+        
+        return ProjectListCard(
                         project: project,
-                        tasks: tasks.filter { $0.projectId == project.id },
+            tasks: projectTasks,
                         areas: areas,
                         selectionMode: selectionMode,
-                        isSelected: selectedProjectIDs.contains(project.id),
+            isSelected: isSelected,
                         onSelectionToggle: { onSelectionToggle(project) },
                         onOpenDetail: { onProjectDetail(project) },
                         onEdit: { onProjectEdit(project) },
                         onDuplicate: { onDuplicateProject(project) },
                         onArchive: { onArchiveProject(project) },
-                        onDelete: { onDeleteProject(project) }
+            onDelete: { onDeleteProject(project) },
+            isBeingDragged: isDragged,
+            isDropTarget: isDropHighlight
                     )
                     .accessibilityLabel("Project: \(project.title)")
                     .accessibilityHint("Double tap to open. Press Enter to view details.")
                     .accessibilityAddTraits(.isButton)
+        .onDrag {
+            draggingProjectID = project.id
+            dropTargetProjectID = project.id
+            return NSItemProvider(object: project.id.uuidString as NSString)
+        }
+        .onDrop(
+            of: [.text],
+            delegate: ProjectListDropDelegate(
+                targetProject: project,
+                projects: $orderedProjects,
+                draggingProjectID: $draggingProjectID,
+                dropTargetProjectID: $dropTargetProjectID,
+                fetchProject: fetchProjectByID,
+                onReorder: { reordered in
+                    orderedProjects = reordered
+                    onReorderProjects(reordered)
                 }
+            )
+        )
+    }
+    
+    private var statusDropTargets: some View {
+        HStack(spacing: 12) {
+            ForEach(ProjectStatus.allCases, id: \.self) { status in
+                statusChip(for: status)
             }
+        }
+        .padding(.horizontal, 4)
+        .animation(.easeInOut(duration: 0.2), value: dropTargetStatus)
+    }
+    
+    private func statusChip(for status: ProjectStatus) -> some View {
+        let isActive = dropTargetStatus == status
+        return Label(status.displayName, systemImage: statusIcon(for: status))
+            .font(.system(.caption, design: .rounded).weight(.medium))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(isActive ? glassColorSystem.emotionalAccent().opacity(0.22) : Color.secondary.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(glassColorSystem.emotionalAccent().opacity(isActive ? 0.6 : 0.2), lineWidth: 1)
+            )
+            .onDrop(
+                of: [.text],
+                delegate: ProjectStatusDropDelegate(
+                    status: status,
+                    projects: $orderedProjects,
+                    draggingProjectID: $draggingProjectID,
+                    dropTargetStatus: $dropTargetStatus,
+                    fetchProject: fetchProjectByID,
+                    onMoveToStatus: onMoveProjectToStatus,
+                    onReorder: { reordered in
+                        orderedProjects = reordered
+                        onReorderProjects(reordered)
+                    }
+                )
+            )
+    }
+    
+    private func statusIcon(for status: ProjectStatus) -> String {
+        switch status {
+        case .active: return "play.fill"
+        case .paused: return "pause.fill"
+        case .completed: return "checkmark.seal.fill"
         }
     }
     
@@ -83,6 +230,8 @@ struct ProjectListCard: View {
     let onDuplicate: () -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
+    var isBeingDragged: Bool = false
+    var isDropTarget: Bool = false
     
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
@@ -118,35 +267,69 @@ struct ProjectListCard: View {
     }
     
     var body: some View {
-        HStack(spacing: 0) {
-            focusGravityBarView
-            cardContentView
+        GlassPanel(tier: .contentCard, cornerRadius: 22) {
+            VStack(spacing: 0) {
+                headerRow
+                    .padding(.horizontal, 24)
+                    .padding(.top, 22)
+                    .padding(.bottom, showProgressSection || isExpanded ? 18 : 22)
+                
+                if showProgressSection {
+                    progressSection
+                }
+                
+                if isExpanded {
+                    expandedSection
+                }
+            }
         }
-        .background(cardBackgroundView)
-        .shadow(color: .black.opacity(isHovered ? 0.1 : 0.05), radius: isHovered ? 6 : 2, y: isHovered ? 3 : 1)
-        .scaleEffect(isHovered ? 1.01 : 1.0)
-        .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3), value: isHovered)
-        .animation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3), value: isExpanded)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: isSelected ? [.kosmicBlue, .kosmicPurple] : [.clear, .clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: isSelected ? 2 : 0
-                )
-        )
+        .overlay(alignment: .leading) {
+            focusAccentBar
+        }
         .overlay(alignment: .topTrailing) {
             if selectionMode {
                 SelectionIndicator(isSelected: isSelected)
-                    .padding(12)
+                    .padding(.top, 18)
+                    .padding(.trailing, 18)
                     .onTapGesture {
                         onSelectionToggle()
                     }
             }
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(selectionBorderGradient, lineWidth: isSelected ? 1.8 : 0.8)
+                .opacity(isSelected ? 1.0 : 0.55)
+        )
+        .overlay {
+            if isActiveToday && !reduceMotion {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(activeHighlightGradient, lineWidth: 1.2)
+                    .blur(radius: 6)
+                    .opacity(0.65)
+                    .allowsHitTesting(false)
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(glassColorSystem.emotionalAccent().opacity(isDropTarget ? 0.85 : 0),
+                        lineWidth: isDropTarget ? 1.6 : 0)
+                .shadow(color: glassColorSystem.emotionalAccent().opacity(isDropTarget ? 0.45 : 0),
+                        radius: isDropTarget ? 18 : 0,
+                        x: 0,
+                        y: isDropTarget ? 10 : 0)
+                .animation(.easeInOut(duration: 0.16), value: isDropTarget)
+        )
+        .shadow(color: Color.black.opacity(isBeingDragged ? 0.18 : (isHovered ? 0.12 : 0.06)),
+                radius: isBeingDragged ? 18 : (isHovered ? 16 : 10),
+                x: 0,
+                y: isBeingDragged ? 12 : (isHovered ? 10 : 6))
+        .scaleEffect(isBeingDragged ? 1.02 : (isHovered ? 1.01 : 1.0))
+        .rotation3DEffect(.degrees(isBeingDragged ? 4 : 0), axis: (x: 1, y: 0, z: 0))
+        .offset(y: isBeingDragged ? -3 : 0)
+        .animation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.35), value: isBeingDragged)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isHovered)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isExpanded)
         .onHover { hovering in
             guard !selectionMode else {
                 isHovered = hovering
@@ -158,7 +341,7 @@ struct ProjectListCard: View {
             if selectionMode {
                 onSelectionToggle()
             } else {
-                withAnimation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3)) {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
                     isExpanded.toggle()
                 }
             }
@@ -176,22 +359,12 @@ struct ProjectListCard: View {
                     showFocusDurationSheet = true
                 }
                 Divider()
-                Button("Open") {
-                    onOpenDetail()
-                }
-                Button("Edit") {
-                    onEdit()
-                }
-                Button("Duplicate") {
-                    onDuplicate()
-                }
+                Button("Open") { onOpenDetail() }
+                Button("Edit") { onEdit() }
+                Button("Duplicate") { onDuplicate() }
                 Divider()
-                Button("Archive") {
-                    onArchive()
-                }
-                Button("Delete", role: .destructive) {
-                    onDelete()
-                }
+                Button("Archive") { onArchive() }
+                Button("Delete", role: .destructive) { onDelete() }
             }
         }
         .sheet(isPresented: $showFocusDurationSheet) {
@@ -209,73 +382,71 @@ struct ProjectListCard: View {
         .onChange(of: selectionMode) { _, newValue in
             if newValue {
                 isHovered = false
-                withAnimation(reduceMotion ? nil : .spring(duration: 0.35, bounce: 0.3)) {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
                     isExpanded = false
                 }
             }
         }
     }
     
-    // MARK: - View Components
+    // MARK: - Header & Meta
     
-    private var focusGravityBarView: some View {
-        Group {
-            if let metrics = focusMetrics {
-                FocusGravityBar(metrics: metrics, isActive: isActiveToday)
-                    .frame(height: cardHeight)
-                    .accessibilityLabel(focusGravityAccessibilityLabel(metrics: metrics))
-            } else {
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: 4, height: cardHeight)
-            }
-        }
-    }
-    
-    private var cardContentView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            cardHeaderView
-            if totalTasksCount > 0 {
-                progressBarView
-            }
-            if isExpanded {
-                expandedContentView
-            }
-        }
-        .padding(16)
-    }
-    
-    private var cardHeaderView: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
+    private var headerRow: some View {
+        HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(project.title)
-                    .font(.headline)
-                    .foregroundColor(glassColorSystem.textPrimary())
+                    .font(.system(.body, design: .rounded).weight(.semibold))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                    .lineLimit(2)
                 
-                HStack(spacing: 8) {
-                    // Interactive status badge
+                metadataRow
+            }
+            
+            Spacer(minLength: 16)
+            
+            if !selectionMode {
+                quickActions
+                    .opacity(isHovered ? 1.0 : 0.0)
+                    .animation(.easeInOut(duration: 0.18), value: isHovered)
+            }
+        }
+    }
+    
+    private var metadataRow: some View {
+        HStack(spacing: 10) {
                     InteractiveProjectStatusBadge(project: project)
-                    
-                    // Interactive due date badge
                     InteractiveProjectDueDateBadge(project: project)
                     
-                    // Area badge (could be made interactive too)
                     if let area = area {
                         InteractiveAreaBadge(project: project, area: area, areas: areas)
                     }
+            
+            focusSummaryChip
+            
+            if completionPercentage > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("\(Int(completionPercentage * 100))%")
+                        .font(.caption2)
+                        .fontWeight(.medium)
                 }
-            }
-            
-            Spacer()
-            
-            if isHovered && !selectionMode {
-                quickActionsView
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.kosmicBlue.opacity(0.12))
+                .foregroundColor(.kosmicBlue)
+                .clipShape(Capsule())
             }
         }
+        .font(.caption)
+        .foregroundColor(.secondary)
     }
     
-    private var quickActionsView: some View {
+    private var quickActions: some View {
         HStack(spacing: 8) {
+            ProjectQuickActionButton(icon: "timer", color: .kosmicPurple) {
+                showFocusDurationSheet = true
+            }
             ProjectQuickActionButton(icon: "pencil", color: .kosmicBlue) {
                 onEdit()
             }
@@ -283,17 +454,55 @@ struct ProjectListCard: View {
                 onArchive()
             }
         }
-        .transition(.opacity.combined(with: .scale))
     }
     
-    private var progressBarView: some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private var focusSummaryChip: some View {
+        Group {
+            if let metrics = focusMetrics {
+                let intensity = focusAverage(metrics)
+                let percentage = Int(intensity * 100)
+                
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("\(percentage)% focus")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.kosmicPurple.opacity(0.12))
+                .foregroundColor(.kosmicPurple)
+                .clipShape(Capsule())
+                .accessibilityLabel("Focus intensity \(percentage) percent")
+            }
+        }
+    }
+    
+    // MARK: - Sections
+    
+    private var showProgressSection: Bool {
+        totalTasksCount > 0
+    }
+    
+    private var progressSection: some View {
+        VStack(spacing: 0) {
+            GlassDivider()
+                .padding(.horizontal, 24)
+            progressRow
+                .padding(.horizontal, 24)
+                .padding(.vertical, isExpanded ? 16 : 22)
+        }
+    }
+    
+    private var progressRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("\(completedTasksCount)/\(totalTasksCount) tasks")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
                 Spacer()
-                Text("\(Int(completionPercentage * 100))%")
+                Text("\(Int(completionPercentage * 100))% complete")
                     .font(.caption)
                     .fontWeight(.medium)
                     .foregroundColor(.kosmicBlue)
@@ -301,37 +510,40 @@ struct ProjectListCard: View {
             
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.secondary.opacity(0.1))
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(glassColorSystem.borderColor().opacity(0.15))
                         .frame(height: 6)
                     
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(progressGradient)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(LinearGradient(colors: [.kosmicBlue, .kosmicPurple], startPoint: .leading, endPoint: .trailing))
                         .frame(width: geometry.size.width * CGFloat(completionPercentage), height: 6)
+                        .animation(.easeInOut(duration: 0.25), value: completionPercentage)
                 }
             }
             .frame(height: 6)
         }
     }
     
-    private var progressGradient: LinearGradient {
-        LinearGradient(
-            colors: [.kosmicBlue, .kosmicPurple],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
+    private var expandedSection: some View {
+        VStack(spacing: 0) {
+            GlassDivider()
+                .padding(.horizontal, 24)
+            expandedDetails
+                .padding(.horizontal, 24)
+                .padding(.vertical, 22)
+        }
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
     
-    private var expandedContentView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let goal = project.goal {
+    private var expandedDetails: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if let goal = project.goal, !goal.isEmpty {
                 Text(goal)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
+                    .font(.system(.subheadline, design: .rounded))
+                    .foregroundColor(glassColorSystem.textSecondary())
+                    .lineLimit(4)
             }
             
-            // Interactive fields row
             HStack(spacing: 12) {
                 InteractiveProjectStatusPicker(project: project)
                 InteractiveProjectDueDatePicker(project: project)
@@ -339,79 +551,76 @@ struct ProjectListCard: View {
             }
             
             if !tasks.isEmpty {
-                tasksListView
+                relatedTasks
             }
         }
-        .padding(.top, 8)
-        .transition(.opacity.combined(with: .move(edge: .top)))
     }
     
-    private var tasksListView: some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private var relatedTasks: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Linked Tasks")
                 .font(.caption)
                 .fontWeight(.semibold)
-                .foregroundColor(.secondary)
+                .foregroundColor(glassColorSystem.textSecondary())
             
             ForEach(tasks.prefix(5)) { task in
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                        .foregroundColor(task.status == .done ? .kosmicGreen : .secondary)
-                        .font(.caption)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(task.status == .done ? .kosmicGreen : glassColorSystem.textSecondary().opacity(0.6))
                     Text(task.title)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(glassColorSystem.textSecondary())
+                        .lineLimit(1)
                     Spacer()
                 }
             }
         }
     }
     
-    private var cardBackgroundView: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            EmptyView()
-        }
-        .overlay(cardOverlayView)
-    }
+    // MARK: - Accents & Helpers
     
-    private var cardOverlayView: some View {
-        Group {
-            if isActiveToday && !reduceMotion {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(activeBorderGradient, lineWidth: 2)
-                    .shimmer()
-            }
-        }
-    }
-    
-    private var activeBorderGradient: LinearGradient {
-        LinearGradient(
+    private var focusAccentBar: some View {
+        let gradient = LinearGradient(
             colors: [
-                .kosmicBlue.opacity(0.3),
-                .kosmicPurple.opacity(0.3),
-                .kosmicGreen.opacity(0.3)
+                Color.kosmicBlue.opacity(isActiveToday ? 0.85 : 0.45),
+                Color.kosmicPurple.opacity(isActiveToday ? 0.8 : 0.4),
+                Color.kosmicGreen.opacity(isActiveToday ? 0.75 : 0.35)
             ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        
+        return RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(gradient)
+            .frame(width: isActiveToday ? 6 : 4)
+            .padding(.vertical, 18)
+            .padding(.leading, 6)
+            .opacity(focusMetrics == nil ? 0.25 : 0.85)
+            .allowsHitTesting(false)
+    }
+    
+    private var selectionBorderGradient: LinearGradient {
+        if isSelected {
+            return LinearGradient(colors: [.kosmicBlue, .kosmicPurple], startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
+        return LinearGradient(colors: [glassColorSystem.borderColor().opacity(0.45)], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+    
+    private var activeHighlightGradient: LinearGradient {
+        LinearGradient(
+            colors: [.kosmicBlue.opacity(0.55), .kosmicPurple.opacity(0.45), .kosmicGreen.opacity(0.4)],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
     }
     
-    // MARK: - Helper Methods
-    
-    private func focusGravityAccessibilityLabel(metrics: ProjectFocusMetrics) -> String {
-        let average = (metrics.cognitiveFocus + metrics.creativeFlow + metrics.completionEnergy) / 3.0
-        let percentage = Int(average * 100)
-        return "Focus gravity: \(percentage) percent"
+    private func focusAverage(_ metrics: ProjectFocusMetrics) -> Double {
+        max(0, min(1, (metrics.cognitiveFocus + metrics.creativeFlow + metrics.completionEnergy) / 3.0))
     }
-    
-    private var cardHeight: CGFloat {
-        isExpanded ? 200 : 80
-    }
-    
     private func startFocusSession() {
         showFocusDurationSheet = false
         
-        // Post notification with session parameters instead of starting immediately
         let params = PendingFocusSessionParams(
             objective: project.title,
             plannedDuration: focusDuration,
@@ -420,14 +629,98 @@ struct ProjectListCard: View {
             shouldAutoStart: true
         )
         
-        // Post session parameters first (will be stored as pending)
-        NotificationCenter.default.post(
-            name: .startPendingFocusSession,
-            object: params
-        )
-        
-        // Switch to focus mode tab (session will start after switch completes)
+        NotificationCenter.default.post(name: .startPendingFocusSession, object: params)
         NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
+    }
+}
+
+private struct ProjectListDropDelegate: DropDelegate {
+    let targetProject: Project?
+    @Binding var projects: [Project]
+    @Binding var draggingProjectID: UUID?
+    @Binding var dropTargetProjectID: UUID?
+    let fetchProject: (UUID) -> Project?
+    let onReorder: ([Project]) -> Void
+    
+    func validateDrop(info: DropInfo) -> Bool { true }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggingID = draggingProjectID,
+              let fromIndex = projects.firstIndex(where: { $0.id == draggingID }) else { return }
+        var toIndex = projects.count - 1
+        if let targetProject = targetProject,
+           let index = projects.firstIndex(where: { $0.id == targetProject.id }) {
+            toIndex = index
+        }
+        if fromIndex != toIndex {
+            withAnimation(.easeInOut(duration: 0.16)) {
+                let project = projects.remove(at: fromIndex)
+                projects.insert(project, at: toIndex)
+            }
+            dropTargetProjectID = targetProject?.id
+        }
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+    
+    func dropExited(info: DropInfo) {
+        dropTargetProjectID = nil
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            draggingProjectID = nil
+            dropTargetProjectID = nil
+        }
+        guard draggingProjectID != nil else { return false }
+        onReorder(projects)
+        return true
+    }
+    
+    func dropSessionDidEnd(_ session: DropSession) {
+        draggingProjectID = nil
+        dropTargetProjectID = nil
+    }
+}
+
+private struct ProjectStatusDropDelegate: DropDelegate {
+    let status: ProjectStatus
+    @Binding var projects: [Project]
+    @Binding var draggingProjectID: UUID?
+    @Binding var dropTargetStatus: ProjectStatus?
+    let fetchProject: (UUID) -> Project?
+    let onMoveToStatus: (Project, ProjectStatus) -> Void
+    let onReorder: ([Project]) -> Void
+    
+    func validateDrop(info: DropInfo) -> Bool { true }
+    
+    func dropEntered(info: DropInfo) {
+        dropTargetStatus = status
+    }
+    
+    func dropExited(info: DropInfo) {
+        dropTargetStatus = nil
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            dropTargetStatus = nil
+            draggingProjectID = nil
+        }
+        
+        guard let draggingID = draggingProjectID,
+              let project = fetchProject(draggingID) else { return false }
+        
+        onMoveToStatus(project, status)
+        onReorder(projects)
+        return true
+    }
+    
+    func dropSessionDidEnd(_ session: DropSession) {
+        dropTargetStatus = nil
+        draggingProjectID = nil
     }
 }
 

@@ -35,194 +35,47 @@ struct NoteCardV2: View {
         return firstThreeLines.isEmpty ? "No content" : firstThreeLines
     }
     
+    private var borderGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                glassColorSystem.emotionalAccent().opacity(0.6),
+                glassColorSystem.emotionalAccent().opacity(0.4)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
     var body: some View {
-        HStack(spacing: 0) {
-            // Focus Gravity accent border (left edge)
-            if isSelected {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [.kosmicBlue, .kosmicPurple],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 4)
-            }
-            
-            // Main card content
-            GlassPanel(tier: .contentCard, cornerRadius: 12) {
-                HStack(alignment: .top, spacing: 12) {
-                    // Content
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Title with pin indicator
-                        HStack(alignment: .center, spacing: 6) {
-                            if note.isPinned {
-                                Image(systemName: "pin.fill")
-                                    .font(.caption2)
-                                    .foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.kosmicBlue, .kosmicPurple],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                            }
-                            
-                            Text(note.title.isEmpty ? "Untitled Note" : note.title)
-                                .font(.system(.body, design: .rounded))
-                                .fontWeight(note.isPinned ? .semibold : .medium)
-                                .foregroundColor(.primary)
-                                .lineLimit(2)
-                                .applyIf(note.isPinned) { view in
-                                    view.foregroundStyle(
-                                        LinearGradient(
-                                            colors: [.kosmicBlue, .kosmicPurple],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                }
-                            
-                            if note.author == .aurora {
-                                AuroraAuthorBadge()
-                            }
-                        }
-                        
-                        // Preview text with fade-out and mention rendering
-                        MentionRenderedTextView(
-                            text: previewText,
-                            textFont: .caption,
-                            mentionFont: .caption
-                        )
-                            .foregroundColor(.secondary)
-                            .lineLimit(3)
-                            .mask(
-                                LinearGradient(
-                                    gradient: Gradient(stops: [
-                                        .init(color: .black, location: 0),
-                                        .init(color: .black, location: 0.8),
-                                        .init(color: .clear, location: 1.0)
-                                    ]),
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
-                        
-                        // Metadata row
-                        HStack(spacing: 8) {
-                            // Tags
-                            if !note.tags.isEmpty {
-                                HStack(spacing: 4) {
-                                    ForEach(note.tags.prefix(3), id: \.self) { tag in
-                                        Text("#\(tag)")
-                                            .font(.caption2)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Color.kosmicPurple.opacity(0.1))
-                                            .foregroundColor(.kosmicPurple)
-                                            .cornerRadius(4)
-                                    }
-                                    if note.tags.count > 3 {
-                                        Text("+\(note.tags.count - 3)")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
-                                }
-                            }
-                            
-                            Spacer()
-                            
-                            // Last modified date
-                            Text(note.updatedAt, style: .relative)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                            
-                            // Linked project/task icon
-                            if note.projectId != nil {
-                                Image(systemName: "folder.fill")
-                                    .font(.caption2)
-                                    .foregroundColor(.kosmicBlue)
-                            }
-                        }
-                    }
-                    
-                    Spacer()
-                    
-                    // Hover actions
-                    if showHoverActions {
-                        HStack(spacing: 8) {
-                            Button(action: onEdit) {
-                                Image(systemName: "pencil")
-                                    .font(.caption)
-                                    .foregroundColor(.primary)
-                                    .padding(6)
-                                    .background(Color.secondary.opacity(0.1))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .help("Edit")
-                            
-                            Button(action: {}) {
-                                Image(systemName: "link")
-                                    .font(.caption)
-                                    .foregroundColor(.primary)
-                                    .padding(6)
-                                    .background(Color.secondary.opacity(0.1))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .help("Link")
-                        }
-                        .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                    }
+        GlassPanel(tier: .contentCard, cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 0) {
+                headerRow
+                
+                if !note.markdown.isEmpty {
+                    previewSection
                 }
-                .padding(16)
-                .frame(minHeight: 56)
             }
         }
-        .floatLift()
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: isSelected ? [.kosmicBlue, .kosmicPurple] : [.clear, .clear],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: isSelected ? 2 : 0
-                )
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(borderGradient, lineWidth: isSelected ? 1.6 : 0.6)
+                .animation(GlassMotion.Easing.spring, value: isSelected)
         )
+        .shadow(
+            color: glassColorSystem.emotionalAccent().opacity(isHovered ? 0.22 : 0.12),
+            radius: isHovered ? 18 : 12,
+            x: 0,
+            y: isHovered ? 12 : 6
+        )
+        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .animation(GlassMotion.Easing.spring, value: isHovered)
         .overlay(alignment: .topTrailing) {
             if selectionMode {
                 SelectionIndicator(isSelected: isSelected)
-                    .padding(10)
+                    .padding(12)
                     .onTapGesture {
                         onSelectionToggle()
                     }
-            }
-        }
-        .onTapGesture {
-            if selectionMode {
-                onSelectionToggle()
-            } else {
-                onTap()
-            }
-        }
-        .onHover { hovering in
-            guard !selectionMode else {
-                isHovered = hovering
-                showHoverActions = false
-                return
-            }
-            if reduceMotion {
-                isHovered = hovering
-                showHoverActions = hovering
-            } else {
-                withAnimation(GlassMotion.Easing.spring) {
-                    isHovered = hovering
-                    showHoverActions = hovering
-                }
             }
         }
         .contextMenu {
@@ -245,16 +98,174 @@ struct NoteCardV2: View {
                 }
             }
         }
-        .accessibilityLabel("Note: \(note.title)")
+        .accessibilityLabel("Note: \(note.title.isEmpty ? "Untitled" : note.title)")
         .accessibilityHint("Double tap to open")
         .accessibilityValue(note.isPinned ? "Pinned" : "")
         .accessibilityAddTraits(note.isPinned ? .isSelected : [])
         .onChange(of: selectionMode) { _, newValue in
             if newValue {
-                showHoverActions = false
+                isHovered = false
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    }
+    
+    private var headerRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            if note.isPinned {
+                pinnedIndicator
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                titleRow
+                metadataRow
+            }
+        }
+        .padding(.horizontal, 26)
+        .padding(.vertical, 22)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onTap()
+        }
+        .onTapGesture(count: 2, perform: onEdit)
+        .onHover { hovering in
+            guard !selectionMode else {
+                isHovered = hovering
+                return
+            }
+            if reduceMotion {
+                isHovered = hovering
+            } else {
+                withAnimation(GlassMotion.Easing.spring) {
+                    isHovered = hovering
+                }
+            }
+        }
+    }
+    
+    private var pinnedIndicator: some View {
+        RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [.kosmicBlue, .kosmicPurple],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(width: 3)
+    }
+    
+    private var titleRow: some View {
+        HStack(alignment: .center, spacing: 10) {
+            Text(note.title.isEmpty ? "Untitled Note" : note.title)
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundStyle(note.isPinned ? 
+                    AnyShapeStyle(LinearGradient(
+                        colors: [.kosmicBlue, .kosmicPurple],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )) :
+                    AnyShapeStyle(glassColorSystem.textPrimary()))
+                .lineLimit(2)
+            
+            if note.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.kosmicBlue, .kosmicPurple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+            
+            if note.author == .aurora {
+                AuroraAuthorBadge()
+            }
+            
+            Spacer()
+            
+            if !note.tags.isEmpty {
+                tagsPreview
+            }
+        }
+    }
+    
+    private var tagsPreview: some View {
+        HStack(spacing: 4) {
+            ForEach(note.tags.prefix(2), id: \.self) { tag in
+                Text("#\(tag)")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(glassColorSystem.emotionalAccent().opacity(0.18))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(glassColorSystem.emotionalAccent().opacity(0.35), lineWidth: 0.8)
+                    )
+                    .foregroundStyle(glassColorSystem.emotionalAccent())
+            }
+            if note.tags.count > 2 {
+                Text("+\(note.tags.count - 2)")
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+            }
+        }
+    }
+    
+    private var metadataRow: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 4) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 11, weight: .medium))
+                Text(note.updatedAt, style: .relative)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+            }
+            .foregroundStyle(glassColorSystem.textSecondary())
+            
+            if note.projectId != nil {
+                HStack(spacing: 4) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Linked")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                }
+                .foregroundStyle(glassColorSystem.textSecondary())
+            }
+        }
+    }
+    
+    private var previewSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .background(glassColorSystem.borderColor().opacity(0.3))
+            
+            MentionRenderedTextView(
+                text: previewText,
+                textFont: .system(size: 14, weight: .regular, design: .rounded),
+                mentionFont: .system(size: 14, weight: .medium, design: .rounded)
+            )
+            .foregroundStyle(glassColorSystem.textSecondary())
+            .lineLimit(4)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 26)
+            .padding(.vertical, 18)
+            .mask(
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: 0.85),
+                        .init(color: .clear, location: 1.0)
+                    ]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+        }
     }
 }
 

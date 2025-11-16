@@ -18,6 +18,7 @@ struct ProjectTimelineView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var hoveredProjectID: UUID?
     @State private var selectedProject: Project?
@@ -71,10 +72,21 @@ struct ProjectTimelineView: View {
         }
     }
     
+    private var axisTickCount: Int {
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.month], from: dateRange.start, to: dateRange.end)
+        let months = max(components.month ?? 1, 1)
+        return min(max(months, 3), 8)
+    }
+    
     @ViewBuilder
     private func timelineContent(trackWidth: CGFloat) -> some View {
         ZStack(alignment: .topLeading) {
-            timelineBackdrop(width: trackWidth)
+            TimelineTrackBackground(
+                width: trackWidth,
+                height: TimelineLayout.trackHeight,
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme)
+            )
             if !reduceMotion {
                 FocusGravityWave(
                     metrics: calculateOverallMetrics(),
@@ -85,7 +97,31 @@ struct ProjectTimelineView: View {
                 .offset(y: TimelineLayout.baselineY - (TimelineLayout.trackHeight * 0.45))
             }
             
-            timelineBaseline(width: trackWidth)
+            let densityPoints = projectDensityPoints(for: trackWidth)
+            if densityPoints.count >= 2 {
+                TimelineDensityRibbon(
+                    points: densityPoints,
+                    baselineY: TimelineLayout.baselineY,
+                    fillGradient: Gradient(colors: [
+                        Color.kosmicBlue.opacity(0.12),
+                        Color.kosmicPurple.opacity(0.1),
+                        Color.kosmicGreen.opacity(0.08)
+                    ]),
+                    strokeGradient: Gradient(colors: [
+                        Color.kosmicBlue.opacity(0.85),
+                        Color.kosmicPurple.opacity(0.85),
+                        Color.kosmicGreen.opacity(0.85)
+                    ])
+                )
+                .blendMode(.screen)
+                .allowsHitTesting(false)
+            }
+            
+            TimelineAxis(
+                width: trackWidth,
+                tickCount: axisTickCount,
+                tickHeight: TimelineLayout.tickHeight
+            )
             
             ForEach(positionedProjects) { positioned in
                 TimelineMilestone(
@@ -109,59 +145,16 @@ struct ProjectTimelineView: View {
                 .zIndex(hoveredProjectID == positioned.project.id ? 3 : 1)
             }
         }
-    }
-
-    private func timelineBackdrop(width: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: 28, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(0.08),
-                        Color.white.opacity(0.03)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+        .overlay(alignment: .topLeading) {
+            TimelineDateRangeLabel(
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                alignment: .leading,
+                icon: "chart.bar.doc.horizontal"
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.18),
-                                Color.white.opacity(0.05)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            .shadow(color: .black.opacity(0.08), radius: 20, y: 18)
-            .frame(
-                width: width - (TimelineLayout.horizontalPadding * 1.2),
-                height: TimelineLayout.connectionHeight + 128
-            )
-            .offset(
-                x: TimelineLayout.horizontalPadding * 0.6,
-                y: TimelineLayout.baselineY - (TimelineLayout.connectionHeight / 2) - 40
-            )
-            .allowsHitTesting(false)
-    }
-    
-    private func timelineBaseline(width: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY))
-            path.addLine(to: CGPoint(x: width - TimelineLayout.horizontalPadding, y: TimelineLayout.baselineY))
+            .padding(.leading, 24)
+            .padding(.top, 10)
         }
-        .stroke(
-            LinearGradient(
-                colors: [.kosmicBlue.opacity(0.9), .kosmicPurple.opacity(0.9)],
-                startPoint: .leading,
-                endPoint: .trailing
-            ),
-            style: StrokeStyle(lineWidth: 2, lineCap: .round)
-        )
     }
     
     private var emptyState: some View {
@@ -178,6 +171,30 @@ struct ProjectTimelineView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.vertical, 60)
+    }
+    
+    private func projectDensityPoints(for width: CGFloat) -> [TimelineDensityRibbon.Point] {
+        let calendar = Calendar.current
+        let buckets = projects.reduce(into: [Date: Int]()) { partial, project in
+            let bucket = calendar.startOfDay(for: project.dueDate ?? project.createdAt)
+            partial[bucket, default: 0] += 1
+        }
+        guard !buckets.isEmpty else { return [] }
+        
+        let sortedKeys = buckets.keys.sorted()
+        let maxCount = max(buckets.values.max() ?? 1, 1)
+        let usableWidth = width - (TimelineLayout.horizontalPadding * 2)
+        
+        return sortedKeys.map { date in
+            let offset = date.timeIntervalSince(dateRange.start)
+            let total = dateRange.end.timeIntervalSince(dateRange.start)
+            let ratio = total == 0 ? 0.5 : min(max(CGFloat(offset / total), 0), 1)
+            let x = TimelineLayout.horizontalPadding + ratio * usableWidth
+            let normalized = CGFloat(buckets[date] ?? 0) / CGFloat(maxCount)
+            let amplitude: CGFloat = 92
+            let y = TimelineLayout.baselineY - max(normalized, 0.08) * amplitude
+            return TimelineDensityRibbon.Point(x: x, y: y)
+        }
     }
     
     private func calculateOverallMetrics() -> ProjectFocusMetrics {

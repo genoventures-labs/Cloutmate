@@ -11,6 +11,7 @@ import AppKit
 import UniformTypeIdentifiers
 import CloutmateShared
 
+@available(*, deprecated, message: "Legacy list view retained for fallback flows. Prefer UnifiedNotesView.")
 struct NotesView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

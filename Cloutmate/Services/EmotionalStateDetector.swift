@@ -131,7 +131,7 @@ final class EmotionalStateDetector {
         }
         
         // Declining emotional trend
-        if snapshot.emotionalTrend == .declining {
+        if snapshot.emotionalTrend == EmotionalTrend.declining {
             score += 0.2
         }
         
@@ -191,7 +191,7 @@ final class EmotionalStateDetector {
         }
         
         // Stable emotional trend
-        if snapshot.emotionalTrend == .stable {
+        if snapshot.emotionalTrend == EmotionalTrend.stable {
             score += 0.2
         }
         

@@ -33,13 +33,21 @@ actor JournalAIService {
     func generateJournalContent(
         from prompt: String,
         entryType: JournalEntryType,
+        mood: JournalMood? = nil,
         context: String = ""
     ) async throws -> String {
         let systemPrompt = buildSystemPrompt(for: entryType, context: context)
         
+        // Determine tone from mood and entry type
+        let tone = mood.map { AuroraToneKit.tone(for: $0, entryType: entryType) } ?? .reflective
+        
         do {
             let fullPrompt = "\(systemPrompt)\n\nUser prompt: \(prompt)\n\nGenerate journal content:"
-            let response = try await coreResponseService.generateResponse(for: fullPrompt, context: context)
+            let response = try await coreResponseService.generateResponse(
+                for: fullPrompt,
+                context: context,
+                toneContext: tone
+            )
             return response
         } catch {
             return "Unable to generate content at this time."
@@ -76,8 +84,15 @@ actor JournalAIService {
         Provide a concise analysis in 3-5 bullet points:
         """
         
+        // Use reflective tone for journal analysis
+        let tone = AuroraTone.reflective
+        
         do {
-            let response = try await coreResponseService.generateResponse(for: prompt, context: "")
+            let response = try await coreResponseService.generateResponse(
+                for: prompt,
+                context: "",
+                toneContext: tone
+            )
             return response
         } catch {
             return "Unable to analyze entries at this time."
@@ -106,8 +121,15 @@ actor JournalAIService {
         Format as a numbered list (1. 2. 3. etc.):
         """
         
+        // Use creative flow tone for content ideas
+        let tone = AuroraTone.creativeFlow
+        
         do {
-            let response = try await coreResponseService.generateResponse(for: prompt, context: "")
+            let response = try await coreResponseService.generateResponse(
+                for: prompt,
+                context: "",
+                toneContext: tone
+            )
             return response
         } catch {
             return "Unable to generate ideas at this time."
@@ -134,8 +156,15 @@ actor JournalAIService {
         Summary:
         """
         
+        // Use reflective tone for summaries
+        let tone = AuroraTone.reflective
+        
         do {
-            let response = try await coreResponseService.generateResponse(for: prompt, context: "")
+            let response = try await coreResponseService.generateResponse(
+                for: prompt,
+                context: "",
+                toneContext: tone
+            )
             return response
         } catch {
             return "Unable to summarize entries at this time."

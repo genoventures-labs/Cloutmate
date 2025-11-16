@@ -50,7 +50,7 @@ struct Sidebar: View {
                         label: "EXPRESS",
                         icon: "pencil.line",
                         isExpanded: $expressExpanded,
-                        tabs: [.drafts, .calendar, .posts]
+                        tabs: [.drafts, .calendar]
                     )
                     
                     collapsibleSection(

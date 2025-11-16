@@ -86,8 +86,14 @@ struct ReflectionPanel: View {
             )
         }
         
+        // Use insightful tone for insights generation
+        let tone = AuroraTone.insightful
+        
         do {
-            let result = try await CoreResponseService.shared.generateInsights(conversations: conversationContexts)
+            let result = try await CoreResponseService.shared.generateInsights(
+                conversations: conversationContexts,
+                toneContext: tone
+            )
             await MainActor.run {
                 insights = result
                 isLoading = false

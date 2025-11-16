@@ -135,38 +135,16 @@ struct TaskDetailDrawer: View {
                 header: { headerContent },
                 content: {
                     notesSection
-                    statusSection
-                    prioritySection
-                    dueDateSection
-                    projectSection
-                    areaSection
-                    effortSection
-                    if mode == .create {
-                        energyRequirementSection
-                    }
+                    detailsSection
+                    associationsSection
                 },
                 sidebar: { EmptyView() }
             )
             .frame(minWidth: 680, minHeight: 540)
             .frame(idealWidth: 860, idealHeight: 640)
             .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        cancel()
-                    }
-                    .keyboardShortcut(.escape, modifiers: [])
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        commit()
-                    }
-                    .keyboardShortcut(.return, modifiers: [])
-                    .disabled(!draft.canCommit)
-                }
-            }
         }
+        .onEscape { cancel() }
         .frame(minWidth: 600, minHeight: 500)
         .frame(idealWidth: 800, idealHeight: 600)
         .onAppear {
@@ -188,44 +166,31 @@ struct TaskDetailDrawer: View {
     // MARK: - Sections
     
     private var headerContent: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 TextField("Task Title", text: $draft.title)
                     .font(.system(.title2, design: .rounded))
                     .fontWeight(.semibold)
                     .textFieldStyle(.plain)
                     .focused($isTitleFocused)
+                    .drawerFocusGlow()
                 
                 HStack(spacing: 12) {
-                    Label(draft.status.displayName, systemImage: "checkmark.circle")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Label(draft.priority.displayName, systemImage: "flag.fill")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    metadataPill(title: draft.status.displayName, icon: "checkmark.circle")
+                    metadataPill(title: draft.priority.displayName, icon: "flag.fill")
                     
                     if let dueDate = draft.dueDate {
-                        Label(dueDate, systemImage: "calendar")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        metadataPill(
+                            title: dueDate.formatted(date: .abbreviated, time: .omitted),
+                            icon: "calendar"
+                        )
                     }
                 }
             }
             
-            Spacer()
+            Spacer(minLength: 24)
             
-            VStack(spacing: 8) {
-                GlassButton(
-                    "Save",
-                    icon: "tray.and.arrow.down.fill",
-                    style: .standard,
-                    role: .primary
-                ) {
-                    commit()
-                }
-                .disabled(!draft.canCommit)
-                
+            HStack(spacing: 12) {
                 GlassButton(
                     "Cancel",
                     icon: "xmark",
@@ -234,8 +199,35 @@ struct TaskDetailDrawer: View {
                 ) {
                     cancel()
                 }
+                .keyboardShortcut(.escape, modifiers: [])
+                
+                GlassButton(
+                    mode == .create ? "Create Task" : "Save Changes",
+                    icon: "tray.and.arrow.down.fill",
+                    style: .standard,
+                    role: .primary
+                ) {
+                    commit()
+                }
+                .disabled(!draft.canCommit)
+                .keyboardShortcut(.return, modifiers: [])
             }
         }
+    }
+    
+    private func metadataPill(title: String, icon: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.12))
+        .clipShape(Capsule())
     }
     
     private var notesSection: some View {
@@ -255,134 +247,165 @@ struct TaskDetailDrawer: View {
                 draft.linkedEntityTypes = types
             }
             .frame(minHeight: 200)
-            .padding(12)
-            .background(.ultraThinMaterial)
-            .cornerRadius(10)
+            .drawerFocusGlow()
         }
     }
     
-    private var statusSection: some View {
-        DrawerSection(title: "Status", icon: "checkmark.circle") {
-            Picker("Status", selection: $draft.status) {
-                ForEach(TaskStatus.allCases, id: \.self) { status in
-                    Text(status.displayName).tag(status)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-    
-    private var prioritySection: some View {
-        DrawerSection(title: "Priority", icon: "flag.fill") {
-            Picker("Priority", selection: $draft.priority) {
-                ForEach(TaskPriority.allCases, id: \.self) { priority in
-                    Text(priority.displayName).tag(priority)
-                }
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-    
-    private var dueDateSection: some View {
-        DrawerSection(title: "Due Date", icon: "calendar") {
-            Toggle("Set Due Date", isOn: Binding(
-                get: { draft.dueDate != nil },
-                set: { newValue in
-                    draft.dueDate = newValue ? (draft.dueDate ?? Date()) : nil
-                }
-            ))
-            
-            if let dueDate = draft.dueDate {
-                DatePicker(
-                    "Due Date",
-                    selection: Binding(
-                        get: { dueDate },
-                        set: { newValue in
-                            draft.dueDate = newValue
+    private var detailsSection: some View {
+        DrawerSection(title: "Details", icon: "slider.horizontal.3") {
+            Grid(alignment: .leading, horizontalSpacing: 24, verticalSpacing: 18) {
+                GridRow {
+                    detailField(title: "Status", icon: "checkmark.circle") {
+                        Picker("Status", selection: $draft.status) {
+                            ForEach(TaskStatus.allCases, id: \.self) { status in
+                                Text(status.displayName).tag(status)
+                            }
                         }
-                    ),
-                    displayedComponents: .date
-                )
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var projectSection: some View {
-        if !allProjects.isEmpty {
-            DrawerSection(title: "Project", icon: "folder.fill") {
-                Picker("Project", selection: Binding(
-                    get: { draft.projectId },
-                    set: { newValue in
-                        draft.projectId = newValue
+                        .pickerStyle(.segmented)
                     }
-                )) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(allProjects) { project in
-                        Text(project.title).tag(project.id as UUID?)
+                    
+                    detailField(title: "Priority", icon: "flag.fill") {
+                        Picker("Priority", selection: $draft.priority) {
+                            ForEach(TaskPriority.allCases, id: \.self) { priority in
+                                Text(priority.displayName).tag(priority)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+                
+                GridRow {
+                    detailField(title: "Due Date", icon: "calendar") {
+                        Toggle(isOn: Binding(
+                            get: { draft.dueDate != nil },
+                            set: { newValue in
+                                draft.dueDate = newValue ? (draft.dueDate ?? Date()) : nil
+                            }
+                        )) {
+                            Text(draft.dueDate != nil ? "Enabled" : "Off")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .toggleStyle(.switch)
+                        
+                        if let dueDate = draft.dueDate {
+                            DatePicker(
+                                "Due date",
+                                selection: Binding(
+                                    get: { dueDate },
+                                    set: { newValue in draft.dueDate = newValue }
+                                ),
+                                displayedComponents: .date
+                            )
+                            .labelsHidden()
+                        }
+                    }
+                    
+                    detailField(title: "Effort", icon: "timer") {
+                        Picker("Effort", selection: Binding(
+                            get: { draft.effort ?? "" },
+                            set: { newValue in
+                                draft.effort = newValue.isEmpty ? nil : newValue
+                            }
+                        )) {
+                            Text("None").tag("")
+                            Text("Small").tag("small")
+                            Text("Medium").tag("medium")
+                            Text("Large").tag("large")
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+                
+                if mode == .create {
+                    GridRow {
+                        detailField(title: "Energy Requirement", icon: "bolt.fill") {
+                            Picker("Energy Requirement", selection: $energyRequirement) {
+                                Text("None").tag(EnergyRequirement?.none)
+                                ForEach(EnergyRequirement.allCases, id: \.self) { energy in
+                                    Text(energy.displayName).tag(energy as EnergyRequirement?)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            if let energyRequirement {
+                                HStack(spacing: 8) {
+                                    Image(systemName: energyIcon(for: energyRequirement))
+                                        .foregroundColor(energyColor(for: energyRequirement))
+                                    Text(energyRequirement.displayName)
+                                        .font(.caption)
+                                        .foregroundColor(glassColorSystem.textSecondary())
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(energyColor(for: energyRequirement).opacity(0.12))
+                                .cornerRadius(8)
+                            }
+                        }
+                        .gridCellColumns(2)
                     }
                 }
             }
         }
     }
     
-    @ViewBuilder
-    private var areaSection: some View {
-        if !allAreas.isEmpty {
-            DrawerSection(title: "Area", icon: "rectangle.stack.fill") {
-                Picker("Area", selection: Binding(
-                    get: { draft.areaId },
-                    set: { newValue in
-                        draft.areaId = newValue
+    private var associationsSection: some View {
+        DrawerSection(title: "Associations", icon: "link") {
+            VStack(alignment: .leading, spacing: 16) {
+                if !allProjects.isEmpty {
+                    detailField(title: "Project", icon: "folder.fill") {
+                        Picker("Project", selection: Binding(
+                            get: { draft.projectId },
+                            set: { newValue in
+                                draft.projectId = newValue
+                            }
+                        )) {
+                            Text("None").tag(UUID?.none)
+                            ForEach(allProjects) { project in
+                                Text(project.title).tag(project.id as UUID?)
+                            }
+                        }
+                        .labelsHidden()
                     }
-                )) {
-                    Text("None").tag(UUID?.none)
-                    ForEach(allAreas) { area in
-                        Text(area.title).tag(area.id as UUID?)
+                }
+                
+                if !allAreas.isEmpty {
+                    detailField(title: "Area", icon: "rectangle.stack.fill") {
+                        Picker("Area", selection: Binding(
+                            get: { draft.areaId },
+                            set: { newValue in
+                                draft.areaId = newValue
+                            }
+                        )) {
+                            Text("None").tag(UUID?.none)
+                            ForEach(allAreas) { area in
+                                Text(area.title).tag(area.id as UUID?)
+                            }
+                        }
+                        .labelsHidden()
                     }
                 }
             }
         }
     }
     
-    private var effortSection: some View {
-        DrawerSection(title: "Effort", icon: "timer") {
-            Picker("Effort", selection: Binding(
-                get: { draft.effort ?? "" },
-                set: { newValue in
-                    draft.effort = newValue.isEmpty ? nil : newValue
+    private func detailField<Content: View>(
+        title: String,
+        icon: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
-            )) {
-                Text("None").tag("")
-                Text("Small").tag("small")
-                Text("Medium").tag("medium")
-                Text("Large").tag("large")
-            }
-        }
-    }
-    
-    private var energyRequirementSection: some View {
-        DrawerSection(title: "Energy Requirement", icon: "bolt.fill") {
-            Picker("Energy Requirement", selection: $energyRequirement) {
-                Text("None").tag(EnergyRequirement?.none)
-                ForEach(EnergyRequirement.allCases, id: \.self) { energy in
-                    Text(energy.displayName).tag(energy as EnergyRequirement?)
-                }
+                Text(title.uppercased())
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
             }
             
-            if let energyRequirement {
-                HStack(spacing: 8) {
-                    Image(systemName: energyIcon(for: energyRequirement))
-                        .foregroundColor(energyColor(for: energyRequirement))
-                    Text(energyRequirement.displayName)
-                        .font(.subheadline)
-                        .foregroundColor(glassColorSystem.textSecondary())
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(energyColor(for: energyRequirement).opacity(0.1))
-                .cornerRadius(8)
-            }
+            content()
         }
     }
     
@@ -441,3 +464,4 @@ struct TaskDetailDrawer_Previews: PreviewProvider {
     }
 }
 //
+

@@ -8,18 +8,20 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import UniformTypeIdentifiers
 import CloutmateShared
 // Note: Area is defined in Cloutmate/Models/Area.swift, not CloutmateShared
 
 struct UnifiedTasksView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Query(sort: \CloutmateShared.Task.updatedAt, order: .reverse) private var allTasks: [CloutmateShared.Task]
     @Query private var allProjects: [CloutmateShared.Project]
     @Query private var allAreas: [Area]
     
-    @State private var selectedFilter: TasksHeaderView.TaskFilter = .all
+    @State private var selectedFilter: TaskFilter = .all
     @State private var selectedViewMode: TaskViewMode = .list
     @State private var activeTask: Task?
     @State private var isDrawerVisible = false
@@ -27,12 +29,29 @@ struct UnifiedTasksView: View {
     @State private var pendingTaskDraft: TaskDraft?
     @State private var focusOverlayTask: Task?
     @State private var focusDuration: TimeInterval = 1800
-    @State private var scrollOffset: CGFloat = 0
     @State private var focusedTaskIndex: Int?
     @State private var showFocusRecap = false
     @State private var expandedSections: Set<TaskSectionType> = [.today, .nextUp, .later]
     @State private var isSelectionMode = false
     @State private var selectedTaskIDs: Set<UUID> = []
+    
+    enum TaskFilter: String, CaseIterable, Identifiable {
+        case all = "All"
+        case today = "Today"
+        case upcoming = "Upcoming"
+        case completed = "Completed"
+        
+        var id: String { rawValue }
+        
+        var icon: String {
+            switch self {
+            case .all: return "list.bullet"
+            case .today: return "sun.max.fill"
+            case .upcoming: return "calendar"
+            case .completed: return "checkmark.circle.fill"
+            }
+        }
+    }
     
     enum TaskSectionType: String, CaseIterable {
         case today = "Today"
@@ -143,36 +162,14 @@ struct UnifiedTasksView: View {
     }
     
     var body: some View {
-        ZStack(alignment: .top) {
-            Color(.windowBackgroundColor)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header
-                TasksHeaderView(
-                    todayCompletionRate: todayCompletionRate,
-                    currentStreak: currentStreak,
-                    selectedFilter: selectedFilter,
-                    selectedViewMode: selectedViewMode,
-                    onFilterChange: { selectedFilter = $0 },
-                    onViewModeChange: { selectedViewMode = $0 },
-                    onQuickAdd: {
-                        startCreatingTask()
-                    }
-                )
-                .glassPanel(tier: .overlay, cornerRadius: 12)
-                .padding(.horizontal)
-                .padding(.top)
-                .padding(.bottom, 8)
-                .opacity(headerOpacity)
-                .offset(y: headerOffset)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                
-                Divider()
-                
-                // Content based on selected view mode
-                contentView
-            }
+        ZStack {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+                showsSidebar: false,
+                header: { headerBar },
+                content: { tasksContent },
+                sidebar: { EmptyView() }
+            )
             .opacity(isDrawerVisible ? 0 : 1)
             
             if isDrawerVisible {
@@ -281,83 +278,176 @@ struct UnifiedTasksView: View {
         }
     }
     
-    // MARK: - Content View
+    // MARK: - Layout
+    
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Tasks",
+            subtitle: "Focus summary: \(todayCompletionRate) • \(currentStreak)-day streak",
+            trailingAccessory: {
+                HStack(spacing: 12) {
+                    viewModeSelector
+                    quickAddButton
+                }
+            }
+        )
+    }
     
     @ViewBuilder
-    private var contentView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(spacing: 0) {
-                    GeometryReader { geometry in
-                        Color.clear
-                            .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
+    private var tasksContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            filterPanel
+            activeModeView
+        }
+        .animation(.easeInOut(duration: 0.24), value: selectedViewMode)
                     }
-                    .frame(height: 0)
-                    
-                    Group {
+
+    @ViewBuilder
+    private var activeModeView: some View {
                         switch selectedViewMode {
                         case .list:
                             listView
                         case .board:
-                            TaskBoardView(
-                                tasks: filteredTasks,
-                                projects: allProjects,
-                                areas: allAreas,
-                                selectionMode: isSelectionMode,
-                                selectedTaskIDs: selectedTaskIDs,
-                                onSelectionToggle: { task in toggleTaskSelection(task) },
-                                onTaskSelected: { task in openDrawer(for: task) },
-                                onDuplicateTask: duplicateTask,
-                                onArchiveTask: { task in
-                                    task.status = .cancelled
-                                    try? modelContext.save()
-                                },
-                                onDeleteTask: deleteTask,
-                                onStartFocus: { task in
-                                    requestFocusSession(for: task)
-                                },
-                                onQuickAddTask: { status in
-                                    startCreatingTask(status: status)
-                                }
-                            )
-                        case .timeline:
-                            TaskTimelineView(
-                                tasks: filteredTasks,
-                                projects: allProjects,
-                                areas: allAreas,
-                                onTaskSelected: { task in openDrawer(for: task) }
-                            )
-                        case .gallery:
-                            TaskGalleryView(
-                                tasks: filteredTasks,
-                                projects: allProjects,
-                                areas: allAreas,
-                                selectionMode: isSelectionMode,
-                                selectedTaskIDs: selectedTaskIDs,
-                                onSelectionToggle: { task in toggleTaskSelection(task) },
-                                onTaskSelected: { task in openDrawer(for: task) }
-                            )
+            boardView
+        case .planner:
+            plannerView
+        case .gallery:
+            galleryView
+        }
+    }
+    
+    private var viewModeSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(TaskViewMode.allCases, id: \.self, content: modeButton)
+        }
+    }
+
+    @ViewBuilder
+    private func modeButton(for mode: TaskViewMode) -> some View {
+        let isSelected = selectedViewMode == mode
+        Button {
+            selectedViewMode = mode
+        } label: {
+            Image(systemName: mode.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : glassColorSystem.textSecondary())
+                .frame(width: 28, height: 28)
+                .background {
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.kosmicBlue, .kosmicPurple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(glassColorSystem.cardColor().opacity(0.35))
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 24)
+                }
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(glassColorSystem.borderColor().opacity(0.5), lineWidth: 0.6)
+                )
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+    }
+    
+    private var quickAddButton: some View {
+        GlassButton(
+            icon: "plus",
+            style: .iconOnly,
+            tintColor: .kosmicPurple,
+            action: { startCreatingTask() }
+        )
+        .frame(width: 32, height: 32)
+                                }
+    
+    private var filterPanel: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 24) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.kosmicPurple)
+                        .padding(10)
+                        .background(
+                            Circle()
+                                .fill(glassColorSystem.cardColor().opacity(0.4))
+                                .overlay(
+                                    Circle()
+                                        .stroke(glassColorSystem.borderColor().opacity(0.6), lineWidth: 0.5)
+                                )
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Focus your tasks")
+                            .font(.system(.headline, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                        Text("Choose the view and highlight the work that matters right now.")
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                    }
+                    
+                    Spacer()
+                    
+                    Button(role: nil) {
+                        withAnimation(GlassMotion.Easing.spring) {
+                            selectedFilter = .all
+                        }
+                    } label: {
+                        Text("Reset")
+                            .font(.system(.caption, design: .rounded).weight(.medium))
+                            .foregroundStyle(glassColorSystem.textSecondary())
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(glassColorSystem.cardColor().opacity(0.28))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                GlassDivider()
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Filter")
+                        .font(.system(.caption, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(TaskFilter.allCases) { filter in
+                                FilterPill(
+                                    title: filter.rawValue,
+                                    isSelected: selectedFilter == filter,
+                                    action: {
+                                        withAnimation(GlassMotion.Easing.spring) {
+                                            selectedFilter = filter
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                    }
                 }
             }
-            .coordinateSpace(name: "scroll")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                scrollOffset = -value
-            }
+            .padding(24)
         }
     }
     
     private var listView: some View {
-        VStack(spacing: 0) {
-            // Focus Recap Banner
+        VStack(alignment: .leading, spacing: 24) {
             if showFocusRecap {
                 FocusRecapBanner(streak: currentStreak)
                     .transition(.move(edge: .top).combined(with: .opacity))
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                             withAnimation(GlassMotion.Easing.spring) {
@@ -367,10 +457,6 @@ struct UnifiedTasksView: View {
                     }
             }
             
-            // Task sections
-            ScrollView {
-                ScrollViewReader { proxy in
-                    LazyVStack(spacing: 24) {
                         ForEach(groupedSections) { section in
                             if !section.tasks.isEmpty || section.type == .completed {
                                 TaskSectionView(
@@ -398,21 +484,74 @@ struct UnifiedTasksView: View {
                                     onDelete: deleteTask,
                                     onRequestFocus: { task in
                                         requestFocusSession(for: task)
+                            },
+                            onMoveTaskToSection: { task, destination in
+                                handleTaskMove(task, to: destination)
+                            },
+                            onReorderTasks: { ordered, sectionType in
+                                persistTaskOrder(ordered, in: sectionType)
+                            },
+                            fetchTaskByID: { id in
+                                allTasks.first(where: { $0.id == id })
                                     }
                                 )
                             }
                         }
                         
-                        // Empty state
                         if filteredTasks.isEmpty {
                             TasksEmptyStateView(filter: selectedFilter)
+                    .transition(.opacity)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 40)
-                }
+    }
+
+    private var boardView: some View {
+        TaskBoardView(
+            tasks: filteredTasks,
+            projects: allProjects,
+            areas: allAreas,
+            selectionMode: isSelectionMode,
+            selectedTaskIDs: selectedTaskIDs,
+            onSelectionToggle: { task in toggleTaskSelection(task) },
+            onTaskSelected: { task in openDrawer(for: task) },
+            onDuplicateTask: duplicateTask,
+            onArchiveTask: { task in
+                task.status = .cancelled
+                try? modelContext.save()
+            },
+            onDeleteTask: deleteTask,
+            onStartFocus: { task in
+                requestFocusSession(for: task)
+            },
+            onQuickAddTask: { status in
+                startCreatingTask(status: status)
             }
-        }
+        )
+        .padding(.top, 8)
+    }
+    
+    private var plannerView: some View {
+        TaskPlannerView(
+            tasks: filteredTasks,
+            projects: allProjects,
+            areas: allAreas,
+            onTaskSelected: { task in openDrawer(for: task) },
+            onStartFocus: { task in requestFocusSession(for: task) }
+        )
+        .padding(.vertical, 4)
+                }
+    
+    private var galleryView: some View {
+        TaskGalleryView(
+            tasks: filteredTasks,
+            projects: allProjects,
+            areas: allAreas,
+            selectionMode: isSelectionMode,
+            selectedTaskIDs: selectedTaskIDs,
+            onSelectionToggle: { task in toggleTaskSelection(task) },
+            onTaskSelected: { task in openDrawer(for: task) }
+        )
+        .padding(.top, 8)
     }
     
     private func toggleTaskSelection(_ task: Task) {
@@ -580,22 +719,6 @@ struct UnifiedTasksView: View {
         NotificationCenter.default.post(name: .switchTab, object: TabIdentifier.focusMode)
     }
     
-    private var headerOpacity: Double {
-        let threshold: CGFloat = 100
-        if scrollOffset > threshold {
-            return max(0.3, 1.0 - (scrollOffset - threshold) / 200)
-        }
-        return 1.0
-    }
-    
-    private var headerOffset: CGFloat {
-        let threshold: CGFloat = 100
-        if scrollOffset > threshold {
-            return min(-20, -(scrollOffset - threshold) / 10)
-        }
-        return 0
-    }
-    
     private func checkFocusRecap() {
         let todayTasks = allTasks.filter { task in
             guard let due = task.dueDate else { return false }
@@ -696,6 +819,36 @@ struct UnifiedTasksView: View {
         modelContext.insert(copy)
         try? modelContext.save()
     }
+
+    private func handleTaskMove(_ task: Task, to section: TaskSectionType) {
+        let calendar = Calendar.current
+        let startOfToday = calendar.startOfDay(for: Date())
+        
+        switch section {
+        case .today:
+            task.dueDate = startOfToday
+            if task.status == .done { task.status = .todo }
+        case .nextUp:
+            task.dueDate = calendar.date(byAdding: .day, value: 2, to: startOfToday)
+            if task.status == .done { task.status = .todo }
+        case .later:
+            task.dueDate = calendar.date(byAdding: .day, value: 7, to: startOfToday)
+            if task.status == .done { task.status = .todo }
+        case .completed:
+            task.status = .done
+            task.completedAt = Date()
+        }
+        task.updatedAt = Date()
+        try? modelContext.save()
+    }
+    
+    private func persistTaskOrder(_ tasks: [Task], in section: TaskSectionType) {
+        let base = Date()
+        for (offset, task) in tasks.enumerated() {
+            task.updatedAt = base.addingTimeInterval(Double(tasks.count - offset))
+        }
+        try? modelContext.save()
+    }
 }
 
 // MARK: - Task Section View
@@ -711,23 +864,116 @@ struct TaskSectionView: View {
     let onArchive: (Task) -> Void
     let onDelete: (Task) -> Void
     let onRequestFocus: (Task) -> Void
+    let onMoveTaskToSection: (Task, UnifiedTasksView.TaskSectionType) -> Void
+    let onReorderTasks: ([Task], UnifiedTasksView.TaskSectionType) -> Void
+    let fetchTaskByID: (UUID) -> Task?
     
-    @State private var globalTaskIndex = 0
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
+    @State private var orderedTasks: [Task]
+    @State private var draggingTaskID: UUID?
+    @State private var dropTargetTaskID: UUID?
+    @State private var dragSourceSection: UnifiedTasksView.TaskSectionType?
+    @State private var isSectionDropTarget = false
+    
+    init(
+        section: UnifiedTasksView.TaskSection,
+        projects: [Project],
+        areas: [Area],
+        focusedTaskIndex: Binding<Int?>,
+        onToggleCollapse: @escaping () -> Void,
+        onEdit: @escaping (Task) -> Void,
+        onDuplicate: @escaping (Task) -> Void,
+        onArchive: @escaping (Task) -> Void,
+        onDelete: @escaping (Task) -> Void,
+        onRequestFocus: @escaping (Task) -> Void,
+        onMoveTaskToSection: @escaping (Task, UnifiedTasksView.TaskSectionType) -> Void,
+        onReorderTasks: @escaping ([Task], UnifiedTasksView.TaskSectionType) -> Void,
+        fetchTaskByID: @escaping (UUID) -> Task?
+    ) {
+        self.section = section
+        self.projects = projects
+        self.areas = areas
+        self._focusedTaskIndex = focusedTaskIndex
+        self.onToggleCollapse = onToggleCollapse
+        self.onEdit = onEdit
+        self.onDuplicate = onDuplicate
+        self.onArchive = onArchive
+        self.onDelete = onDelete
+        self.onRequestFocus = onRequestFocus
+        self.onMoveTaskToSection = onMoveTaskToSection
+        self.onReorderTasks = onReorderTasks
+        self.fetchTaskByID = fetchTaskByID
+        _orderedTasks = State(initialValue: section.tasks)
+    }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        GlassPanel(tier: .contentCard, cornerRadius: 26) {
+            VStack(alignment: .leading, spacing: 16) {
             sectionHeader
-            sectionDivider
+                GlassDivider()
+                    .padding(.vertical, 4)
             taskCardsSection
         }
+            .padding(24)
+            .onChange(of: section.tasks.map(\.id)) { _ in
+                orderedTasks = section.tasks
+            }
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(glassColorSystem.emotionalAccent().opacity(isSectionDropTarget ? 0.28 : 0),
+                        lineWidth: isSectionDropTarget ? 1.4 : 0)
+                .animation(.easeInOut(duration: 0.18), value: isSectionDropTarget)
+        )
+        .onDrop(
+            of: [.text],
+            delegate: TaskListDropDelegate(
+                targetTask: nil,
+                tasks: $orderedTasks,
+                draggingTaskID: $draggingTaskID,
+                dropTargetTaskID: $dropTargetTaskID,
+                dragSourceSection: $dragSourceSection,
+                section: section.type,
+                isSectionDropTarget: $isSectionDropTarget,
+                fetchTask: fetchTaskByID,
+                onReorder: { reordered in
+                    orderedTasks = reordered
+                    onReorderTasks(reordered, section.type)
+                },
+                onMoveToSection: { movedTask in
+                    onMoveTaskToSection(movedTask, section.type)
+                }
+            )
+        )
     }
     
     private var sectionHeader: some View {
             Button(action: onToggleCollapse) {
-                HStack {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.kosmicBlue.opacity(0.25), .kosmicPurple.opacity(0.22)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 38, height: 38)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 0.8)
+                        )
+                    
+                    Text(section.type.rawValue.prefix(1).uppercased())
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+                
+                VStack(alignment: .leading, spacing: 4) {
                     Text(section.type.rawValue)
-                        .font(.system(.headline, design: .rounded))
-                        .fontWeight(.semibold)
+                        .font(.system(.title3, design: .rounded).weight(.semibold))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [.kosmicBlue, .kosmicPurple],
@@ -736,38 +982,48 @@ struct TaskSectionView: View {
                             )
                         )
                     
-                    Spacer()
-                    
-                    Text("\(section.tasks.count)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    Image(systemName: section.isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.caption)
+                    Text("\(section.tasks.count) \(section.tasks.count == 1 ? "task" : "tasks")")
+                        .font(.system(.caption, design: .rounded))
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 8)
+                
+                Spacer()
+                    
+                    Image(systemName: section.isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.primary.opacity(0.05))
+                    )
+                }
+            .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-    }
-            
-    private var sectionDivider: some View {
-            Rectangle()
-                .fill(Color.secondary.opacity(0.2))
-                .frame(height: 1)
-                .padding(.bottom, 4)
     }
             
     @ViewBuilder
     private var taskCardsSection: some View {
             if !section.isCollapsed {
-                LazyVStack(spacing: 12) {
-                    ForEach(Array(section.tasks.enumerated()), id: \.element.id) { index, task in
+            VStack(spacing: 14) {
+                ForEach(Array(orderedTasks.enumerated()), id: \.element.id) { index, task in
                     taskCard(for: task, at: index)
+                        .transition(.scale.combined(with: .opacity))
                 }
             }
             .transition(.opacity.combined(with: .move(edge: .top)))
+        } else {
+            HStack(spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.kosmicPurple.opacity(0.7))
+                Text("Collapsed — tap to reveal tasks in this group.")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 6)
+            .transition(.opacity)
         }
     }
     
@@ -785,9 +1041,37 @@ struct TaskSectionView: View {
                             onDuplicate: { onDuplicate(task) },
                             onArchive: { onArchive(task) },
                             onDelete: { onDelete(task) },
-            onRequestFocus: { taskParam in onRequestFocus(taskParam) }
+            onRequestFocus: { onRequestFocus($0) },
+            isBeingDragged: draggingTaskID == task.id,
+            isDropTarget: dropTargetTaskID == task.id
                         )
                         .id("task-\(task.id)")
+        .onDrag {
+            dragSourceSection = section.type
+            draggingTaskID = task.id
+            dropTargetTaskID = task.id
+            return NSItemProvider(object: task.id.uuidString as NSString)
+        }
+        .onDrop(
+            of: [.text],
+            delegate: TaskListDropDelegate(
+                targetTask: task,
+                tasks: $orderedTasks,
+                draggingTaskID: $draggingTaskID,
+                dropTargetTaskID: $dropTargetTaskID,
+                dragSourceSection: $dragSourceSection,
+                section: section.type,
+                isSectionDropTarget: $isSectionDropTarget,
+                fetchTask: fetchTaskByID,
+                onReorder: { reordered in
+                    orderedTasks = reordered
+                    onReorderTasks(reordered, section.type)
+                },
+                onMoveToSection: { movedTask in
+                    onMoveTaskToSection(movedTask, section.type)
+                }
+            )
+        )
     }
 }
 
@@ -799,49 +1083,53 @@ struct FocusRecapBanner: View {
     @State private var pulsePhase: CGFloat = 0
     
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.title2)
+        GlassPanel(tier: .contentCard, cornerRadius: 22) {
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [.kosmicGreen.opacity(0.25), .kosmicBlue.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        )
+                        .shadow(color: .kosmicGreen.opacity(0.25), radius: 12, y: 6)
+                    
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 24, weight: .semibold))
                 .foregroundColor(.kosmicGreen)
+                }
             
-            VStack(alignment: .leading, spacing: 2) {
-                Text("All tasks complete! 🎉")
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Momentum locked in.")
+                        .font(.system(.headline, design: .rounded))
                     .foregroundColor(.primary)
                 
-                Text("Focus streak: \(streak) days")
-                    .font(.caption)
+                    Text("Every task is complete — focus streak at \(streak) day\(streak == 1 ? "" : "s").")
+                        .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
             }
             
             Spacer()
-        }
-        .padding(16)
+                
+                Text("Aurora applauds 🌟")
+                    .font(.system(.caption, design: .rounded))
+                    .foregroundColor(.kosmicPurple)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
         .background(
-            LinearGradient(
-                colors: [
-                    Color.kosmicBlue.opacity(0.15),
-                    Color.kosmicPurple.opacity(0.15)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
+                        Capsule()
+                            .fill(Color.kosmicPurple.opacity(0.12))
         )
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [
-                            Color.kosmicBlue.opacity(0.3 + pulsePhase * 0.2),
-                            Color.kosmicPurple.opacity(0.3 + pulsePhase * 0.2)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    lineWidth: 2
-                )
-        )
+            }
+            .padding(22)
+        }
         .onAppear {
             withAnimation(
                 Animation.easeInOut(duration: 2.0)
@@ -853,27 +1141,143 @@ struct FocusRecapBanner: View {
     }
 }
 
+private struct TaskListDropDelegate: DropDelegate {
+    let targetTask: Task?
+    @Binding var tasks: [Task]
+    @Binding var draggingTaskID: UUID?
+    @Binding var dropTargetTaskID: UUID?
+    @Binding var dragSourceSection: UnifiedTasksView.TaskSectionType?
+    let section: UnifiedTasksView.TaskSectionType
+    @Binding var isSectionDropTarget: Bool
+    let fetchTask: (UUID) -> Task?
+    let onReorder: ([Task]) -> Void
+    let onMoveToSection: (Task) -> Void
+    
+    func validateDrop(info: DropInfo) -> Bool {
+        true
+    }
+    
+    func dropEntered(info: DropInfo) {
+        guard let draggingID = draggingTaskID else { return }
+        if dragSourceSection == section {
+            guard let fromIndex = tasks.firstIndex(where: { $0.id == draggingID }) else { return }
+            var toIndex = tasks.count - 1
+            if let targetTask = targetTask,
+               let index = tasks.firstIndex(where: { $0.id == targetTask.id }) {
+                toIndex = index
+            }
+            if fromIndex != toIndex {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    let item = tasks.remove(at: fromIndex)
+                    tasks.insert(item, at: toIndex)
+                }
+                dropTargetTaskID = targetTask?.id
+            }
+        } else {
+            dropTargetTaskID = targetTask?.id
+            isSectionDropTarget = targetTask == nil
+        }
+    }
+    
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+    
+    func dropExited(info: DropInfo) {
+        dropTargetTaskID = nil
+        isSectionDropTarget = false
+    }
+    
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            draggingTaskID = nil
+            dropTargetTaskID = nil
+            dragSourceSection = nil
+            isSectionDropTarget = false
+        }
+        
+        guard let draggingID = draggingTaskID else { return false }
+        
+        if dragSourceSection == section {
+            onReorder(tasks)
+            return true
+        } else if let movedTask = fetchTask(draggingID) {
+            if !tasks.contains(where: { $0.id == movedTask.id }) {
+                withAnimation(.easeInOut(duration: 0.16)) {
+                    if let targetTask = targetTask,
+                       let index = tasks.firstIndex(where: { $0.id == targetTask.id }) {
+                        tasks.insert(movedTask, at: index)
+                    } else {
+                        tasks.append(movedTask)
+                    }
+                }
+            }
+            onMoveToSection(movedTask)
+            return true
+        }
+        
+        return false
+    }
+    
+    func dropSessionDidEnd(_ session: DropSession) {
+        draggingTaskID = nil
+        dropTargetTaskID = nil
+        dragSourceSection = nil
+        isSectionDropTarget = false
+    }
+}
+
 // MARK: - Tasks Empty State View
 
 struct TasksEmptyStateView: View {
-    let filter: TasksHeaderView.TaskFilter
+    let filter: UnifiedTasksView.TaskFilter
     
     var body: some View {
-        VStack(spacing: 16) {
+        GlassPanel(tier: .contentCard, cornerRadius: 24) {
+            VStack(spacing: 18) {
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.kosmicBlue.opacity(0.18), Color.kosmicPurple.opacity(0.18)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 72, height: 72)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.2), lineWidth: 0.8)
+                        )
+                    
             Image(systemName: iconName)
-                .font(.system(size: 48))
-                .foregroundColor(.secondary.opacity(0.5))
+                        .font(.system(size: 30, weight: .semibold))
+                        .foregroundColor(.kosmicPurple)
+                }
             
+                VStack(spacing: 6) {
             Text(message)
-                .font(.headline)
+                        .font(.system(.headline, design: .rounded))
+                        .foregroundColor(.primary)
+                    
+                    Text("No tasks found in this view right now.")
+                        .font(.system(.caption, design: .rounded))
                 .foregroundColor(.secondary)
-            
-            Text("No tasks found in this view")
-                .font(.caption)
-                .foregroundColor(.secondary.opacity(0.7))
+                }
+                
+                Button {
+                    NotificationCenter.default.post(name: .showCreateTask, object: nil)
+                } label: {
+                    Label("Capture a new task", systemImage: "plus.circle.fill")
+                        .font(.system(.callout, design: .rounded).weight(.semibold))
         }
-        .padding(40)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .tint(.kosmicPurple)
+            }
         .frame(maxWidth: .infinity)
+            .padding(30)
+        }
     }
     
     private var iconName: String {

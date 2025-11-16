@@ -22,20 +22,19 @@ struct ReflectionFeedView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             // Aurora's Reflection of the Day
             if !dailyReflection.isEmpty {
-                GlassPanel(tier: .contentCard, cornerRadius: 12, tintColor: .kosmicPurple.opacity(0.1)) {
+                DashboardTile(accent: .kosmicPurple, padding: 20) {
                     HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 18))
+                            .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(.kosmicPurple)
                         Text(dailyReflection)
-                            .font(.subheadline)
+                            .font(.system(.subheadline, design: .rounded))
                             .foregroundColor(glassColorSystem.textPrimary())
                             .italic()
                     }
-                    .padding(16)
                 }
             }
             
@@ -43,7 +42,7 @@ struct ReflectionFeedView: View {
             if !recentJournals.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Recent Reflections")
-                        .font(.headline)
+                        .font(.system(.headline, design: .rounded))
                         .foregroundColor(glassColorSystem.textPrimary())
                     
                     LazyVStack(spacing: 12) {
@@ -100,7 +99,7 @@ struct JournalEntryCard: View {
     }
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+        DashboardTile(accent: toneColor, padding: 18) {
             HStack(alignment: .top, spacing: 12) {
                 // Tone color dot
                 Circle()
@@ -124,14 +123,6 @@ struct JournalEntryCard: View {
                     }
                 }
             }
-            .padding(16)
-            .background(
-                LinearGradient(
-                    colors: [toneColor.opacity(0.05), toneColor.opacity(0.02)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
         }
     }
 }

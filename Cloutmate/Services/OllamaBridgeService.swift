@@ -130,7 +130,7 @@ actor OllamaBridgeService {
     static let shared = OllamaBridgeService()
     
     private let baseURL = "http://localhost:11434"
-    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (gemma3:4b)
+    private var currentModel: String = ModelTierMap.defaultModel() // Use routing engine default (gemma3:1b)
     private var previousModel: String? // Track previous model for switch notifications
     private var cachedAvailableModels: [String] = [] // Cache available models
     private var lastModelFetch: Date?
@@ -169,17 +169,16 @@ actor OllamaBridgeService {
     private init() {
         // Prepare schema document for prompts
         schemaDocument = SchemaIntrospector.generateSchemaDocument()
-        // Use default model from routing engine (gemma3:4b)
+        // Use default model from routing engine (gemma3:1b)
         currentModel = ModelTierMap.defaultModel()
         print("[OllamaBridgeService] Initialized with default model: \(currentModel)")
-        // Pre-warm the default model
-        _Concurrency.Task {
-            await preWarmModel()
-        }
-        // Pre-warm background Granite model for silent inference tasks
-        _Concurrency.Task {
-            await preWarmBackgroundModel()
-        }
+        
+        // Note: Pre-warming is now handled by ModelWarmupService to avoid conflicts and timeouts
+        // ModelWarmupService waits for Ollama to be ready and handles warmup properly
+        // These automatic pre-warms are disabled to prevent premature requests before user interaction
+        // 
+        // Pre-warm will happen on-demand when models are actually needed via ensureModelReady()
+        // This prevents timeouts when Ollama isn't ready yet
     }
     
     func isModelReady(_ model: String) -> Bool {
@@ -634,6 +633,9 @@ Help users brainstorm, write, plan, schedule, optimize their workflows, and main
 
 IMPORTANT: When asked to list tasks, projects, posts, or other items, actually list them conversationally (e.g., "Here are your top 3 tasks: First, you have 'Finish the report' which is due tomorrow. Second, there's 'Review the design' that's high priority. And third, 'Call the client' is scheduled for this afternoon."). Only provide summaries when explicitly asked for a summary. If the user asks "what are my tasks?" or "list my tasks", give them the actual list, not just a summary count.**
 
+**ABSOLUTE RULE - NEVER USE META-COMMENTARY:**
+NEVER start your response with phrases like "Here's how Aurora should respond", "**Aurora:**", "Here's how Aurora would respond", "Based on the given data", or any explanation about HOW to respond. Respond DIRECTLY as Aurora. Start immediately with your actual response. Never use quotes, formatting markers, or meta-instructions. Just BE Aurora and respond naturally as if you ARE Aurora, not someone describing how Aurora would respond.
+
 Data schema (reference):
 
 \(schemaDocument.prefix(2000))
@@ -716,7 +718,9 @@ Aurora:
         confidence: ConfidenceSnapshot? = nil,
         useThinking: Bool = false,
         model: String? = nil,
-        initialCasualConversation: Bool = false
+        initialCasualConversation: Bool = false,
+        toneContext: AuroraTone? = nil,
+        modelContext: ModelContext? = nil
     ) async throws -> (response: String, thinking: String?, modelUsed: String) {
         // Check availability first
         guard await checkOllamaAvailability() else {
@@ -826,7 +830,8 @@ Aurora:
         // Initialize humanization services and get contextual adaptations on MainActor
         let casualConversation = isCasualConversation
         let includeWorkloadCues = shouldIncludeWorkloadCues(for: input, payloadContext: resolvedPayloadContext)
-        let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
+        
+        // Get contextual adaptations (synchronous part)
             let languagePersonality = LanguagePersonalityService.shared
             let conversationalQuirks = ConversationalQuirksService.shared
             let personalityQuirks = PersonalityQuirksService.shared
@@ -834,13 +839,118 @@ Aurora:
             let contextualAdaptation = ContextualAdaptationService.shared
             let responsePattern = ResponsePatternService.shared
             
-            // Get contextual adaptations
-            let timeContext = contextualAdaptation.getTimeOfDayContext()
+        // Get contextual adaptations (MainActor-isolated)
+        let timeContext = await MainActor.run {
+            contextualAdaptation.getTimeOfDayContext()
+        }
             let userEnergy = currentMessageStyle?.energyLevel ?? 0.5
             let workload = workloadLevel(from: resolvedPayloadContext)
             
             // Determine formality level
             let formalityLevel = userStyleProfile?.formalityScore ?? currentMessageStyle?.formalityScore ?? 0.5
+        
+        // Detect tone transition and blend if needed
+        let previousTone = extractPreviousToneFromHistory(conversationMessages: conversationMessages)
+        let (blendedTone, isTransitioning): (AuroraTone?, Bool) = {
+            guard let currentTone = toneContext else { return (toneContext, false) }
+            guard let previous = previousTone, previous != currentTone else { return (currentTone, false) }
+            
+            // Use transition tone for smooth blending
+            let transition = AuroraToneKit.transitionTone(from: previous, to: currentTone)
+            return (transition, true)
+        }()
+        
+        // Use blended tone for prompt composition
+        let effectiveTone = blendedTone ?? toneContext
+        
+        // Get reliability profile for tone characteristic scaling (only if modelContext is available)
+        let reliabilityProfile: ToneReliabilityProfile? = await {
+            guard let tone = effectiveTone, let context = modelContext else { return nil }
+            return await ToneFeedbackReinforcementEngine.shared.getProfile(for: tone, modelContext: context)
+        }()
+        
+        // Get temporal emotional memory context (only if modelContext is available)
+        let (rollingBaseline, historicalBaseline, momentumForecast): (Double, Double, (momentum: Double, trend: TemporalEmotionalTrend, confidence: Double)) = await {
+            guard let context = modelContext else {
+                return (0.0, 0.0, (0.0, .neutral, 0.0))
+            }
+            let rolling = await TemporalEmotionalMemory.shared.rollingAverageBaseline(days: 7, modelContext: context)
+            let historical = await TemporalEmotionalMemory.shared.historicalBaselineForSimilarPeriod(
+                currentDate: Date(),
+                lookbackDays: 30,
+                modelContext: context
+            )
+            let momentum = await TemporalEmotionalMemory.shared.forecastEmotionalMomentum(modelContext: context)
+            return (rolling, historical, momentum)
+        }()
+        
+        // Get emotional memory for the current tone (only if modelContext is available)
+        let toneEmotionalMemory: (baseline: Double, stability: Double, momentum: Double)? = await {
+            guard let tone = effectiveTone, let context = modelContext else { return nil }
+            return await TemporalEmotionalMemory.shared.emotionalMemoryForTone(
+                tone: tone,
+                modelContext: context,
+                lookbackDays: 30
+            )
+        }()
+        
+        // Get AECI for response pacing adjustment (only if modelContext is available)
+        let aecIndex = await {
+            guard let context = modelContext else { return 0.0 }
+            return await EmotionalContinuityEngine.shared.getCurrentAECI(modelContext: context)
+        }()
+        let pacingAdjustment = await MainActor.run {
+            EmotionalContinuityEngine.shared.getResponsePacingAdjustment(aecIndex: aecIndex)
+        }
+        
+        // Build tone-specific modifiers from AuroraToneKit with reliability scaling, temporal context, and AECI pacing (actor-isolated, call before MainActor.run)
+        var toneModifiers = buildToneSpecificModifiers(
+            toneContext: effectiveTone,
+            reliabilityProfile: reliabilityProfile,
+            rollingBaseline: rollingBaseline,
+            historicalBaseline: historicalBaseline,
+            momentumForecast: momentumForecast,
+            toneEmotionalMemory: toneEmotionalMemory,
+            pacingAdjustment: pacingAdjustment
+        )
+        
+        // Analyze tone patterns from history (actor-isolated, call before MainActor.run)
+        let tonePatternAnalysis = analyzeTonePatternsFromHistory(conversationMessages: conversationMessages)
+        
+        // Extract transition state from conversation if available
+        let transitionState: ToneTransitionState? = {
+            // Try to get from payload context metadata first
+            if let transitionDataString = resolvedPayloadContext?.metadata["toneTransitionState"],
+               let transitionData = transitionDataString.data(using: .utf8),
+               let decoded = try? JSONDecoder().decode(ToneTransitionState.self, from: transitionData) {
+                return decoded
+            }
+            // Fallback: infer from conversation history patterns
+            return nil
+        }()
+        
+        // Build tone-based recall weighting (actor-isolated, call before MainActor.run)
+        let recallWeighting = buildToneBasedRecallWeighting(
+            toneContext: effectiveTone,
+            tonePatternAnalysis: tonePatternAnalysis,
+            transitionState: transitionState
+        )
+        
+        // Build humanization instructions (synchronous part)
+        let (_, _, _, _, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions) = await MainActor.run {
+            
+            // Add transition awareness if blending occurred
+            if isTransitioning, let previous = previousTone, let current = toneContext, let effective = effectiveTone {
+                let transitionNote = """
+                
+**TONE TRANSITION DETECTED:**
+- Previous tone: \(previous.displayName)
+- Current tone: \(current.displayName)
+- Transition tone: \(effective.displayName)
+- Your response should smoothly bridge from the previous emotional state to the new one. Start with subtle acknowledgment of the shift, then gradually embody the new tone. This creates a natural, flowing conversation experience.
+"""
+                toneModifiers += transitionNote
+            }
             
             // Enhance tone instructions with humanization services
             var enhancedToneInstructions: String
@@ -856,6 +966,7 @@ Aurora:
 **TONE & STYLE ADAPTATION:**
 \(enhancedStyleText)
 \(quirksText)
+\(toneModifiers)
 - Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
 - Default to a conversational ChatGPT-like voice: warm, natural, and curious.
 - When the user pivots into planning or structure, move into organized guidance while staying conversational and human. Never sound robotic.
@@ -870,6 +981,7 @@ Aurora:
                 enhancedToneInstructions = """
 **TONE & STYLE ADAPTATION:**
 \(enhancedDefault)
+\(toneModifiers)
 - Default to a friendly, encouraging tone; mirror the user's energy level (relaxed vs focused) when evident.
 - Use natural contractions and approachable phrasing.
 - Mirror the user's energy: keep it soft when they sound tired, bring more spark when they show high energy.
@@ -914,10 +1026,15 @@ Aurora:
             let patternInstructions = responsePattern.getResponsePatternInstructions(pattern: pattern)
             
             // Add memory behavior instructions if we have recall context
+            // Tone context influences recall weighting with gradual transitions
             var memoryInstructions = ""
             if let recall = resolvedPayloadContext?.recall, !recall.isEmpty {
-                memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n- Prioritize emotional memories over routine tasks\n- If memory details are fuzzy, acknowledge it gracefully"
+                memoryInstructions = "\n\n**MEMORY RECALL:**\n- Express memory confidence naturally: 'You definitely mentioned...' for high confidence, 'I think you mentioned...' for medium, 'I'm not entirely sure...' for low\n\(recallWeighting)\n- If memory details are fuzzy, acknowledge it gracefully"
             }
+            
+            // Store blended tone info for visual styling (pass through toneContext for metadata)
+            // The blended tone is used for prompt composition, but we also need to track it
+            // for visual styling in MessageBubble
             
             return (timeContext, userEnergy, workload, formalityLevel, enhancedToneInstructions, personalityInstructions, selfAwarenessInstructions, contextualInstructions, patternInstructions, memoryInstructions)
         }
@@ -1406,6 +1523,448 @@ Aurora:
     }
     
     // MARK: - Helper Methods for Prompt Building
+    
+    /// Build tone-specific modifiers for writing style, emotional emphasis, and pacing
+    private func buildToneSpecificModifiers(
+        toneContext: AuroraTone?,
+        reliabilityProfile: ToneReliabilityProfile? = nil,
+        rollingBaseline: Double = 0.0,
+        historicalBaseline: Double = 0.0,
+        momentumForecast: (momentum: Double, trend: TemporalEmotionalTrend, confidence: Double) = (0.0, .neutral, 0.0),
+        toneEmotionalMemory: (baseline: Double, stability: Double, momentum: Double)? = nil,
+        pacingAdjustment: Double = 1.0
+    ) -> String {
+        guard let tone = toneContext else {
+            return ""
+        }
+        
+        let toneDescription = AuroraToneKit.summaryTone(for: tone)
+        var voiceCharacteristics = AuroraToneKit.ttsVoiceCharacteristics(for: tone)
+        
+        // Apply AECI pacing adjustment to TTS characteristics
+        let adjustedPacing = voiceCharacteristics.pacing * pacingAdjustment
+        voiceCharacteristics = AuroraToneKit.TTSVoiceCharacteristics(
+            pacing: adjustedPacing,
+            pitch: voiceCharacteristics.pitch,
+            warmth: voiceCharacteristics.warmth,
+            clarity: voiceCharacteristics.clarity,
+            energy: voiceCharacteristics.energy,
+            pauseFrequency: pacingAdjustment < 1.0 ? voiceCharacteristics.pauseFrequency * 1.2 : voiceCharacteristics.pauseFrequency, // Slower pacing = more pauses
+            emphasis: voiceCharacteristics.emphasis
+        )
+        
+        // Apply reliability profile modifiers to scale warmth, clarity, and energy
+        if let profile = reliabilityProfile {
+            // Scale warmth (0.5x to 1.5x)
+            let scaledWarmth = voiceCharacteristics.warmth * profile.warmthModifier
+            voiceCharacteristics = AuroraToneKit.TTSVoiceCharacteristics(
+                pacing: voiceCharacteristics.pacing,
+                pitch: voiceCharacteristics.pitch,
+                warmth: min(1.0, max(0.0, scaledWarmth)),
+                clarity: min(1.0, max(0.0, voiceCharacteristics.clarity * profile.clarityModifier)),
+                energy: min(1.0, max(0.0, voiceCharacteristics.energy * profile.energyModifier)),
+                pauseFrequency: voiceCharacteristics.pauseFrequency,
+                emphasis: voiceCharacteristics.emphasis
+            )
+        }
+        
+        // Writing style modifiers based on tone
+        var styleModifiers: [String] = []
+        
+        // Pacing and rhythm
+        if voiceCharacteristics.pacing > 140 {
+            styleModifiers.append("- Use a faster, more dynamic pace with shorter sentences and active voice")
+        } else if voiceCharacteristics.pacing < 120 {
+            styleModifiers.append("- Use a slower, more measured pace with thoughtful pauses and longer sentences")
+        } else {
+            styleModifiers.append("- Use a balanced, natural conversational pace")
+        }
+        
+        // Emotional emphasis
+        if voiceCharacteristics.energy > 0.75 {
+            styleModifiers.append("- Show higher emotional energy: use more expressive language, positive affirmations, and enthusiastic phrasing")
+        } else if voiceCharacteristics.energy < 0.5 {
+            styleModifiers.append("- Show lower emotional energy: use calmer, more measured language with gentle reassurance")
+        } else {
+            styleModifiers.append("- Show balanced emotional energy: be warm and supportive without being overly energetic or subdued")
+        }
+        
+        // Warmth and tone
+        if voiceCharacteristics.warmth > 0.8 {
+            styleModifiers.append("- Emphasize warmth and empathy: use caring language, acknowledge feelings, and show understanding")
+        } else if voiceCharacteristics.warmth < 0.6 {
+            styleModifiers.append("- Use a more neutral, professional tone: focus on clarity and precision over emotional warmth")
+        } else {
+            styleModifiers.append("- Balance warmth with clarity: be friendly and approachable while staying focused")
+        }
+        
+        // Clarity and articulation
+        if voiceCharacteristics.clarity > 0.9 {
+            styleModifiers.append("- Prioritize clarity and precision: use specific, concrete language and avoid ambiguity")
+        } else if voiceCharacteristics.clarity < 0.75 {
+            styleModifiers.append("- Use more natural, conversational language: allow for some informality and natural flow")
+        }
+        
+        // Emphasis on key words
+        if voiceCharacteristics.emphasis > 0.75 {
+            styleModifiers.append("- Emphasize important points: use stronger language for key concepts and actionable items")
+        } else if voiceCharacteristics.emphasis < 0.6 {
+            styleModifiers.append("- Use subtle emphasis: let important points emerge naturally without heavy highlighting")
+        }
+        
+        // Pause frequency (affects sentence structure)
+        if voiceCharacteristics.pauseFrequency > 0.6 {
+            styleModifiers.append("- Use more thoughtful pauses: structure sentences to allow reflection, use commas and periods strategically")
+        } else if voiceCharacteristics.pauseFrequency < 0.4 {
+            styleModifiers.append("- Use minimal pauses: keep sentences flowing smoothly with fewer breaks")
+        }
+        
+        // Tone-specific writing style guidance
+        let category = AuroraToneKit.category(for: tone)
+        switch category {
+        case .ritual:
+            if tone == .clarityCharge {
+                styleModifiers.append("- Morning ritual tone: be forward-looking, motivational, and intentional. Focus on clarity and setting priorities")
+            } else {
+                styleModifiers.append("- Evening ritual tone: be reflective, calming, and gentle. Acknowledge what moved and offer gentle insights")
+            }
+        case .focus:
+            styleModifiers.append("- Focus mode tone: be concentrated and intentional. Use precise language and avoid distractions")
+        case .emotional:
+            styleModifiers.append("- Emotional tone: be empathetic and understanding. Acknowledge feelings and provide emotional support")
+        case .guidance:
+            styleModifiers.append("- Guidance tone: be clear and helpful. Provide actionable advice with confidence")
+        case .insight:
+            styleModifiers.append("- Insight tone: be perceptive and thoughtful. Connect patterns and reveal deeper understanding")
+        case .error:
+            styleModifiers.append("- Problem-solving tone: be solution-oriented and supportive. Focus on fixing issues without judgment")
+        case .learning:
+            styleModifiers.append("- Educational tone: be clear and structured. Break down concepts and provide step-by-step guidance")
+        case .social:
+            styleModifiers.append("- Social tone: be collaborative and inclusive. Foster connection and teamwork")
+        case .wellness:
+            styleModifiers.append("- Wellness tone: be restorative and mindful. Support healing and recovery")
+        case .achievement:
+            styleModifiers.append("- Achievement tone: be celebratory and proud. Acknowledge accomplishments with enthusiasm")
+        case .warning:
+            styleModifiers.append("- Alert tone: be clear and attention-grabbing. Communicate urgency without alarm")
+        case .transition:
+            styleModifiers.append("- Transition tone: be smooth and natural. Guide changes seamlessly")
+        case .timeBased:
+            styleModifiers.append("- Time-aware tone: match the energy of the time of day naturally")
+        case .workload:
+            styleModifiers.append("- Workload-aware tone: adjust energy and support based on current load")
+        case .recovery:
+            styleModifiers.append("- Recovery tone: be peaceful and restorative. Support rest and rejuvenation")
+        }
+        
+        // Add reliability-based adjustments if profile exists
+        if let profile = reliabilityProfile {
+            if profile.warmthModifier > 1.1 {
+                styleModifiers.append("- **Reliability adjustment**: This tone has shown high stability and positive sentiment - amplify warmth and emotional connection")
+            } else if profile.warmthModifier < 0.9 {
+                styleModifiers.append("- **Reliability adjustment**: This tone has shown variability - maintain consistent warmth")
+            }
+            
+            if profile.clarityModifier > 1.1 {
+                styleModifiers.append("- **Reliability adjustment**: This tone has shown high consistency - emphasize clarity and precision")
+            } else if profile.clarityModifier < 0.9 {
+                styleModifiers.append("- **Reliability adjustment**: This tone has shown volatility - focus on clear communication")
+            }
+            
+            if profile.energyModifier > 1.1 {
+                styleModifiers.append("- **Reliability adjustment**: This tone has shown positive sentiment trends - bring appropriate energy")
+            } else if profile.energyModifier < 0.9 {
+                styleModifiers.append("- **Reliability adjustment**: This tone has shown lower energy patterns - match that energy level")
+            }
+        }
+        
+        // Add temporal emotional memory context
+        // Blend recent (70%) and historical (30%) baselines for continuity
+        let blendedBaseline = (rollingBaseline * 0.7) + (historicalBaseline * 0.3)
+        
+        if abs(blendedBaseline) > 0.2 {
+            let direction = blendedBaseline > 0 ? "positive" : "calmer"
+            styleModifiers.append("- **Temporal emotional context**: Recent emotional patterns suggest a \(direction) baseline - let this influence your tone naturally")
+        }
+        
+        // Add momentum forecasting
+        if momentumForecast.confidence > 0.6 {
+            switch momentumForecast.trend {
+            case .positive:
+                styleModifiers.append("- **Emotional momentum**: Trends show improving sentiment - you may naturally shift toward more positive, encouraging tones")
+            case .negative:
+                styleModifiers.append("- **Emotional momentum**: Trends show declining sentiment - be prepared to provide more support and understanding")
+            case .neutral:
+                break
+            }
+        }
+        
+        // Add tone-specific emotional memory
+        if let memory = toneEmotionalMemory {
+            if memory.stability > 0.7 {
+                let memoryDirection = memory.baseline > 0 ? "positive" : "calmer"
+                styleModifiers.append("- **Emotional memory**: During similar periods with this tone, the emotional baseline was \(memoryDirection) (stability: \(String(format: "%.0f", memory.stability * 100))%) - draw from this continuity")
+            }
+            
+            if abs(memory.momentum) > 0.15 {
+                let momentumDirection = memory.momentum > 0 ? "increasing" : "decreasing"
+                styleModifiers.append("- **Emotional momentum for this tone**: Historical patterns show \(momentumDirection) emotional momentum - anticipate this trend")
+            }
+        }
+        
+        let modifiersText = styleModifiers.joined(separator: "\n")
+        
+        return """
+**TONE-SPECIFIC STYLE GUIDANCE (AuroraToneKit: \(tone.displayName)):**
+- Core tone: \(toneDescription)
+- Writing style: \(modifiersText)
+- Remember: This tone should shape your entire response, not just the opening. Let it influence word choice, sentence structure, and emotional emphasis throughout.
+"""
+    }
+    
+    /// Extract the previous tone from conversation history (from AIMessage metadata)
+    private func extractPreviousToneFromHistory(conversationMessages: [ConversationMessage]?) -> AuroraTone? {
+        // Note: ConversationMessage doesn't have tone metadata directly
+        // We need to look at the actual AIMessage objects if available
+        // For now, we'll infer from message content patterns as a fallback
+        // This should be enhanced to use actual AIMessage.tone when available
+        
+        guard let messages = conversationMessages, !messages.isEmpty else {
+            return nil
+        }
+        
+        // Look for the last assistant message
+        let assistantMessages = messages.filter { $0.role == "assistant" }
+        guard let lastAssistantMessage = assistantMessages.last else {
+            return nil
+        }
+        
+        // Infer tone from content patterns (fallback until we can access AIMessage.tone directly)
+        let content = lastAssistantMessage.content.lowercased()
+        
+        if content.contains("congratulations") || content.contains("well done") || content.contains("great job") {
+            return .celebratory
+        } else if content.contains("let's") && (content.contains("start") || content.contains("begin")) {
+            return .clarityCharge
+        } else if content.contains("reflect") || content.contains("think") || content.contains("consider") {
+            return .reflective
+        } else if content.contains("problem") || content.contains("issue") || content.contains("error") {
+            return .problemSolving
+        } else if content.contains("insight") || content.contains("pattern") || content.contains("notice") {
+            return .insightful
+        } else if content.contains("encourag") || content.contains("support") || content.contains("help") {
+            return .encouraging
+        }
+        
+        return nil
+    }
+    
+    /// Analyze tone patterns from conversation history to inform recall weighting
+    private func analyzeTonePatternsFromHistory(conversationMessages: [ConversationMessage]?) -> TonePatternAnalysis {
+        guard let messages = conversationMessages, !messages.isEmpty else {
+            return TonePatternAnalysis(dominantTone: nil, toneTransitions: [], emotionalTrend: .neutral)
+        }
+        
+        // Extract tones from recent assistant messages (if we had access to AIMessage)
+        // For now, we'll infer from message content patterns
+        var tones: [AuroraTone] = []
+        var emotionalTrend: TemporalEmotionalTrend = .neutral
+        
+        // Analyze last 5 messages for tone patterns
+        let recentMessages = Array(messages.suffix(5))
+        for message in recentMessages where message.role == "assistant" {
+            let content = message.content.lowercased()
+            
+            // Infer tone from content patterns
+            if content.contains("congratulations") || content.contains("well done") || content.contains("great job") {
+                tones.append(.celebratory)
+                emotionalTrend = .positive
+            } else if content.contains("let's") && (content.contains("start") || content.contains("begin")) {
+                tones.append(.clarityCharge)
+                emotionalTrend = .positive
+            } else if content.contains("reflect") || content.contains("think") || content.contains("consider") {
+                tones.append(.reflective)
+                emotionalTrend = .neutral
+            } else if content.contains("problem") || content.contains("issue") || content.contains("error") {
+                tones.append(.problemSolving)
+                emotionalTrend = .neutral
+            } else if content.contains("insight") || content.contains("pattern") || content.contains("notice") {
+                tones.append(.insightful)
+                emotionalTrend = .neutral
+            }
+        }
+        
+        let dominantTone = tones.mostFrequent()
+        let toneTransitions = analyzeToneTransitions(tones: tones)
+        
+        return TonePatternAnalysis(
+            dominantTone: dominantTone,
+            toneTransitions: toneTransitions,
+            emotionalTrend: emotionalTrend
+        )
+    }
+    
+    /// Analyze tone transitions in conversation
+    private func analyzeToneTransitions(tones: [AuroraTone]) -> [ToneTransition] {
+        guard tones.count >= 2 else { return [] }
+        
+        var transitions: [ToneTransition] = []
+        for i in 1..<tones.count {
+            let from = tones[i - 1]
+            let to = tones[i]
+            if from != to {
+                transitions.append(ToneTransition(from: from, to: to))
+            }
+        }
+        return transitions
+    }
+    
+    /// Build tone-based recall weighting instructions for contextual memory prioritization
+    /// Supports gradual transition weighting over 3 turns
+    private func buildToneBasedRecallWeighting(
+        toneContext: AuroraTone?,
+        tonePatternAnalysis: TonePatternAnalysis? = nil,
+        transitionState: ToneTransitionState? = nil
+    ) -> String {
+        guard let tone = toneContext else {
+            return "- Prioritize emotional memories over routine tasks"
+        }
+        
+        let category = AuroraToneKit.category(for: tone)
+        
+        var weightingInstructions: [String] = []
+        
+        switch category {
+        case .ritual:
+            if tone == .clarityCharge {
+                weightingInstructions.append("- Prioritize: recent accomplishments, active priorities, forward-looking goals")
+                weightingInstructions.append("- De-emphasize: past failures, unresolved issues from yesterday")
+            } else {
+                weightingInstructions.append("- Prioritize: what was accomplished today, patterns from the day, emotional reflections")
+                weightingInstructions.append("- De-emphasize: tomorrow's tasks, future planning")
+            }
+        case .focus:
+            weightingInstructions.append("- Prioritize: current work context, related tasks and projects, focus session history")
+            weightingInstructions.append("- De-emphasize: unrelated items, social interactions, future planning")
+        case .emotional:
+            weightingInstructions.append("- Prioritize: emotional memories, feelings from past interactions, mood patterns")
+            weightingInstructions.append("- De-emphasize: technical details, routine tasks, data points")
+        case .guidance:
+            weightingInstructions.append("- Prioritize: past successful guidance, similar situations, user preferences")
+            weightingInstructions.append("- De-emphasize: irrelevant context, unrelated memories")
+        case .insight:
+            weightingInstructions.append("- Prioritize: pattern memories, trend data, behavioral observations")
+            weightingInstructions.append("- De-emphasize: one-off events, routine tasks")
+        case .error:
+            weightingInstructions.append("- Prioritize: similar problems solved before, troubleshooting history, solution patterns")
+            weightingInstructions.append("- De-emphasize: unrelated successes, routine memories")
+        case .learning:
+            weightingInstructions.append("- Prioritize: teaching moments, educational context, related knowledge")
+            weightingInstructions.append("- De-emphasize: unrelated work memories")
+        case .social:
+            weightingInstructions.append("- Prioritize: collaborative memories, team interactions, social context")
+            weightingInstructions.append("- De-emphasize: solo work, individual tasks")
+        case .wellness:
+            weightingInstructions.append("- Prioritize: recovery patterns, wellness history, self-care moments")
+            weightingInstructions.append("- De-emphasize: work stress, productivity pressure")
+        case .achievement:
+            weightingInstructions.append("- Prioritize: past accomplishments, milestone memories, success patterns")
+            weightingInstructions.append("- De-emphasize: failures, setbacks, incomplete work")
+        case .warning:
+            weightingInstructions.append("- Prioritize: similar warnings, risk patterns, cautionary memories")
+            weightingInstructions.append("- De-emphasize: routine memories, unrelated context")
+        case .transition:
+            weightingInstructions.append("- Prioritize: transition patterns, change history, adaptation memories")
+            weightingInstructions.append("- De-emphasize: static context, routine patterns")
+        case .timeBased:
+            weightingInstructions.append("- Prioritize: memories from similar times of day, time-based patterns")
+            weightingInstructions.append("- De-emphasize: memories from very different times")
+        case .workload:
+            if tone == .overloaded || tone == .heavyLoad {
+                weightingInstructions.append("- Prioritize: stress patterns, overload history, recovery strategies")
+                weightingInstructions.append("- De-emphasize: additional tasks, future planning")
+            } else {
+                weightingInstructions.append("- Prioritize: available capacity, opportunities, forward planning")
+            }
+        case .recovery:
+            weightingInstructions.append("- Prioritize: rest patterns, recovery strategies, wellness memories")
+            weightingInstructions.append("- De-emphasize: work pressure, productivity demands")
+        }
+        
+        // Add emotional emphasis weighting
+        let voiceCharacteristics = AuroraToneKit.ttsVoiceCharacteristics(for: tone)
+        if voiceCharacteristics.warmth > 0.8 {
+            weightingInstructions.append("- Emotional emphasis: High - prioritize memories with strong emotional resonance")
+        } else if voiceCharacteristics.warmth < 0.6 {
+            weightingInstructions.append("- Emotional emphasis: Low - prioritize factual, objective memories")
+        } else {
+            weightingInstructions.append("- Emotional emphasis: Balanced - mix emotional and factual memories")
+        }
+        
+        // Incorporate tone pattern analysis from conversation history
+        if let analysis = tonePatternAnalysis {
+            if let dominantTone = analysis.dominantTone, dominantTone != tone {
+                weightingInstructions.append("- Conversation pattern: Recent messages showed \(dominantTone.displayName) tone - consider this when selecting relevant memories")
+            }
+            
+            if !analysis.toneTransitions.isEmpty {
+                let recentTransition = analysis.toneTransitions.last!
+                if recentTransition.to == tone {
+                    weightingInstructions.append("- Tone shift detected: Transitioning from \(recentTransition.from.displayName) to \(recentTransition.to.displayName) - adjust memory selection accordingly")
+                }
+            }
+            
+            switch analysis.emotionalTrend {
+            case .positive:
+                weightingInstructions.append("- Emotional trend: Positive - prioritize uplifting memories and successful outcomes")
+            case .negative:
+                weightingInstructions.append("- Emotional trend: Negative - prioritize supportive memories and solution patterns")
+            case .neutral:
+                break
+            }
+        }
+        
+        // Apply gradual transition weighting if in active transition
+        if let transition = transitionState, transition.isActive {
+            let progress = transition.progress // 0.0 to 1.0 over 3 turns
+            let intensity = transition.transitionIntensity // 0.0 to 1.0
+            
+            // Calculate weighting blend: gradually shift from previous tone to current tone
+            let previousWeight = 1.0 - progress // Start at 1.0, fade to 0.0
+            let currentWeight = progress // Start at 0.0, grow to 1.0
+            
+            // Calculate decay rate modifier based on intensity
+            // Higher intensity = faster decay of old tone-context memories
+            let decayRateModifier = 1.0 + (intensity * 0.5) // 1.0x to 1.5x decay rate
+            
+            weightingInstructions.append("")
+            weightingInstructions.append("**GRADUAL TONE TRANSITION (Turn \(transition.transitionTurn + 1)/3):**")
+            weightingInstructions.append("- Previous tone (\(transition.fromToneValue?.displayName ?? "unknown")) weight: \(String(format: "%.0f", previousWeight * 100))%")
+            weightingInstructions.append("- Current tone (\(transition.toToneValue?.displayName ?? "unknown")) weight: \(String(format: "%.0f", currentWeight * 100))%")
+            weightingInstructions.append("- Transition intensity: \(String(format: "%.0f", intensity * 100))%")
+            weightingInstructions.append("- Memory decay rate: \(String(format: "%.1f", decayRateModifier))x (higher intensity = faster decay of old tone-context memories)")
+            weightingInstructions.append("- Blend memories from both tones proportionally. Memories from the previous tone should gradually fade as we transition.")
+            weightingInstructions.append("- Older memories from the previous tone context should decay \(String(format: "%.0f", (decayRateModifier - 1.0) * 100))% faster than normal due to transition intensity.")
+        }
+        
+        return weightingInstructions.joined(separator: "\n")
+    }
+    
+    // MARK: - Tone Pattern Analysis Types
+    
+    private struct TonePatternAnalysis {
+        let dominantTone: AuroraTone?
+        let toneTransitions: [ToneTransition]
+        let emotionalTrend: TemporalEmotionalTrend
+    }
+    
+    private struct ToneTransition {
+        let from: AuroraTone
+        let to: AuroraTone
+    }
+    
+    // EmotionalTrend is now defined in TemporalEmotionalMemory.swift
     
     private func extractEnabledPhases(from payloadContext: AIPayloadContext?) -> [Int] {
         var phases: [Int] = []
@@ -2781,10 +3340,10 @@ Aurora:
             throw OllamaError.connectionFailed
         }
         
-        // Use llama3.2-vision:latest for image analysis (from available models)
+        // Use granite3.2-vision for image analysis
         let availableVisionModels = [
-            "llama3.2-vision:latest",
-            "llama3.2-vision"
+            "granite3.2-vision",
+            "granite3.2-vision:latest"
         ]
         
         // Check if vision model is available
@@ -2803,7 +3362,7 @@ Aurora:
         guard let modelToUse = visionModel else {
             // No vision model available - return helpful error
             return DocumentAnalysisResult(
-                summary: "I'd love to analyze that image, but I don't have a vision-capable model installed. To enable image analysis, please install llama3.2-vision by running: `ollama pull llama3.2-vision:latest`",
+                summary: "I'd love to analyze that image, but I don't have a vision-capable model installed. To enable image analysis, please install granite3.2-vision by running: `ollama pull granite3.2-vision`",
                 truncatedContext: false,
                 sourceModel: .ollama
             )
@@ -3474,6 +4033,18 @@ You are Aurora, analyzing a document the user shared. Be conversational, helpful
         }
         
         return info
+    }
+}
+
+// MARK: - Array Extension for Tone Analysis
+
+extension Array where Element == AuroraTone {
+    /// Find the most frequently occurring tone
+    func mostFrequent() -> AuroraTone? {
+        guard !isEmpty else { return nil }
+        let frequency = Dictionary(grouping: self, by: { $0 })
+            .mapValues { $0.count }
+        return frequency.max(by: { $0.value < $1.value })?.key
     }
 }
 

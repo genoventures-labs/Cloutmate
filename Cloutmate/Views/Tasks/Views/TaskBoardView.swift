@@ -616,9 +616,9 @@ private struct QuickActionBar: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            QuickActionButton(systemName: "pencil", tint: .primary, action: onEdit)
-            QuickActionButton(systemName: "bolt.fill", tint: .kosmicGreen, action: onFocus)
-            QuickActionButton(systemName: "doc.on.doc", tint: .kosmicBlue, action: onDuplicate)
+            TaskBoardQuickActionButton(systemName: "pencil", tint: .primary, action: onEdit)
+            TaskBoardQuickActionButton(systemName: "bolt.fill", tint: .kosmicGreen, action: onFocus)
+            TaskBoardQuickActionButton(systemName: "doc.on.doc", tint: .kosmicBlue, action: onDuplicate)
             
             Menu {
                 ForEach(TaskBoardView.BoardLane.allCases, id: \.self) { lane in
@@ -642,7 +642,7 @@ private struct QuickActionBar: View {
     }
 }
 
-private struct QuickActionButton: View {
+private struct TaskBoardQuickActionButton: View {
     let systemName: String
     let tint: Color
     let action: () -> Void
@@ -669,7 +669,7 @@ private struct QuickActionGlyph: View {
     }
 }
 
-private struct StatusBadge: View {
+private struct TaskBoardStatusBadge: View {
     let status: String
     let color: Color
     
@@ -684,7 +684,7 @@ private struct StatusBadge: View {
     }
 }
 
-private struct PriorityBadge: View {
+private struct TaskBoardPriorityBadge: View {
     let priority: String
     let color: Color
     

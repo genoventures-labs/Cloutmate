@@ -77,6 +77,16 @@ struct JournalTimelineView: View {
             VStack(alignment: .leading, spacing: 16) {
                 header
                 
+                if let range = dateRange {
+                    TimelineDateRangeLabel(
+                        startDate: range.start,
+                        endDate: range.end,
+                        alignment: .leading,
+                        icon: "waveform.path.ecg"
+                    )
+                    .padding(.top, 4)
+                }
+                
                 ScrollView(.horizontal, showsIndicators: false) {
                     GeometryReader { geometry in
                         let trackWidth = max(geometry.size.width, TimelineLayout.minTrackWidth)
@@ -140,7 +150,37 @@ struct JournalTimelineView: View {
         let monthMarkers = computeMonthMarkers(for: positioned)
         
         ZStack(alignment: .topLeading) {
-            timelineBackground(width: trackWidth, positioned: positioned, baselineY: baselineY)
+            TimelineTrackBackground(
+                width: trackWidth,
+                height: TimelineLayout.trackHeight,
+                accentGradient: LinearGradient(
+                    colors: [
+                        Color.kosmicBlue,
+                        Color.kosmicPurple,
+                        Color.kosmicGreen
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            
+            moodWaveLayer(width: trackWidth, positioned: positioned, baselineY: baselineY)
+                .allowsHitTesting(false)
+            
+            TimelineAxis(
+                width: trackWidth,
+                tickCount: min(max(monthMarkers.count, 3), 8),
+                tickHeight: TimelineLayout.tickHeight,
+                gradient: LinearGradient(
+                    colors: [
+                        Color.kosmicBlue.opacity(0.9),
+                        Color.kosmicPurple.opacity(0.85),
+                        Color.kosmicGreen.opacity(0.85)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             
             ForEach(monthMarkers) { marker in
                 Text(marker.label)
@@ -167,27 +207,12 @@ struct JournalTimelineView: View {
         }
     }
     
-    private func timelineBackground(width: CGFloat, positioned: [PositionedJournal], baselineY: CGFloat) -> some View {
+    private func moodWaveLayer(width: CGFloat, positioned: [PositionedJournal], baselineY: CGFloat) -> some View {
         Canvas { context, size in
             guard positioned.count >= 1 else { return }
             
-            // Baseline
-            var baseline = Path()
-            baseline.move(to: CGPoint(x: TimelineLayout.horizontalPadding, y: baselineY))
-            baseline.addLine(to: CGPoint(x: width - TimelineLayout.horizontalPadding, y: baselineY))
-            context.stroke(
-                baseline,
-                with: .linearGradient(
-                    Gradient(colors: [.kosmicBlue.opacity(0.3), .kosmicPurple.opacity(0.3), .kosmicGreen.opacity(0.3)]),
-                    startPoint: CGPoint(x: TimelineLayout.horizontalPadding, y: baselineY),
-                    endPoint: CGPoint(x: width - TimelineLayout.horizontalPadding, y: baselineY)
-                ),
-                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
-            )
-            
             guard positioned.count >= 2 else { return }
             
-            // Mood drift fill
             var fill = Path()
             fill.move(to: CGPoint(x: positioned.first!.x, y: baselineY))
             positioned.forEach { fill.addLine(to: CGPoint(x: $0.x, y: $0.y)) }

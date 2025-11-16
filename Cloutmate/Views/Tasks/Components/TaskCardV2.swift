@@ -19,8 +19,11 @@ struct TaskCardV2: View {
     let onArchive: () -> Void
     let onDelete: () -> Void
     let onRequestFocus: (Task) -> Void
+    var isBeingDragged = false
+    var isDropTarget = false
     
     @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @State private var isExpanded = false
     @State private var isHovered = false
     @State private var showCompletionAnimation = false
@@ -51,160 +54,55 @@ struct TaskCardV2: View {
     }
     
     var body: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 22) {
         VStack(spacing: 0) {
-            // Main card content
-            HStack(spacing: 12) {
-                // Quick completion checkbox
-                Button(action: {
-                    completeTask()
-                }) {
-                    Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(task.status == .done ? .kosmicGreen : .secondary.opacity(0.6))
-                        .contentTransition(.symbolEffect(.replace))
-                }
-                .buttonStyle(.plain)
-                .help(task.status == .done ? "Mark as incomplete" : "Mark as complete")
-                .allowsHitTesting(true)
-                
-                // Progress pill indicator (interactive)
-                InteractiveProgressPill(task: task)
-                
-                // Task content
-                VStack(alignment: .leading, spacing: 6) {
-                    // Title and due date
-                    HStack(alignment: .top) {
-                        Text(task.title)
-                            .font(.system(.body, design: .rounded))
-                            .fontWeight(.medium)
-                            .foregroundColor(task.status == .done ? .secondary : .primary)
-                            .strikethrough(task.status == .done)
-                            .lineLimit(isExpanded ? nil : 2)
-                        
-                        Spacer()
-                        
-                        // Due date badge (interactive)
-                        InteractiveDueDateBadge(task: task, color: dueDateColor)
-                    }
-                    
-                    // Expanded content
-                    if isExpanded {
-                        VStack(alignment: .leading, spacing: 8) {
-                            // Notes with mention rendering
-                            if let notes = task.notes, !notes.isEmpty {
-                                MentionRenderedTextView(
-                                    text: notes,
-                                    textFont: .caption,
-                                    mentionFont: .caption
-                                )
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(nil)
-                            }
-                            
-                            // Interactive fields row
-                            HStack(spacing: 12) {
-                                // Status picker
-                                InteractiveStatusPicker(task: task)
-                                
-                                // Priority picker
-                                InteractivePriorityPicker(task: task)
-                                
-                                Spacer()
-                            }
-                            
-                            // Project/Area
-                            if let project = project {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "folder.fill")
-                                        .font(.caption2)
-                                        .foregroundColor(.kosmicBlue)
-                                    Text(project.title)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            
-                            if let area = area {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "square.grid.2x2.fill")
-                                        .font(.caption2)
-                                        .foregroundColor(.kosmicPurple)
-                                    Text(area.title)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            
-                            // Focus metrics
-                            TaskFocusMetricsView(metrics: metrics, taskTitle: task.title)
-                        }
-                        .padding(.top, 4)
-                    }
-                }
-                
-                // Priority indicator (interactive)
-                InteractivePriorityIndicator(task: task)
-            }
-            .padding(16)
-            .frame(minHeight: 56)
+                headerRow
+                    .padding(.horizontal, 26)
+                    .padding(.vertical, 22)
             .contentShape(Rectangle())
             .onTapGesture {
                 withAnimation(GlassMotion.Easing.spring) {
                     isExpanded.toggle()
                 }
             }
-            .onTapGesture(count: 2) {
-                onEdit()
-            }
+                    .onTapGesture(count: 2, perform: onEdit)
             .onHover { hovering in
                 withAnimation(GlassMotion.Easing.spring) {
                     isHovered = hovering
                 }
             }
             
-            // Hover actions row
             if isHovered && !isExpanded {
-                HStack(spacing: 8) {
-                    Spacer()
-                    
-                    QuickActionButton(icon: "checkmark.circle.fill", color: .kosmicGreen) {
-                        completeTask()
-                    }
-                    
-                    QuickActionButton(icon: "pencil", color: .kosmicBlue) {
-                        onEdit()
-                    }
-                    
-                    QuickActionButton(icon: "timer", color: .kosmicPurple) {
-                        onRequestFocus(task)
-                    }
-                    
-                    QuickActionButton(icon: "archivebox.fill", color: .gray) {
-                        onArchive()
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
-                .transition(.move(edge: .bottom).combined(with: .opacity))
+                    hoverActions
+                        .transition(AnyTransition.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .glassPanel(tier: .contentCard, cornerRadius: 12)
+        }
         .overlay(
-            // Animated border for due/overdue tasks
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(
-                    borderGradient,
-                    lineWidth: isDueToday || isOverdue ? 2 : 0
-                )
-                .animation(GlassMotion.Easing.spring, value: isDueToday)
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(borderGradient, lineWidth: isDueToday || isOverdue ? 1.4 : 0.6)
+                .animation(GlassMotion.Easing.spring, value: isDueToday || isOverdue)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(glassColorSystem.emotionalAccent().opacity(isDropTarget ? 0.85 : 0),
+                        lineWidth: isDropTarget ? 1.8 : 0)
+                .shadow(color: glassColorSystem.emotionalAccent().opacity(isDropTarget ? 0.45 : 0),
+                        radius: isDropTarget ? 18 : 0,
+                        x: 0,
+                        y: isDropTarget ? 10 : 0)
+                .animation(.easeInOut(duration: 0.16), value: isDropTarget)
         )
         .shadow(
-            color: Color.kosmicPurple.opacity(isHovered ? 0.2 : 0.1),
-            radius: isHovered ? 6 : 4,
+            color: Color.kosmicPurple.opacity(isBeingDragged ? 0.28 : (isHovered ? 0.22 : 0.12)),
+            radius: isBeingDragged ? 20 : (isHovered ? 18 : 12),
             x: 0,
-            y: isHovered ? 3 : 2
+            y: isBeingDragged ? 14 : (isHovered ? 12 : 6)
         )
-        .scaleEffect(isHovered ? 1.01 : 1.0)
+        .scaleEffect(isBeingDragged ? 1.03 : (isHovered ? 1.01 : 1.0))
+        .rotation3DEffect(.degrees(isBeingDragged ? 4 : 0), axis: (x: 1, y: 0, z: 0))
+        .offset(y: isBeingDragged ? -3 : 0)
+        .animation(GlassMotion.Easing.spring, value: isBeingDragged)
         .animation(GlassMotion.Easing.spring, value: isHovered)
         .contextMenu {
             Button("Start Focus Session") {
@@ -240,6 +138,175 @@ struct TaskCardV2: View {
                 }
             }
         )
+    }
+    
+    private var headerRow: some View {
+        HStack(alignment: .top, spacing: 20) {
+            completionCheckbox
+            VStack(spacing: 0) {
+                titleRow
+                notesOrExpanded
+            }
+            InteractivePriorityIndicator(task: task)
+        }
+    }
+    
+    private var titleRow: some View {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 8) {
+                titleText
+                tagStack
+            }
+            
+            Spacer(minLength: 12)
+            
+            VStack(alignment: .trailing, spacing: 12) {
+                InteractiveDueDateBadge(task: task, color: dueDateColor)
+                InteractiveProgressPill(task: task)
+            }
+        }
+    }
+    
+    private var titleText: some View {
+        Text(task.title)
+            .font(.system(.body, design: .rounded).weight(.semibold))
+            .foregroundStyle(task.status == .done ? glassColorSystem.textSecondary() : glassColorSystem.textPrimary())
+            .strikethrough(task.status == .done)
+            .lineLimit(isExpanded ? nil : 3)
+    }
+    
+    @ViewBuilder
+    private var tagStack: some View {
+        if project != nil || area != nil || task.effort != nil {
+            HStack(spacing: 10) {
+                if let project = project {
+                    TagBadge(icon: "folder.fill", title: project.title, tint: .kosmicBlue)
+                }
+                if let area = area {
+                    TagBadge(icon: "square.grid.2x2.fill", title: area.title, tint: .kosmicPurple)
+                }
+                if let effort = effortMetricLabel {
+                    TagBadge(icon: "bolt.fill", title: effortLabel(for: effort), tint: .kosmicGreen)
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var notesOrExpanded: some View {
+        if isExpanded {
+            expandedDetails
+        } else if let notes = task.notes, !notes.isEmpty {
+            MentionRenderedTextView(
+                text: notes,
+                textFont: .system(.caption, design: .rounded),
+                mentionFont: .system(.caption, design: .rounded).weight(.medium)
+            )
+            .foregroundColor(glassColorSystem.textSecondary())
+            .lineLimit(1)
+            .padding(.top, 8)
+        }
+    }
+
+    private var effortMetricLabel: Double? {
+        guard let effort = task.effort else { return nil }
+        switch effort.lowercased() {
+        case "low", "small", "s":
+            return 0.25
+        case "medium", "m", "mid":
+            return 0.5
+        case "high", "large", "h":
+            return 0.85
+        default:
+            return Double(effort)
+        }
+    }
+    
+    private func effortLabel(for effortValue: Double) -> String {
+        let normalized = max(0, min(1, effortValue))
+        switch normalized {
+        case ..<0.34:
+            return "Light effort"
+        case 0.34..<0.67:
+            return "Moderate effort"
+        default:
+            return "Deep effort"
+        }
+    }
+    
+    private var completionCheckbox: some View {
+        Button(action: completeTask) {
+            Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: task.status == .done ? [.kosmicGreen, .kosmicBlue] : [.secondary.opacity(0.8)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: task.status == .done ? .kosmicGreen.opacity(0.4) : .clear, radius: 6, x: 0, y: 3)
+        }
+        .buttonStyle(.plain)
+        .help(task.status == .done ? "Mark as incomplete" : "Mark as complete")
+        .allowsHitTesting(true)
+    }
+    
+    private var hoverActions: some View {
+        HStack(spacing: 10) {
+            Spacer()
+            
+            QuickActionButton(icon: "checkmark.circle.fill", color: .kosmicGreen) {
+                completeTask()
+            }
+            
+            QuickActionButton(icon: "pencil", color: .kosmicBlue) {
+                onEdit()
+            }
+            
+            QuickActionButton(icon: "timer", color: .kosmicPurple) {
+                onRequestFocus(task)
+            }
+            
+            QuickActionButton(icon: "archivebox.fill", color: .gray) {
+                onArchive()
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 18)
+    }
+    
+    private var expandedDetails: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let notes = task.notes, !notes.isEmpty {
+                MentionRenderedTextView(
+                    text: notes,
+                    textFont: .system(.subheadline, design: .rounded),
+                    mentionFont: .system(.subheadline, design: .rounded).weight(.semibold)
+                )
+                .foregroundColor(.secondary)
+            }
+            
+            GlassDivider()
+            
+            HStack(spacing: 12) {
+                InteractiveStatusPicker(task: task)
+                InteractivePriorityPicker(task: task)
+                
+                if let project = project {
+                    TagBadge(icon: "folder.fill", title: project.title, tint: .kosmicBlue)
+                }
+                
+                if let area = area {
+                    TagBadge(icon: "square.grid.2x2.fill", title: area.title, tint: .kosmicPurple)
+                }
+                
+                Spacer()
+            }
+            
+            TaskFocusMetricsView(metrics: metrics, taskTitle: task.title)
+        }
+        .padding(.top, 6)
     }
     
     private var borderGradient: LinearGradient {
@@ -347,6 +414,8 @@ struct InteractiveProgressPill: View {
             return .gray
         case .todo:
             return .kosmicBlue
+        @unknown default:
+            fatalError("Unhandled TaskStatus case: \(task.status)")
         }
     }
     
@@ -360,6 +429,8 @@ struct InteractiveProgressPill: View {
             return "xmark"
         case .todo:
             return "circle"
+        @unknown default:
+            fatalError("Unhandled TaskStatus case: \(task.status)")
         }
     }
 }
@@ -624,6 +695,34 @@ struct QuickActionButton: View {
     }
 }
 
+// MARK: - Tag Badge
+
+private struct TagBadge: View {
+    let icon: String
+    let title: String
+    let tint: Color
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(title)
+                .font(.system(.caption2, design: .rounded).weight(.medium))
+        }
+        .foregroundColor(tint)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule(style: .continuous)
+                .fill(tint.opacity(0.16))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(tint.opacity(0.28), lineWidth: 0.6)
+                )
+        )
+    }
+}
+
 // MARK: - Completion Animation Overlay
 
 struct CompletionAnimationOverlay: View {
@@ -691,4 +790,3 @@ struct CompletionAnimationOverlay: View {
     .padding()
     .environmentObject(GlassColorSystem())
 }
-

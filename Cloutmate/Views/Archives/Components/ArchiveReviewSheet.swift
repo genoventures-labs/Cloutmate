@@ -14,6 +14,8 @@ struct ArchiveReviewSheet: View {
     @Binding var isPresented: Bool
     
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     @State private var dateRange: DateRange = .thisWeek
@@ -29,60 +31,118 @@ struct ArchiveReviewSheet: View {
         var id: String { rawValue }
     }
     
+    private var accentGradient: LinearGradient {
+        AuroraPalette.linearGradient(for: colorScheme)
+    }
+    
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    dateRangeSelector
-                    
-                    if isLoading {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                    } else if let snapshot {
-                        statsGrid(for: snapshot)
-                        chartsSection(snapshot: snapshot)
-                        archivedItemsSection(snapshot: snapshot)
-                        auroraInsightCard
-                    } else {
-                        ContentUnavailableView(
-                            "No archived items",
-                            systemImage: "archivebox",
-                            description: Text("Archive items to generate a review summary.")
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 200)
+        Group {
+            if isPresented {
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottom) {
+                        // Backdrop
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                closeDrawer()
+                            }
+                            .transition(.opacity)
+                        
+                        // Drawer slides up from bottom
+                        VStack(spacing: 0) {
+                            V2DrawerScaffold(
+                                accentGradient: accentGradient,
+                                showsSidebar: false,
+                                header: { headerContent },
+                                content: { drawerContent },
+                                sidebar: { EmptyView() }
+                            )
+                        }
+                        .frame(maxHeight: geometry.size.height * 0.85)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     }
                 }
-                .padding()
-            }
-            .navigationTitle("Review Summary")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        isPresented = false
+                .onAppear {
+                    _Concurrency.Task {
+                        await loadData()
                     }
                 }
             }
-        }
-        .frame(width: 800, height: 600)
-        .task {
-            await loadData()
         }
     }
     
-    private var dateRangeSelector: some View {
+    private func closeDrawer() {
+        withAnimation(GlassMotion.Easing.modalOpen) {
+                        isPresented = false
+                    }
+                }
+    
+    private var headerContent: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Review Summary")
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textPrimary())
+                
+                Text("Archive analytics and insights")
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+            }
+            
+            Spacer()
+            
+            // Date range selector in header
         Picker("Date Range", selection: $dateRange) {
             ForEach(DateRange.allCases) { range in
                 Text(range.rawValue).tag(range)
             }
         }
         .pickerStyle(.segmented)
+            .frame(width: 300)
         .onChange(of: dateRange) { oldValue, newValue in
             _Concurrency.Task {
                 await loadData()
             }
         }
+            
+            GlassButton(
+                nil,
+                icon: "xmark",
+                style: .iconOnly,
+                role: .surface
+            ) {
+                closeDrawer()
+            }
+            .accessibilityLabel("Close")
+        }
     }
+    
+    @ViewBuilder
+    private var drawerContent: some View {
+        if isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding()
+        } else if let snapshot {
+            VStack(alignment: .leading, spacing: 24) {
+                statsGrid(for: snapshot)
+                chartsSection(snapshot: snapshot)
+                archivedItemsSection(snapshot: snapshot)
+                auroraInsightCard
+            }
+            .padding(.vertical, 8)
+        } else {
+            ContentUnavailableView(
+                "No archived items",
+                systemImage: "archivebox",
+                description: Text("Archive items to generate a review summary.")
+            )
+            .frame(maxWidth: .infinity, minHeight: 200)
+            .padding(.vertical, 8)
+        }
+    }
+    
     
     private func statsGrid(for snapshot: ArchiveAnalyticsSnapshot) -> some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 16), count: 3)
@@ -139,30 +199,27 @@ struct ArchiveReviewSheet: View {
     }
     
     private func statCard(title: String, value: String, footer: String, icon: String, tint: Color) -> some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 16) {
+        DashboardTile(accent: tint, padding: 16) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: icon)
-                        .foregroundColor(tint)
+                        .foregroundStyle(tint)
                     Text(title)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(glassColorSystem.textSecondary())
                 }
                 Text(value)
                     .font(.title2.weight(.semibold))
+                    .foregroundStyle(glassColorSystem.textPrimary())
                 Text(footer)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
             }
-            .padding(16)
         }
     }
     
     private func chartsSection(snapshot: ArchiveAnalyticsSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Analytics")
-                .font(.headline)
-            
+        VStack(alignment: .leading, spacing: 24) {
             itemsByTypeChart(snapshot: snapshot)
             arteToneChart(snapshot: snapshot)
             learningThemesCard(snapshot: snapshot)
@@ -171,14 +228,11 @@ struct ArchiveReviewSheet: View {
     
     @ViewBuilder
     private func itemsByTypeChart(snapshot: ArchiveAnalyticsSnapshot) -> some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Archived by Type")
-                    .font(.subheadline.weight(.medium))
+        DrawerSection(title: "Archived by Type", icon: "chart.bar") {
                 if snapshot.countsByType.isEmpty {
                     Text("No archived items in this range.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
                 } else {
                     Chart {
                         ForEach(ArchiveFilter.allCases.filter { $0 != .all }, id: \.self) { filter in
@@ -194,22 +248,16 @@ struct ArchiveReviewSheet: View {
                     .frame(height: 160)
                     .transaction { $0.animation = nil }
                 }
-            }
-            .padding()
         }
     }
     
     @ViewBuilder
     private func arteToneChart(snapshot: ArchiveAnalyticsSnapshot) -> some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("ARTE Tone Distribution")
-                    .font(.subheadline.weight(.medium))
-                
+        DrawerSection(title: "ARTE Tone Distribution", icon: "sparkles") {
                 if snapshot.toneCounts.isEmpty {
                     Text("No ARTE tone data for this range.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
                 } else {
                     Chart {
                         ForEach(EmotionalState.allCases, id: \.self) { tone in
@@ -225,35 +273,29 @@ struct ArchiveReviewSheet: View {
                     .frame(height: 180)
                     .transaction { $0.animation = nil }
                 }
-            }
-            .padding()
         }
     }
     
     @ViewBuilder
     private func learningThemesCard(snapshot: ArchiveAnalyticsSnapshot) -> some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Learning Themes")
-                    .font(.subheadline.weight(.medium))
+        DrawerSection(title: "Learning Themes", icon: "lightbulb") {
                 if snapshot.learningThemes.isEmpty {
                     Text("No learning themes detected for this range.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
                 } else {
                     ForEach(snapshot.learningThemes.sorted(by: { $0.value > $1.value }).prefix(5), id: \.key) { theme, count in
                         HStack {
                             Text(theme)
                                 .font(.caption.weight(.semibold))
+                            .foregroundStyle(glassColorSystem.textPrimary())
                             Spacer()
                             Text("\(count)")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                            .foregroundStyle(glassColorSystem.textSecondary())
                     }
                 }
             }
-            .padding()
         }
     }
     
@@ -268,35 +310,28 @@ struct ArchiveReviewSheet: View {
     }
     
     private func archivedItemsSection(snapshot: ArchiveAnalyticsSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Recently Archived")
-                .font(.headline)
-            
+        DrawerSection(title: "Recently Archived", icon: "clock.arrow.circlepath") {
             if snapshot.recentItems.isEmpty {
-                GlassPanel(tier: .contentCard, cornerRadius: 12) {
                     Text("No archived items available in this date range.")
                         .font(.caption)
-                        .foregroundColor(.secondary)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                    .foregroundStyle(glassColorSystem.textSecondary())
             } else {
                 VStack(spacing: 12) {
                     ForEach(snapshot.recentItems.prefix(6)) { entry in
-                        GlassPanel(tier: .contentCard, cornerRadius: 12) {
                             HStack(alignment: .top, spacing: 12) {
                                 Image(systemName: icon(for: entry.item))
-                                    .foregroundColor(color(for: entry.item))
+                                .foregroundStyle(color(for: entry.item))
                                     .font(.headline)
                                     .frame(width: 28, height: 28)
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(entry.title)
                                         .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                                     if let summary = entry.summary, !summary.isEmpty {
                                         Text(summary)
                                             .font(.caption)
-                                            .foregroundColor(.secondary)
+                                        .foregroundStyle(glassColorSystem.textSecondary())
                                             .lineLimit(2)
                                     }
                                     
@@ -304,23 +339,22 @@ struct ArchiveReviewSheet: View {
                                         if let date = entry.archivedAt {
                                             Text(date, style: .date)
                                                 .font(.caption)
-                                                .foregroundColor(.secondary)
+                                            .foregroundStyle(glassColorSystem.textSecondary())
                                         }
                                         
                                         Text(entry.entityType)
                                             .font(.caption)
-                                            .foregroundColor(.secondary)
+                                        .foregroundStyle(glassColorSystem.textSecondary())
                                         
                                         if let tone = entry.tone {
                                             Label(tone.displayName, systemImage: tone.iconName)
                                                 .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
+                                            .foregroundStyle(glassColorSystem.textSecondary())
                                     }
                                 }
                             }
-                            .padding(12)
                         }
+                        .padding(.vertical, 4)
                     }
                 }
             }
@@ -328,27 +362,17 @@ struct ArchiveReviewSheet: View {
     }
     
     private var auroraInsightCard: some View {
-        GlassPanel(tier: .overlay, cornerRadius: 12) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .foregroundColor(.kosmicPurple)
-                    Text("Aurora Insight")
-                        .font(.headline)
-                }
-                
+        DrawerSection(title: "Aurora Insight", icon: "sparkles") {
                 if let insight = auroraInsight {
                     Text(insight)
                         .font(.body)
-                        .foregroundColor(.secondary)
+                    .foregroundStyle(glassColorSystem.textSecondary())
                 } else {
                     Text("Generating insights...")
                         .font(.body)
-                        .foregroundColor(.secondary.opacity(0.6))
+                    .foregroundStyle(glassColorSystem.textSecondary().opacity(0.6))
                         .italic()
-                }
             }
-            .padding()
         }
     }
     
@@ -414,4 +438,5 @@ struct ArchiveReviewSheet: View {
         .environmentObject(GlassColorSystem())
         .modelContainer(for: [ArchiveReflection.self])
 }
+
 

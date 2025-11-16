@@ -20,6 +20,21 @@ class GlassColorSystem: ObservableObject {
     @Published var emotionalIntensity: Double = 0.7
     @Published var isARTEEnabled: Bool = true
     
+    // MARK: - AECI Integration (Emotional Continuity)
+    @Published var currentAECI: Double = 0.0
+    @Published var aecCategory: AECICategory = .neutral
+    @Published var isAECIEnabled: Bool = true
+    
+    // MARK: - ERI Integration (Ecospheric Resonance)
+    @Published var currentERI: Double = 0.0
+    @Published var eriCategory: ERICategory = .neutral
+    @Published var isERIEnabled: Bool = true
+    
+    // MARK: - ERS Integration (Emotional Resonance Score)
+    @Published var currentERS: Double = 0.0
+    @Published var ersCategory: ERSCategory = .neutral
+    @Published var isERSEnabled: Bool = true
+    
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Palette
@@ -90,9 +105,18 @@ class GlassColorSystem: ObservableObject {
         return applyEmotionalModulation(to: base, blendFactor: 0.22)
     }
     
-    /// Border color (subtle)
+    /// Border color (subtle, with ERI discord effects)
     func borderColor() -> Color {
-        currentColorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+        let base = currentColorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+        
+        // Apply ERI discord effects (negative ERI = increased contrast)
+        if isERIEnabled && currentERI < 0 {
+            let discordIntensity = abs(currentERI)
+            let contrastBoost = discordIntensity * 0.3 // Up to 30% contrast increase
+            return base.opacity(1.0 + contrastBoost)
+        }
+        
+        return base
     }
     
     /// Divider color
@@ -223,6 +247,36 @@ class GlassColorSystem: ObservableObject {
         return LinearGradient(colors: [color], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
     
+    /// Get ERS-synchronized color gradient
+    func ersSynchronizedGradient() -> LinearGradient {
+        guard isERSEnabled else {
+            return backgroundGradient()
+        }
+        
+        // Positive ERS → brighter, warmer gradients
+        // Negative ERS → darker, cooler gradients
+        let baseColor = backgroundColor()
+        let accentColor = emotionalAccent()
+        
+        // Blend based on ERS
+        let ersInfluence = (currentERS + 1.0) / 2.0 // Normalize to 0..1
+        
+        // Positive ERS: more accent color (warmer, brighter)
+        // Negative ERS: less accent color (cooler, darker)
+        let blendAmount1 = ersInfluence * 0.2
+        let blendAmount2 = ersInfluence * 0.15
+        
+        // Blend base color with accent color based on ERS influence
+        let color1 = baseColor.mixed(with: accentColor, amount: blendAmount1)
+        let color2 = baseColor.mixed(with: accentColor, amount: blendAmount2)
+        
+        return LinearGradient(
+            colors: [color1, color2],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+    
     // MARK: - ARTE Emotional Modulation (Phase 7)
     
     /// Apply emotional modulation to a color
@@ -234,14 +288,30 @@ class GlassColorSystem: ObservableObject {
         return color.mixed(with: emotionalAccent(), amount: clampedBlend)
     }
     
-    /// Get emotionally-modulated accent color
+    /// Get emotionally-modulated accent color (with AECI adjustments)
     func emotionalAccent() -> Color {
         guard isARTEEnabled else { return Palette.accentPrimary }
         
         let palette = EmotionalPalette.palette(for: emotionalState)
-        let hue = palette.accentHue / 360.0
-        let saturationBaseDark = 0.55 + (palette.accentSaturation * 0.35 * emotionalIntensity)
-        let saturationBaseLight = 0.5 + (palette.accentSaturation * 0.25 * emotionalIntensity)
+        var hue = palette.accentHue / 360.0
+        
+        // Apply AECI hue adjustment (positive = warmer, negative = cooler)
+        if isAECIEnabled {
+            let hueShift = EmotionalContinuityEngine.shared.getUIHueAdjustment(aecIndex: currentAECI) / 360.0
+            hue = (hue + hueShift).truncatingRemainder(dividingBy: 1.0)
+            if hue < 0 { hue += 1.0 }
+        }
+        
+        var saturationBaseDark = 0.55 + (palette.accentSaturation * 0.35 * emotionalIntensity)
+        var saturationBaseLight = 0.5 + (palette.accentSaturation * 0.25 * emotionalIntensity)
+        
+        // Apply AECI saturation adjustment
+        if isAECIEnabled {
+            let saturationAdjust = EmotionalContinuityEngine.shared.getUISaturationAdjustment(aecIndex: currentAECI)
+            saturationBaseDark = min(1.0, max(0.0, saturationBaseDark + saturationAdjust))
+            saturationBaseLight = min(1.0, max(0.0, saturationBaseLight + saturationAdjust))
+        }
+        
         let brightnessDark = 0.75 + (0.15 * emotionalIntensity)
         let brightnessLight = 0.65 + (0.2 * emotionalIntensity)
         let saturation = currentColorScheme == .dark ? min(1.0, saturationBaseDark) : min(1.0, saturationBaseLight)
@@ -279,18 +349,51 @@ class GlassColorSystem: ObservableObject {
         return palette.backgroundTint.opacity(emotionalIntensity)
     }
     
-    /// Get emotionally-adjusted animation speed multiplier
+    /// Get emotionally-adjusted animation speed multiplier (with ERI discord effects and ERS tempo sync)
     func emotionalAnimationSpeed() -> Double {
         guard isARTEEnabled else { return 1.0 }
         
         let palette = EmotionalPalette.palette(for: emotionalState)
-        return palette.animationSpeed
+        var speed = palette.animationSpeed
+        
+        // Apply ERI discord effects (negative ERI = slower animations)
+        if isERIEnabled && currentERI < 0 {
+            let discordIntensity = abs(currentERI)
+            let slowdown = discordIntensity * 0.4 // Up to 40% slowdown
+            speed = speed * (1.0 - slowdown)
+        }
+        
+        // Apply ERS tempo synchronization (positive ERS = faster, negative = slower)
+        if isERSEnabled {
+            let tempoMultiplier = AuroraMetaSymphony.shared.getTempoMultiplier()
+            speed = speed * tempoMultiplier
+        }
+        
+        return speed
     }
     
     /// Update emotional state from ReactiveThemeManager
     func updateEmotionalState(_ state: EmotionalState, intensity: Double) {
         self.emotionalState = state
         self.emotionalIntensity = intensity
+    }
+    
+    /// Update AECI from EmotionalContinuityEngine
+    func updateAECI(_ aecIndex: Double, category: AECICategory) {
+        self.currentAECI = aecIndex
+        self.aecCategory = category
+    }
+    
+    /// Update ERI from AuroraEcosphericLayer
+    func updateERI(_ eriIndex: Double, category: ERICategory) {
+        self.currentERI = eriIndex
+        self.eriCategory = category
+    }
+    
+    /// Update ERS from AuroraMetaSymphony
+    func updateERS(_ ersIndex: Double, category: ERSCategory) {
+        self.currentERS = ersIndex
+        self.ersCategory = category
     }
     
     // MARK: - Sidebar Tone Gradient (Sidebar V2)
@@ -305,6 +408,29 @@ class GlassColorSystem: ObservableObject {
         GlassColorSystem.active = self
         // Initialize with system appearance
         updateColorScheme()
+        
+        let themeManager = ReactiveThemeManager.shared
+        isARTEEnabled = themeManager.isEnabled
+        updateEmotionalState(themeManager.currentState, intensity: themeManager.intensity)
+        emotionalIntensity = themeManager.intensity
+        SidebarToneSyncService.shared.prime(with: themeManager.currentState, intensity: themeManager.intensity)
+        
+        themeManager.$currentState
+            .combineLatest(themeManager.$intensity)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] state, intensity in
+                self?.updateEmotionalState(state, intensity: intensity)
+                self?.emotionalIntensity = intensity
+                SidebarToneSyncService.shared.prime(with: state, intensity: intensity)
+            }
+            .store(in: &cancellables)
+        
+        themeManager.$isEnabled
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isEnabled in
+                self?.isARTEEnabled = isEnabled
+            }
+            .store(in: &cancellables)
         
         // Listen for system appearance changes
         NotificationCenter.default.publisher(for: NSNotification.Name("NSInterfaceThemeChangedNotification"))
@@ -337,6 +463,7 @@ class GlassColorSystem: ObservableObject {
         default: // system
             currentColorScheme = NSApp.effectiveAppearance.name == .darkAqua ? .dark : .light
         }
+        
     }
 }
 

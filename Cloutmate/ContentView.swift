@@ -13,6 +13,7 @@ struct ContentView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage("appearanceMode") private var appearanceModeRawValue = "system"
+    @State private var hasPrimedAppearance = false
     
     private var effectiveColorScheme: ColorScheme {
         let mode = AppearanceMode(rawValue: appearanceModeRawValue) ?? .system
@@ -43,8 +44,10 @@ struct ContentView: View {
             NudgeOverlayView()
                 .padding(.top, 12)
         }
+        .preferredColorScheme(effectiveColorScheme)
         .onAppear {
             updateColorScheme()
+            hasPrimedAppearance = true
         }
         .onChange(of: colorScheme) { _, _ in
             updateColorScheme()
@@ -54,6 +57,18 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AppearanceModeChanged"))) { _ in
             updateColorScheme()
+        }
+        .task {
+            guard !hasPrimedAppearance else { return }
+            await MainActor.run {
+                updateColorScheme()
+                hasPrimedAppearance = true
+            }
+        }
+        .task(id: effectiveColorScheme) {
+            await MainActor.run {
+                updateColorScheme()
+            }
         }
     }
     

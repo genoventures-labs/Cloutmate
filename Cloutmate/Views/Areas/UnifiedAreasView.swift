@@ -13,6 +13,7 @@ struct UnifiedAreasView: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     
     @Query(sort: \Area.updatedAt, order: .reverse) private var allAreas: [Area]
     @Query private var allProjects: [CloutmateShared.Project]
@@ -20,6 +21,7 @@ struct UnifiedAreasView: View {
     @Query private var allTasks: [CloutmateShared.Task]
     
     @State private var selectedFilter: AreaFilter = .all
+    @State private var selectedViewMode: AreaViewMode = .grid
     @State private var searchText = ""
     @State private var scrollOffset: CGFloat = 0
     @State private var activeArea: Area?
@@ -86,49 +88,170 @@ struct UnifiedAreasView: View {
         return scrollOffset > threshold ? 1.0 : max(0.3, Double(scrollOffset / threshold))
     }
     
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            HStack(spacing: 0) {
-                if !sidebarCollapsed {
-                    AreasSidebar(
-                        areas: allAreas,
-                        onAreaSelected: { area in
-                            openDrawer(for: area)
-                        }
-                    )
-                    .transition(.move(edge: .leading))
+    // MARK: - Header Bar
+    
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Areas",
+            subtitle: "Your ongoing domains of focus"
+        ) {
+            // Leading accessory - sidebar toggle
+            Button(action: {
+                withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
+                    sidebarCollapsed.toggle()
                 }
+            }) {
+                Image(systemName: sidebarCollapsed ? "sidebar.right" : "sidebar.left")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(glassColorSystem.textSecondary())
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
+            .help(sidebarCollapsed ? "Show Sidebar" : "Hide Sidebar")
+        } trailingAccessory: {
+            // Trailing accessory - view mode selector and quick add
+            HStack(spacing: 12) {
+                // View mode selector
+                viewModeSelector
                 
-                VStack(spacing: 0) {
-                    AreasHeaderView(
-                        selectedFilter: selectedFilter,
-                        searchText: $searchText,
-                        onFilterChange: { filter in
-                            selectedFilter = filter
-                        },
-                        onQuickAdd: {
+                // Quick Add button
+                GlassButton(
+                    icon: "plus",
+                    style: .iconOnly,
+                    role: .primary,
+                    tintColor: .kosmicBlue,
+                    action: {
                             startCreatingArea()
-                        },
-                        sidebarCollapsed: sidebarCollapsed,
-                        onToggleSidebar: {
+                    }
+                )
+                .frame(width: 32, height: 32)
+            }
+        }
+    }
+    
+    // MARK: - View Mode Selector
+    
+    private var viewModeSelector: some View {
+        HStack(spacing: 6) {
+            ForEach(AreaViewMode.allCases, id: \.self) { mode in
+                modeButton(for: mode)
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func modeButton(for mode: AreaViewMode) -> some View {
+        let isSelected = selectedViewMode == mode
+        Button {
                             withAnimation(reduceMotion ? nil : GlassMotion.Easing.spring) {
-                                sidebarCollapsed.toggle()
+                selectedViewMode = mode
+            }
+            if !reduceMotion {
+                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+            }
+        } label: {
+            Image(systemName: mode.icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isSelected ? Color.white : glassColorSystem.textSecondary())
+                .frame(width: 28, height: 28)
+                .background {
+                    Group {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.kosmicBlue, .kosmicPurple],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        } else {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(glassColorSystem.backgroundSecondary().opacity(0.4))
+                        }
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .help(mode.displayName)
+    }
+    
+    // MARK: - Filter Panel
+    
+    private var filterPanel: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 16) {
+                // Search bar
+                HStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(glassColorSystem.textSecondary().opacity(0.75))
+                    
+                    TextField("Search areas", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(.subheadline, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    
+                    if !searchText.isEmpty {
+                        GlassButton(icon: "xmark.circle.fill", style: .iconOnly, role: .surface) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                searchText = ""
                             }
                         }
-                    )
-                    .opacity(headerOpacity)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: headerOpacity)
-                    
-                    Divider()
-                    
+                        .accessibilityLabel("Clear search")
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(glassColorSystem.backgroundSecondary().opacity(0.35))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(glassColorSystem.borderColor().opacity(0.55), lineWidth: 0.6)
+                        )
+                )
+                
+                Spacer()
+                
+                // Filter chips
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(AreaFilter.allCases, id: \.self) { filter in
+                            FilterPill(
+                                title: filter.rawValue,
+                                isSelected: selectedFilter == filter,
+                                action: {
+                                    withAnimation(GlassMotion.Easing.spring) {
+                                        selectedFilter = filter
+                                    }
+                                    if !reduceMotion {
+                                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .default)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    
+    // MARK: - Content
+    
+    private var areasContent: some View {
                     ScrollViewReader { proxy in
                         ScrollView {
-                            VStack(spacing: 0) {
+                VStack(spacing: 28) {
                                 GeometryReader { geometry in
                                     Color.clear
                                         .preference(key: ScrollOffsetPreferenceKey.self, value: geometry.frame(in: .named("scroll")).minY)
                                 }
                                 .frame(height: 0)
+                    
+                    filterPanel
                                 
                                 if !areasNeedingReview.isEmpty {
                                     AreasReviewSummaryCard(
@@ -137,10 +260,20 @@ struct UnifiedAreasView: View {
                                             openReviewDrawer(for: area)
                                         }
                                     )
-                                    .padding(.horizontal, 20)
-                                    .padding(.top, 20)
-                                }
-                                
+                    }
+                    
+                    activeModeView
+                }
+            }
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                scrollOffset = -value
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var activeModeView: some View {
                                 if sortedAreas.isEmpty {
                                     ContentUnavailableView(
                                         "No Areas",
@@ -150,6 +283,8 @@ struct UnifiedAreasView: View {
                                     .frame(maxHeight: .infinity)
                                     .padding(.top, 100)
                                 } else {
+            switch selectedViewMode {
+            case .grid:
                                     LazyVGrid(
                                         columns: [
                                             GridItem(.adaptive(minimum: 320, maximum: 400), spacing: 16)
@@ -181,20 +316,69 @@ struct UnifiedAreasView: View {
                                             )
                                         }
                                     }
-                                    .padding(20)
-                                }
-                            }
-                        }
-                        .coordinateSpace(name: "scroll")
-                        .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                            scrollOffset = -value
-                        }
+            case .list:
+                VStack(spacing: 12) {
+                    ForEach(sortedAreas) { area in
+                        let reviewStatus = AreaReviewService.shared.status(for: area)
+                        AreaListCard(
+                            area: area,
+                            projects: allProjects,
+                            notes: allNotes,
+                            onTap: {
+                                openDrawer(for: area)
+                            },
+                            isReviewDue: reviewStatus.isDue,
+                            onReview: reviewStatus.isDue ? {
+                                openReviewDrawer(for: area)
+                            } : nil
+                        )
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .opacity(isDrawerVisible || reviewDrawerVisible ? 0 : 1)
+            case .board:
+                AreaBoardView(
+                    areas: sortedAreas,
+                    projects: allProjects,
+                    notes: allNotes,
+                    onAreaSelected: { area in
+                        openDrawer(for: area)
+                    }
+                )
+            case .overview:
+                AreaOverviewView(
+                    areas: sortedAreas,
+                    projects: allProjects,
+                    notes: allNotes,
+                    tasks: allTasks,
+                    onAreaSelected: { area in
+                        openDrawer(for: area)
+                    }
+                )
             }
-            .background(glassColorSystem.backgroundColor())
+        }
+    }
+    
+    // MARK: - Sidebar
+    
+    private var sidebarContent: some View {
+        AreasSidebar(
+            areas: allAreas,
+            onAreaSelected: { area in
+                openDrawer(for: area)
+            }
+        )
+    }
+    
+    var body: some View {
+        ZStack {
+            V2GlassContentScaffold(
+                accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+                showsSidebar: !sidebarCollapsed,
+                sidebarWidth: 320,
+                header: { headerBar },
+                content: { areasContent },
+                sidebar: { sidebarContent }
+            )
+                .opacity(isDrawerVisible || reviewDrawerVisible ? 0 : 1)
             
             if let area = activeArea, isDrawerVisible {
                 AreaDetailDrawer(

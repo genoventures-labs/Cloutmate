@@ -77,7 +77,7 @@ struct FocusAnalyticsView: View {
     }
     
     private var focusGravityChart: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+        DashboardTile(accent: .kosmicBlue, padding: 24) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Focus Gravity Trendline")
                     .font(.system(.headline, design: .rounded))
@@ -126,10 +126,8 @@ struct FocusAnalyticsView: View {
                 }
                 .frame(height: 200)
             }
-            .padding(20)
         }
         .padding(.horizontal, 20)
-        .floatLift()
     }
     
     private var metricsGrid: some View {
@@ -166,7 +164,7 @@ struct FocusAnalyticsView: View {
     }
     
     private var topFocusWindowsCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+        DashboardTile(accent: .kosmicPurple.opacity(0.85), padding: 24) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Top Focus Windows")
                     .font(.system(.headline, design: .rounded))
@@ -200,14 +198,12 @@ struct FocusAnalyticsView: View {
                     }
                 }
             }
-            .padding(20)
         }
         .padding(.horizontal, 20)
-        .floatLift()
     }
     
     private var flowHeatmapCard: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+        DashboardTile(accent: .kosmicBlue.opacity(0.75), padding: 24) {
             VStack(alignment: .leading, spacing: 16) {
                 Text("Flow Heatmap")
                     .font(.system(.headline, design: .rounded))
@@ -220,10 +216,8 @@ struct FocusAnalyticsView: View {
                 FlowHeatmapView(data: flowHeatmap)
                     .frame(height: 200)
             }
-            .padding(20)
         }
         .padding(.horizontal, 20)
-        .floatLift()
     }
     
     // MARK: - Data Loading
@@ -336,7 +330,7 @@ struct MetricCard: View {
     @AppStorage("calmModeEnabled") private var calmModeEnabled = false
     
     var body: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 12) {
+        DashboardTile(accent: color.opacity(0.9), padding: 20) {
             VStack(alignment: .leading, spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 24))
@@ -352,9 +346,7 @@ struct MetricCard: View {
                     .foregroundColor(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
         }
-        .floatLift()
     }
 }
 

@@ -61,37 +61,27 @@ struct NoteDetailDrawer: View {
     }
     
     var body: some View {
-        NavigationStack {
-            V2DrawerScaffold(
-                accentGradient: accentGradient,
-                showsSidebar: false,
-                header: { headerContent },
-                content: {
-                    contentSection
-                    tagsSection
-                    aiSummarySection
-                    if hasLinkedItems {
-                        linkedItemsSection
-                    }
-                    auroraSection
-                },
-                sidebar: { EmptyView() }
-            )
-            .frame(minWidth: 700, minHeight: 560)
-            .frame(idealWidth: 860, idealHeight: 640)
-            .navigationTitle("")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        saveNote()
-                        isPresented = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .keyboardShortcut(.escape, modifiers: [])
+        V2DrawerScaffold(
+            accentGradient: accentGradient,
+            showsSidebar: false,
+            header: { headerContent },
+            content: {
+                contentSection
+                tagsSection
+                aiSummarySection
+                if hasLinkedItems {
+                    linkedItemsSection
                 }
-            }
+                auroraSection
+            },
+            sidebar: { EmptyView() }
+        )
+        .frame(minWidth: 700, minHeight: 560)
+        .frame(idealWidth: 860, idealHeight: 640)
+        .background(glassColorSystem.backgroundColor())
+        .onEscape {
+            saveNote()
+            isPresented = false
         }
         .onAppear {
             editingTitle = note.title
@@ -127,47 +117,60 @@ struct NoteDetailDrawer: View {
     }
     
     private var headerContent: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .top, spacing: 18) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 10) {
                     TextField("Note Title", text: $editingTitle)
-                        .font(.system(.title2, design: .rounded))
-                        .fontWeight(.semibold)
+                        .font(.system(size: 24, weight: .semibold, design: .rounded))
                         .textFieldStyle(.plain)
+                        .foregroundStyle(glassColorSystem.textPrimary())
                         .disableAutocorrection(true)
+                        .drawerFocusGlow()
                     
                     if note.author == .aurora {
                         AuroraAuthorBadge()
                     }
                 }
                 
-                HStack(spacing: 12) {
-                    Label(note.updatedAt, systemImage: "clock.arrow.circlepath")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                HStack(spacing: 14) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 12, weight: .medium))
+                        Text(note.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(glassColorSystem.textSecondary())
                     
                     if !note.tags.isEmpty {
-                        Label("\(note.tags.count) tag\(note.tags.count == 1 ? "" : "s")", systemImage: "number")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 6) {
+                            Image(systemName: "tag.fill")
+                                .font(.system(size: 12, weight: .medium))
+                            Text("\(note.tags.count) tag\(note.tags.count == 1 ? "" : "s")")
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                        }
+                        .foregroundStyle(glassColorSystem.textSecondary())
                     }
                     
                     if let projectId = note.projectId,
                        let project = linkedProjects.first(where: { $0.id == projectId }) {
-                        Label(project.title, systemImage: "folder.fill")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack(spacing: 6) {
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: 12, weight: .medium))
+                            Text(project.title)
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
+                        }
+                        .foregroundStyle(glassColorSystem.textSecondary())
                     }
                 }
             }
             
             Spacer()
             
-            VStack(spacing: 8) {
+            HStack(spacing: 12) {
                 GlassButton(
                     "Done",
                     icon: "checkmark",
-                    style: .standard,
+                    style: .pill,
                     role: .primary
                 ) {
                     saveNote()
@@ -178,7 +181,8 @@ struct NoteDetailDrawer: View {
                     nil,
                     icon: "xmark",
                     style: .iconOnly,
-                    role: .surface
+                    role: .surface,
+                    tintColor: glassColorSystem.backgroundElevated()
                 ) {
                     saveNote()
                     isPresented = false
@@ -201,9 +205,7 @@ struct NoteDetailDrawer: View {
                 }
                 .focused($isContentFocused)
                 .frame(minHeight: 220)
-                .padding(12)
-                .background(.ultraThinMaterial)
-                .cornerRadius(10)
+                .drawerFocusGlow()
             }
         }
     }
@@ -214,45 +216,66 @@ struct NoteDetailDrawer: View {
                 if !editingTags.isEmpty {
                     NoteTagFlowLayout(spacing: 8) {
                         ForEach(editingTags, id: \.self) { tag in
-                            HStack(spacing: 4) {
+                            HStack(spacing: 6) {
                                 Text("#\(tag)")
-                                    .font(.caption)
+                                    .font(.system(size: 13, weight: .semibold, design: .rounded))
                                 Button {
-                                    editingTags.removeAll { $0 == tag }
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        editingTags.removeAll { $0 == tag }
+                                    }
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
-                                        .font(.caption2)
+                                        .font(.system(size: 12, weight: .medium))
                                 }
                                 .buttonStyle(.plain)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.kosmicPurple.opacity(0.12))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(Color.kosmicPurple.opacity(0.18))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .stroke(Color.kosmicPurple.opacity(0.32), lineWidth: 1)
+                                    )
+                            )
                             .foregroundColor(.kosmicPurple)
-                            .cornerRadius(6)
                         }
                     }
                 } else {
                     Text("Add tags to organize and surface this note in other contexts.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textSecondary())
                 }
                 
-                HStack {
+                HStack(spacing: 10) {
                     TextField("Add tag", text: $newTag)
                         .textFieldStyle(.plain)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
                         .onSubmit(addTag)
                     
-                    Button(action: addTag) {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.kosmicPurple)
+                    GlassButton(
+                        nil,
+                        icon: "plus",
+                        style: .iconOnly,
+                        role: .accent
+                    ) {
+                        addTag()
                     }
-                    .buttonStyle(.plain)
-                    .disabled(newTag.isEmpty)
+                    .disabled(newTag.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .padding(10)
-                .background(.ultraThinMaterial)
-                .cornerRadius(8)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(glassColorSystem.backgroundElevated().opacity(0.28))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(glassColorSystem.borderColor().opacity(0.35), lineWidth: 0.9)
+                        )
+                )
+                .drawerFocusGlow()
             }
         }
     }
@@ -288,8 +311,8 @@ struct NoteDetailDrawer: View {
             GlassButton(
                 "Ask Aurora",
                 icon: "sparkles",
-                style: .standard,
-                role: .primary
+                style: .pill,
+                role: .accent
             ) {
                 // TODO: Open Aurora chat overlay contextual to this note
             }
@@ -393,12 +416,17 @@ struct AISummarySection: View {
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             // Header
-            Button(action: { isExpanded.toggle() }) {
-                HStack {
-                    HStack(spacing: 6) {
+            Button(action: { 
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         Image(systemName: "sparkles")
+                            .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [.kosmicBlue, .kosmicPurple],
@@ -407,77 +435,84 @@ struct AISummarySection: View {
                                 )
                             )
                         Text("AI Summary")
-                            .font(.headline)
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
                     }
                     
                     Spacer()
                     
                     if let tone = emotionalTone {
                         Text(tone)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.kosmicPurple.opacity(0.1))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(Color.kosmicPurple.opacity(0.18))
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(Color.kosmicPurple.opacity(0.32), lineWidth: 1)
+                                    )
+                            )
                             .foregroundColor(.kosmicPurple)
-                            .cornerRadius(6)
                     }
                     
                     Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(glassColorSystem.textSecondary())
                 }
             }
             .buttonStyle(.plain)
             
             if isExpanded {
                 if isGenerating {
-                    HStack {
+                    HStack(spacing: 12) {
                         ProgressView()
                             .scaleEffect(0.8)
                         Text("Generating summary...")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textSecondary())
                     }
-                    .padding()
+                    .padding(.vertical, 8)
                 } else if let summary = summary {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
                         Text(summary)
-                            .font(.body)
-                            .foregroundColor(.primary)
-                            .padding()
+                            .font(.system(size: 14, weight: .regular, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                            .lineSpacing(4)
+                            .padding(16)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .fill(glassColorSystem.backgroundElevated().opacity(0.32))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(glassColorSystem.borderColor().opacity(0.35), lineWidth: 0.9)
+                                    )
+                            )
                         
-                        Button(action: onRegenerate) {
-                            HStack {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Regenerate")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.kosmicPurple)
+                        GlassButton(
+                            "Regenerate",
+                            icon: "arrow.clockwise",
+                            style: .pill,
+                            role: .surface,
+                            tintColor: glassColorSystem.backgroundElevated()
+                        ) {
+                            onRegenerate()
                         }
-                        .buttonStyle(.plain)
                     }
                 } else {
-                    Button(action: onRegenerate) {
-                        HStack {
-                            Image(systemName: "sparkles")
-                            Text("Generate AI Summary")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(Color.kosmicPurple.opacity(0.1))
-                        .foregroundColor(.kosmicPurple)
-                        .cornerRadius(8)
+                    GlassButton(
+                        "Generate AI Summary",
+                        icon: "sparkles",
+                        style: .pill,
+                        role: .accent
+                    ) {
+                        onRegenerate()
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .cornerRadius(12)
     }
 }
 
@@ -488,47 +523,61 @@ struct LinkedItemsSection: View {
     let projects: [Project]
     let artifacts: [Artifact]
     
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
     var body: some View {
         if !tasks.isEmpty || !projects.isEmpty || !artifacts.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Linked Items")
-                    .font(.headline)
-                
+            VStack(alignment: .leading, spacing: 16) {
                 if !tasks.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Tasks")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.kosmicBlue)
+                            Text("Tasks")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundStyle(glassColorSystem.textSecondary())
+                        }
+                        
                         ForEach(tasks) { task in
-                            HStack {
-                                Image(systemName: "checkmark.circle")
-                                    .foregroundColor(.kosmicBlue)
+                            HStack(spacing: 10) {
+                                Image(systemName: "circle")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.kosmicBlue.opacity(0.6))
                                 Text(task.title)
-                                    .font(.caption)
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                             }
+                            .padding(.leading, 4)
                         }
                     }
                 }
                 
                 if !projects.isEmpty {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Projects")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "folder.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.kosmicPurple)
+                            Text("Projects")
+                                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                .foregroundStyle(glassColorSystem.textSecondary())
+                        }
+                        
                         ForEach(projects) { project in
-                            HStack {
+                            HStack(spacing: 10) {
                                 Image(systemName: "folder")
-                                    .foregroundColor(.kosmicPurple)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundColor(.kosmicPurple.opacity(0.6))
                                 Text(project.title)
-                                    .font(.caption)
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundStyle(glassColorSystem.textPrimary())
                             }
+                            .padding(.leading, 4)
                         }
                     }
                 }
             }
-            .padding()
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
         }
     }
 }

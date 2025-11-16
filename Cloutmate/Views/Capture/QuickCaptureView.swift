@@ -31,6 +31,7 @@ enum CaptureType {
     }
 }
 
+@available(*, deprecated, message: "Legacy capture surface. Use QuickCaptureDrawer for V2 styling.")
 struct QuickCaptureView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss

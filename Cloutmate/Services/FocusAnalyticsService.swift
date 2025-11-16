@@ -165,10 +165,12 @@ final class FocusAnalyticsService {
     }
     
     private func calculateLongestStreak(modelContext: ModelContext) -> Int {
-        let sessions = (try? modelContext.fetch(FetchDescriptor<FocusSession>(
-            predicate: #Predicate { $0.statusRaw == FocusSessionStatus.completed.rawValue },
+        let completedRaw = FocusSessionStatus.completed.rawValue
+        let descriptor = FetchDescriptor<FocusSession>(
+            predicate: #Predicate { $0.statusRaw == completedRaw },
             sortBy: [SortDescriptor(\.startTime, order: .forward)]
-        ))) ?? []
+        )
+        let sessions = (try? modelContext.fetch(descriptor)) ?? []
         
         guard !sessions.isEmpty else { return 0 }
         let calendar = Calendar.current

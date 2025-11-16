@@ -22,6 +22,7 @@ struct AIMessageComposer: View {
     var pendingDocumentAttachment: DocumentAttachmentService.DocumentAttachment?
     var lastConfidenceScore: Double? // Confidence score from last assistant message
     var canRetry: Bool // Whether retry is available
+    var isResearchMode: Bool = false // Research mode indicator
     var onResendLastAssistant: (() -> Void)?
     
     let onSend: () -> Void

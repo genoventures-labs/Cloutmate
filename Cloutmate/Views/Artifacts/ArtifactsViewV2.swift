@@ -87,10 +87,11 @@ struct ArtifactsViewV2: View {
                                     ForEach(filteredArtifacts) { artifact in
                                         ArtifactCardV2(
                                             artifact: artifact,
-                                            onTap: {
-                                                selectedArtifact = artifact
-                                                showDetailDrawer = true
-                                            }
+                                            onOpen: { openDetail(for: artifact) },
+                                            onEdit: { openDetail(for: artifact) },
+                                            onDuplicate: { duplicateArtifact(artifact) },
+                                            onArchive: { archiveArtifact(artifact) },
+                                            onDelete: { deleteArtifact(artifact) }
                                         )
                                     }
                                 }
@@ -122,10 +123,10 @@ struct ArtifactsViewV2: View {
                 ArtifactQuickAddDrawer(isPresented: $isCreateDrawerVisible)
                     .transition(.move(edge: .trailing))
             }
-        }
-        .sheet(isPresented: $showDetailDrawer) {
-            if let artifact = selectedArtifact {
+            
+            if let artifact = selectedArtifact, showDetailDrawer {
                 ArtifactDetailDrawer(artifact: artifact)
+                    .transition(.move(edge: .trailing))
             }
         }
         .background(
@@ -237,6 +238,67 @@ struct ArtifactsViewV2: View {
         withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
             isCreateDrawerVisible = true
         }
+    }
+    
+    private func openDetail(for artifact: Artifact) {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            selectedArtifact = artifact
+            showDetailDrawer = true
+        }
+    }
+    
+    private func closeDetailDrawer() {
+        withAnimation(reduceMotion ? nil : GlassMotion.Easing.modalOpen) {
+            showDetailDrawer = false
+            selectedArtifact = nil
+        }
+    }
+    
+    private func duplicateArtifact(_ artifact: Artifact) {
+        let baseTitle = artifact.title.isEmpty ? "Untitled" : artifact.title
+        let copyTitle = "\(baseTitle) Copy"
+        
+        let copy = Artifact(
+            title: copyTitle,
+            content: artifact.content,
+            mediaURLs: artifact.mediaURLs,
+            outputFormat: artifact.format,
+            state: .draft,
+            tags: artifact.tags,
+            projectId: artifact.projectId,
+            areaId: artifact.areaId,
+            focusSessionId: artifact.focusSessionId,
+            linkedEntityIds: artifact.linkedEntityIds,
+            linkedEntityTypes: artifact.linkedEntityTypes,
+            arteToneSnapshot: artifact.arteToneSnapshot,
+            sentimentSummary: artifact.sentimentSummary,
+            confidenceScore: artifact.confidenceScore,
+            storyTokenIds: artifact.storyTokenIds,
+            auroraNotes: artifact.auroraNotes,
+            forecastSnapshot: artifact.forecastSnapshot
+        )
+        copy.customProperties = artifact.customProperties
+        modelContext.insert(copy)
+        try? modelContext.save()
+    }
+    
+    private func archiveArtifact(_ artifact: Artifact) {
+        artifact.artifactState = .archived
+        artifact.archivedAt = Date()
+        artifact.updatedAt = Date()
+        try? modelContext.save()
+        
+        if selectedArtifact?.id == artifact.id {
+            closeDetailDrawer()
+        }
+    }
+    
+    private func deleteArtifact(_ artifact: Artifact) {
+        if selectedArtifact?.id == artifact.id {
+            closeDetailDrawer()
+        }
+        modelContext.delete(artifact)
+        try? modelContext.save()
     }
 }
 

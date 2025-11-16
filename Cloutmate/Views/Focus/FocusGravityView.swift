@@ -13,6 +13,7 @@ import CloutmateShared
 struct FocusGravityView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var priorityItems: [PriorityItem] = []
     @State private var selectedFilter: FocusGravityFilter = .all
@@ -22,30 +23,24 @@ struct FocusGravityView: View {
     @State private var isPulsing = false
     @State private var showAuroraInsights = false
     @State private var recenterToken = UUID()
+    @State private var scrollProxy: ScrollViewProxy?
     
     var body: some View {
+        V2GlassContentScaffold(
+            accentGradient: AuroraPalette.linearGradient(for: colorScheme),
+            showsSidebar: false,
+            header: { headerBar },
+            content: {
         ScrollViewReader { proxy in
-            VStack(spacing: 0) {
-                header
-                Divider()
-                ScrollView {
-                    VStack(spacing: 24) {
-                        gravityCanvas
-                            .id("gravity-top")
-                    }
-                    .padding(.horizontal, 28)
-                    .padding(.vertical, 24)
-                }
-                .background(Color.clear)
-                .onChange(of: recenterToken) { _ in
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
-                        proxy.scrollTo("gravity-top", anchor: .top)
+                    focusContent
+                        .onAppear {
+                            scrollProxy = proxy
                     }
                 }
-            }
+            },
+            sidebar: { EmptyView() }
+        )
             .frame(minWidth: 700, minHeight: 500)
-            .background(Color.clear)
-        }
         .task {
             await refreshPriorities(animated: false)
             startPulse()
@@ -60,32 +55,32 @@ struct FocusGravityView: View {
         .onDisappear {
             stopPulse()
         }
+        .onChange(of: recenterToken) { _ in
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                scrollProxy?.scrollTo("gravity-top", anchor: .top)
+            }
+        }
     }
     
     // MARK: - Header
-    private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Focus Gravity")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(glassColorSystem.textPrimary())
-                Text("Track how your focus shifts across tasks and priorities.")
-                    .font(.system(size: 14))
-                    .foregroundColor(glassColorSystem.textSecondary())
-                Text(syncStatusText)
-                    .font(.caption)
-                    .foregroundColor(glassColorSystem.textTertiary())
-            }
-            Spacer()
-            VStack(alignment: .trailing, spacing: 12) {
+    private var headerBar: some View {
+        V2GlassHeaderBar(
+            title: "Focus Gravity",
+            subtitle: "Track how your attention shifts across CPS priorities.",
+            trailingAccessory: {
                 stateBadge
-                filterBar
-                controlCluster
             }
+        )
+    }
+    
+    @ViewBuilder
+    private var focusContent: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            filterPanel
+            gravityCanvas
         }
-        .padding(.horizontal, 28)
-        .padding(.top, 24)
-        .padding(.bottom, 16)
+        .padding(.top, 4)
+        .id("gravity-top")
     }
     
     // MARK: - State Badge
@@ -122,12 +117,28 @@ struct FocusGravityView: View {
     }
     
     // MARK: - Filters
-    private var filterBar: some View {
+    private var filterPanel: some View {
+        GlassPanel(tier: .contentCard, cornerRadius: 22) {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .center) {
+                    Text("Prioritization Filters")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(glassColorSystem.textPrimary())
+                    Spacer()
+                    controlCluster
+                }
+                
+                GlassDivider()
+                
         HStack(spacing: 8) {
             ForEach(FocusGravityFilter.allCases, id: \.self) { filter in
                 filterChip(for: filter)
             }
         }
+            }
+            .padding(20)
+        }
+        .padding(.horizontal, 4)
     }
     
     private func filterChip(for filter: FocusGravityFilter) -> some View {
@@ -187,15 +198,33 @@ struct FocusGravityView: View {
     
     // MARK: - Gravity Canvas
     private var gravityCanvas: some View {
-        GlassPanel(tier: .contentCard, cornerRadius: 20) {
+        GlassPanel(tier: .overlay, cornerRadius: 28) {
+            VStack(spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Top Priority Signals")
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            .foregroundStyle(glassColorSystem.textPrimary())
+                        Text(syncStatusText)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Label("\(priorityItems.count) items", systemImage: "list.number")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.bottom, 18)
+                
+                GlassDivider()
+                
             ZStack {
                 if glassColorSystem.isARTEEnabled {
                     glassColorSystem.emotionalBackgroundShift()
                         .opacity(0.28)
-                        .blur(radius: 60)
+                            .blur(radius: 80)
                 }
-                VStack(alignment: .leading, spacing: 16) {
-                    Group {
+                    VStack(alignment: .leading, spacing: 20) {
                         if isLoading {
                             loadingState
                         } else if priorityItems.isEmpty {
@@ -204,11 +233,12 @@ struct FocusGravityView: View {
                             priorityList
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 24)
             }
-            .frame(maxWidth: .infinity, minHeight: 360, alignment: .topLeading)
-            .padding(24)
+            .padding(28)
+            .frame(maxWidth: .infinity, minHeight: 380, alignment: .topLeading)
         }
     }
     

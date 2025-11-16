@@ -23,91 +23,58 @@ struct DashboardFooterView: View {
     let onEndOfDaySummary: (() -> Void)?
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Quick Stats
+        DashboardTile(accent: .kosmicBlue.opacity(0.7), padding: 24) {
+            VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 16) {
-                StatCard(
+                    DashboardStatTile(
                     title: "Sessions Today",
                     value: "\(sessionsToday)",
                     icon: "timer",
-                    color: .kosmicBlue
+                        accent: .kosmicBlue
                 )
                 
-                StatCard(
+                    DashboardStatTile(
                     title: "Focus Time",
                     value: formatFocusTime(totalFocusTime),
                     icon: "clock.fill",
-                    color: .kosmicPurple
+                        accent: .kosmicPurple
                 )
                 
-                StatCard(
+                    DashboardStatTile(
                     title: "Current Streak",
                     value: "\(currentStreak)",
                     icon: "flame.fill",
-                    color: .kosmicGreen
+                        accent: .kosmicGreen
                 )
             }
             
-            // Micro Reflection Memory Bubble
             if !memoryBubble.isEmpty {
-                HStack {
+                    DashboardTile(accent: .kosmicPurple.opacity(0.9), padding: 16) {
+                        HStack(spacing: 10) {
                     Image(systemName: "brain.head.profile")
                         .font(.caption)
-                        .foregroundColor(.kosmicPurple.opacity(0.7))
+                                .foregroundColor(.kosmicPurple)
                     Text(memoryBubble)
-                        .font(.caption)
-                        .foregroundColor(glassColorSystem.textSecondary())
+                                .font(.system(.caption, design: .rounded))
+                                .foregroundColor(glassColorSystem.textPrimary())
                         .italic()
                 }
-                .padding(12)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.kosmicPurple.opacity(0.1))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.kosmicPurple.opacity(0.2), lineWidth: 1)
-                        )
-                )
+                    }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
             
-            // Aurora Quote
-            HStack {
-                Spacer()
                 Text("Momentum begins with awareness.")
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .rounded))
                     .foregroundColor(glassColorSystem.textSecondary())
                     .italic()
-                Spacer()
-            }
-            .padding(.top, 8)
+                    .frame(maxWidth: .infinity, alignment: .center)
             
-            // End of Day Summary button
-            Button {
+                GlassButton("End of Day Summary", icon: "moon.stars.fill", style: .pill, role: .accent) {
                 onEndOfDaySummary?()
-            } label: {
-                HStack {
-                    Image(systemName: "moon.stars.fill")
-                    Text("End of Day Summary")
                 }
-                .font(.subheadline)
-                .foregroundColor(.kosmicPurple)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.kosmicPurple.opacity(0.1))
-                )
-            }
-            .buttonStyle(.plain)
             .frame(maxWidth: .infinity)
         }
-        .padding(20)
-        .background(
-            GlassPanel(tier: .contentCard, cornerRadius: 12) {
-                EmptyView()
-            }
-        )
+        }
         .task {
             await loadData()
         }
@@ -177,6 +144,42 @@ struct DashboardFooterView: View {
         } else {
             return "\(minutes)m"
         }
+    }
+}
+
+private struct DashboardStatTile: View {
+    @EnvironmentObject private var glassColorSystem: GlassColorSystem
+    
+    let title: String
+    let value: String
+    let icon: String
+    let accent: Color
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(accent)
+            
+            Text(value)
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                .foregroundColor(glassColorSystem.textPrimary())
+            
+            Text(title.uppercased())
+                .font(.caption2)
+                .foregroundColor(glassColorSystem.textSecondary())
+                .tracking(0.6)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(accent.opacity(0.16))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(accent.opacity(0.28), lineWidth: 0.8)
+                )
+        )
     }
 }
 

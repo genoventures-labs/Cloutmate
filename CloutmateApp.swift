@@ -9,8 +9,9 @@ import SwiftUI
 import SwiftData
 import Combine
 
-@main
-struct CloutmateApp: App {
+// NOTE: This file appears to be a legacy version. The main app entry point is now Cloutmate/CloutmateApp.swift
+// Removed @main to prevent duplicate menu definitions
+struct CloutmateAppLegacy: App {
     @State private var selectedTab: TabIdentifier = .home
     @State private var publishingTimer: Timer?
     @StateObject private var glassColorSystem = GlassColorSystem()

@@ -22,10 +22,10 @@ enum ModelTierMap {
     // Local model definitions
     static let localModels: [ModelTier] = [
         ModelTier(
-            name: "gemma3:4b",
+            name: "gemma3:1b",
             displayName: "Gemma3",
             capabilities: ["multimodal", "foreground", "chat"],
-            primaryUseCases: ["Casual", "General", "Images"],
+            primaryUseCases: ["Casual", "General"],
             tier: 1,
             supportsThinking: false
         ),
@@ -38,10 +38,26 @@ enum ModelTierMap {
             supportsThinking: true
         ),
         ModelTier(
+            name: "deepseek-r1:1.5b",
+            displayName: "DeepSeek R1",
+            capabilities: ["research", "reasoning", "deep-analysis"],
+            primaryUseCases: ["Research", "Analysis"],
+            tier: 2,
+            supportsThinking: true
+        ),
+        ModelTier(
             name: "granite3.2:2b",
             displayName: "Granite3",
             capabilities: ["background", "summaries", "memory"],
             primaryUseCases: ["Background", "Cognition"],
+            tier: 3,
+            supportsThinking: false
+        ),
+        ModelTier(
+            name: "granite3.2-vision",
+            displayName: "Granite3 Vision",
+            capabilities: ["multimodal", "vision", "image-analysis"],
+            primaryUseCases: ["Images", "Vision"],
             tier: 3,
             supportsThinking: false
         )
@@ -60,6 +76,15 @@ enum ModelTierMap {
         }
         if model.lowercased().contains("gwen3") {
             return "Gwen3"
+        }
+        if model.lowercased().contains("deepseek") {
+            return "DeepSeek R1"
+        }
+        if model.lowercased().contains("granite") && model.lowercased().contains("vision") {
+            return "Granite3 Vision"
+        }
+        if model.lowercased().contains("granite") {
+            return "Granite3"
         }
         // Handle Gemini for image analysis
         if model.lowercased().contains("gemini") {
@@ -83,9 +108,9 @@ enum ModelTierMap {
         return localModels.map { $0.name }
     }
     
-    /// Gets default model (qwen3:1.7b)
+    /// Gets default model (gemma3:1b)
     static func defaultModel() -> String {
-        return "gemma3:4b"
+        return "gemma3:1b"
     }
     
     /// Gets fallback model

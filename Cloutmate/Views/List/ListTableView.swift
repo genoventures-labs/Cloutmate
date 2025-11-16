@@ -11,6 +11,7 @@ import AppKit
 import UniformTypeIdentifiers
 import CloutmateShared
 
+@available(*, deprecated, message: "Legacy list composer retained for archival access. Prefer V2 dashboards.")
 struct ListTableView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Post.createdAt, order: .reverse) private var posts: [Post]
