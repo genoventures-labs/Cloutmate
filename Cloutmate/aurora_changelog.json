@@ -1,7 +1,85 @@
 {
   "currentVersion": "9.0",
-  "lastUpdated": "2025-11-16T17:19:31.668916Z",
+  "lastUpdated": "2025-11-16T22:12:32.564658Z",
   "entries": [
+    {
+      "id": "dbf1064f-4080-4bbe-9207-8b54a331f416",
+      "date": "2025-11-16T22:12:32.556440Z",
+      "version": "0.8",
+      "feature": "Memory Edge",
+      "changeType": "improved",
+      "description": "Record a traversal of this edge",
+      "impact": "Enhances Memory Edge performance or features",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2890ca5d-58e8-4c5e-b83a-081755a54dd0",
+      "date": "2025-11-16T22:12:32.556440Z",
+      "version": "0.8",
+      "feature": "Memory Node",
+      "changeType": "improved",
+      "description": "Emotional tone (computed property)",
+      "impact": "Enhances Memory Node performance or features",
+      "userFacing": false,
+      "tags": [
+        "data",
+        "model",
+        "concurrency"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "e4aa2bd9-e7ee-40f5-ae9c-5f6b243a7383",
+      "date": "2025-11-16T22:12:32.556440Z",
+      "version": "0.8",
+      "feature": "Memory Consolidation",
+      "changeType": "added",
+      "description": "Start nightly consolidation schedule",
+      "impact": "Adds new Memory Consolidation capability",
+      "userFacing": true,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "2a86e193-00a0-4117-af47-72b71ff80aea",
+      "date": "2025-11-16T22:12:32.556440Z",
+      "version": "0.8",
+      "feature": "Memory Graph",
+      "changeType": "improved",
+      "description": "Subgraph representing a persistent cluster of related nodes",
+      "impact": "Enhances Memory Graph performance or features",
+      "userFacing": true,
+      "tags": [
+        "ollama",
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
+    {
+      "id": "b7886b61-5436-4de7-ad73-13d647ec3881",
+      "date": "2025-11-16T22:12:32.556440Z",
+      "version": "0.8",
+      "feature": "Predictive Context Manager",
+      "changeType": "improved",
+      "description": "Predictive posture modes for flow adaptation",
+      "impact": "Enhances Predictive Context Manager performance or features",
+      "userFacing": false,
+      "tags": [
+        "service",
+        "backend"
+      ],
+      "commitHash": null
+    },
     {
       "id": "e535b520-4ef4-4981-ace4-16460312066e",
       "date": "2025-11-16T17:19:31.662636Z",
@@ -12,7 +90,7 @@
       "impact": "Enhances Cloutmate App performance or features",
       "userFacing": false,
       "tags": [],
-      "commitHash": null
+      "commitHash": "e71702a58284bef1b4b6dfe9691f9a39736b7c2d"
     },
     {
       "id": "90b2bcbd-c828-47a8-a13c-7e816cc789a2",
