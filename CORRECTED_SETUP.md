@@ -2,12 +2,12 @@
 
 ## Important: Framework vs App Entitlements
 
-**CloutmateShared is a Framework** - it does NOT need:
+**FocusOSShared is a Framework** - it does NOT need:
 - ❌ Entitlements file
 - ❌ App Groups capability
 - ❌ Signing & Capabilities configuration
 
-**The app targets** (Cloutmate, CloutmateWidget, CloutmateMenuBar) DO need:
+**The app targets** (FocusOS, FocusOSWidget, FocusOSMenuBar) DO need:
 - ✅ Entitlements file
 - ✅ App Groups capability
 
@@ -15,49 +15,49 @@
 
 ## Correct Setup Steps
 
-### 1. Create CloutmateShared Framework
+### 1. Create FocusOSShared Framework
 
 In Xcode:
 1. **File → New → Target → macOS → Framework**
-2. Name: `CloutmateShared`
+2. Name: `FocusOSShared`
 3. Click **Finish**
 4. **DO NOT** configure capabilities (frameworks don't need them)
 
-### 2. Add Files to CloutmateShared
+### 2. Add Files to FocusOSShared
 
-Right-click and add these files to the CloutmateShared target:
-- `CloutmateShared/CloutmateShared/Models/*.swift`
-- `CloutmateShared/CloutmateShared/Services/*.swift`
-- `CloutmateShared/CloutmateShared/UI/*.swift`
-- `CloutmateShared/CloutmateShared/SharedDataManager.swift`
+Right-click and add these files to the FocusOSShared target:
+- `FocusOSShared/FocusOSShared/Models/*.swift`
+- `FocusOSShared/FocusOSShared/Services/*.swift`
+- `FocusOSShared/FocusOSShared/UI/*.swift`
+- `FocusOSShared/FocusOSShared/SharedDataManager.swift`
 
 **In the add files dialog:**
-- ✅ Check "CloutmateShared" under "Add to targets"
+- ✅ Check "FocusOSShared" under "Add to targets"
 - Click "Add"
 
 ### 3. Add App Groups to Main App
 
-Select **Cloutmate** target (the main app):
+Select **FocusOS** target (the main app):
 1. Go to **Signing & Capabilities**
 2. Click **+ Capability**
 3. Add **App Groups**
-4. Check: `group.kosmicapps.cloutmate`
+4. Check: `group.kosmicapps.focusos`
 
 ### 4. Add App Groups to Widget
 
-Select **CloutmateWidget** target:
+Select **FocusOSWidget** target:
 1. Add files to target:
-   - `CloutmateWidget/CloutmateWidget.swift`
-   - `CloutmateWidget/WidgetTimelineProvider.swift`
-   - `CloutmateWidget/CloutmateWidgetView.swift`
+   - `FocusOSWidget/FocusOSWidget.swift`
+   - `FocusOSWidget/WidgetTimelineProvider.swift`
+   - `FocusOSWidget/FocusOSWidgetView.swift`
 2. Go to **General** tab
-3. Under **Frameworks**: Click + → Add `CloutmateShared.framework`
+3. Under **Frameworks**: Click + → Add `FocusOSShared.framework`
 4. Go to **Signing & Capabilities**
-5. Add **App Groups**: `group.kosmicapps.cloutmate`
+5. Add **App Groups**: `group.kosmicapps.focusos`
 
 ### 5. Add App Groups to Menu Bar App
 
-Select **CloutmateMenuBar** target:
+Select **FocusOSMenuBar** target:
 1. Add files to target:
    - `MenuBarApp.swift`
    - `MenuBarPopoverView.swift`
@@ -65,9 +65,9 @@ Select **CloutmateMenuBar** target:
    - `UpcomingPostsView.swift`
    - `MenuBarSettingsView.swift`
 2. Go to **General** tab
-3. Under **Frameworks**: Click + → Add `CloutmateShared.framework`
+3. Under **Frameworks**: Click + → Add `FocusOSShared.framework`
 4. Go to **Signing & Capabilities**
-5. Add **App Groups**: `group.kosmicapps.cloutmate`
+5. Add **App Groups**: `group.kosmicapps.focusos`
 6. Add **App Sandbox**:
    - Enable **Outgoing Connections (Client)**
 7. Go to **Info** tab
@@ -79,41 +79,41 @@ Select **CloutmateMenuBar** target:
 
 | Target | Type | Needs Entitlements? | Needs App Groups? |
 |--------|------|-------------------|-------------------|
-| Cloutmate | App | ✅ Yes | ✅ Yes |
-| CloutmateShared | Framework | ❌ No | ❌ No |
-| CloutmateWidget | Widget Extension | ✅ Yes | ✅ Yes |
-| CloutmateMenuBar | App | ✅ Yes | ✅ Yes |
+| FocusOS | App | ✅ Yes | ✅ Yes |
+| FocusOSShared | Framework | ❌ No | ❌ No |
+| FocusOSWidget | Widget Extension | ✅ Yes | ✅ Yes |
+| FocusOSMenuBar | App | ✅ Yes | ✅ Yes |
 
 ---
 
 ## Key Files Location
 
 ```
-Cloutmate/
-├── Cloutmate.entitlements ✅ (has App Groups)
-├── CloutmateWidget.entitlements ✅ (has App Groups)
-├── CloutmateMenuBar.entitlements ✅ (has App Groups)
-├── CloutmateShared/ ❌ (no entitlements needed)
+FocusOS/
+├── FocusOS.entitlements ✅ (has App Groups)
+├── FocusOSWidget.entitlements ✅ (has App Groups)
+├── FocusOSMenuBar.entitlements ✅ (has App Groups)
+├── FocusOSShared/ ❌ (no entitlements needed)
 ```
 
 ---
 
 ## Quick Fix for Your Error
 
-If you're seeing "Capabilities for CloutmateShared are not supported":
+If you're seeing "Capabilities for FocusOSShared are not supported":
 
-1. **Select CloutmateShared target**
+1. **Select FocusOSShared target**
 2. Go to **Signing & Capabilities** tab
 3. **Remove any capabilities** you added there
 4. Frameworks just compile code - they don't need signing or capabilities
-5. The app targets (Cloutmate, CloutmateWidget, CloutmateMenuBar) handle the entitlements
+5. The app targets (FocusOS, FocusOSWidget, FocusOSMenuBar) handle the entitlements
 
 ---
 
 ## Build Order
 
-1. Build CloutmateShared first (it's a dependency)
-2. Build the apps that use it (Cloutmate, CloutmateWidget, CloutmateMenuBar)
+1. Build FocusOSShared first (it's a dependency)
+2. Build the apps that use it (FocusOS, FocusOSWidget, FocusOSMenuBar)
 
-The CloutmateShared framework will be automatically linked to the apps that use it.
+The FocusOSShared framework will be automatically linked to the apps that use it.
 

@@ -68,7 +68,7 @@ Add to `AuroraSpotlightView`:
 
 ### 7. Keyboard Shortcut Integration
 
-- Already exists in `CloutmateApp.swift` (Cmd+Shift+A) - verify it works
+- Already exists in `FocusOSApp.swift` (Cmd+Shift+A) - verify it works
 - Add ESC handler to close Spotlight (already exists in current view)
 - Ensure input field auto-focuses on open
 

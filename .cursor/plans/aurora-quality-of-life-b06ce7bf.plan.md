@@ -23,9 +23,9 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- New: `Cloutmate/Services/ConversationCompressionService.swift`
-- Update: `Cloutmate/Services/GeminiService.swift` (lines 575-577 where history is sliced)
-- Update: `Cloutmate/ViewModels/AIAssistantViewModel.swift` (add compression trigger)
+- New: `FocusOS/Services/ConversationCompressionService.swift`
+- Update: `FocusOS/Services/GeminiService.swift` (lines 575-577 where history is sliced)
+- Update: `FocusOS/ViewModels/AIAssistantViewModel.swift` (add compression trigger)
 
 ### 2. Ambient Forgetting Rules
 
@@ -42,8 +42,8 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- Update: `Cloutmate/Services/AIRecallService.swift` (add decay logic to scoring)
-- Update: `Cloutmate/Models/RecallIndexEntry.swift` (schema already supports this)
+- Update: `FocusOS/Services/AIRecallService.swift` (add decay logic to scoring)
+- Update: `FocusOS/Models/RecallIndexEntry.swift` (schema already supports this)
 
 ## Phase 2: Self-Awareness & Diagnostics
 
@@ -64,10 +64,10 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- New: `Cloutmate/Services/ConfidenceScorer.swift`
-- Update: `Cloutmate/Models/AIMessage.swift` (add `confidenceScore: Double?`)
-- Update: `Cloutmate/ViewModels/AIAssistantViewModel.swift` (compute confidence, include in system prompt)
-- Update: `Cloutmate/Services/GeminiService.swift` (add confidence context to prompts)
+- New: `FocusOS/Services/ConfidenceScorer.swift`
+- Update: `FocusOS/Models/AIMessage.swift` (add `confidenceScore: Double?`)
+- Update: `FocusOS/ViewModels/AIAssistantViewModel.swift` (compute confidence, include in system prompt)
+- Update: `FocusOS/Services/GeminiService.swift` (add confidence context to prompts)
 
 ### 4. Memory Health Dashboard (Aurora's Self-Introspection)
 
@@ -88,9 +88,9 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- New: `Cloutmate/Services/CognitiveHealthService.swift`
-- Update: `Cloutmate/Services/AIRecallService.swift` (add `getCognitiveHealthMetrics()` method)
-- Update: `Cloutmate/ViewModels/AIAssistantViewModel.swift` (include health in context)
+- New: `FocusOS/Services/CognitiveHealthService.swift`
+- Update: `FocusOS/Services/AIRecallService.swift` (add `getCognitiveHealthMetrics()` method)
+- Update: `FocusOS/ViewModels/AIAssistantViewModel.swift` (include health in context)
 
 ## Phase 3: Capability Enhancement (Initiative & Autonomy)
 
@@ -110,10 +110,10 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- Update: `Cloutmate/Services/ConceptTracker.swift` (add cluster detection)
-- Update: `Cloutmate/Services/AIRecallService.swift` (add linking suggestion logic)
-- Update: `Cloutmate/ViewModels/AIAssistantViewModel.swift` (check for linking opportunities)
-- Update: `Cloutmate/Models/UserPreferences.swift` (track suggested clusters)
+- Update: `FocusOS/Services/ConceptTracker.swift` (add cluster detection)
+- Update: `FocusOS/Services/AIRecallService.swift` (add linking suggestion logic)
+- Update: `FocusOS/ViewModels/AIAssistantViewModel.swift` (check for linking opportunities)
+- Update: `FocusOS/Models/UserPreferences.swift` (track suggested clusters)
 
 ### 6. Weighted Relevance (User Interaction Signals)
 
@@ -133,9 +133,9 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- Update: `Cloutmate/Models/RecallIndexEntry.swift` (add `engagementScore` and `lastEngagementDate`)
-- Update: `Cloutmate/Services/AIRecallService.swift` (update scoring formula)
-- Update: `Cloutmate/Services/PriorityEngine.swift` (track engagement when items accessed)
+- Update: `FocusOS/Models/RecallIndexEntry.swift` (add `engagementScore` and `lastEngagementDate`)
+- Update: `FocusOS/Services/AIRecallService.swift` (update scoring formula)
+- Update: `FocusOS/Services/PriorityEngine.swift` (track engagement when items accessed)
 
 ### 7. Aurora's Initiative System (Autonomous Suggestions)
 
@@ -153,10 +153,10 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- Update: `Cloutmate/Services/SmartAutomationEngine.swift` (add `getPendingSuggestions()` method)
-- Update: `Cloutmate/Models/AIConversation.swift` (add `pendingSuggestion` field)
-- Update: `Cloutmate/ViewModels/AIAssistantViewModel.swift` (check for pending suggestions on load)
-- Update: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (render proactive messages)
+- Update: `FocusOS/Services/SmartAutomationEngine.swift` (add `getPendingSuggestions()` method)
+- Update: `FocusOS/Models/AIConversation.swift` (add `pendingSuggestion` field)
+- Update: `FocusOS/ViewModels/AIAssistantViewModel.swift` (check for pending suggestions on load)
+- Update: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (render proactive messages)
 
 ## Phase 4: Blindspot Reduction (Environmental Awareness)
 
@@ -175,9 +175,9 @@ Enhance Aurora's internal cognitive environment with tactical improvements that 
 
 **Files**:
 
-- Update: `Cloutmate/Models/Task.swift`, `Note.swift`, `Project.swift` (add `emotionalContext: String?`)
-- Update: `Cloutmate/Services/EmotionAnalyzer.swift` (add context sampling method)
-- Update: `Cloutmate/Services/AIRecallService.swift` (factor emotional weight into scoring)
+- Update: `FocusOS/Models/Task.swift`, `Note.swift`, `Project.swift` (add `emotionalContext: String?`)
+- Update: `FocusOS/Services/EmotionAnalyzer.swift` (add context sampling method)
+- Update: `FocusOS/Services/AIRecallService.swift` (factor emotional weight into scoring)
 
 ## Technical Notes
 

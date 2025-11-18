@@ -1,0 +1,118 @@
+//
+//  CalendarEvent.swift
+//  FocusOSShared
+//
+//  Created by Assistant on 11/12/25.
+//
+
+import Foundation
+import SwiftData
+
+public enum EventRecurrenceFrequency: String, Codable, CaseIterable, Sendable {
+    case daily
+    case weekly
+    case monthly
+    case yearly
+}
+
+public struct EventRecurrence: Codable, Hashable, Sendable {
+    public var frequency: EventRecurrenceFrequency
+    public var interval: Int
+    public var endDate: Date?
+    /// 1 = Sunday ... 7 = Saturday (Calendar.current.component(.weekday, from:))
+    public var weekdays: [Int]?
+    
+    public init(
+        frequency: EventRecurrenceFrequency,
+        interval: Int = 1,
+        endDate: Date? = nil,
+        weekdays: [Int]? = nil
+    ) {
+        self.frequency = frequency
+        self.interval = max(1, interval)
+        self.endDate = endDate
+        self.weekdays = weekdays
+    }
+}
+
+@Model
+public final class CalendarEvent {
+    public var id: UUID
+    public var title: String
+    public var notes: String?
+    public var location: String?
+    public var startDate: Date
+    public var endDate: Date
+    public var allDay: Bool
+    @Attribute(.externalStorage)
+    private var recurrenceData: Data?
+    public var remindMinutesBefore: Int?
+    public var colorHex: String?
+    
+    public var createdAt: Date
+    public var updatedAt: Date
+    public var auroraGenerated: Bool
+    
+    public var linkedEntityIds: [UUID]
+    public var linkedEntityTypes: [String]
+    
+    // External calendar tracking
+    public var externalEventId: String? // EKEvent.eventIdentifier
+    public var externalCalendarId: String? // EKCalendar.calendarIdentifier
+    public var externalSource: String? // "apple_calendar", "google_calendar", etc.
+    public var lastSyncedAt: Date?
+    
+    public init(
+        title: String,
+        notes: String? = nil,
+        location: String? = nil,
+        startDate: Date,
+        endDate: Date,
+        allDay: Bool = false,
+        recurrence: EventRecurrence? = nil,
+        remindMinutesBefore: Int? = nil,
+        colorHex: String? = nil,
+        auroraGenerated: Bool = false
+    ) {
+        self.id = UUID()
+        self.title = title
+        self.notes = notes
+        self.location = location
+        self.startDate = startDate
+        self.endDate = endDate
+        self.allDay = allDay
+        if let recurrence {
+            recurrenceData = try? JSONEncoder().encode(recurrence)
+        } else {
+            recurrenceData = nil
+        }
+        self.remindMinutesBefore = remindMinutesBefore
+        self.colorHex = colorHex
+        self.createdAt = Date()
+        self.updatedAt = Date()
+        self.auroraGenerated = auroraGenerated
+        self.linkedEntityIds = []
+        self.linkedEntityTypes = []
+        self.externalEventId = nil
+        self.externalCalendarId = nil
+        self.externalSource = nil
+        self.lastSyncedAt = nil
+    }
+    
+    public func touch() {
+        updatedAt = Date()
+    }
+    
+    public var recurrence: EventRecurrence? {
+        get {
+            guard let recurrenceData else { return nil }
+            return try? JSONDecoder().decode(EventRecurrence.self, from: recurrenceData)
+        }
+        set {
+            recurrenceData = newValue.flatMap { recurrence in
+                try? JSONEncoder().encode(recurrence)
+            }
+        }
+    }
+}
+

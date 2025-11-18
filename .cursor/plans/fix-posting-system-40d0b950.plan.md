@@ -39,7 +39,7 @@ Implement 6 advanced features that leverage AI and historical data to provide in
 
 ### Data Model
 
-**File**: `Cloutmate/Models/PerformancePrediction.swift`
+**File**: `FocusOS/Models/PerformancePrediction.swift`
 
 ```swift
 @Model
@@ -64,7 +64,7 @@ final class PerformancePrediction {
 
 ### Service Layer
 
-**File**: `Cloutmate/Services/PerformancePredictionService.swift`
+**File**: `FocusOS/Services/PerformancePredictionService.swift`
 
 ```swift
 actor PerformancePredictionService {
@@ -80,7 +80,7 @@ actor PerformancePredictionService {
 
 ### Composer Integration
 
-**File**: `Cloutmate/Views/Composer/PerformancePredictorPanel.swift`
+**File**: `FocusOS/Views/Composer/PerformancePredictorPanel.swift`
 
 Add panel to ComposerWindow showing:
 
@@ -93,7 +93,7 @@ Add panel to ComposerWindow showing:
 
 ### Data Model
 
-**File**: `Cloutmate/Models/RecyclablePost.swift`
+**File**: `FocusOS/Models/RecyclablePost.swift`
 
 ```swift
 @Model
@@ -112,7 +112,7 @@ final class RecyclablePost {
 
 ### Service Layer
 
-**File**: `Cloutmate/Services/ContentRecyclingService.swift`
+**File**: `FocusOS/Services/ContentRecyclingService.swift`
 
 ```swift
 actor ContentRecyclingService {
@@ -127,7 +127,7 @@ actor ContentRecyclingService {
 
 ### Dashboard Integration
 
-**File**: `Cloutmate/Views/Dashboard/ContentRecyclingSuggestions.swift`
+**File**: `FocusOS/Views/Dashboard/ContentRecyclingSuggestions.swift`
 
 Card showing:
 
@@ -140,7 +140,7 @@ Card showing:
 
 ### Data Model
 
-**File**: `Cloutmate/Models/ContentTopic.swift`
+**File**: `FocusOS/Models/ContentTopic.swift`
 
 ```swift
 @Model
@@ -168,7 +168,7 @@ final class ContentBalance {
 
 ### Service Layer
 
-**File**: `Cloutmate/Services/ContentGapAnalyzerService.swift`
+**File**: `FocusOS/Services/ContentGapAnalyzerService.swift`
 
 ```swift
 actor ContentGapAnalyzerService {
@@ -183,7 +183,7 @@ actor ContentGapAnalyzerService {
 
 ### Insights Integration
 
-**File**: `Cloutmate/Views/Insights/ContentGapAnalyzerView.swift`
+**File**: `FocusOS/Views/Insights/ContentGapAnalyzerView.swift`
 
 Full-screen view showing:
 
@@ -197,7 +197,7 @@ Full-screen view showing:
 
 ### Data Model
 
-**File**: `Cloutmate/Models/PostingTimeTest.swift`
+**File**: `FocusOS/Models/PostingTimeTest.swift`
 
 ```swift
 @Model
@@ -226,7 +226,7 @@ final class OptimalPostingTime {
 
 ### Service Layer
 
-**File**: `Cloutmate/Services/BestTimeOptimizerService.swift`
+**File**: `FocusOS/Services/BestTimeOptimizerService.swift`
 
 ```swift
 actor BestTimeOptimizerService {
@@ -242,7 +242,7 @@ actor BestTimeOptimizerService {
 
 ### UI Components
 
-**File**: `Cloutmate/Views/Insights/BestTimeOptimizerView.swift`
+**File**: `FocusOS/Views/Insights/BestTimeOptimizerView.swift`
 
 Features:
 
@@ -256,7 +256,7 @@ Features:
 
 ### Data Model
 
-**File**: `Cloutmate/Models/CustomPostProperty.swift`
+**File**: `FocusOS/Models/CustomPostProperty.swift`
 
 ```swift
 @Model
@@ -284,7 +284,7 @@ final class PostView {
 
 ### Extend Post Model
 
-**File**: `CloutmateShared/CloutmateShared/CloutmateShared/Models/Post.swift`
+**File**: `FocusOSShared/FocusOSShared/FocusOSShared/Models/Post.swift`
 
 Add:
 
@@ -297,7 +297,7 @@ public var campaignId: UUID?
 
 ### UI Components
 
-**File**: `Cloutmate/Views/List/DatabaseViews/`
+**File**: `FocusOS/Views/List/DatabaseViews/`
 
 Create:
 
@@ -311,7 +311,7 @@ Create:
 
 ### Data Model
 
-**File**: `Cloutmate/Models/HashtagPerformance.swift`
+**File**: `FocusOS/Models/HashtagPerformance.swift`
 
 ```swift
 @Model
@@ -341,7 +341,7 @@ final class HashtagSet {
 
 ### Service Layer
 
-**File**: `Cloutmate/Services/HashtagPerformanceService.swift`
+**File**: `FocusOS/Services/HashtagPerformanceService.swift`
 
 ```swift
 actor HashtagPerformanceService {
@@ -357,7 +357,7 @@ actor HashtagPerformanceService {
 
 ### UI Components
 
-**File**: `Cloutmate/Views/Insights/HashtagPerformanceView.swift`
+**File**: `FocusOS/Views/Insights/HashtagPerformanceView.swift`
 
 Features:
 
@@ -367,7 +367,7 @@ Features:
 - Trending indicators
 - Suggestions based on content
 
-**File**: `Cloutmate/Views/Composer/HashtagSuggestionPanel.swift`
+**File**: `FocusOS/Views/Composer/HashtagSuggestionPanel.swift`
 
 In composer:
 

@@ -7,7 +7,7 @@ Extends existing CognitionPredictor/DriftMonitor stack with actionable temporal 
 
 ### 1.1 Dynamic Reflow Service
 
-**File:** `Cloutmate/Services/AdaptiveScheduler.swift` (new)
+**File:** `FocusOS/Services/AdaptiveScheduler.swift` (new)
 
 Create service that reschedules missed/skipped focus sessions based on:
 
@@ -28,9 +28,9 @@ Key methods:
 
 ### 1.2 EventKit Calendar Sync
 
-**File:** `Cloutmate/Services/CalendarSyncService.swift` (new)
+**File:** `FocusOS/Services/CalendarSyncService.swift` (new)
 
-Bi-directional sync between Cloutmate focus sessions and macOS Calendar:
+Bi-directional sync between FocusOS focus sessions and macOS Calendar:
 
 - Request EventKit permissions on first use
 - Write FocusSessions as EKEvents to selected calendar
@@ -48,7 +48,7 @@ Key methods:
 
 ### 1.3 Energy Window Prediction
 
-**File:** Extend `Cloutmate/Services/CognitionPredictor.swift`
+**File:** Extend `FocusOS/Services/CognitionPredictor.swift`
 
 Add rolling energy pattern prediction:
 
@@ -62,7 +62,7 @@ New method:
   - Returns array of time slots with predicted energy scores (0-1)
   - Feeds into AdaptiveScheduler for reflow decisions
 
-**New model:** `Cloutmate/Models/EnergyWindow.swift`
+**New model:** `FocusOS/Models/EnergyWindow.swift`
 
 ```swift
 @Model
@@ -79,7 +79,7 @@ final class EnergyWindow {
 
 ### 2.1 Tab Switch Interceptor
 
-**File:** `Cloutmate/Services/ContextSwitchGuard.swift` (new)
+**File:** `FocusOS/Services/ContextSwitchGuard.swift` (new)
 
 Intercepts tab switches in MainWindowView with graduated resistance:
 
@@ -107,7 +107,7 @@ enum InterceptDecision {
 
 ### 2.2 UI Integration
 
-**File:** Modify `Cloutmate/Views/MainWindowView.swift`
+**File:** Modify `FocusOS/Views/MainWindowView.swift`
 
 Hook into tab switching logic:
 
@@ -117,7 +117,7 @@ Hook into tab switching logic:
 - Show overlay prompt with countdown timer if interception triggered
 - Log overrides to DriftMonitor for learning
 
-**New component:** `Cloutmate/Views/Components/ContextSwitchPrompt.swift`
+**New component:** `FocusOS/Views/Components/ContextSwitchPrompt.swift`
 
 ```swift
 struct ContextSwitchPrompt: View {
@@ -132,7 +132,7 @@ struct ContextSwitchPrompt: View {
 
 ### 3.1 Extend DriftMonitor
 
-**File:** Modify `Cloutmate/Services/DriftMonitor.swift`
+**File:** Modify `FocusOS/Services/DriftMonitor.swift`
 
 Add momentum metrics as behavioral layer:
 
@@ -161,7 +161,7 @@ New methods:
 - `triggerRecoveryNudge(modelContext: ModelContext)`
   - Sends nudge via SmartNudgeService for micro-break
 
-**New model:** `Cloutmate/Models/MomentumMetrics.swift`
+**New model:** `FocusOS/Models/MomentumMetrics.swift`
 
 ```swift
 struct MomentumMetrics: Codable {
@@ -182,7 +182,7 @@ enum FlowState: String, Codable {
 
 ### 3.2 Integration with ARTE
 
-**File:** Modify `Cloutmate/Services/ReactiveThemeManager.swift`
+**File:** Modify `FocusOS/Services/ReactiveThemeManager.swift`
 
 Feed momentum data into ARTE state detection:
 
@@ -197,7 +197,7 @@ Add method:
 
 ### 3.3 Integration with CPS
 
-**File:** Modify `Cloutmate/Services/PriorityEngine.swift`
+**File:** Modify `FocusOS/Services/PriorityEngine.swift`
 
 Use momentum to adjust priority weights:
 
@@ -210,7 +210,7 @@ Add method:
 
 ### 3.4 Momentum Dashboard
 
-**File:** `Cloutmate/Views/Insights/MomentumDashboard.swift` (new)
+**File:** `FocusOS/Views/Insights/MomentumDashboard.swift` (new)
 
 Visual momentum tracking in Insights tab:
 
@@ -219,13 +219,13 @@ Visual momentum tracking in Insights tab:
 - Streak counter
 - Recovery time trends
 
-Integrate into `Cloutmate/Views/Insights/InsightsView.swift` as new card
+Integrate into `FocusOS/Views/Insights/InsightsView.swift` as new card
 
 ## 4. Cross-System Orchestration
 
 ### 4.1 Startup Integration
 
-**File:** Modify `Cloutmate/CloutmateApp.swift`
+**File:** Modify `FocusOS/FocusOSApp.swift`
 
 Start new services in `startRitualSystemsIfNeeded()`:
 
@@ -239,7 +239,7 @@ if UserDefaults.standard.bool(forKey: "predictiveModeEnabled") {
 
 ### 4.2 Settings Panel
 
-**File:** `Cloutmate/Views/Settings/TemporalIntelligenceSettingsView.swift` (new)
+**File:** `FocusOS/Views/Settings/TemporalIntelligenceSettingsView.swift` (new)
 
 User controls for:
 
@@ -252,7 +252,7 @@ Link from `SettingsView.swift` as new section
 
 ### 4.3 Update Aurora's System Prompt
 
-**File:** Modify `Cloutmate/Services/GeminiService.swift`
+**File:** Modify `FocusOS/Services/GeminiService.swift`
 
 Add Phase 9 temporal intelligence to system prompts:
 
@@ -263,7 +263,7 @@ Add Phase 9 temporal intelligence to system prompts:
 
 ## 5. Schema Updates
 
-**File:** Modify `Cloutmate/CloutmateApp.swift`
+**File:** Modify `FocusOS/FocusOSApp.swift`
 
 Add new models to Schema:
 
@@ -297,12 +297,12 @@ Add properties to existing models:
 - Models/FocusSession.swift
 - Views/MainWindowView.swift
 - Views/Insights/InsightsView.swift
-- CloutmateApp.swift
+- FocusOSApp.swift
 
 ## Testing Criteria
 
 1. Skip a focus session → verify AdaptiveScheduler reschedules to next energy peak
-2. Edit calendar event externally → verify Cloutmate detects and reflows
+2. Edit calendar event externally → verify FocusOS detects and reflows
 3. Switch tabs during active session → verify context guard prompts with ARTE tone
 4. Complete 3+ sessions in a day → verify momentum metrics calculate correctly
 5. Momentum drops → verify recovery nudge triggers
@@ -321,5 +321,5 @@ Add properties to existing models:
 - [ ] Create MomentumDashboard view with weekly curves, flow state indicator, and trends
 - [ ] Add EnergyWindow model to schema and extend FocusSession with scheduledTime, calendarEventId, wasRescheduled properties
 - [ ] Create TemporalIntelligenceSettingsView with controls for reflow, calendar sync, context guard sensitivity, and momentum tracking
-- [ ] Start new services in CloutmateApp startup flow when predictiveModeEnabled
+- [ ] Start new services in FocusOSApp startup flow when predictiveModeEnabled
 - [ ] Update Aurora's system prompts in GeminiService with temporal intelligence capabilities

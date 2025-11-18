@@ -1,25 +1,25 @@
-# Add Service Files to CloutmateMenuBar Target
+# Add Service Files to FocusOSMenuBar Target
 
 ## Problem
 Menu bar can't find XPCService and PublishingService.
 
 ## Solution
 
-These service files need to be in the CloutmateMenuBar target.
+These service files need to be in the FocusOSMenuBar target.
 
 ### In Xcode:
 
-1. **Select** `CloutmateShared/CloutmateShared/CloutmateShared/Services/XPCService.swift`
+1. **Select** `FocusOSShared/FocusOSShared/FocusOSShared/Services/XPCService.swift`
 2. Press **⌥⌘1** (File Inspector)
 3. **Target Membership**:
-   - ✅ **CHECK CloutmateMenuBar** (ADD THIS!)
+   - ✅ **CHECK FocusOSMenuBar** (ADD THIS!)
 
-4. **Select** `CloutmateShared/CloutmateShared/CloutmateShared/Services/PublishingService.swift`
+4. **Select** `FocusOSShared/FocusOSShared/FocusOSShared/Services/PublishingService.swift`
 5. Press **⌥⌘1** (File Inspector)
 6. **Target Membership**:
-   - ✅ **CHECK CloutmateMenuBar** (ADD THIS!)
+   - ✅ **CHECK FocusOSMenuBar** (ADD THIS!)
 
-These service files need to be in the CloutmateMenuBar target to be accessible.
+These service files need to be in the FocusOSMenuBar target to be accessible.
 
 ## After Adding
 

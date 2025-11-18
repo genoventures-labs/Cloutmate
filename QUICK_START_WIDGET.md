@@ -7,70 +7,70 @@ Follow these steps to complete the Widget and Menu Bar integration:
 ### 1. Open Xcode Project
 
 ```bash
-open Cloutmate.xcodeproj
+open FocusOS.xcodeproj
 ```
 
-### 2. Create CloutmateShared Framework
+### 2. Create FocusOSShared Framework
 
 1. **File → New → Target → macOS → Framework**
-   - Name: `CloutmateShared`
-   - Bundle ID: `com.kosmicapps.Cloutmate.CloutmateShared`
+   - Name: `FocusOSShared`
+   - Bundle ID: `com.kosmicapps.FocusOS.FocusOSShared`
 
 2. **Add files to target:**
    ```
-   - CloutmateShared/CloutmateShared/Models/*.swift
-   - CloutmateShared/CloutmateShared/Services/*.swift  
-   - CloutmateShared/CloutmateShared/UI/*.swift
-   - CloutmateShared/CloutmateShared/SharedDataManager.swift
+   - FocusOSShared/FocusOSShared/Models/*.swift
+   - FocusOSShared/FocusOSShared/Services/*.swift  
+   - FocusOSShared/FocusOSShared/UI/*.swift
+   - FocusOSShared/FocusOSShared/SharedDataManager.swift
    ```
 
-### 3. Create CloutmateWidget Extension
+### 3. Create FocusOSWidget Extension
 
 1. **File → New → Target → macOS → Widget Extension**
-   - Name: `CloutmateWidget`
-   - Bundle ID: `com.kosmicapps.Cloutmate.CloutmateWidget`
+   - Name: `FocusOSWidget`
+   - Bundle ID: `com.kosmicapps.FocusOS.FocusOSWidget`
    - Include Configuration Intent: **No**
 
 2. **Add App Groups capability**
-   - Add group: `group.kosmicapps.cloutmate`
+   - Add group: `group.kosmicapps.focusos`
 
-3. **Add CloutmateShared as dependency:**
-   - General tab → Frameworks → + → Add CloutmateShared.framework
+3. **Add FocusOSShared as dependency:**
+   - General tab → Frameworks → + → Add FocusOSShared.framework
 
 4. **Add files to target:**
    ```
-   - CloutmateWidget/CloutmateWidget.swift
-   - CloutmateWidget/WidgetTimelineProvider.swift
-   - CloutmateWidget/CloutmateWidgetView.swift
+   - FocusOSWidget/FocusOSWidget.swift
+   - FocusOSWidget/WidgetTimelineProvider.swift
+   - FocusOSWidget/FocusOSWidgetView.swift
    ```
 
-### 4. Create CloutmateMenuBar App
+### 4. Create FocusOSMenuBar App
 
 1. **File → New → Target → macOS → App**
-   - Name: `CloutmateMenuBar`
-   - Bundle ID: `com.kosmicapps.Cloutmate.CloutmateMenuBar`
+   - Name: `FocusOSMenuBar`
+   - Bundle ID: `com.kosmicapps.FocusOS.FocusOSMenuBar`
 
 2. **Configure as agent app** (Info tab):
    - Add key: `LSUIElement` = **YES**
 
 3. **Add App Groups & App Sandbox capabilities**
-   - Add group: `group.kosmicapps.cloutmate`
+   - Add group: `group.kosmicapps.focusos`
    - Enable **Outgoing Connections**
 
-4. **Add CloutmateShared as dependency**
+4. **Add FocusOSShared as dependency**
 
 5. **Add files to target:**
    ```
-   - CloutmateMenuBar/MenuBarApp.swift
-   - CloutmateMenuBar/MenuBarPopoverView.swift
-   - CloutmateMenuBar/QuickComposerView.swift
-   - CloutmateMenuBar/UpcomingPostsView.swift
-   - CloutmateMenuBar/MenuBarSettingsView.swift
+   - FocusOSMenuBar/MenuBarApp.swift
+   - FocusOSMenuBar/MenuBarPopoverView.swift
+   - FocusOSMenuBar/QuickComposerView.swift
+   - FocusOSMenuBar/UpcomingPostsView.swift
+   - FocusOSMenuBar/MenuBarSettingsView.swift
    ```
 
 ### 5. Update Main App Container
 
-**Open** `Cloutmate/CloutmateApp.swift`
+**Open** `FocusOS/FocusOSApp.swift`
 
 **Replace** this line:
 ```swift
@@ -87,16 +87,16 @@ var sharedModelContainer: ModelContainer = SharedDataManager.createSharedModelCo
 
 **Add import at top of file:**
 ```swift
-import CloutmateShared
+import FocusOSShared
 ```
 
 ### 6. Update Keychain Service
 
-**Open** `CloutmateShared/CloutmateShared/Services/KeychainService.swift`
+**Open** `FocusOSShared/FocusOSShared/Services/KeychainService.swift`
 
 **Add** after line 14:
 ```swift
-private let accessGroup = "group.kosmicapps.cloutmate"
+private let accessGroup = "group.kosmicapps.focusos"
 ```
 
 **Update** all `kSecAttrAccessGroup` references to use `accessGroup` variable.
@@ -105,40 +105,40 @@ private let accessGroup = "group.kosmicapps.cloutmate"
 
 For any files using Post, Draft, Platform models, add:
 ```swift
-import CloutmateShared
+import FocusOSShared
 ```
 
 **Files to update:**
-- Most files in `Cloutmate/Models/`
-- Most files in `Cloutmate/Views/`
-- `CloutmateApp.swift`
+- Most files in `FocusOS/Models/`
+- Most files in `FocusOS/Views/`
+- `FocusOSApp.swift`
 
 ### 8. Build & Test
 
-1. **Build CloutmateShared**
+1. **Build FocusOSShared**
    - Product → Build (⌘B)
 
-2. **Build CloutmateWidget**  
+2. **Build FocusOSWidget**  
    - Product → Build
 
-3. **Build CloutmateMenuBar**
+3. **Build FocusOSMenuBar**
    - Product → Build
 
 4. **Run Widget**
-   - Select CloutmateWidget scheme → Run → Add to desktop
+   - Select FocusOSWidget scheme → Run → Add to desktop
 
 5. **Run Menu Bar**
-   - Select CloutmateMenuBar scheme → Run → Check menu bar icon
+   - Select FocusOSMenuBar scheme → Run → Check menu bar icon
 
 ---
 
 ## 📋 Checklist
 
-- [ ] CloutmateShared framework created and configured
-- [ ] CloutmateWidget extension created and configured  
-- [ ] CloutmateMenuBar app created and configured
+- [ ] FocusOSShared framework created and configured
+- [ ] FocusOSWidget extension created and configured  
+- [ ] FocusOSMenuBar app created and configured
 - [ ] App Groups capability added to all targets
-- [ ] CloutmateShared added as dependency to widget and menu bar
+- [ ] FocusOSShared added as dependency to widget and menu bar
 - [ ] Main app updated to use shared container
 - [ ] Keychain service updated for app group
 - [ ] All imports updated
@@ -150,11 +150,11 @@ import CloutmateShared
 
 ## 🔧 Common Issues
 
-**"No such module 'CloutmateShared'"**
-→ Add CloutmateShared.framework to target's dependencies
+**"No such module 'FocusOSShared'"**
+→ Add FocusOSShared.framework to target's dependencies
 
 **"App Group not found"**  
-→ Verify all targets use same app group ID: `group.kosmicapps.cloutmate`
+→ Verify all targets use same app group ID: `group.kosmicapps.focusos`
 
 **Widget not showing data**
 → Check Console.app for SwiftData errors

@@ -11,30 +11,30 @@ Replace the shared `ComposerViewModel` pattern with local `@State` variables in 
 
 ## Files to Fix
 
-### 1. **Cloutmate/Views/List/ListTableView.swift**
+### 1. **FocusOS/Views/List/ListTableView.swift**
 
 - Remove `@State private var composerViewModel = ComposerViewModel()`
 - Add `@State private var showComposer = false`
 - Change button action from `composerViewModel.present()` to `showComposer = true`
 - Change `.sheet(isPresented: $composerViewModel.isPresented)` to `.sheet(isPresented: $showComposer)`
 
-### 2. **Cloutmate/Views/Drafts/DraftsView.swift**
+### 2. **FocusOS/Views/Drafts/DraftsView.swift**
 
 - Check if it uses ComposerViewModel
 - If yes, apply same fix as ListTableView
 
-### 3. **Cloutmate/Views/MainWindowView.swift**
+### 3. **FocusOS/Views/MainWindowView.swift**
 
 - Keep the ComposerViewModel for NotificationCenter integration (Cmd+N shortcut)
 - This instance handles keyboard shortcuts and sidebar button
 - No changes needed here
 
-### 4. **Cloutmate/Views/Sidebar.swift**
+### 4. **FocusOS/Views/Sidebar.swift**
 
 - This receives composerViewModel from MainWindowView as a parameter - correct approach
 - No changes needed
 
-### 5. **Cloutmate/Views/Settings/AccountsSection.swift**
+### 5. **FocusOS/Views/Settings/AccountsSection.swift**
 
 - OAuth buttons don't use ComposerViewModel
 - They use local `@State private var isAuthenticating`

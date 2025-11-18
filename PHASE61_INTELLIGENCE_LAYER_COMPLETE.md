@@ -14,7 +14,7 @@ Phase 6.1 makes the intelligence layer **visible and actionable** by providing c
 ## Core Components Implemented
 
 ### 1. **AnalyticsEngine.swift** - Data Aggregation Service
-- **Location:** `Cloutmate/Services/AnalyticsEngine.swift`
+- **Location:** `FocusOS/Services/AnalyticsEngine.swift`
 - **Purpose:** Aggregates metrics from all intelligence subsystems
 - **Features:**
   - `AnalyticsSnapshot` - Comprehensive metrics snapshot
@@ -36,7 +36,7 @@ Phase 6.1 makes the intelligence layer **visible and actionable** by providing c
 ---
 
 ### 2. **SmartAutomationEngine.swift** - Pattern Recognition & Workflow Automation
-- **Location:** `Cloutmate/Services/SmartAutomationEngine.swift`
+- **Location:** `FocusOS/Services/SmartAutomationEngine.swift`
 - **Purpose:** Detects patterns in user behavior and automates workflows
 - **Features:**
   - **Pattern Detection:**
@@ -70,7 +70,7 @@ enum WorkflowPatternType {
 ---
 
 ### 3. **WorkflowPattern.swift** - Automation Models
-- **Location:** `Cloutmate/Models/WorkflowPattern.swift`
+- **Location:** `FocusOS/Models/WorkflowPattern.swift`
 - **Models:**
   - `WorkflowPattern` - Detected recurring patterns
   - `AutomationRule` - User-defined or AI-suggested rules
@@ -89,7 +89,7 @@ enum WorkflowPatternType {
 ## UI Components Implemented
 
 ### 4. **InsightsDashboard.swift** - Main Container
-- **Location:** `Cloutmate/Views/Insights/InsightsDashboard.swift`
+- **Location:** `FocusOS/Views/Insights/InsightsDashboard.swift`
 - **Layout:** NavigationSplitView with sidebar and detail panes
 - **Tabs:**
   - Overview - Aggregated metrics snapshot
@@ -213,7 +213,7 @@ enum WorkflowPatternType {
 
 ## Schema Updates
 
-**New Models Added to `CloutmateApp.swift`:**
+**New Models Added to `FocusOSApp.swift`:**
 ```swift
 // AI & Phase 6.1 models
 WorkflowPattern.self,
@@ -407,23 +407,23 @@ The system respects existing feature flags from `AIConfig.plist`:
 ## Files Modified/Created
 
 **Services:**
-- `Cloutmate/Services/AnalyticsEngine.swift` (NEW)
-- `Cloutmate/Services/SmartAutomationEngine.swift` (NEW)
+- `FocusOS/Services/AnalyticsEngine.swift` (NEW)
+- `FocusOS/Services/SmartAutomationEngine.swift` (NEW)
 
 **Models:**
-- `Cloutmate/Models/WorkflowPattern.swift` (NEW)
+- `FocusOS/Models/WorkflowPattern.swift` (NEW)
 
 **Views:**
-- `Cloutmate/Views/Insights/InsightsDashboard.swift` (NEW)
-- `Cloutmate/Views/Insights/ProductivityMetricsView.swift` (NEW)
-- `Cloutmate/Views/Insights/EmotionalHeatmapView.swift` (NEW)
-- `Cloutmate/Views/Insights/ConceptGraphView.swift` (NEW)
-- `Cloutmate/Views/Insights/LearningLoopView.swift` (NEW)
-- `Cloutmate/Views/Insights/ContentAnalyticsView.swift` (NEW)
-- `Cloutmate/Views/Insights/AutomationDashboardView.swift` (NEW)
+- `FocusOS/Views/Insights/InsightsDashboard.swift` (NEW)
+- `FocusOS/Views/Insights/ProductivityMetricsView.swift` (NEW)
+- `FocusOS/Views/Insights/EmotionalHeatmapView.swift` (NEW)
+- `FocusOS/Views/Insights/ConceptGraphView.swift` (NEW)
+- `FocusOS/Views/Insights/LearningLoopView.swift` (NEW)
+- `FocusOS/Views/Insights/ContentAnalyticsView.swift` (NEW)
+- `FocusOS/Views/Insights/AutomationDashboardView.swift` (NEW)
 
 **Schema:**
-- `Cloutmate/CloutmateApp.swift` (UPDATED)
+- `FocusOS/FocusOSApp.swift` (UPDATED)
 
 ---
 

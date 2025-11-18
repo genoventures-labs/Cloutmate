@@ -51,8 +51,8 @@
 
 ## Files to Modify
 
-1. `Cloutmate/Services/GeminiService.swift` - Add conversion helper, update signature
-2. `Cloutmate/ViewModels/AIAssistantViewModel.swift` - Convert and pass messages
+1. `FocusOS/Services/GeminiService.swift` - Add conversion helper, update signature
+2. `FocusOS/ViewModels/AIAssistantViewModel.swift` - Convert and pass messages
 
 ### To-dos
 

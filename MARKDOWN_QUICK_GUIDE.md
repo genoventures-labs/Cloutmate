@@ -199,8 +199,8 @@ Make sure the function is marked as **async**.
 **You see:** **Visit our docs** (blue, underlined on hover, clickable)
 
 ### Code You Can Copy
-**Markdown:** `` `npm install cloutmate` ``  
-**You see:** `npm install cloutmate` (selectable, copyable)
+**Markdown:** `` `npm install focusos` ``  
+**You see:** `npm install focusos` (selectable, copyable)
 
 ---
 

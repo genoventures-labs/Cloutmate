@@ -18,7 +18,7 @@ After cross-referencing Aurora's documentation (`AURORA_README.md`, `AURORA_KNOW
 
 #### 1. System Prompt Lacks Detailed Phase Documentation
 
-**Location:** `Cloutmate/Services/OllamaBridgeService.swift` - `buildSystemPrompt()` method (lines 1144-1242)
+**Location:** `FocusOS/Services/OllamaBridgeService.swift` - `buildSystemPrompt()` method (lines 1144-1242)
 
 **Issue:** The system prompt is very basic compared to the comprehensive documentation:
 
@@ -88,7 +88,7 @@ The documentation lists extensive natural language commands Aurora understands, 
 
 ### Priority 1: Enhance System Prompt with Phase Documentation
 
-**File:** `Cloutmate/Services/OllamaBridgeService.swift` - `buildSystemPrompt()` method
+**File:** `FocusOS/Services/OllamaBridgeService.swift` - `buildSystemPrompt()` method
 
 **Add comprehensive phase documentation section:**
 
@@ -108,7 +108,7 @@ The documentation lists extensive natural language commands Aurora understands, 
 
 ### Priority 2: Create System Prompt Builder Service
 
-**New File:** `Cloutmate/Services/AuroraSystemPromptBuilder.swift`
+**New File:** `FocusOS/Services/AuroraSystemPromptBuilder.swift`
 
 **Purpose:** Centralize system prompt construction with modular sections:
 
@@ -242,13 +242,13 @@ The documentation lists extensive natural language commands Aurora understands, 
 
 ## Files to Modify
 
-1. **`Cloutmate/Services/OllamaBridgeService.swift`**
+1. **`FocusOS/Services/OllamaBridgeService.swift`**
 
 - Enhance `buildSystemPrompt()` method
 - Add phase documentation sections
 - Add behavioral guidelines
 
-2. **`Cloutmate/Services/AuroraSystemPromptBuilder.swift`** (NEW)
+2. **`FocusOS/Services/AuroraSystemPromptBuilder.swift`** (NEW)
 
 - Centralized prompt building service
 - Modular section builders

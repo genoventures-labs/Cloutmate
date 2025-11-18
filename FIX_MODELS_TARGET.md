@@ -2,8 +2,8 @@
 
 ## Problem
 All model files are being compiled by both:
-- Cloutmate target (main app)
-- CloutmateShared target
+- FocusOS target (main app)
+- FocusOSShared target
 
 This causes "Multiple commands produce" errors.
 
@@ -11,13 +11,13 @@ This causes "Multiple commands produce" errors.
 
 ### In Xcode:
 
-For EACH model file in `CloutmateShared/CloutmateShared/Models/`:
+For EACH model file in `FocusOSShared/FocusOSShared/Models/`:
 
 1. **Select the file** (e.g., `Post.swift`)
 2. Press **⌥⌘1** (File Inspector)
 3. **Target Membership** section:
-   - ❌ **UNCHECK** Cloutmate (main app)
-   - ✅ **KEEP CHECKED** CloutmateShared
+   - ❌ **UNCHECK** FocusOS (main app)
+   - ✅ **KEEP CHECKED** FocusOSShared
    - ❌ Other targets should be UNCHECKED
 
 ### Files to Fix:
@@ -35,7 +35,7 @@ For EACH model file in `CloutmateShared/CloutmateShared/Models/`:
 
 ### Why?
 
-These models are now part of the **CloutmateShared framework**. The main app should **import** the framework, not compile these files directly.
+These models are now part of the **FocusOSShared framework**. The main app should **import** the framework, not compile these files directly.
 
 ## After Fixing:
 

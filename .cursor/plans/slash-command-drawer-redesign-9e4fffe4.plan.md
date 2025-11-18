@@ -44,8 +44,8 @@ Redesign the `SlashCommandAutocompleteView` to match Image 2's large white panel
 
 ## Files to Modify
 
-1. `Cloutmate/Views/Components/SlashCommandAutocompleteView.swift` - Main drawer redesign
-2. `Cloutmate/Views/AIAssistant/AuroraChatContainer.swift` - Positioning adjustments (if needed)
+1. `FocusOS/Views/Components/SlashCommandAutocompleteView.swift` - Main drawer redesign
+2. `FocusOS/Views/AIAssistant/AuroraChatContainer.swift` - Positioning adjustments (if needed)
 
 ## Design Specifications
 

@@ -1,12 +1,12 @@
-# Fix: Models Still in Cloutmate Target
+# Fix: Models Still in FocusOS Target
 
-## Even Though Target Membership Shows Only CloutmateShared
+## Even Though Target Membership Shows Only FocusOSShared
 
 If you're getting "Invalid redeclaration" errors, the files are still being compiled by BOTH targets somewhere.
 
 ## Check Build Phases
 
-1. **Select Cloutmate TARGET** (not the project)
+1. **Select FocusOS TARGET** (not the project)
 2. Go to **Build Phases** tab
 3. Expand **Compile Sources**
 4. Look for these files:
@@ -19,7 +19,7 @@ If you're getting "Invalid redeclaration" errors, the files are still being comp
 
 ## Why This Happens
 
-Even if File Inspector shows only CloutmateShared checked, the files can still be in the "Compile Sources" list from being added earlier.
+Even if File Inspector shows only FocusOSShared checked, the files can still be in the "Compile Sources" list from being added earlier.
 
 ## After Removing from Compile Sources
 

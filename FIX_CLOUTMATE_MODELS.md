@@ -1,19 +1,19 @@
-# Fix: Cloutmate/Models Files Being Compiled by CloutmateShared
+# Fix: FocusOS/Models Files Being Compiled by FocusOSShared
 
 ## The Problem
-Files in `Cloutmate/Models/` are being compiled by BOTH:
-- ✅ Cloutmate target (correct)
-- ❌ CloutmateShared target (WRONG - causing redeclaration)
+Files in `FocusOS/Models/` are being compiled by BOTH:
+- ✅ FocusOS target (correct)
+- ❌ FocusOSShared target (WRONG - causing redeclaration)
 
 ## The Solution
 
-### For EACH file in `Cloutmate/Models/`:
+### For EACH file in `FocusOS/Models/`:
 
-1. **Select the file** in Xcode (e.g., `Cloutmate/Models/Template.swift`)
+1. **Select the file** in Xcode (e.g., `FocusOS/Models/Template.swift`)
 2. Press **⌥⌘1** (File Inspector)
 3. **Target Membership**:
-   - ✅ **CHECK Cloutmate** (keep)
-   - ❌ **UNCHECK CloutmateShared** (remove)
+   - ✅ **CHECK FocusOS** (keep)
+   - ❌ **UNCHECK FocusOSShared** (remove)
 
 ### Files to Fix:
 - AIMessage.swift
@@ -30,10 +30,10 @@ Files in `Cloutmate/Models/` are being compiled by BOTH:
 
 ## Why?
 
-Files in `Cloutmate/Models/` should ONLY be in the Cloutmate (main app) target.
-They should NOT be in the CloutmateShared target.
+Files in `FocusOS/Models/` should ONLY be in the FocusOS (main app) target.
+They should NOT be in the FocusOSShared target.
 
-The shared framework has its OWN copies in `CloutmateShared/CloutmateShared/CloutmateShared/Models/`.
+The shared framework has its OWN copies in `FocusOSShared/FocusOSShared/FocusOSShared/Models/`.
 
 ## After Fixing
 

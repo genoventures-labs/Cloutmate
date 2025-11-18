@@ -3,18 +3,18 @@
 
 ## Overview
 
-Transform the menu bar app to match the Archives V2 design system, remove deprecated posting status features, and align with current Cloutmate functionalities (PARA, Aurora, ARTE).
+Transform the menu bar app to match the Archives V2 design system, remove deprecated posting status features, and align with current FocusOS functionalities (PARA, Aurora, ARTE).
 
 ## Files to Modify
 
 **Core Files:**
 
-- `CloutmateMenuBar/MenuBarApp.swift` - Remove posting status, update icon, integrate GlassColorSystem
-- `CloutmateMenuBar/MenuBarPopoverView.swift` - Replace segmented picker with FilterChip tabs, use GlassPanel
-- `CloutmateMenuBar/MenuBarQuickCaptureView.swift` - Update to GlassPanel design
-- `CloutmateMenuBar/MenuBarSettingsView.swift` - Update to GlassPanel design
-- `CloutmateMenuBar/QuickComposerView.swift` - Update to GlassPanel design
-- `CloutmateMenuBar/UpcomingPostsView.swift` - Update to GlassPanel design
+- `FocusOSMenuBar/MenuBarApp.swift` - Remove posting status, update icon, integrate GlassColorSystem
+- `FocusOSMenuBar/MenuBarPopoverView.swift` - Replace segmented picker with FilterChip tabs, use GlassPanel
+- `FocusOSMenuBar/MenuBarQuickCaptureView.swift` - Update to GlassPanel design
+- `FocusOSMenuBar/MenuBarSettingsView.swift` - Update to GlassPanel design
+- `FocusOSMenuBar/QuickComposerView.swift` - Update to GlassPanel design
+- `FocusOSMenuBar/UpcomingPostsView.swift` - Update to GlassPanel design
 
 ## Phase 1: MenuBarApp.swift Modernization
 
@@ -31,7 +31,7 @@ Transform the menu bar app to match the Archives V2 design system, remove deprec
 - Change icon from `message.fill` to `sparkles` (Aurora icon) or `brain.head.profile`
 - Use static icon (no state changes)
 - Update menu styling to use GlassPanel design tokens
-- Keep "Open Main App" and "Quit Cloutmate" menu items
+- Keep "Open Main App" and "Quit FocusOS" menu items
 
 ### Integrate Design System
 
@@ -60,7 +60,7 @@ Transform the menu bar app to match the Archives V2 design system, remove deprec
 
 ### Header Section
 
-- Add gradient header: "Cloutmate Menu" with kosmicBlue → kosmicPurple gradient
+- Add gradient header: "FocusOS Menu" with kosmicBlue → kosmicPurple gradient
 - Use `.glassPanel(tier: .overlay)` wrapper
 - Subline: "Quick access to your workspace"
 - SF Pro Rounded font for title
@@ -96,7 +96,7 @@ Transform the menu bar app to match the Archives V2 design system, remove deprec
 
 ### Header Section
 
-- Replace icon with gradient text: "Cloutmate" (kosmicBlue → kosmicPurple)
+- Replace icon with gradient text: "FocusOS" (kosmicBlue → kosmicPurple)
 - Use `.glassPanel(tier: .overlay)` wrapper
 - Update description text styling
 
@@ -183,7 +183,7 @@ Transform the menu bar app to match the Archives V2 design system, remove deprec
 
 - Ensure `GlassColorSystem` and `AccessibilityGlassManager` are properly initialized in MenuBarApp
 - All views should respect `UIAccessibility.isReduceMotionEnabled` for animations
-- Use `CloutmateShared` framework components where available (GlassPanel, GlassMotion, GlassColorSystem)
+- Use `FocusOSShared` framework components where available (GlassPanel, GlassMotion, GlassColorSystem)
 - Maintain backward compatibility with existing keyboard shortcuts
 
 ### To-dos

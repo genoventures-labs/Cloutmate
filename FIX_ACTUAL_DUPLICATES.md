@@ -4,28 +4,28 @@
 
 You have model files in TWO places:
 
-1. **Original location**: `Cloutmate/Models/` - 11 files (these are in main app target)
-2. **Copied location**: `CloutmateShared/CloutmateShared/Models/` - 10 files (in shared target)
+1. **Original location**: `FocusOS/Models/` - 11 files (these are in main app target)
+2. **Copied location**: `FocusOSShared/FocusOSShared/Models/` - 10 files (in shared target)
 
 Both sets are being compiled, causing "Multiple commands produce" errors.
 
 ## Solution: Remove Originals from Main App Target
 
-The files in `Cloutmate/Models/` should NOT be in the Cloutmate target anymore - they should only be in CloutmateShared.
+The files in `FocusOS/Models/` should NOT be in the FocusOS target anymore - they should only be in FocusOSShared.
 
-### For EACH file in Cloutmate/Models/:
+### For EACH file in FocusOS/Models/:
 
 1. **Select the file** in Project Navigator
-   - Example: `Cloutmate/Models/Post.swift`
+   - Example: `FocusOS/Models/Post.swift`
 
 2. **Press ⌥⌘1** (File Inspector)
 
 3. **Target Membership** section:
-   - ❌ **UNCHECK Cloutmate**
-   - ✅ **Keep CloutmateShared checked** (if it shows up)
-   - OR: Just uncheck Cloutmate
+   - ❌ **UNCHECK FocusOS**
+   - ✅ **Keep FocusOSShared checked** (if it shows up)
+   - OR: Just uncheck FocusOS
 
-### Files to Fix (from Cloutmate/Models/):
+### Files to Fix (from FocusOS/Models/):
 
 - AIMessage.swift
 - AISettings.swift
@@ -42,8 +42,8 @@ The files in `Cloutmate/Models/` should NOT be in the Cloutmate target anymore -
 ## Alternative: Copy Structure
 
 If that doesn't work, you may need to:
-1. Delete files from `Cloutmate/Models/`
-2. Ensure only copies in `CloutmateShared/CloutmateShared/Models/` exist
+1. Delete files from `FocusOS/Models/`
+2. Ensure only copies in `FocusOSShared/FocusOSShared/Models/` exist
 3. Main app imports from framework
 
 ## After Fixing:

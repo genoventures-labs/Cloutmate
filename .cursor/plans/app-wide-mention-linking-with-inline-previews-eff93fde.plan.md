@@ -9,7 +9,7 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 
 ### 1. Create Missing Drawer Components
 
-**TaskDetailDrawer** (`Cloutmate/Views/Tasks/Components/TaskDetailDrawer.swift`)
+**TaskDetailDrawer** (`FocusOS/Views/Tasks/Components/TaskDetailDrawer.swift`)
 
 - Match `NoteDetailDrawer` structure and style
 - Include Focus Gravity sidebar (for editing existing tasks)
@@ -17,7 +17,7 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 - Use `MentionTextEditor` for notes field
 - No Focus Gravity sidebar for new tasks
 
-**ProjectDetailDrawer** (`Cloutmate/Views/Projects/Components/ProjectDetailDrawer.swift`)
+**ProjectDetailDrawer** (`FocusOS/Views/Projects/Components/ProjectDetailDrawer.swift`)
 
 - Match `NoteDetailDrawer` structure and style
 - Include Focus Gravity sidebar (for editing existing projects)
@@ -27,21 +27,21 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 
 ### 2. Update Unified Views to Use Overlays
 
-**UnifiedNotesView** (`Cloutmate/Views/Notes/UnifiedNotesView.swift`)
+**UnifiedNotesView** (`FocusOS/Views/Notes/UnifiedNotesView.swift`)
 
 - Remove `.sheet(isPresented: $showCreateSheet)` for creating
 - Replace with `.overlay` pattern matching editing drawer
 - Create note inline when `showCreateSheet` becomes true
 - Drawer slides in from right, hides list content
 
-**UnifiedJournalView** (`Cloutmate/Views/Journal/UnifiedJournalView.swift`)
+**UnifiedJournalView** (`FocusOS/Views/Journal/UnifiedJournalView.swift`)
 
 - Remove `.sheet(isPresented: $showCreateSheet)` for creating
 - Replace with `.overlay` pattern matching editing drawer
 - Create journal entry inline when `showCreateSheet` becomes true
 - Drawer slides in from right, hides list content
 
-**UnifiedTasksView** (`Cloutmate/Views/Tasks/UnifiedTasksView.swift`)
+**UnifiedTasksView** (`FocusOS/Views/Tasks/UnifiedTasksView.swift`)
 
 - Remove `.sheet(isPresented: $showCreateSheet)` for creating
 - Remove `.sheet(isPresented: Binding(...))` for editing
@@ -50,7 +50,7 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 - When drawer is open, hide list content (use conditional rendering or opacity)
 - Drawer slides in from right with `.transition(.move(edge: .trailing))`
 
-**UnifiedProjectsView** (`Cloutmate/Views/Projects/UnifiedProjectsView.swift`)
+**UnifiedProjectsView** (`FocusOS/Views/Projects/UnifiedProjectsView.swift`)
 
 - Remove `.sheet(isPresented: $showCreateSheet)` for creating
 - Remove `.sheet(item: $projectToShow)` for editing
@@ -59,7 +59,7 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 - When drawer is open, hide list content
 - Drawer slides in from right with `.transition(.move(edge: .trailing))`
 
-**UnifiedAreasView** (`Cloutmate/Views/Areas/UnifiedAreasView.swift`)
+**UnifiedAreasView** (`FocusOS/Views/Areas/UnifiedAreasView.swift`)
 
 - Remove `.sheet(isPresented: $showCreateSheet)` for creating
 - Already uses `.sheet(item: $selectedArea)` for editing - replace with `.overlay`
@@ -67,14 +67,14 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 - Update to use `.overlay` pattern for both creating and editing
 - When drawer is open, hide list content
 
-**UnifiedResourcesView** (`Cloutmate/Views/Resources/UnifiedResourcesView.swift`)
+**UnifiedResourcesView** (`FocusOS/Views/Resources/UnifiedResourcesView.swift`)
 
 - Remove `.sheet(isPresented: $showImportSheet)` for importing
 - Already uses `.overlay` for editing - keep that pattern
 - Add import functionality to overlay or create separate import drawer
 - When drawer is open, hide list content
 
-**UnifiedCalendarView** (`Cloutmate/Views/Calendar/UnifiedCalendarView.swift`)
+**UnifiedCalendarView** (`FocusOS/Views/Calendar/UnifiedCalendarView.swift`)
 
 - Remove `.sheet(isPresented: $showingComposer)` for posts
 - Remove `.sheet(isPresented: $showingArtifactComposer)` for artifacts
@@ -153,24 +153,24 @@ Remove all `.sheet()` presentations for creating and editing items across the ap
 
 **New Files**:
 
-- `Cloutmate/Views/Tasks/Components/TaskDetailDrawer.swift`
-- `Cloutmate/Views/Projects/Components/ProjectDetailDrawer.swift`
+- `FocusOS/Views/Tasks/Components/TaskDetailDrawer.swift`
+- `FocusOS/Views/Projects/Components/ProjectDetailDrawer.swift`
 
 **Modified Files**:
 
-- `Cloutmate/Views/Notes/UnifiedNotesView.swift`
-- `Cloutmate/Views/Journal/UnifiedJournalView.swift`
-- `Cloutmate/Views/Tasks/UnifiedTasksView.swift`
-- `Cloutmate/Views/Projects/UnifiedProjectsView.swift`
-- `Cloutmate/Views/Areas/UnifiedAreasView.swift`
-- `Cloutmate/Views/Resources/UnifiedResourcesView.swift`
-- `Cloutmate/Views/Calendar/UnifiedCalendarView.swift`
-- `Cloutmate/Views/Areas/Components/AreaDetailDrawer.swift` (update to match pattern)
-- `Cloutmate/Views/Resources/Components/ResourceDetailDrawer.swift` (verify pattern)
+- `FocusOS/Views/Notes/UnifiedNotesView.swift`
+- `FocusOS/Views/Journal/UnifiedJournalView.swift`
+- `FocusOS/Views/Tasks/UnifiedTasksView.swift`
+- `FocusOS/Views/Projects/UnifiedProjectsView.swift`
+- `FocusOS/Views/Areas/UnifiedAreasView.swift`
+- `FocusOS/Views/Resources/UnifiedResourcesView.swift`
+- `FocusOS/Views/Calendar/UnifiedCalendarView.swift`
+- `FocusOS/Views/Areas/Components/AreaDetailDrawer.swift` (update to match pattern)
+- `FocusOS/Views/Resources/Components/ResourceDetailDrawer.swift` (verify pattern)
 
 **Files to Remove** (after migration):
 
-- `Cloutmate/Views/Tasks/TasksView.swift` (if deprecated, check usage)
+- `FocusOS/Views/Tasks/TasksView.swift` (if deprecated, check usage)
 - Old sheet components if they become unused
 
 ## Testing Checklist

@@ -29,7 +29,7 @@ This is a different OAuth flow designed for devices that can't display a browser
 
 ## Temporary Solution
 
-I've set the redirect URI to `https://oauth.cloutmate.app/callback`. You need to:
+I've set the redirect URI to `https://oauth.focusos.app/callback`. You need to:
 
 1. Add this URL to Meta App Dashboard
 2. Set up a web server at that domain that redirects to your app

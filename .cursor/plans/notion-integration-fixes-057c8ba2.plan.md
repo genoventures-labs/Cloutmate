@@ -34,7 +34,7 @@ Verify and fix the Notion integration to ensure it's fully functional, properly 
 - Add section for Notion integration status
 - Include connected databases count and types
 - List active sync configurations with last sync times
-- Add database titles and Cloutmate type mappings
+- Add database titles and FocusOS type mappings
 - Include sync status (active/paused) and sync intervals
 
 ### 4. Verify KeychainService Integration
@@ -54,29 +54,29 @@ Verify and fix the Notion integration to ensure it's fully functional, properly 
 
 - Verify OAuth flow completes successfully
 - Test database list loads with proper names
-- Confirm import creates correct Cloutmate models
+- Confirm import creates correct FocusOS models
 - Verify Aurora receives Notion context in AI payloads
 - Test sync configuration persistence
 
 ## Files to Modify
 
-1. `Cloutmate/Views/Notion/NotionDatabaseSelectorView.swift`
+1. `FocusOS/Views/Notion/NotionDatabaseSelectorView.swift`
 
 - Fix database title extraction
 - Complete import flow wiring
 - Add error handling
 
-2. `Cloutmate/Services/AppContextService.swift`
+2. `FocusOS/Services/AppContextService.swift`
 
 - Add Notion integration section to context
 - Include database sync information
 
-3. `Cloutmate/Views/Settings/NotionIntegrationSection.swift`
+3. `FocusOS/Views/Settings/NotionIntegrationSection.swift`
 
 - Verify KeychainService usage
 - Ensure token is properly loaded on view appear
 
-4. `Cloutmate/Services/NotionSyncService.swift`
+4. `FocusOS/Services/NotionSyncService.swift`
 
 - Verify import completion properly saves config
 - Ensure database title is extracted and stored

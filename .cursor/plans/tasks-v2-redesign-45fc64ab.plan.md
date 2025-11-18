@@ -9,7 +9,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 1.1 Create TasksHeaderView Component
 
-**File:** `Cloutmate/Views/Tasks/Components/TasksHeaderView.swift`
+**File:** `FocusOS/Views/Tasks/Components/TasksHeaderView.swift`
 
 - Left-aligned "Tasks" title with `.system(.title3, design: .rounded)` bold font
 - "Focus Summary" subline showing:
@@ -26,7 +26,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 1.2 Update UnifiedTasksView Structure
 
-**File:** `Cloutmate/Views/Tasks/UnifiedTasksView.swift` (create new)
+**File:** `FocusOS/Views/Tasks/UnifiedTasksView.swift` (create new)
 
 - Replace existing `TasksView.swift` table-based implementation
 - Integrate TasksHeaderView at top
@@ -37,7 +37,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 2.1 Create TaskCardV2 Component
 
-**File:** `Cloutmate/Views/Tasks/Components/TaskCardV2.swift`
+**File:** `FocusOS/Views/Tasks/Components/TaskCardV2.swift`
 
 **Card Structure:**
 
@@ -70,7 +70,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 3.1 Implement Sectioned View in UnifiedTasksView
 
-**File:** `Cloutmate/Views/Tasks/UnifiedTasksView.swift`
+**File:** `FocusOS/Views/Tasks/UnifiedTasksView.swift`
 
 **Group by Focus Window:**
 
@@ -102,7 +102,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 4.1 Create TaskFocusMetrics Component
 
-**File:** `Cloutmate/Views/Tasks/Components/TaskFocusMetrics.swift`
+**File:** `FocusOS/Views/Tasks/Components/TaskFocusMetrics.swift`
 
 **Visual Indicators:**
 
@@ -130,7 +130,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 5.1 Update ContextualCreateSheet
 
-**File:** `Cloutmate/Views/Components/ContextualCreateSheet.swift`
+**File:** `FocusOS/Views/Components/ContextualCreateSheet.swift`
 
 - Already has `.tasks` case with actions (Task, Subtask, Routine Builder)
 - Ensure actions trigger correct notifications
@@ -138,7 +138,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 5.2 Integrate Quick Add in UnifiedTasksView
 
-**File:** `Cloutmate/Views/Tasks/UnifiedTasksView.swift`
+**File:** `FocusOS/Views/Tasks/UnifiedTasksView.swift`
 
 - "+" button in header opens ContextualCreateSheet
 - Prefill task creation with "today" date when opened from Tasks view
@@ -158,7 +158,7 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### 6.1 Keyboard Navigation
 
-**File:** `Cloutmate/Views/Tasks/UnifiedTasksView.swift`
+**File:** `FocusOS/Views/Tasks/UnifiedTasksView.swift`
 
 - Implement keyboard handlers:
   - ↑ ↓: Navigate tasks
@@ -199,15 +199,15 @@ Transform the Tasks view from a table-based checklist into a calm, intent-driven
 
 ### Key Files to Create:
 
-- `Cloutmate/Views/Tasks/Components/TasksHeaderView.swift`
-- `Cloutmate/Views/Tasks/Components/TaskCardV2.swift`
-- `Cloutmate/Views/Tasks/Components/TaskFocusMetrics.swift`
-- `Cloutmate/Views/Tasks/UnifiedTasksView.swift` (rename/replace existing TasksView.swift)
+- `FocusOS/Views/Tasks/Components/TasksHeaderView.swift`
+- `FocusOS/Views/Tasks/Components/TaskCardV2.swift`
+- `FocusOS/Views/Tasks/Components/TaskFocusMetrics.swift`
+- `FocusOS/Views/Tasks/UnifiedTasksView.swift` (rename/replace existing TasksView.swift)
 
 ### Key Files to Modify:
 
-- `Cloutmate/Views/Components/ContextualCreateSheet.swift` - Ensure tasks actions work correctly
-- `Cloutmate/Views/Tasks/TasksView.swift` - Replace with UnifiedTasksView or keep as fallback
+- `FocusOS/Views/Components/ContextualCreateSheet.swift` - Ensure tasks actions work correctly
+- `FocusOS/Views/Tasks/TasksView.swift` - Replace with UnifiedTasksView or keep as fallback
 
 ### Design System Integration:
 

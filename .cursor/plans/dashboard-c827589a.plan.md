@@ -10,9 +10,9 @@
 
 ## Files To Update
 
-- `Cloutmate/Views/Dashboard/DashboardView.swift`
-- New: `Cloutmate/Views/Dashboard/DashboardSectionPanel.swift` (reusable collapsible section)
-- `Cloutmate/Views/Dashboard/DashboardSettingsView.swift` (only if minor label updates are needed; logic is already OK)
+- `FocusOS/Views/Dashboard/DashboardView.swift`
+- New: `FocusOS/Views/Dashboard/DashboardSectionPanel.swift` (reusable collapsible section)
+- `FocusOS/Views/Dashboard/DashboardSettingsView.swift` (only if minor label updates are needed; logic is already OK)
 
 ## Implementation Steps
 

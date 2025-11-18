@@ -7,11 +7,11 @@ Replace the existing `Sidebar.swift` with a new `SidebarNavigationViewV2.swift` 
 
 ## Files to Create
 
-### 1. `Cloutmate/Views/Sidebar/SidebarNavigationViewV2.swift`
+### 1. `FocusOS/Views/Sidebar/SidebarNavigationViewV2.swift`
 
 Main sidebar component with:
 
-- Header zone with App Orb + "Cloutmate" label
+- Header zone with App Orb + "FocusOS" label
 - Three navigation groups: Primary, Personal, System
 - Collapse/expand functionality (260pt expanded, 72pt collapsed)
 - ARTE tone-aware background gradients
@@ -19,7 +19,7 @@ Main sidebar component with:
 - Keyboard shortcuts support (⌘1-⌘9, ⌘⇧←/→, ⌘K)
 - Accessibility support (VoiceOver, Reduce Motion, High Contrast)
 
-### 2. `Cloutmate/Views/Sidebar/SidebarNavItem.swift`
+### 2. `FocusOS/Views/Sidebar/SidebarNavItem.swift`
 
 Individual navigation item component:
 
@@ -30,7 +30,7 @@ Individual navigation item component:
 - Notification dot indicator (kosmicGreen glow)
 - Focus mode pulsing accent bar
 
-### 3. `Cloutmate/Views/Sidebar/SidebarCollapseButton.swift`
+### 3. `FocusOS/Views/Sidebar/SidebarCollapseButton.swift`
 
 Collapse/expand toggle button:
 
@@ -38,7 +38,7 @@ Collapse/expand toggle button:
 - Smooth width transition animation (0.25s easeInOut)
 - Persistent state via `@AppStorage("sidebar.v2.collapsed")`
 
-### 4. `Cloutmate/Services/SidebarToneSyncService.swift`
+### 4. `FocusOS/Services/SidebarToneSyncService.swift`
 
 Service to sync sidebar background with ARTE emotional state:
 
@@ -53,7 +53,7 @@ Service to sync sidebar background with ARTE emotional state:
 
 ## Files to Modify
 
-### 1. `Cloutmate/Views/MainWindowView.swift`
+### 1. `FocusOS/Views/MainWindowView.swift`
 
 - Replace `Sidebar` reference with `SidebarNavigationViewV2`
 - Update `sidebarWidth` state to handle collapse (260pt/72pt)
@@ -61,7 +61,7 @@ Service to sync sidebar background with ARTE emotional state:
 - Add `@AppStorage("selectedRoute")` for persistent selection
 - Map TabIdentifier to route strings for persistence
 
-### 2. `Cloutmate/Utilities/GlassColorSystem.swift`
+### 2. `FocusOS/Utilities/GlassColorSystem.swift`
 
 - Add `kosmicViolet` color constant (if not exists)
 - Add `sidebarToneGradient(for: EmotionalState)` method

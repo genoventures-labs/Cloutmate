@@ -19,7 +19,7 @@ CognitionPredictor (FocusForecast)
 
 ### New Service: FocusGravityService
 
-**File:** `Cloutmate/Services/FocusGravityService.swift`
+**File:** `FocusOS/Services/FocusGravityService.swift`
 
 Purpose: Central service that aggregates CPS data with session/ritual/predictive layers and computes gravity weights for orbit visualization.
 
@@ -35,7 +35,7 @@ Purpose: Central service that aggregates CPS data with session/ritual/predictive
 
 ### New Model: FocusEntity
 
-**File:** `Cloutmate/Models/FocusEntity.swift`
+**File:** `FocusOS/Models/FocusEntity.swift`
 
 ```swift
 struct FocusEntity: Identifiable {
@@ -64,7 +64,7 @@ struct FocusEnergyProfile {
 ## File Structure
 
 ```
-Cloutmate/Views/Focus/
+FocusOS/Views/Focus/
 ├── FocusGravityViewV2.swift          (Main view - replaces FocusGravityView.swift)
 ├── Components/
 │   ├── FocusGravityOrbit.swift       (Orbit visualization with spring physics)
@@ -75,7 +75,7 @@ Cloutmate/Views/Focus/
 └── Services/
     └── FocusGravityService.swift      (New aggregation service)
 
-Cloutmate/Models/
+FocusOS/Models/
 └── FocusEntity.swift                 (New data model)
 ```
 

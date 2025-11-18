@@ -1,23 +1,23 @@
-# Remove Models from Cloutmate Main App Target
+# Remove Models from FocusOS Main App Target
 
 ## Problem
-Files in `Cloutmate/Models/` are being compiled by BOTH:
-- Cloutmate target (main app)
-- CloutmateShared target
+Files in `FocusOS/Models/` are being compiled by BOTH:
+- FocusOS target (main app)
+- FocusOSShared target
 
 This causes "Invalid redeclaration" errors.
 
 ## Solution
 
-**The models should ONLY be in the CloutmateShared framework.**
+**The models should ONLY be in the FocusOSShared framework.**
 
-### For EACH file in `Cloutmate/Models/`:
+### For EACH file in `FocusOS/Models/`:
 
-1. **Select the file** (e.g., `Cloutmate/Models/AIMessage.swift`)
+1. **Select the file** (e.g., `FocusOS/Models/AIMessage.swift`)
 2. Press **⌥⌘1** (File Inspector)
 3. **Target Membership** section:
-   - ❌ **UNCHECK** Cloutmate
-   - ✅ **KEEP** CloutmateShared
+   - ❌ **UNCHECK** FocusOS
+   - ✅ **KEEP** FocusOSShared
 
 ### Files to Fix:
 - AIMessage.swift
@@ -33,15 +33,15 @@ This causes "Invalid redeclaration" errors.
 
 ### Why?
 
-These models are now part of the CloutmateShared framework. The main app should:
-- Import the framework (`import CloutmateShared`)
+These models are now part of the FocusOSShared framework. The main app should:
+- Import the framework (`import FocusOSShared`)
 - NOT compile the files directly
 
 ## Alternative Option
 
 If you don't want to change each file individually, you can:
-1. Delete `Cloutmate/Models/` directory entirely
-2. The main app will import models from CloutmateShared framework
+1. Delete `FocusOS/Models/` directory entirely
+2. The main app will import models from FocusOSShared framework
 
 ## After Fixing:
 

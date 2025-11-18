@@ -7,10 +7,10 @@ The Emotional Continuity System has been fully integrated into Aurora's AI recal
 ## Aurora Sass-Fusion Tone Overhaul (Nov 2025)
 
 **Files Modified:**
-- `Cloutmate/Services/PersonalityQuirksService.swift`
-- `Cloutmate/Services/ConversationalQuirksService.swift`
-- `Cloutmate/Services/LanguagePersonalityService.swift`
-- `Cloutmate/Services/OllamaBridgeService.swift`
+- `FocusOS/Services/PersonalityQuirksService.swift`
+- `FocusOS/Services/ConversationalQuirksService.swift`
+- `FocusOS/Services/LanguagePersonalityService.swift`
+- `FocusOS/Services/OllamaBridgeService.swift`
 
 **What Changed:**
 - Personality engine now emits a structured sass-fusion brief that blends feminine confidence, clever empathy, and emotional resilience into a single spectrum.
@@ -28,8 +28,8 @@ The Emotional Continuity System has been fully integrated into Aurora's AI recal
 ### 1. **Emotional Memory in Recall System**
 
 **Files Modified:**
-- `Cloutmate/Services/AIRecallService.swift`
-- `Cloutmate/Services/EmotionAnalyzer.swift`
+- `FocusOS/Services/AIRecallService.swift`
+- `FocusOS/Services/EmotionAnalyzer.swift`
 
 **What It Does:**
 - Every item in the recall index (tasks, projects, notes, drafts, posts) now has emotional metadata
@@ -53,7 +53,7 @@ var emotionKeywords: [String]      // Words that triggered emotional detection
 ### 2. **Message-Level Emotional Tracking**
 
 **Files Modified:**
-- `Cloutmate/Models/AIMessage.swift`
+- `FocusOS/Models/AIMessage.swift`
 
 **What It Does:**
 - Every user message in AI conversations now has emotional tracking
@@ -71,8 +71,8 @@ var emotionKeywords: [String]      // Words that triggered emotional detection
 ### 3. **Emotional Context in AI Responses**
 
 **Files Modified:**
-- `Cloutmate/Services/GeminiService.swift`
-- `Cloutmate/ViewModels/AIAssistantViewModel.swift`
+- `FocusOS/Services/GeminiService.swift`
+- `FocusOS/ViewModels/AIAssistantViewModel.swift`
 
 **What It Does:**
 - Aurora receives emotional context from both recalled work items AND the current conversation
@@ -267,11 +267,11 @@ Aurora: "You were really energized yesterday! You created 'Finish marketing
 ## Files Changed
 
 ### Core Implementation
-- `Cloutmate/Services/AIRecallService.swift` - Added emotional properties to recall system
-- `Cloutmate/Services/EmotionAnalyzer.swift` - Made thread-safe, enhanced aggregation
-- `Cloutmate/Services/GeminiService.swift` - Integrated emotional context into prompts
-- `Cloutmate/Models/AIMessage.swift` - Added emotional tracking to messages
-- `Cloutmate/ViewModels/AIAssistantViewModel.swift` - Built emotional narrative system
+- `FocusOS/Services/AIRecallService.swift` - Added emotional properties to recall system
+- `FocusOS/Services/EmotionAnalyzer.swift` - Made thread-safe, enhanced aggregation
+- `FocusOS/Services/GeminiService.swift` - Integrated emotional context into prompts
+- `FocusOS/Models/AIMessage.swift` - Added emotional tracking to messages
+- `FocusOS/ViewModels/AIAssistantViewModel.swift` - Built emotional narrative system
 
 ### Data Models Enhanced
 - `RecallIndexEntry` - emotion, emotionScore, emotionIntensity, emotionKeywords

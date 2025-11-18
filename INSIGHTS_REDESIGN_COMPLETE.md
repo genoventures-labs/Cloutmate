@@ -7,7 +7,7 @@
 
 ## Overview
 
-The Insights tab has been **completely redesigned** from a social media metrics dashboard to a **Personal Intelligence Dashboard** - your mirror for understanding how you think, work, and evolve across Cloutmate.
+The Insights tab has been **completely redesigned** from a social media metrics dashboard to a **Personal Intelligence Dashboard** - your mirror for understanding how you think, work, and evolve across FocusOS.
 
 ### Core Transformation
 
@@ -274,7 +274,7 @@ Timer-based refresh every 5 minutes ensures data stays current without manual in
 
 ### File Structure
 ```
-Cloutmate/Views/Insights/
+FocusOS/Views/Insights/
 ├── InsightsView.swift (REDESIGNED - 723 lines)
 ├── InsightsDashboard.swift (Phase 6.1 - separate dashboard)
 ├── ProductivityMetricsView.swift (Phase 6.1)
@@ -298,7 +298,7 @@ import SwiftUI
 import SwiftData
 import Charts
 import os.log
-import CloutmateShared
+import FocusOSShared
 import UniformTypeIdentifiers
 ```
 
@@ -426,7 +426,7 @@ The Insights tab has been successfully transformed from a social metrics tracker
 5. **Connects** recurring themes and long-term memory patterns
 6. **Exports** weekly reflections for external review (coming soon)
 
-**This is your mirror - a unified intelligence dashboard showing how you think, work, and evolve across Cloutmate.**
+**This is your mirror - a unified intelligence dashboard showing how you think, work, and evolve across FocusOS.**
 
 ---
 

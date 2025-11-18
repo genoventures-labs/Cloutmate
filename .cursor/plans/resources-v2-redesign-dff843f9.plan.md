@@ -9,7 +9,7 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 ### Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/Resources/Components/ResourcesHeaderView.swift` (NEW)
+**File:** `FocusOS/Views/Resources/Components/ResourcesHeaderView.swift` (NEW)
 
 - Title: "Resources" with `.system(.title3, design: .rounded)`
 - Subline: "Your library of saved knowledge and media"
@@ -22,7 +22,7 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 ### Phase 2: Resource Card System
 
-**File:** `Cloutmate/Views/Resources/Components/ResourceCardV2.swift` (NEW)
+**File:** `FocusOS/Views/Resources/Components/ResourceCardV2.swift` (NEW)
 
 - Base: `.glassPanel(tier: .contentCard, cornerRadius: 12)`
 - Cover: Thumbnail image or gradient placeholder (120×120pt minimum)
@@ -37,13 +37,13 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 - Tags row: up to 3 category chips (AI-generated: Study, Branding, Technical, etc.)
 - Footer:
 - Date added (relative time)
-- Aurora category prediction badge (e.g., "Recommended for Project: Cloutmate")
+- Aurora category prediction badge (e.g., "Recommended for Project: FocusOS")
 - Hover: `.floatLift()` modifier + kosmicBlue edge glow (using `GlassMotion`)
 - Tap: Opens `ResourceDetailDrawer`
 
 ### Phase 3: Resource Detail Drawer
 
-**File:** `Cloutmate/Views/Resources/Components/ResourceDetailDrawer.swift` (NEW)
+**File:** `FocusOS/Views/Resources/Components/ResourceDetailDrawer.swift` (NEW)
 
 - Width: 450px fixed
 - Background: `.ultraThinMaterial` overlay
@@ -67,7 +67,7 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 ### Phase 4: Resource Import Sheet
 
-**File:** `Cloutmate/Views/Resources/Components/ResourceImportSheet.swift` (NEW)
+**File:** `FocusOS/Views/Resources/Components/ResourceImportSheet.swift` (NEW)
 
 - Visual: `.glassPanel(tier: .overlay)` with tab navigation
 - Input methods (tabs with icon pills):
@@ -86,7 +86,7 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 ### Phase 5: Unified Resources View
 
-**File:** `Cloutmate/Views/Resources/UnifiedResourcesView.swift` (NEW)
+**File:** `FocusOS/Views/Resources/UnifiedResourcesView.swift` (NEW)
 
 - Replaces existing `ResourcesView.swift` table implementation
 - Layout:
@@ -104,8 +104,8 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 **Files:**
 
-- `Cloutmate/Services/OllamaBridgeService.swift` (MODIFY)
-- `Cloutmate/ViewModels/AIAssistantViewModel.swift` (MODIFY)
+- `FocusOS/Services/OllamaBridgeService.swift` (MODIFY)
+- `FocusOS/ViewModels/AIAssistantViewModel.swift` (MODIFY)
 
 - **Auto-Categorization:**
 - On import, call Aurora with resource content
@@ -117,7 +117,7 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 - Use existing `MemoryGraph` infrastructure
 - **Smart Suggestions:**
 - "This resource aligns with your Journal reflection on Nov 3."
-- "You might want to link this to Project: Cloutmate Marketing."
+- "You might want to link this to Project: FocusOS Marketing."
 - Display in `ResourceDetailDrawer` sidebar
 - **Predictive Recall:**
 - When opening related Note/Project, Aurora surfaces connected resources
@@ -125,7 +125,7 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 ### Phase 7: Motion & Feedback
 
-**File:** `Cloutmate/Views/Resources/Components/ResourceCardV2.swift` (MODIFY)
+**File:** `FocusOS/Views/Resources/Components/ResourceCardV2.swift` (MODIFY)
 
 - Card hover: `.floatLift()` (already implemented in `GlassMotion.swift`)
 - Drawer open: `.transition(.move(edge: .trailing))` with `GlassMotion.Easing.modalOpen`
@@ -137,8 +137,8 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 **Files:**
 
-- `Cloutmate/Views/Resources/Components/ResourceCardV2.swift` (MODIFY)
-- `Cloutmate/Views/Resources/UnifiedResourcesView.swift` (MODIFY)
+- `FocusOS/Views/Resources/Components/ResourceCardV2.swift` (MODIFY)
+- `FocusOS/Views/Resources/UnifiedResourcesView.swift` (MODIFY)
 
 - Large clickable thumbnails (min 120×120pt)
 - Keyboard nav: ← → scroll between cards, Enter to open drawer
@@ -150,23 +150,23 @@ Transform Resources into a visual knowledge vault with gallery-driven card layou
 
 **Files to Modify:**
 
-1. **`Cloutmate/Extensions/Notification+Names.swift`:**
+1. **`FocusOS/Extensions/Notification+Names.swift`:**
 
 - Add `.openResourceDetail` notification
 - Add `.showResourceImport` notification
 
-2. **`Cloutmate/Views/Components/ContextualCreateSheet.swift`:**
+2. **`FocusOS/Views/Components/ContextualCreateSheet.swift`:**
 
 - Add `.resources` case to `actionsForTab`
 - Add "Import Resource" action with icon "square.and.arrow.down"
 
-3. **`Cloutmate/Views/MainWindowView.swift`:**
+3. **`FocusOS/Views/MainWindowView.swift`:**
 
 - Handle `.openResourceDetail` notification
 - Handle `.showResourceImport` notification
 - Update Resources tab to use `UnifiedResourcesView`
 
-4. **`Cloutmate/ViewModels/AIAssistantViewModel.swift`:**
+4. **`FocusOS/ViewModels/AIAssistantViewModel.swift`:**
 
 - Add export/import link for resources
 - Include resource context in payload when relevant

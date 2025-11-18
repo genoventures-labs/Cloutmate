@@ -3,16 +3,16 @@
 ## Architecture
 
 ```
-User → Facebook OAuth → https://oauth.cloutmate.app/auth/callback → cloutmate://oauth/callback → Your App
+User → Facebook OAuth → https://oauth.focusos.app/auth/callback → focusos://oauth/callback → Your App
 ```
 
 ## Implementation Required
 
-You need to set up a web server at `https://oauth.cloutmate.app` that:
+You need to set up a web server at `https://oauth.focusos.app` that:
 
 1. Receives OAuth callbacks from Meta at `/auth/callback`
 2. Extracts the `code` parameter from the query string
-3. Redirects to your app's custom URL scheme: `cloutmate://oauth/callback?code=XXX`
+3. Redirects to your app's custom URL scheme: `focusos://oauth/callback?code=XXX`
 
 ## Simple Node.js Implementation
 
@@ -27,10 +27,10 @@ app.get('/auth/callback', (req, res) => {
   
   if (error) {
     // Redirect with error
-    res.redirect(`cloutmate://oauth/callback?error=${encodeURIComponent(error)}`);
+    res.redirect(`focusos://oauth/callback?error=${encodeURIComponent(error)}`);
   } else if (code) {
     // Redirect with code
-    res.redirect(`cloutmate://oauth/callback?code=${code}`);
+    res.redirect(`focusos://oauth/callback?code=${code}`);
   } else {
     res.status(400).send('Missing code parameter');
   }
@@ -43,7 +43,7 @@ app.listen(3000, () => {
 
 ## Deployment
 
-1. Register domain: `oauth.cloutmate.app`
+1. Register domain: `oauth.focusos.app`
 2. Get SSL certificate (Let's Encrypt)
 3. Deploy Node.js server
 4. Configure DNS
@@ -61,7 +61,7 @@ Can handle this redirect in a few lines of code.
 ## Meta App Dashboard Configuration
 
 Add to "Valid OAuth Redirect URIs":
-- `https://oauth.cloutmate.app/auth/callback`
+- `https://oauth.focusos.app/auth/callback`
 
 Enable:
 - Client OAuth login: ON

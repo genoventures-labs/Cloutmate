@@ -1,4 +1,4 @@
-# Important Fixes for CloutmateShared Compilation Errors
+# Important Fixes for FocusOSShared Compilation Errors
 
 ## Summary
 
@@ -6,7 +6,7 @@ The compilation errors you're seeing are because `PublishingService` was trying 
 
 ## What Was Fixed
 
-1. **Removed platform-specific services** from CloutmateShared:
+1. **Removed platform-specific services** from FocusOSShared:
    - ❌ MetaAPIService.swift (needs AuthenticationServices framework)
    - ❌ ThreadsService.swift (depends on MetaAPIService)
    - ❌ FacebookService.swift (depends on MetaAPIService)
@@ -31,7 +31,7 @@ The compilation errors you're seeing are because `PublishingService` was trying 
 
 ## Current State
 
-### ✅ CloutmateShared Contains:
+### ✅ FocusOSShared Contains:
 - Models (Post, Draft, Platform, etc.)
 - Logger
 - KeychainService (with app group support)
@@ -63,16 +63,16 @@ The compilation errors you're seeing are because `PublishingService` was trying 
 
 ## Next Steps in Xcode
 
-1. **Add files to CloutmateShared target** (if not done yet)
-2. **Import CloutmateShared** in files that need it
-3. **Build CloutmateShared** - should now compile ✅
+1. **Add files to FocusOSShared target** (if not done yet)
+2. **Import FocusOSShared** in files that need it
+3. **Build FocusOSShared** - should now compile ✅
 4. **Build Widget and MenuBar** - should compile ✅
 5. **Test scheduling from MenuBar** - should work ✅
 
 ## Files Status
 
 ```
-CloutmateShared/CloutmateShared/
+FocusOSShared/FocusOSShared/
 ├── Models/        ✅ All models included
 ├── Services/      ✅ Logger, Keychain, XPC, Publishing (stub)
 ├── UI/           ✅ Glassmorphic components
@@ -85,7 +85,7 @@ After adding files to targets in Xcode:
 
 ```bash
 # Build the framework
-xcodebuild -project Cloutmate.xcodeproj -scheme CloutmateShared clean build
+xcodebuild -project FocusOS.xcodeproj -scheme FocusOSShared clean build
 
 # Should complete without errors now
 ```

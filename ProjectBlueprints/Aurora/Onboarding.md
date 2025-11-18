@@ -1,6 +1,6 @@
 # Aurora Onboarding Checklist
 
-Use this runbook whenever you provision Cloutmate or bring Aurora online on a new development machine.
+Use this runbook whenever you provision FocusOS or bring Aurora online on a new development machine.
 
 ---
 
@@ -11,20 +11,20 @@ Use this runbook whenever you provision Cloutmate or bring Aurora online on a ne
    ```bash
    ollama pull qwen3:1.7b qwen3-vl:2b gemma3:1b gemma3:4b granite3.2:2b granite3.2-vision gwen2.5-coder:1.5b deepseek-r1:1.5b
    ```
-3. **API Keys** – Populate `Cloutmate/Config/Config.plist` with Notion, Google Vision, Threads/Meta tokens as needed. Optionally set `OllamaCloudAPIKey` for Hybrid Bridge (Info.plist or env var).
-4. **Shared App Group** – Ensure all targets share `group.com.kosmicapps.Cloutmate` and that `CloutmateShared.framework` is embedded everywhere (see `SETUP_GUIDE.md`).
+3. **API Keys** – Populate `FocusOS/Config/Config.plist` with Notion, Google Vision, Threads/Meta tokens as needed. Optionally set `OllamaCloudAPIKey` for Hybrid Bridge (Info.plist or env var).
+4. **Shared App Group** – Ensure all targets share `group.com.kosmicapps.FocusOS` and that `FocusOSShared.framework` is embedded everywhere (see `SETUP_GUIDE.md`).
 
 ---
 
 ## 2. First Run Sequence
 
-1. **Open `Cloutmate.xcodeproj`** and select the `Cloutmate` scheme.
+1. **Open `FocusOS.xcodeproj`** and select the `FocusOS` scheme.
 2. **Build** (⌘B) to let SwiftData synthesize model schemas.
 3. **Launch** (⌘R). On first launch:
    - `SharedDataManager` creates the shared container.
    - `ModelWarmupService` warms each target model (watch logs for "Warming up" messages).
-   - `ReactiveThemeManager`, `FocusRitualManager`, `SmartNudgeService`, `CognitionPredictor`, and `FlowCompanionEngine` start via `CloutmateApp.onAppear`.
-   - Reflection prompts load from `Cloutmate/Config/ReflectionPrompts.plist`.
+   - `ReactiveThemeManager`, `FocusRitualManager`, `SmartNudgeService`, `CognitionPredictor`, and `FlowCompanionEngine` start via `FocusOSApp.onAppear`.
+   - Reflection prompts load from `FocusOS/Config/ReflectionPrompts.plist`.
 4. **Authenticate** any integrations you need (Notion, Meta/Threads, Google Vision) via Settings.
 5. **Seed Data** (optional) – Create a project, task, focus session, and journal entry so analytics/ARTE have data to work with.
 
@@ -32,7 +32,7 @@ Use this runbook whenever you provision Cloutmate or bring Aurora online on a ne
 
 ## 3. Feature Flags
 
-`Cloutmate/Config/AIConfig.plist` controls subsystem enablement:
+`FocusOS/Config/AIConfig.plist` controls subsystem enablement:
 
 - Ensure these keys are `true` in production/dev builds:
   - `AIRecallEnabled`

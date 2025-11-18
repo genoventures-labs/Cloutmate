@@ -11,7 +11,7 @@ Visually, Journal V2 merges **Rituals' calm card aesthetic** with **Notes' drawe
 
 ## Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/Journal/Components/JournalHeaderView.swift` (new)
+**File:** `FocusOS/Views/Journal/Components/JournalHeaderView.swift` (new)
 
 ### Structure
 
@@ -39,7 +39,7 @@ Visually, Journal V2 merges **Rituals' calm card aesthetic** with **Notes' drawe
 
 ## Phase 2: Journal Card System
 
-**File:** `Cloutmate/Views/Journal/Components/JournalCardV2.swift` (new)
+**File:** `FocusOS/Views/Journal/Components/JournalCardV2.swift` (new)
 
 ### Card Structure
 
@@ -69,7 +69,7 @@ Visually, Journal V2 merges **Rituals' calm card aesthetic** with **Notes' drawe
 
 ## Phase 3: Journal Detail Drawer
 
-**File:** `Cloutmate/Views/Journal/Components/JournalDetailDrawer.swift` (new)
+**File:** `FocusOS/Views/Journal/Components/JournalDetailDrawer.swift` (new)
 
 ### Drawer Layout
 
@@ -101,7 +101,7 @@ Visually, Journal V2 merges **Rituals' calm card aesthetic** with **Notes' drawe
 
 ## Phase 4: Emotional Timeline
 
-**File:** `Cloutmate/Views/Journal/Components/JournalTimelineView.swift` (new)
+**File:** `FocusOS/Views/Journal/Components/JournalTimelineView.swift` (new)
 
 ### Purpose
 
@@ -127,7 +127,7 @@ Visualize emotion and focus patterns over time.
 
 ## Phase 5: Quick Add & Capture Flow
 
-**Integration:** `Cloutmate/Views/Components/ContextualCreateSheet.swift` (modify)
+**Integration:** `FocusOS/Views/Components/ContextualCreateSheet.swift` (modify)
 
 ### Changes
 
@@ -154,7 +154,7 @@ Visualize emotion and focus patterns over time.
 
 ### Memory Graph Updates
 
-**File:** `Cloutmate/Views/Journal/Components/JournalDetailDrawer.swift`
+**File:** `FocusOS/Views/Journal/Components/JournalDetailDrawer.swift`
 
 - Each entry update calls `AIRecallService.shared.registerUpdated(journal, modelContext: modelContext)`
 - Link journal entries to Memory Graph nodes via tags and emotional keywords
@@ -167,7 +167,7 @@ Visualize emotion and focus patterns over time.
 
 ### Ask Aurora Chat Overlay
 
-**File:** `Cloutmate/Views/Journal/Components/AuroraJournalChatOverlay.swift` (new)
+**File:** `FocusOS/Views/Journal/Components/AuroraJournalChatOverlay.swift` (new)
 
 - Mini chat overlay (300px width, bottom-right corner)
 - Contextual to current journal entry
@@ -184,7 +184,7 @@ Visualize emotion and focus patterns over time.
 
 ## Phase 7: Unified Journal View
 
-**File:** `Cloutmate/Views/Journal/UnifiedJournalView.swift` (new, replaces `JournalView.swift`)
+**File:** `FocusOS/Views/Journal/UnifiedJournalView.swift` (new, replaces `JournalView.swift`)
 
 ### Structure
 
@@ -272,21 +272,21 @@ Visualize emotion and focus patterns over time.
 
 ### New Files
 
-1. `Cloutmate/Views/Journal/Components/JournalHeaderView.swift`
-2. `Cloutmate/Views/Journal/Components/JournalCardV2.swift`
-3. `Cloutmate/Views/Journal/Components/JournalDetailDrawer.swift`
-4. `Cloutmate/Views/Journal/Components/JournalTimelineView.swift`
-5. `Cloutmate/Views/Journal/Components/AuroraJournalChatOverlay.swift`
-6. `Cloutmate/Views/Journal/Components/ARTEReflectionCard.swift`
-7. `Cloutmate/Views/Journal/Components/MoodRadarChart.swift`
-8. `Cloutmate/Views/Journal/UnifiedJournalView.swift`
+1. `FocusOS/Views/Journal/Components/JournalHeaderView.swift`
+2. `FocusOS/Views/Journal/Components/JournalCardV2.swift`
+3. `FocusOS/Views/Journal/Components/JournalDetailDrawer.swift`
+4. `FocusOS/Views/Journal/Components/JournalTimelineView.swift`
+5. `FocusOS/Views/Journal/Components/AuroraJournalChatOverlay.swift`
+6. `FocusOS/Views/Journal/Components/ARTEReflectionCard.swift`
+7. `FocusOS/Views/Journal/Components/MoodRadarChart.swift`
+8. `FocusOS/Views/Journal/UnifiedJournalView.swift`
 
 ### Modified Files
 
-1. `Cloutmate/Views/Components/ContextualCreateSheet.swift` - Add journal actions
-2. `Cloutmate/Extensions/Notification+Names.swift` - Add `.openJournalEntry` notification
-3. `Cloutmate/Views/MainWindowView.swift` - Update to use `UnifiedJournalView` instead of `JournalView`
-4. `Cloutmate/Services/AIReflectionService.swift` - Add `reflectOnJournalEntries` method
+1. `FocusOS/Views/Components/ContextualCreateSheet.swift` - Add journal actions
+2. `FocusOS/Extensions/Notification+Names.swift` - Add `.openJournalEntry` notification
+3. `FocusOS/Views/MainWindowView.swift` - Update to use `UnifiedJournalView` instead of `JournalView`
+4. `FocusOS/Services/AIReflectionService.swift` - Add `reflectOnJournalEntries` method
 
 ---
 
@@ -320,7 +320,7 @@ Visualize emotion and focus patterns over time.
 
 Journal V2 is about **gentle reflection** — it should feel serene, grounded, and intelligent.
 
-It closes the loop of Cloutmate's cognitive model:
+It closes the loop of FocusOS's cognitive model:
 
 > Tasks → Projects → Focus → Reflection → Prediction.
 

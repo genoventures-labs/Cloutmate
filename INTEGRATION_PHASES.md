@@ -1,7 +1,7 @@
-# Integration Phases - Cloutmate Widget & Menu Bar
+# Integration Phases - FocusOS Widget & Menu Bar
 
 ## ✅ Phase 1: Shared Framework (COMPLETED)
-- Created CloutmateShared framework
+- Created FocusOSShared framework
 - Added all models and UI components
 - Added services (Keychain, XPC, Publishing, MetaAPI)
 - Configured for app group storage
@@ -18,18 +18,18 @@
 ### Steps:
 
 1. **Select Widget files** in Project Navigator:
-   - `CloutmateWidget/CloutmateWidget.swift`
-   - `CloutmateWidget/WidgetTimelineProvider.swift`
-   - `CloutmateWidget/CloutmateWidgetView.swift`
+   - `FocusOSWidget/FocusOSWidget.swift`
+   - `FocusOSWidget/WidgetTimelineProvider.swift`
+   - `FocusOSWidget/FocusOSWidgetView.swift`
 
 2. **For each file:**
    - Press ⌥⌘1 (File Inspector)
-   - Check ✅ **CloutmateWidget** in Target Membership
+   - Check ✅ **FocusOSWidget** in Target Membership
 
-3. **Add CloutmateShared as dependency:**
-   - Select **CloutmateWidget** target
+3. **Add FocusOSShared as dependency:**
+   - Select **FocusOSWidget** target
    - General tab → Frameworks
-   - Click + → Add **CloutmateShared.framework**
+   - Click + → Add **FocusOSShared.framework**
    - Set to **Embed & Sign**
 
 ---
@@ -47,19 +47,19 @@
 
 2. **For each file:**
    - Press ⌥⌘1 (File Inspector)
-   - Check ✅ **CloutmateMenuBar** in Target Membership
+   - Check ✅ **FocusOSMenuBar** in Target Membership
 
-3. **Add CloutmateShared as dependency:**
-   - Select **CloutmateMenuBar** target
+3. **Add FocusOSShared as dependency:**
+   - Select **FocusOSMenuBar** target
    - General tab → Frameworks
-   - Click + → Add **CloutmateShared.framework**
+   - Click + → Add **FocusOSShared.framework**
    - Set to **Embed & Sign**
 
 ---
 
 ## Phase 5: Update Main App to Use Shared Container
 
-### File: `Cloutmate/CloutmateApp.swift`
+### File: `FocusOS/FocusOSApp.swift`
 
 Find this section (around line 19-40):
 ```swift
@@ -82,7 +82,7 @@ var sharedModelContainer: ModelContainer = SharedDataManager.createSharedModelCo
 
 **Add import at top:**
 ```swift
-import CloutmateShared
+import FocusOSShared
 ```
 
 ---
@@ -95,21 +95,21 @@ Files that need updating:
 
 **Add this import to affected files:**
 ```swift
-import CloutmateShared
+import FocusOSShared
 ```
 
 ### Quick Find & Replace:
 
 1. Open Find (⌘F) → Replace (⌥⌘F)
 2. Search: `import Foundation`
-3. Add line: `import CloutmateShared`
+3. Add line: `import FocusOSShared`
 4. Replace in files that use shared models
 
 ### Files to Update:
 
 Check these files for imports:
-- Views in `Cloutmate/Views/`
-- ViewModels in `Cloutmate/ViewModels/`
+- Views in `FocusOS/Views/`
+- ViewModels in `FocusOS/ViewModels/`
 - Services that use models
 
 ---
@@ -120,20 +120,20 @@ Check these files for imports:
 
 ```bash
 # 1. Build Shared Framework first
-xcodebuild -project Cloutmate.xcodeproj -scheme CloutmateShared build
+xcodebuild -project FocusOS.xcodeproj -scheme FocusOSShared build
 
 # 2. Build Widget
-xcodebuild -project Cloutmate.xcodeproj -scheme CloutmateWidget build
+xcodebuild -project FocusOS.xcodeproj -scheme FocusOSWidget build
 
 # 3. Build Menu Bar
-xcodebuild -project Cloutmate.xcodeproj -scheme CloutmateMenuBar build
+xcodebuild -project FocusOS.xcodeproj -scheme FocusOSMenuBar build
 
 # 4. Build Main App
-xcodebuild -project Cloutmate.xcodeproj -scheme Cloutmate build
+xcodebuild -project FocusOS.xcodeproj -scheme FocusOS build
 ```
 
 Or in Xcode:
-1. Select scheme: CloutmateShared
+1. Select scheme: FocusOSShared
 2. Product → Build (⌘B)
 3. Repeat for other targets
 
@@ -142,14 +142,14 @@ Or in Xcode:
 ## Phase 8: Test Integration
 
 ### Test 1: Widget Timeline
-1. Select **CloutmateWidget** scheme
+1. Select **FocusOSWidget** scheme
 2. Run (⌘R)
 3. When prompted, choose widget
 4. Add to desktop
 5. Should show scheduled post count
 
 ### Test 2: Menu Bar App
-1. Select **CloutmateMenuBar** scheme
+1. Select **FocusOSMenuBar** scheme
 2. Run (⌘R)
 3. Look for menu bar icon
 4. Click to open popover
@@ -175,13 +175,13 @@ Or in Xcode:
 
 Common issues and fixes:
 
-### "Module 'CloutmateShared' not found"
-- Check target has CloutmateShared.framework linked
+### "Module 'FocusOSShared' not found"
+- Check target has FocusOSShared.framework linked
 - Clean build (⇧⌘K)
 - Delete Derived Data
 
 ### "Cannot find 'X' in scope"
-- Add `import CloutmateShared`
+- Add `import FocusOSShared`
 - Check file is in correct target
 
 ### Widget not updating
@@ -215,15 +215,15 @@ Run this to see current status:
 
 ```bash
 # Check if all targets build
-cd "/Users/kosmicapps/Desktop/Kosmic Apps/Projects/Cloutmate"
-xcodebuild -list -project Cloutmate.xcodeproj | grep -A 20 "Targets"
+cd "/Users/kosmicapps/Desktop/Kosmic Apps/Projects/FocusOS"
+xcodebuild -list -project FocusOS.xcodeproj | grep -A 20 "Targets"
 ```
 
 Should show:
-- Cloutmate
-- CloutmateShared
-- CloutmateWidget
-- CloutmateMenuBar
+- FocusOS
+- FocusOSShared
+- FocusOSWidget
+- FocusOSMenuBar
 
 ---
 
@@ -232,8 +232,8 @@ Should show:
 **Current Phase:** 3-4 (Add files to targets)
 
 **What to do now:**
-1. Add widget files to CloutmateWidget target
-2. Add menu bar files to CloutmateMenuBar target
-3. Link CloutmateShared.framework to both
+1. Add widget files to FocusOSWidget target
+2. Add menu bar files to FocusOSMenuBar target
+3. Link FocusOSShared.framework to both
 4. Then proceed to Phase 5 (Update main app)
 

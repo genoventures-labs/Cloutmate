@@ -36,7 +36,7 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 ### 1.1 Create AIAssistantHeaderView Component
 
-**File:** `Cloutmate/Views/AIAssistant/Components/AIAssistantHeaderView.swift` (new)
+**File:** `FocusOS/Views/AIAssistant/Components/AIAssistantHeaderView.swift` (new)
 
 **Header Structure:**
 
@@ -62,7 +62,7 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 ### 1.2 Update Main View Structure
 
-**File:** `Cloutmate/Views/AIAssistant/AIAssistantView.swift`
+**File:** `FocusOS/Views/AIAssistant/AIAssistantView.swift`
 
 - Add header zone at top of main chat area
 - Move toolbar actions to header
@@ -73,7 +73,7 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 ### 2.1 Enhance Conversations Sidebar
 
-**File:** `Cloutmate/Views/AIAssistant/Components/AIAssistantSidebar.swift` (create or enhance)
+**File:** `FocusOS/Views/AIAssistant/Components/AIAssistantSidebar.swift` (create or enhance)
 
 **Header Section:**
 
@@ -105,7 +105,7 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 ### 3.1 Redesign Toolbar as Glass Panel
 
-**File:** `Cloutmate/Views/AIAssistant/Components/AIAssistantToolbar.swift` (create or enhance)
+**File:** `FocusOS/Views/AIAssistant/Components/AIAssistantToolbar.swift` (create or enhance)
 
 **Current Location:** Between conversation pane and input area
 
@@ -142,7 +142,7 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 ### 4.1 Redesign Input Area
 
-**File:** `Cloutmate/Views/AIAssistant/Components/AIMessageComposer.swift` (create or enhance)
+**File:** `FocusOS/Views/AIAssistant/Components/AIMessageComposer.swift` (create or enhance)
 
 **Visual Design:**
 
@@ -178,7 +178,7 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 ### 5.1 Message Bubbles
 
-**File:** `Cloutmate/Views/AIAssistant/Components/MessageBubble.swift` (enhance if needed)
+**File:** `FocusOS/Views/AIAssistant/Components/MessageBubble.swift` (enhance if needed)
 
 **Visual Enhancements:**
 
@@ -296,16 +296,16 @@ Transform the AI Assistant view to match the V2 design language used in Tasks, C
 
 **New Components:**
 
-- `Cloutmate/Views/AIAssistant/Components/AIAssistantHeaderView.swift`
-- `Cloutmate/Views/AIAssistant/Components/ConversationCardV2.swift`
-- `Cloutmate/Views/AIAssistant/Components/PlatformToggle.swift` (if moving platform selector)
+- `FocusOS/Views/AIAssistant/Components/AIAssistantHeaderView.swift`
+- `FocusOS/Views/AIAssistant/Components/ConversationCardV2.swift`
+- `FocusOS/Views/AIAssistant/Components/PlatformToggle.swift` (if moving platform selector)
 
 **Modify:**
 
-- `Cloutmate/Views/AIAssistant/AIAssistantView.swift` - Main view structure
-- `Cloutmate/Views/AIAssistant/Components/AIAssistantSidebar.swift` - Enhance styling
-- `Cloutmate/Views/AIAssistant/Components/AIAssistantToolbar.swift` - Enhance styling
-- `Cloutmate/Views/AIAssistant/Components/AIMessageComposer.swift` - Enhance styling
+- `FocusOS/Views/AIAssistant/AIAssistantView.swift` - Main view structure
+- `FocusOS/Views/AIAssistant/Components/AIAssistantSidebar.swift` - Enhance styling
+- `FocusOS/Views/AIAssistant/Components/AIAssistantToolbar.swift` - Enhance styling
+- `FocusOS/Views/AIAssistant/Components/AIMessageComposer.swift` - Enhance styling
 
 ### Design System Integration
 

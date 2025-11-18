@@ -10,7 +10,7 @@
 
 ### 1. ARTE is Already Running
 
-ARTE starts automatically when you launch Cloutmate. It's enabled by default in **Auto** mode, continuously adapting to your work patterns.
+ARTE starts automatically when you launch FocusOS. It's enabled by default in **Auto** mode, continuously adapting to your work patterns.
 
 ### 2. Where to Find ARTE
 

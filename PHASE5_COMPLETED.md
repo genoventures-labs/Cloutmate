@@ -68,7 +68,7 @@ Error (shows 2 sec) → Idle
    - Added keyboard shortcuts
    - Tab switching via shortcuts
 
-4. **CloutmateApp.swift**
+4. **FocusOSApp.swift**
    - Updated to use shared container
    - Background publishing timer
    - Ready for app group sync
@@ -87,7 +87,7 @@ Error (shows 2 sec) → Idle
 ## Next Steps
 
 1. **Test in Xcode:**
-   - Run CloutmateMenuBar scheme
+   - Run FocusOSMenuBar scheme
    - Test posting flow
    - Verify icon states
 

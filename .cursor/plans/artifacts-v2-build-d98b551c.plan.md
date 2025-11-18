@@ -3,7 +3,7 @@
 
 ## Overview
 
-A unified creative output surface for Cloutmate where every major piece of work (brief, summary, reflection, report, release note) lives, intelligently linked to its originating context (Project, Area, or Focus Session).
+A unified creative output surface for FocusOS where every major piece of work (brief, summary, reflection, report, release note) lives, intelligently linked to its originating context (Project, Area, or Focus Session).
 
 ---
 
@@ -11,7 +11,7 @@ A unified creative output surface for Cloutmate where every major piece of work 
 
 ### 1.1 Extend Artifact Model
 
-**File:** `CloutmateShared/CloutmateShared/CloutmateShared/Models/Artifact.swift`
+**File:** `FocusOSShared/FocusOSShared/FocusOSShared/Models/Artifact.swift`
 
 Add fields for V2 features:
 
@@ -27,7 +27,7 @@ Add fields for V2 features:
 
 ### 1.2 Create ArtifactMention Model
 
-**File:** `CloutmateShared/CloutmateShared/CloutmateShared/Models/ArtifactMention.swift`
+**File:** `FocusOSShared/FocusOSShared/FocusOSShared/Models/ArtifactMention.swift`
 
 SwiftData model tracking @mentions within artifacts:
 
@@ -43,7 +43,7 @@ SwiftData model tracking @mentions within artifacts:
 
 ### 2.1 Main Artifacts View
 
-**File:** `Cloutmate/Views/Artifacts/ArtifactsViewV2.swift`
+**File:** `FocusOS/Views/Artifacts/ArtifactsViewV2.swift`
 
 Main orchestration view following `UnifiedProjectsView.swift` pattern:
 
@@ -64,7 +64,7 @@ Main orchestration view following `UnifiedProjectsView.swift` pattern:
 
 ### 2.2 Artifact Card Component
 
-**File:** `Cloutmate/Views/Artifacts/ArtifactCardV2.swift`
+**File:** `FocusOS/Views/Artifacts/ArtifactCardV2.swift`
 
 Following `AreaCardV2.swift` pattern:
 
@@ -85,7 +85,7 @@ Following `AreaCardV2.swift` pattern:
 
 ### 2.3 Artifact Detail Drawer
 
-**File:** `Cloutmate/Views/Artifacts/ArtifactDetailDrawer.swift`
+**File:** `FocusOS/Views/Artifacts/ArtifactDetailDrawer.swift`
 
 Slide-out drawer (right side) for artifact editing:
 
@@ -107,7 +107,7 @@ Slide-out drawer (right side) for artifact editing:
 
 ### 2.4 Artifact Sidebar
 
-**File:** `Cloutmate/Views/Artifacts/ArtifactSidebar.swift`
+**File:** `FocusOS/Views/Artifacts/ArtifactSidebar.swift`
 
 Following `AreasSidebar.swift` pattern:
 
@@ -132,7 +132,7 @@ Following `AreasSidebar.swift` pattern:
 
 ### 2.5 Artifact Editor Toolbar
 
-**File:** `Cloutmate/Views/Artifacts/ArtifactEditorToolbar.swift`
+**File:** `FocusOS/Views/Artifacts/ArtifactEditorToolbar.swift`
 
 AI-powered toolbar for artifact refinement:
 
@@ -149,7 +149,7 @@ AI-powered toolbar for artifact refinement:
 
 ### 2.6 Artifact Quick Add Sheet
 
-**File:** `Cloutmate/Views/Artifacts/ArtifactQuickAddSheet.swift`
+**File:** `FocusOS/Views/Artifacts/ArtifactQuickAddSheet.swift`
 
 Modal sheet for quick artifact creation:
 
@@ -164,7 +164,7 @@ Modal sheet for quick artifact creation:
 
 ### 3.1 Artifact Analytics Service
 
-**File:** `Cloutmate/Services/ArtifactAnalyticsService.swift`
+**File:** `FocusOS/Services/ArtifactAnalyticsService.swift`
 
 Analytics and insights for artifacts:
 
@@ -181,7 +181,7 @@ Analytics and insights for artifacts:
 
 ### 3.2 Artifact Predictive Bridge
 
-**File:** `Cloutmate/Services/ArtifactPredictiveBridge.swift`
+**File:** `FocusOS/Services/ArtifactPredictiveBridge.swift`
 
 Bridges artifacts to Predictive Reflection Engine:
 
@@ -198,7 +198,7 @@ Bridges artifacts to Predictive Reflection Engine:
 
 ### 3.3 Artifact Export Service
 
-**File:** `Cloutmate/Services/ArtifactExportService.swift`
+**File:** `FocusOS/Services/ArtifactExportService.swift`
 
 Export functionality:
 
@@ -216,7 +216,7 @@ Export functionality:
 
 ### 3.4 Artifact Mention Service
 
-**File:** `Cloutmate/Services/ArtifactMentionService.swift`
+**File:** `FocusOS/Services/ArtifactMentionService.swift`
 
 Manages @mention parsing and CPS updates:
 
@@ -245,8 +245,8 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Services/WorkspaceObjectSearchService.swift`
-- `Cloutmate/Views/Components/MentionAutocompleteView.swift`
+- `FocusOS/Services/WorkspaceObjectSearchService.swift`
+- `FocusOS/Views/Components/MentionAutocompleteView.swift`
 
 ### 4.2 Predictive Reflection Engine Hooks
 
@@ -258,8 +258,8 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Services/ArtifactPredictiveBridge.swift` (new)
-- `Cloutmate/Views/Artifacts/ArtifactCardV2.swift`
+- `FocusOS/Services/ArtifactPredictiveBridge.swift` (new)
+- `FocusOS/Views/Artifacts/ArtifactCardV2.swift`
 
 ### 4.3 ARTE Synchronization
 
@@ -271,8 +271,8 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Views/Artifacts/ArtifactCardV2.swift`
-- `Cloutmate/Views/Artifacts/ArtifactDetailDrawer.swift`
+- `FocusOS/Views/Artifacts/ArtifactCardV2.swift`
+- `FocusOS/Views/Artifacts/ArtifactDetailDrawer.swift`
 
 ### 4.4 Cross-Conversation Memory
 
@@ -283,7 +283,7 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Views/Artifacts/ArtifactDetailDrawer.swift`
+- `FocusOS/Views/Artifacts/ArtifactDetailDrawer.swift`
 - Uses `ConversationArchive.shared.searchConversations()`
 
 ### 4.5 Narrative Engine Integration
@@ -296,7 +296,7 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Services/ArtifactMentionService.swift`
+- `FocusOS/Services/ArtifactMentionService.swift`
 - Uses `ConceptTracker.shared.trackConcepts()`
 
 ### 4.6 Smart Automation
@@ -308,7 +308,7 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Services/SmartAutomationEngine.swift`
+- `FocusOS/Services/SmartAutomationEngine.swift`
 - Add artifact pattern detection methods
 
 ### 4.7 Export & Publishing
@@ -320,7 +320,7 @@ Manages @mention parsing and CPS updates:
 
 **Files Modified:**
 
-- `Cloutmate/Services/ArtifactExportService.swift` (new)
+- `FocusOS/Services/ArtifactExportService.swift` (new)
 
 ---
 
@@ -356,7 +356,7 @@ Manages @mention parsing and CPS updates:
 
 ### 6.1 Main Window Integration
 
-**File:** `Cloutmate/Views/MainWindowView.swift`
+**File:** `FocusOS/Views/MainWindowView.swift`
 
 Add Artifacts tab to main navigation:
 
@@ -403,7 +403,7 @@ Add "Create Artifact" to:
 ## File Structure
 
 ```
-Cloutmate/Views/Artifacts/
+FocusOS/Views/Artifacts/
 ├── ArtifactsViewV2.swift          (Main view)
 ├── ArtifactCardV2.swift           (Card component)
 ├── ArtifactDetailDrawer.swift     (Detail drawer)
@@ -411,13 +411,13 @@ Cloutmate/Views/Artifacts/
 ├── ArtifactSidebar.swift          (Sidebar filters)
 └── ArtifactQuickAddSheet.swift    (Quick add modal)
 
-Cloutmate/Services/
+FocusOS/Services/
 ├── ArtifactAnalyticsService.swift      (Analytics)
 ├── ArtifactPredictiveBridge.swift      (Predictive hooks)
 ├── ArtifactExportService.swift          (Export)
 └── ArtifactMentionService.swift         (Mention handling)
 
-CloutmateShared/.../Models/
+FocusOSShared/.../Models/
 ├── Artifact.swift (enhanced)
 └── ArtifactMention.swift (new)
 ```

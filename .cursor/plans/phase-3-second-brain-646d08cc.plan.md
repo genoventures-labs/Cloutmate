@@ -7,7 +7,7 @@ Transform Projects, Areas, Resources (Notes), and Inbox views from card-based sc
 ## Implementation Strategy
 
 ### 1. ProjectsTableView
-Convert `Cloutmate/Views/Projects/ProjectsView.swift` to table format.
+Convert `FocusOS/Views/Projects/ProjectsView.swift` to table format.
 
 **Columns:**
 - Title (min: 200, ideal: 300) - with goal preview
@@ -31,7 +31,7 @@ Convert `Cloutmate/Views/Projects/ProjectsView.swift` to table format.
 - Keep existing `ProjectHubSheet` for editing
 
 ### 2. AreasTableView
-Convert `Cloutmate/Views/Areas/AreasView.swift` to table format.
+Convert `FocusOS/Views/Areas/AreasView.swift` to table format.
 
 **Columns:**
 - Title (min: 200, ideal: 300) - with notes preview
@@ -54,7 +54,7 @@ Convert `Cloutmate/Views/Areas/AreasView.swift` to table format.
 - Keep existing `AreaDetailSheet` for editing
 
 ### 3. ResourcesTableView (Notes)
-Convert `Cloutmate/Views/Resources/ResourcesView.swift` to table format for resource notes.
+Convert `FocusOS/Views/Resources/ResourcesView.swift` to table format for resource notes.
 
 **Columns:**
 - Title (min: 200, ideal: 300) - with markdown preview
@@ -80,7 +80,7 @@ Convert `Cloutmate/Views/Resources/ResourcesView.swift` to table format for reso
 - Keep `NoteHighlightingView` for editing with highlights
 
 ### 4. InboxTableView
-Convert `Cloutmate/Views/Inbox/InboxView.swift` to table format.
+Convert `FocusOS/Views/Inbox/InboxView.swift` to table format.
 
 **Columns:**
 - Content (min: 250, ideal: 400) - truncated preview
@@ -137,10 +137,10 @@ if !selectedItems.isEmpty {
 
 ## Files to Modify
 
-1. `Cloutmate/Views/Projects/ProjectsView.swift` → Convert to table
-2. `Cloutmate/Views/Areas/AreasView.swift` → Convert to table
-3. `Cloutmate/Views/Resources/ResourcesView.swift` → Convert to table
-4. `Cloutmate/Views/Inbox/InboxView.swift` → Convert to table
+1. `FocusOS/Views/Projects/ProjectsView.swift` → Convert to table
+2. `FocusOS/Views/Areas/AreasView.swift` → Convert to table
+3. `FocusOS/Views/Resources/ResourcesView.swift` → Convert to table
+4. `FocusOS/Views/Inbox/InboxView.swift` → Convert to table
 
 ## Design Considerations
 

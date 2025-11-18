@@ -15,7 +15,7 @@ export async function GET(request) {
   let redirect;
   switch (platform) {
     case "notion":
-      redirect = `cloutmate://oauth/notion?code=${code || ""}&state=${state || ""}`;
+      redirect = `focusos://oauth/notion?code=${code || ""}&state=${state || ""}`;
       break;
     // ...
   }
@@ -32,7 +32,7 @@ export async function GET(request) {
   let platform = searchParams.get("platform");
 
   // Extract platform from state if not provided directly
-  // Format: "platform:cloutmate_platform_abc123"
+  // Format: "platform:focusos_platform_abc123"
   if (!platform && state) {
     const stateMatch = state.match(/^([^:]+):/);
     if (stateMatch) {
@@ -43,14 +43,14 @@ export async function GET(request) {
   let redirect;
   switch (platform) {
     case "notion":
-      redirect = `cloutmate://oauth/notion?code=${code || ""}&state=${state || ""}`;
+      redirect = `focusos://oauth/notion?code=${code || ""}&state=${state || ""}`;
       break;
     case "threads":
-      redirect = `cloutmate://oauth/threads?code=${code || ""}&state=${state || ""}`;
+      redirect = `focusos://oauth/threads?code=${code || ""}&state=${state || ""}`;
       break;
     case "facebook":
     default:
-      redirect = `cloutmate://oauth/facebook?code=${code || ""}&state=${state || ""}`;
+      redirect = `focusos://oauth/facebook?code=${code || ""}&state=${state || ""}`;
       break;
   }
 
@@ -60,18 +60,18 @@ export async function GET(request) {
 
 ## Flow
 
-1. App initiates Notion OAuth with state: `notion:cloutmate_notion_abc123`
+1. App initiates Notion OAuth with state: `notion:focusos_notion_abc123`
 2. User authorizes on Notion
-3. Notion redirects to: `https://oauth.kosmicapps.com/auth/callback?code=abc&state=notion:cloutmate_notion_abc123`
+3. Notion redirects to: `https://oauth.kosmicapps.com/auth/callback?code=abc&state=notion:focusos_notion_abc123`
 4. Your server extracts `platform = "notion"` from state prefix
-5. Your server redirects to: `cloutmate://oauth/notion?code=abc&state=notion:cloutmate_notion_abc123`
+5. Your server redirects to: `focusos://oauth/notion?code=abc&state=notion:focusos_notion_abc123`
 6. App receives callback and processes
 
 ## State Parameter Format
 
-- Notion: `notion:cloutmate_notion_abc123`
-- Threads: `threads:cloutmate_threads_abc123`  
-- Facebook: `facebook:cloutmate_facebook_abc123`
+- Notion: `notion:focusos_notion_abc123`
+- Threads: `threads:focusos_threads_abc123`  
+- Facebook: `facebook:focusos_facebook_abc123`
 
 The first part before the colon (`:`) is the platform identifier.
 

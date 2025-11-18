@@ -2,15 +2,15 @@
 
 ## Problem
 ```
-SwiftData/ModelContext.swift:712: Fatal error: Failed to cast model Cloutmate.Draft for PersistentIdentifier(...) to Draft.
+SwiftData/ModelContext.swift:712: Fatal error: Failed to cast model FocusOS.Draft for PersistentIdentifier(...) to Draft.
 ```
 
 ## Root Causes Identified
 
 ### 1. **Incorrect Module Reference for Draft Model**
-- **Issue**: `CloutmateApp.swift` referenced `CloutmateShared.Draft.self` in the schema
-- **Reality**: `Draft` model is defined in `Cloutmate/Models/Draft.swift` (main app module, not CloutmateShared)
-- **Fix**: Changed to `Draft.self` without the `CloutmateShared.` prefix
+- **Issue**: `FocusOSApp.swift` referenced `FocusOSShared.Draft.self` in the schema
+- **Reality**: `Draft` model is defined in `FocusOS/Models/Draft.swift` (main app module, not FocusOSShared)
+- **Fix**: Changed to `Draft.self` without the `FocusOSShared.` prefix
 
 ### 2. **Multiple Models Missing from Schema**
 The following SwiftData models were being used with `@Query` or `FetchDescriptor` but were NOT included in the model container schema:
@@ -24,47 +24,47 @@ The following SwiftData models were being used with `@Query` or `FetchDescriptor
 **Impact**: When SwiftData tried to fetch these models, it couldn't find them in the schema, causing casting failures.
 
 ### 3. **Duplicate Model Files**
-Many models existed in both `Cloutmate/Models/` and `CloutmateShared/Models/`, causing type identity conflicts:
+Many models existed in both `FocusOS/Models/` and `FocusOSShared/Models/`, causing type identity conflicts:
 
-**Removed Duplicates (Shared models - kept in CloutmateShared):**
-- ✅ `Note.swift` - Deleted from main app, using `CloutmateShared.Note`
-- ✅ `Task.swift` - Deleted from main app, using `CloutmateShared.Task`
-- ✅ `Project.swift` - Deleted from main app, using `CloutmateShared.Project`
-- ✅ `InboxItem.swift` - Deleted from main app, using `CloutmateShared.InboxItem`
+**Removed Duplicates (Shared models - kept in FocusOSShared):**
+- ✅ `Note.swift` - Deleted from main app, using `FocusOSShared.Note`
+- ✅ `Task.swift` - Deleted from main app, using `FocusOSShared.Task`
+- ✅ `Project.swift` - Deleted from main app, using `FocusOSShared.Project`
+- ✅ `InboxItem.swift` - Deleted from main app, using `FocusOSShared.InboxItem`
 
 **Removed Duplicates (App-local models - kept in main app):**
-- ✅ `Area.swift` - Deleted from CloutmateShared (not used by Widget/MenuBar)
-- ✅ `AIMessage.swift` - Deleted from CloutmateShared (main app has emotion tracking)
-- ✅ `AISettings.swift` - Deleted from CloutmateShared (not a SwiftData model, app-local singleton)
-- ✅ `InsightSnapshot.swift` - Deleted from CloutmateShared (app-local only)
-- ✅ `PlatformAIConfiguration.swift` - Deleted from CloutmateShared (app-local, has AITool support)
-- ✅ `Platform+UI.swift` - Deleted from CloutmateShared (app-local extension)
+- ✅ `Area.swift` - Deleted from FocusOSShared (not used by Widget/MenuBar)
+- ✅ `AIMessage.swift` - Deleted from FocusOSShared (main app has emotion tracking)
+- ✅ `AISettings.swift` - Deleted from FocusOSShared (not a SwiftData model, app-local singleton)
+- ✅ `InsightSnapshot.swift` - Deleted from FocusOSShared (app-local only)
+- ✅ `PlatformAIConfiguration.swift` - Deleted from FocusOSShared (app-local, has AITool support)
+- ✅ `Platform+UI.swift` - Deleted from FocusOSShared (app-local extension)
 
 ## Complete Schema Fix
 
-### Updated `CloutmateApp.swift` Schema:
+### Updated `FocusOSApp.swift` Schema:
 ```swift
 let schema = Schema([
     // Shared models used in the app (publicly accessible)
-    CloutmateShared.Post.self,
-    Draft.self,  // ✅ FIXED: Was incorrectly CloutmateShared.Draft.self
-    CloutmateShared.Template.self,
-    CloutmateShared.PlatformAccount.self,
-    CloutmateShared.PerformancePrediction.self,
-    CloutmateShared.RecyclablePost.self,
-    CloutmateShared.ContentTopic.self,
-    CloutmateShared.ContentBalance.self,
-    CloutmateShared.PostingTimeTest.self,
-    CloutmateShared.OptimalPostingTime.self,
-    CloutmateShared.CustomPostProperty.self,
-    CloutmateShared.PostView.self,
-    CloutmateShared.HashtagPerformance.self,
-    CloutmateShared.HashtagSet.self,
+    FocusOSShared.Post.self,
+    Draft.self,  // ✅ FIXED: Was incorrectly FocusOSShared.Draft.self
+    FocusOSShared.Template.self,
+    FocusOSShared.PlatformAccount.self,
+    FocusOSShared.PerformancePrediction.self,
+    FocusOSShared.RecyclablePost.self,
+    FocusOSShared.ContentTopic.self,
+    FocusOSShared.ContentBalance.self,
+    FocusOSShared.PostingTimeTest.self,
+    FocusOSShared.OptimalPostingTime.self,
+    FocusOSShared.CustomPostProperty.self,
+    FocusOSShared.PostView.self,
+    FocusOSShared.HashtagPerformance.self,
+    FocusOSShared.HashtagSet.self,
     // Shared PARA models (used by dashboard cards and other features)
-    CloutmateShared.Note.self,  // ✅ FIXED: Now properly namespaced
-    CloutmateShared.Task.self,  // ✅ FIXED: Now properly namespaced
-    CloutmateShared.Project.self,  // ✅ FIXED: Now properly namespaced
-    CloutmateShared.InboxItem.self,  // ✅ FIXED: Now properly namespaced
+    FocusOSShared.Note.self,  // ✅ FIXED: Now properly namespaced
+    FocusOSShared.Task.self,  // ✅ FIXED: Now properly namespaced
+    FocusOSShared.Project.self,  // ✅ FIXED: Now properly namespaced
+    FocusOSShared.InboxItem.self,  // ✅ FIXED: Now properly namespaced
     // App-local PARA models
     Area.self,  // ✅ ADDED: Was missing from schema
     // App-specific models
@@ -94,22 +94,22 @@ let schema = Schema([
 - ✅ All active SwiftData models included in schema
 - ✅ No duplicate model definitions
 - ✅ Type identity properly resolved across the app
-- ✅ `Cloutmate_v3.sqlite` will be recreated with correct schema
+- ✅ `FocusOS_v3.sqlite` will be recreated with correct schema
 
 ## Files Modified
-1. `/Cloutmate/CloutmateApp.swift` - Fixed schema with proper model references
+1. `/FocusOS/FocusOSApp.swift` - Fixed schema with proper model references
 
 ## Files Deleted (Duplicates)
-1. `/CloutmateShared/Models/Area.swift`
-2. `/CloutmateShared/Models/AIMessage.swift`
-3. `/CloutmateShared/Models/AISettings.swift`
-4. `/CloutmateShared/Models/InsightSnapshot.swift`
-5. `/CloutmateShared/Models/PlatformAIConfiguration.swift`
-6. `/CloutmateShared/Models/Platform+UI.swift`
-7. `/Cloutmate/Models/Note.swift`
-8. `/Cloutmate/Models/Task.swift`
-9. `/Cloutmate/Models/Project.swift`
-10. `/Cloutmate/Models/InboxItem.swift`
+1. `/FocusOSShared/Models/Area.swift`
+2. `/FocusOSShared/Models/AIMessage.swift`
+3. `/FocusOSShared/Models/AISettings.swift`
+4. `/FocusOSShared/Models/InsightSnapshot.swift`
+5. `/FocusOSShared/Models/PlatformAIConfiguration.swift`
+6. `/FocusOSShared/Models/Platform+UI.swift`
+7. `/FocusOS/Models/Note.swift`
+8. `/FocusOS/Models/Task.swift`
+9. `/FocusOS/Models/Project.swift`
+10. `/FocusOS/Models/InboxItem.swift`
 
 ## Testing Recommendations
 1. **Clean build** the project to ensure all references resolve correctly
@@ -124,8 +124,8 @@ let schema = Schema([
 5. **Check Widget/MenuBar** still work with shared models
 
 ## Database Schema Version
-- **Current**: `Cloutmate_v3.sqlite`
-- **SharedDataManager**: `Cloutmate_v2.sqlite` (Widget/MenuBar)
+- **Current**: `FocusOS_v3.sqlite`
+- **SharedDataManager**: `FocusOS_v2.sqlite` (Widget/MenuBar)
 - **Note**: Different versions intentional - main app has additional app-local models
 
 ## Conclusion
@@ -133,5 +133,5 @@ The casting error was caused by a combination of incorrect module references, mi
 1. Correcting all model references to use proper namespaces
 2. Adding all missing models to the schema
 3. Removing duplicate model files and establishing single source of truth
-4. Properly separating shared models (in CloutmateShared) from app-local models (in main app)
+4. Properly separating shared models (in FocusOSShared) from app-local models (in main app)
 

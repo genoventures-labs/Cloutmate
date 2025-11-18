@@ -1,14 +1,14 @@
 ## Legacy View Audit
 
-- `NotesView` (`Cloutmate/Views/Notes/NotesView.swift`)  
+- `NotesView` (`FocusOS/Views/Notes/NotesView.swift`)  
   - **Status:** Deprecated (`@available` applied)  
   - **Replacement:** `UnifiedNotesView`
 
-- `ListTableView` (`Cloutmate/Views/List/ListTableView.swift`)  
+- `ListTableView` (`FocusOS/Views/List/ListTableView.swift`)  
   - **Status:** Deprecated (`@available` applied)  
   - **Replacement:** V2 dashboards (`UnifiedProjectsView`, `UnifiedArtifactsView`, etc.)
 
-- `QuickCaptureView` (`Cloutmate/Views/Capture/QuickCaptureView.swift`)  
+- `QuickCaptureView` (`FocusOS/Views/Capture/QuickCaptureView.swift`)  
   - **Status:** Deprecated (`@available` applied)  
   - **Replacement:** `QuickCaptureDrawer`
 

@@ -65,10 +65,10 @@ Transform the insights panel into a professional, sleek dashboard with modern gl
 - Consistent icon usage throughout
 
 ## Files to Modify
-- `Cloutmate/Views/Insights/InsightsView.swift` - Main layout, picker, metric cards
-- `Cloutmate/Views/Insights/PerformanceChart.swift` - Chart styling and interactivity
-- `Cloutmate/Views/Insights/PlatformComparisonView.swift` - Platform cards and stats
-- `Cloutmate/Views/Insights/ReflectionSummary.swift` - Summary card design
+- `FocusOS/Views/Insights/InsightsView.swift` - Main layout, picker, metric cards
+- `FocusOS/Views/Insights/PerformanceChart.swift` - Chart styling and interactivity
+- `FocusOS/Views/Insights/PlatformComparisonView.swift` - Platform cards and stats
+- `FocusOS/Views/Insights/ReflectionSummary.swift` - Summary card design
 
 
 ### To-dos

@@ -7,7 +7,7 @@ Create a "#" drawer that shows content items (Posts, Notes, Projects, Artifacts)
 
 ## Phase 1: Extend WorkspaceObjectSearchService
 
-**File**: `Cloutmate/Services/WorkspaceObjectSearchService.swift`
+**File**: `FocusOS/Services/WorkspaceObjectSearchService.swift`
 
 Add `searchByHashtag` method that:
 
@@ -25,7 +25,7 @@ Add `searchByHashtag` method that:
 
 ## Phase 2: Create HashtagDrawerView Component
 
-**File**: `Cloutmate/Views/AIAssistant/Components/HashtagDrawerView.swift` (NEW)
+**File**: `FocusOS/Views/AIAssistant/Components/HashtagDrawerView.swift` (NEW)
 
 Create component matching `MentionDrawerView` design:
 
@@ -45,7 +45,7 @@ Create component matching `MentionDrawerView` design:
 
 ## Phase 3: Add "#" Detection to MentionInputField
 
-**File**: `Cloutmate/Views/Components/MentionInputField.swift`
+**File**: `FocusOS/Views/Components/MentionInputField.swift`
 
 Add hashtag detection logic (similar to "/" and "@" detection):
 
@@ -79,7 +79,7 @@ Add hashtag detection logic (similar to "/" and "@" detection):
 
 ## Phase 4: Add Hashtag State to AuroraChatContainer
 
-**File**: `Cloutmate/Views/AIAssistant/AuroraChatContainer.swift`
+**File**: `FocusOS/Views/AIAssistant/AuroraChatContainer.swift`
 
 Add hashtag autocomplete state:
 
@@ -102,7 +102,7 @@ Add hashtag autocomplete state:
 
 ## Phase 5: Integrate HashtagDrawerView
 
-**File**: `Cloutmate/Views/AIAssistant/AuroraChatContainer.swift`
+**File**: `FocusOS/Views/AIAssistant/AuroraChatContainer.swift`
 
 In `conversationScroll` view:
 
@@ -121,7 +121,7 @@ In `conversationScroll` view:
 
 ## Phase 6: Handle Hashtag Selection & Context Linking
 
-**File**: `Cloutmate/Views/AIAssistant/AuroraChatContainer.swift`
+**File**: `FocusOS/Views/AIAssistant/AuroraChatContainer.swift`
 
 **When hashtag result is selected**:
 

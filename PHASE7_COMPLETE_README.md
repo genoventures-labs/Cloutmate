@@ -8,7 +8,7 @@
 
 ## 🎯 Quick Summary
 
-ARTE is Aurora's emotional nervous system - a real-time interface adaptation engine that responds to your cognitive-emotional state. It's now **fully operational** in Cloutmate.
+ARTE is Aurora's emotional nervous system - a real-time interface adaptation engine that responds to your cognitive-emotional state. It's now **fully operational** in FocusOS.
 
 **What It Does:**
 - Detects 5 emotional-cognitive states automatically

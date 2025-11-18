@@ -9,7 +9,7 @@ Phase 3 is now **fully implemented** and **production-ready**. The Contextual Pr
 
 ### 1. Core Data Models
 
-**`Cloutmate/Models/PriorityScore.swift`**
+**`FocusOS/Models/PriorityScore.swift`**
 - SwiftData model tracking priority scores for all objects
 - Fields: `recencyScore`, `frequencyScore`, `connectionScore`, `aiMentionScore`, `manualBoost`
 - Weighted scoring calculation with exponential recency decay
@@ -32,7 +32,7 @@ final class PriorityScore {
 
 ### 2. Priority Engine Service
 
-**`Cloutmate/Services/PriorityEngine.swift`**
+**`FocusOS/Services/PriorityEngine.swift`**
 - Main service managing all CPS operations
 - In-memory caching with 5-minute refresh cycle
 - Configurable weights loaded from `AIConfig.plist`
@@ -61,7 +61,7 @@ final class PriorityScore {
 ### 3. System Integrations
 
 #### AIRecallService Integration
-**`Cloutmate/Services/AIRecallService.swift`**
+**`FocusOS/Services/AIRecallService.swift`**
 - ✅ `registerCreated()` now updates CPS scores
 - ✅ `registerUpdated()` now updates CPS scores  
 - ✅ `fetchRelevantSnippets()` records AI mentions for surfaced items
@@ -73,7 +73,7 @@ final class PriorityScore {
 - Creates intelligent "gravity well" around important work
 
 #### AIFeedbackLogger Integration
-**`Cloutmate/Services/AIFeedbackLogger.swift`**
+**`FocusOS/Services/AIFeedbackLogger.swift`**
 - ✅ Successful AI actions boost CPS scores by 0.15
 - ✅ Works alongside recall importance boost (0.05)
 - ✅ Creates reinforcement loop: successful actions → higher priority
@@ -89,7 +89,7 @@ User: "Create task to review Q3 metrics"
 ```
 
 #### AIPayloadContext Integration
-**`Cloutmate/ViewModels/AIAssistantViewModel.swift`**
+**`FocusOS/ViewModels/AIAssistantViewModel.swift`**
 - ✅ Fetches top 10 priority items on every AI interaction
 - ✅ Sends to Gemini in `AIPayloadContext.priorities`
 - ✅ Formatted in "Priority Highlights" section
@@ -107,7 +107,7 @@ let payloadContext = AIPayloadContext(
 
 ### 4. Aurora's CPS Awareness
 
-**`Cloutmate/Services/GeminiService.swift`**
+**`FocusOS/Services/GeminiService.swift`**
 Updated system prompts to teach Aurora about CPS:
 
 ```
@@ -138,7 +138,7 @@ IMPORTANT BEHAVIORS:
 
 ### 5. Focus Gravity UI
 
-**`Cloutmate/Views/Focus/FocusGravityView.swift`**
+**`FocusOS/Views/Focus/FocusGravityView.swift`**
 New dedicated view for visualizing CPS priorities:
 
 **Features:**
@@ -161,7 +161,7 @@ New dedicated view for visualizing CPS priorities:
 
 ### 6. Configuration Updates
 
-**`Cloutmate/Config/AIConfig.plist`**
+**`FocusOS/Config/AIConfig.plist`**
 ```xml
 <key>FeatureFlags</key>
 <dict>
@@ -170,7 +170,7 @@ New dedicated view for visualizing CPS priorities:
 </dict>
 ```
 
-**`Cloutmate/Services/AIRecallService.swift`**
+**`FocusOS/Services/AIRecallService.swift`**
 - ✅ `AIConfig` struct now includes `CPSWeights`
 - ✅ `AIConfigService` loads CPS configuration
 - ✅ Feature flag: `featureFlags.cpsEnabled`
@@ -245,7 +245,7 @@ All Phase 3 files passed linting with zero errors.
 ## Configuration Reference
 
 ### CPS Weight Tuning
-Edit `Cloutmate/Config/AIConfig.plist` to adjust CPS behavior:
+Edit `FocusOS/Config/AIConfig.plist` to adjust CPS behavior:
 
 ```xml
 <key>CPSWeights</key>
@@ -438,18 +438,18 @@ struct PriorityItem {
 ## Files Modified/Created
 
 ### New Files ✨
-- `Cloutmate/Models/PriorityScore.swift`
-- `Cloutmate/Services/PriorityEngine.swift`
-- `Cloutmate/Views/Focus/FocusGravityView.swift`
+- `FocusOS/Models/PriorityScore.swift`
+- `FocusOS/Services/PriorityEngine.swift`
+- `FocusOS/Views/Focus/FocusGravityView.swift`
 
 ### Modified Files 🔧
-- `Cloutmate/Config/AIConfig.plist`
-- `Cloutmate/Services/AIRecallService.swift`
-- `Cloutmate/Services/AIFeedbackLogger.swift`
-- `Cloutmate/Services/GeminiService.swift`
-- `Cloutmate/ViewModels/AIAssistantViewModel.swift`
-- `Cloutmate/Views/MainWindowView.swift`
-- `Cloutmate/Views/Sidebar.swift`
+- `FocusOS/Config/AIConfig.plist`
+- `FocusOS/Services/AIRecallService.swift`
+- `FocusOS/Services/AIFeedbackLogger.swift`
+- `FocusOS/Services/GeminiService.swift`
+- `FocusOS/ViewModels/AIAssistantViewModel.swift`
+- `FocusOS/Views/MainWindowView.swift`
+- `FocusOS/Views/Sidebar.swift`
 
 ---
 

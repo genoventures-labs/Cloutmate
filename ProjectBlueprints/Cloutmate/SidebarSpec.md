@@ -1,6 +1,6 @@
 # Sidebar Navigation V2 Specification
 
-The sidebar is a critical navigation surface that mirrors ARTE state changes and exposes the PARA hierarchy. The implementation lives under `Cloutmate/Views/Sidebar/`.
+The sidebar is a critical navigation surface that mirrors ARTE state changes and exposes the PARA hierarchy. The implementation lives under `FocusOS/Views/Sidebar/`.
 
 ---
 
@@ -51,7 +51,7 @@ Section headers disappear when collapsed, but spacing remains for muscle memory.
 
 ## 3. Keyboard & Notifications
 
-- Keyboard shortcuts defined in `CloutmateApp.commands` (⌘1–⌘6, ⌘, for Settings) post `.switchTab` notifications.
+- Keyboard shortcuts defined in `FocusOSApp.commands` (⌘1–⌘6, ⌘, for Settings) post `.switchTab` notifications.
 - Sidebar subscribes to `.focusSessionStatusChanged` to show focus-mode badges (e.g., highlight Focus Mode when active).
 - Flow Companion + Command Palette live outside the sidebar but post `.switchTab` notifications for navigation when actions complete.
 
@@ -73,4 +73,4 @@ Section headers disappear when collapsed, but spacing remains for muscle memory.
 - Test with ARTE disabled to ensure fallback gradients render correctly.
 - Verify scrollbars appear when content overflows.
 
-This spec ensures the navigation surface stays coherent with Cloutmate’s emotional theming and PARA workflow.
+This spec ensures the navigation surface stays coherent with FocusOS’s emotional theming and PARA workflow.

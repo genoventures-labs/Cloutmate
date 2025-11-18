@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 
 # Configuration
-CHANGELOG_FILE = "Cloutmate/aurora_changelog.json"
+CHANGELOG_FILE = "FocusOS/aurora_changelog.json"
 CONFIG_FILE = ".changelog-config.json"
 
 def run_git_command(cmd: List[str]) -> str:
@@ -207,8 +207,8 @@ def generate_changelog_entries() -> List[Dict]:
     now = datetime.utcnow().isoformat() + "Z"
     
     for status, filepath in staged_files:
-        # Only process Swift files in Cloutmate directory
-        if not filepath.endswith(".swift") or not filepath.startswith("Cloutmate/"):
+        # Only process Swift files in FocusOS directory
+        if not filepath.endswith(".swift") or not filepath.startswith("FocusOS/"):
             continue
         
         # Skip changelog file itself

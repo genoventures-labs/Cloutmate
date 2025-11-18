@@ -1,6 +1,6 @@
 # Dashboard V2 Specification
 
-Dashboard V2 lives in `Cloutmate/Views/Dashboard/` and is rendered by `DashboardViewV2`. It surfaces the day’s momentum through five stacked sections.
+Dashboard V2 lives in `FocusOS/Views/Dashboard/` and is rendered by `DashboardViewV2`. It surfaces the day’s momentum through five stacked sections.
 
 ---
 

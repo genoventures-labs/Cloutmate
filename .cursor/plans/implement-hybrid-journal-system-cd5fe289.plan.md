@@ -1,5 +1,5 @@
 <!-- cd5fe289-867e-46b8-aff3-7ec445dd96af 66308acb-1d78-4b41-bb3c-f6739cfabba9 -->
-# Implement Hybrid Journal System for Cloutmate
+# Implement Hybrid Journal System for FocusOS
 
 ## Overview
 
@@ -9,7 +9,7 @@ Create a comprehensive journaling system that allows users to capture personal r
 
 ### Model Structure
 
-**New File:** `Cloutmate/Models/Journal.swift`
+**New File:** `FocusOS/Models/Journal.swift`
 
 - SwiftData model similar to Note but with journal-specific fields
 - Fields: `id`, `title`, `content`, `mood`, `tags`, `entryDate`, `createdAt`, `updatedAt`, `projectId`, `areaId`, `linkedNoteIds`, `linkedAreaIds`, `linkedProjectIds`, `aiPrompt`, `aiGeneratedContent`, `isArchived`
@@ -19,26 +19,26 @@ Create a comprehensive journaling system that allows users to capture personal r
 
 **New Files:**
 
-- `Cloutmate/Views/Journal/JournalView.swift` - Main journal list/table view
-- `Cloutmate/Views/Journal/CreateJournalEntrySheet.swift` - Create/edit journal entry
-- `Cloutmate/Views/Journal/JournalDetailView.swift` - Detail view with AI controls
-- `Cloutmate/Views/Journal/Components/JournalFiltersView.swift` - Filter chips and search
-- `Cloutmate/Views/Journal/Components/AIPromptPanel.swift` - AI prompt suggestions and generation
+- `FocusOS/Views/Journal/JournalView.swift` - Main journal list/table view
+- `FocusOS/Views/Journal/CreateJournalEntrySheet.swift` - Create/edit journal entry
+- `FocusOS/Views/Journal/JournalDetailView.swift` - Detail view with AI controls
+- `FocusOS/Views/Journal/Components/JournalFiltersView.swift` - Filter chips and search
+- `FocusOS/Views/Journal/Components/AIPromptPanel.swift` - AI prompt suggestions and generation
 
 ### Service Integration
 
 **New Files:**
 
-- `Cloutmate/Services/JournalAIService.swift` - AI prompts, content generation, reflection analysis
+- `FocusOS/Services/JournalAIService.swift` - AI prompts, content generation, reflection analysis
 - Uses existing `GeminiService` for AI functionality
 
 ### UI Updates
 
 **Files to Modify:**
 
-1. `Cloutmate/Views/MainWindowView.swift` - Add `.journal` tab identifier and view case
-2. `Cloutmate/Views/Sidebar.swift` - Update sections: move Inbox/Notes/Journal to CAPTURE section
-3. `Cloutmate/CloutmateApp.swift` - Ensure Journal model is in model container
+1. `FocusOS/Views/MainWindowView.swift` - Add `.journal` tab identifier and view case
+2. `FocusOS/Views/Sidebar.swift` - Update sections: move Inbox/Notes/Journal to CAPTURE section
+3. `FocusOS/FocusOSApp.swift` - Ensure Journal model is in model container
 
 ## Implementation Details
 
@@ -118,6 +118,6 @@ Create a comprehensive journaling system that allows users to capture personal r
 - [ ] Build JournalAIService.swift for prompt suggestions, content generation, and entry analysis using GeminiService
 - [ ] Add .journal tab to TabIdentifier enum and MainWindowView contentView switch statement
 - [ ] Reorganize sidebar: create CAPTURE section with Inbox, Notes, Journal tabs
-- [ ] Add Journal to model container in CloutmateApp.swift
+- [ ] Add Journal to model container in FocusOSApp.swift
 - [ ] Add linking controls to JournalDetailView with visual indicators for linked Notes/Areas/Projects
 - [ ] Add CSV export functionality for journal entries matching ListTableView export pattern

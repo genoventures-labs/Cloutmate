@@ -369,7 +369,7 @@ if #available(macOS 12.0, *) {
 
 ## Comparison with Other Chat Apps
 
-| Feature | ChatGPT | Claude | Cloutmate |
+| Feature | ChatGPT | Claude | FocusOS |
 |---------|---------|--------|-----------|
 | **Bold** | ✅ | ✅ | ✅ |
 | *Italic* | ✅ | ✅ | ✅ |
@@ -380,7 +380,7 @@ if #available(macOS 12.0, *) {
 | Code Blocks | ✅ | ✅ | ✅ |
 | Headers | ✅ | ✅ | ✅ |
 
-**Cloutmate now matches** industry-standard AI chat interfaces! 🎉
+**FocusOS now matches** industry-standard AI chat interfaces! 🎉
 
 ---
 

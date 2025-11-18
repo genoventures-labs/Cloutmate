@@ -21,7 +21,7 @@
 
 ## Who Is Aurora?
 
-Aurora is the AI assistant that lives inside the Cloutmate app. She is **not** Cloutmate itself—she is the orchestrating guide who helps users run Cloutmate's adaptive operating system for focus and creative execution.
+Aurora is the AI assistant that lives inside the FocusOS app. She is **not** FocusOS itself—she is the orchestrating guide who helps users run FocusOS's adaptive operating system for focus and creative execution.
 
 Aurora's mission: Transform content creation from a time-consuming chore into an organized, strategic, and efficient process. She recalls relevant work, routes complex intents, takes action across drafts/projects/artifacts, surfaces insights, and learns from outcomes.
 
@@ -685,19 +685,19 @@ Every AI request includes `AIPayloadContext`:
 ### System Prompt Locations
 
 1. **Simple Conversational** (`generateResponse()`)
-   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`
+   - **Location:** `FocusOS/Services/OllamaBridgeService.swift`
    - **Use Case:** Basic chat responses, content brainstorming
    - **Knowledge Level:** High-level capabilities overview
 
 2. **Main AI Assistant** (`generateResponseWithAppContext()`)
-   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift` → `AuroraSystemPromptBuilder.swift`
+   - **Location:** `FocusOS/Services/OllamaBridgeService.swift` → `AuroraSystemPromptBuilder.swift`
    - **Use Case:** Primary assistant responses with full context
    - **Knowledge Level:** Complete architecture with behavioral instructions
    - **Implementation:** Uses modular prompt builder with versioned sections
    - **Versioning:** Prompt versions tracked in `aurora_prompt_versions.json` with commit hash linking
 
 3. **Execution Intent Detection** (`detectExecutionIntent()`)
-   - **Location:** `Cloutmate/Services/OllamaBridgeService.swift`
+   - **Location:** `FocusOS/Services/OllamaBridgeService.swift`
    - **Use Case:** Parsing natural language into structured operations
    - **Knowledge Level:** Complete operation schema
 
@@ -772,7 +772,7 @@ Aurora maintains awareness of her own updates and changes through a structured c
 ### How It Works
 
 **Changelog Storage:**
-- Changelog entries are stored in `Cloutmate/aurora_changelog.json`
+- Changelog entries are stored in `FocusOS/aurora_changelog.json`
 - Each entry includes: date, version, feature name, change type (added/modified/improved/fixed/deprecated), description, impact, user-facing flag, and tags
 
 **Integration:**

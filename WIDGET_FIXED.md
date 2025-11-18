@@ -7,7 +7,7 @@ The widget was trying to access SwiftData directly, which has issues with app gr
 ## Current Solution
 
 The widget now:
-1. ✅ Imports CloutmateShared framework
+1. ✅ Imports FocusOSShared framework
 2. ✅ Shows placeholder data (0 scheduled posts)
 3. ✅ Updates timeline every 15 minutes
 4. ✅ Ready for future enhancement with app group data

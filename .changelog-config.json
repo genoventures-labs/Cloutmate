@@ -1,8 +1,8 @@
 {
   "monitorPaths": [
-    "Cloutmate/Services/",
-    "Cloutmate/Models/",
-    "Cloutmate/Views/"
+    "FocusOS/Services/",
+    "FocusOS/Models/",
+    "FocusOS/Views/"
   ],
   "patternDetection": {
     "newService": {

@@ -7,7 +7,7 @@ Transform the Notes view from a table-based interface to a modern card-based sys
 
 ## Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/Notes/Components/NotesHeaderView.swift` (NEW)
+**File:** `FocusOS/Views/Notes/Components/NotesHeaderView.swift` (NEW)
 
 Create header component with:
 
@@ -27,7 +27,7 @@ Create header component with:
 
 ## Phase 2: Note Card System
 
-**File:** `Cloutmate/Views/Notes/Components/NoteCardV2.swift` (NEW)
+**File:** `FocusOS/Views/Notes/Components/NoteCardV2.swift` (NEW)
 
 Create card component with:
 
@@ -46,12 +46,12 @@ Create card component with:
 
 **Model Update Required:**
 
-- Add `isPinned: Bool` property to `CloutmateShared/CloutmateShared/CloutmateShared/Models/Note.swift`
+- Add `isPinned: Bool` property to `FocusOSShared/FocusOSShared/FocusOSShared/Models/Note.swift`
 - Add `pinnedAt: Date?` property for sorting
 
 ## Phase 3: Note Detail Drawer
 
-**File:** `Cloutmate/Views/Notes/Components/NoteDetailDrawer.swift` (NEW)
+**File:** `FocusOS/Views/Notes/Components/NoteDetailDrawer.swift` (NEW)
 
 Create drawer component (similar to DailySnapshotDrawer pattern):
 
@@ -79,7 +79,7 @@ Create drawer component (similar to DailySnapshotDrawer pattern):
 
 ## Phase 4: Organization & Grouping
 
-**File:** `Cloutmate/Views/Notes/UnifiedNotesView.swift` (NEW - replaces NotesView.swift)
+**File:** `FocusOS/Views/Notes/UnifiedNotesView.swift` (NEW - replaces NotesView.swift)
 
 Create unified view with:
 
@@ -103,20 +103,20 @@ Create unified view with:
 
 ## Phase 5: Quick Add & Capture Flow
 
-**File:** `Cloutmate/Views/Components/ContextualCreateSheet.swift` (MODIFY)
+**File:** `FocusOS/Views/Components/ContextualCreateSheet.swift` (MODIFY)
 
 - Ensure "New Note" action opens blank editor modal (uses same drawer UI as NoteDetailDrawer)
 - Autofocus cursor to body field
 - Light confetti shimmer when note is saved (use existing shimmer effect)
 - Haptic pulse feedback on creation (NSHapticFeedbackManager)
 
-**File:** `Cloutmate/Extensions/Notification+Names.swift` (MODIFY)
+**File:** `FocusOS/Extensions/Notification+Names.swift` (MODIFY)
 
 - Add `.openNoteDetail` notification name for drawer opening
 
 ## Phase 6: Accessibility & Calm Mode
 
-**File:** `Cloutmate/Views/Notes/Components/NoteCardV2.swift` (MODIFY)
+**File:** `FocusOS/Views/Notes/Components/NoteCardV2.swift` (MODIFY)
 
 - Large tap targets (min 56pt height)
 - Reduce motion → fade-only transitions (check `@Environment(\.accessibilityReduceMotion)`)
@@ -124,7 +124,7 @@ Create unified view with:
 - Dynamic Type scaling support
 - Calm mode → desaturate gradient backgrounds, reduce animation intensity (check ARTE emotional state)
 
-**File:** `Cloutmate/Views/Notes/UnifiedNotesView.swift` (MODIFY)
+**File:** `FocusOS/Views/Notes/UnifiedNotesView.swift` (MODIFY)
 
 - Keyboard navigation:
 - ↑↓ for cards
@@ -134,7 +134,7 @@ Create unified view with:
 
 ## Phase 7: Aurora Integration
 
-**File:** `Cloutmate/Views/Notes/Components/NoteDetailDrawer.swift` (MODIFY)
+**File:** `FocusOS/Views/Notes/Components/NoteDetailDrawer.swift` (MODIFY)
 
 - AI Summary drawer section connects to Aurora's Recall Layer
 - Display emotional tone (from emotional continuity phase)
@@ -144,7 +144,7 @@ Create unified view with:
 - Link to related concepts/themes via tags
 - Update access count and lastAccessedAt
 
-**File:** `Cloutmate/Services/OllamaBridgeService.swift` (USE EXISTING)
+**File:** `FocusOS/Services/OllamaBridgeService.swift` (USE EXISTING)
 
 - Use `analyzeDocument()` method for note summarization
 - Pass note content + context (linked tasks/projects) as appContext
@@ -173,18 +173,18 @@ Create unified view with:
 
 ## Files to Create
 
-- `Cloutmate/Views/Notes/Components/NotesHeaderView.swift`
-- `Cloutmate/Views/Notes/Components/NoteCardV2.swift`
-- `Cloutmate/Views/Notes/Components/NoteDetailDrawer.swift`
-- `Cloutmate/Views/Notes/UnifiedNotesView.swift`
-- `Cloutmate/Views/Components/FilterChipGroup.swift` (if needed)
+- `FocusOS/Views/Notes/Components/NotesHeaderView.swift`
+- `FocusOS/Views/Notes/Components/NoteCardV2.swift`
+- `FocusOS/Views/Notes/Components/NoteDetailDrawer.swift`
+- `FocusOS/Views/Notes/UnifiedNotesView.swift`
+- `FocusOS/Views/Components/FilterChipGroup.swift` (if needed)
 
 ## Files to Modify
 
-- `CloutmateShared/CloutmateShared/CloutmateShared/Models/Note.swift` - Add isPinned, pinnedAt
-- `Cloutmate/Views/Components/ContextualCreateSheet.swift` - Integrate note creation
-- `Cloutmate/Extensions/Notification+Names.swift` - Add .openNoteDetail
-- `Cloutmate/Views/MainWindowView.swift` - Update to use UnifiedNotesView instead of NotesView
+- `FocusOSShared/FocusOSShared/FocusOSShared/Models/Note.swift` - Add isPinned, pinnedAt
+- `FocusOS/Views/Components/ContextualCreateSheet.swift` - Integrate note creation
+- `FocusOS/Extensions/Notification+Names.swift` - Add .openNoteDetail
+- `FocusOS/Views/MainWindowView.swift` - Update to use UnifiedNotesView instead of NotesView
 
 ## Testing Checklist
 
@@ -202,7 +202,7 @@ Create unified view with:
 
 ### To-dos
 
-- [ ] Add isPinned and pinnedAt properties to Note model in CloutmateShared
+- [ ] Add isPinned and pinnedAt properties to Note model in FocusOSShared
 - [ ] Create FilterChipGroup component wrapper for horizontal filter chips
 - [ ] Build NotesHeaderView with title, subline, search bar, filter chips, and quick add button
 - [ ] Create NoteCardV2 component with glass panel, preview, metadata, hover states, and context menu

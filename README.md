@@ -1,8 +1,8 @@
-# Cloutmate
+# FocusOS
 
 **A cognitive workspace orchestration system for focus and creative execution.**
 
-Cloutmate is a macOS-native application that transforms content creation from a time-consuming chore into an organized, strategic, and efficient process. Built on the PARA method (Projects, Areas, Resources, Archives) and powered by Aurora—an advanced AI assistant with 9 development phases of cognitive capabilities.
+FocusOS is a macOS-native application that transforms content creation from a time-consuming chore into an organized, strategic, and efficient process. Built on the PARA method (Projects, Areas, Resources, Archives) and powered by Aurora—an advanced AI assistant with 9 development phases of cognitive capabilities.
 
 ---
 
@@ -24,7 +24,7 @@ Cloutmate is a macOS-native application that transforms content creation from a 
 
 ## Overview
 
-Cloutmate is a comprehensive cognitive workspace orchestration system that combines:
+FocusOS is a comprehensive cognitive workspace orchestration system that combines:
 
 - **PARA Method Organization**: Projects, Areas, Resources, and Archives for structured knowledge management
 - **AI-Powered Cognition**: Aurora, an advanced AI assistant with emotional memory, predictive capabilities, and adaptive intelligence
@@ -38,7 +38,7 @@ Cloutmate is a comprehensive cognitive workspace orchestration system that combi
 
 ### Cognitive Workspace Philosophy
 
-Cloutmate is a cognitive workspace that helps you:
+FocusOS is a cognitive workspace that helps you:
 
 1. **Capture** ideas instantly (Inbox, Quick Capture, Voice Memos)
 2. **Organize** using PARA method (Projects, Areas, Resources, Archives)
@@ -47,7 +47,7 @@ Cloutmate is a cognitive workspace that helps you:
 
 ### The PARA Method
 
-Cloutmate implements Tiago Forte's PARA method:
+FocusOS implements Tiago Forte's PARA method:
 
 - **Projects**: Specific outcomes with deadlines (e.g., "Launch Q4 Campaign")
 - **Areas**: Standards to maintain (e.g., "Health", "Content Creation")
@@ -110,7 +110,7 @@ Cloutmate implements Tiago Forte's PARA method:
 
 ### 🤖 Aurora AI Assistant
 
-Aurora is Cloutmate's AI assistant—a cognitive operating system that lives inside the app. See [Aurora AI Assistant](#aurora-ai-assistant) section for complete details.
+Aurora is FocusOS's AI assistant—a cognitive operating system that lives inside the app. See [Aurora AI Assistant](#aurora-ai-assistant) section for complete details.
 
 **Key Capabilities:**
 - Natural language workspace operations (create tasks, projects, notes, reminders)
@@ -160,7 +160,7 @@ Personal Intelligence Dashboard with 6 analytics tabs:
 
 ## Aurora AI Assistant
 
-Aurora is the AI assistant that orchestrates Cloutmate's cognitive operating system. She is **not** Cloutmate itself—she is the intelligent guide who helps you run everything.
+Aurora is the AI assistant that orchestrates FocusOS's cognitive operating system. She is **not** FocusOS itself—she is the intelligent guide who helps you run everything.
 
 ### Who Is Aurora?
 
@@ -329,20 +329,20 @@ Aurora runs entirely on your computer using **Ollama** (local LLM) for privacy a
 ### Project Structure
 
 ```
-Cloutmate/
-├── Cloutmate/                    # Main application
+FocusOS/
+├── FocusOS/                    # Main application
 │   ├── Models/                   # SwiftData models
 │   ├── Services/                 # Core services
 │   ├── ViewModels/               # View models
 │   ├── Views/                    # SwiftUI views
 │   └── Utilities/                # Utilities and helpers
-├── CloutmateShared/              # Shared framework
+├── FocusOSShared/              # Shared framework
 │   ├── Models/                   # Shared models
 │   ├── Services/                 # Shared services
 │   └── UI/                       # Shared UI components
-├── CloutmateHelper/              # Background helper app
-├── CloutmateWidget/              # WidgetKit extension
-└── CloutmateMenuBar/             # Menu bar application
+├── FocusOSHelper/              # Background helper app
+├── FocusOSWidget/              # WidgetKit extension
+└── FocusOSMenuBar/             # Menu bar application
 ```
 
 ### Core Services
@@ -451,7 +451,7 @@ Cloutmate/
 
 ### Background Architecture
 
-#### Helper App (CloutmateHelper)
+#### Helper App (FocusOSHelper)
 - Background services for notifications and system integration
 - XPC listener for communication with main app
 
@@ -499,21 +499,21 @@ Cloutmate/
 #### 1. App Groups
 
 Ensure all targets use the same App Group:
-- App Group: `group.com.kosmicapps.Cloutmate`
+- App Group: `group.com.kosmicapps.FocusOS`
 - Update entitlements for main app, helper, widget, and menu bar
 
 #### 2. Notion Integration (Optional)
 
 1. Go to Settings → Integrations → Notion
 2. Click "Connect Notion Account"
-3. Authorize Cloutmate in Notion
+3. Authorize FocusOS in Notion
 4. Select databases to import
 5. Configure property mappings
 
 ### Build and Run
 
-1. Open `Cloutmate.xcodeproj` in Xcode
-2. Select the Cloutmate scheme
+1. Open `FocusOS.xcodeproj` in Xcode
+2. Select the FocusOS scheme
 3. Build and run (`Cmd+R`)
 
 **Note**: The helper app will be embedded automatically when properly configured.
@@ -573,7 +573,7 @@ Ensure all targets use the same App Group:
 ### Daily Workflow
 
 **Morning Routine:**
-1. Open Cloutmate and check Inbox (`Cmd+2`)
+1. Open FocusOS and check Inbox (`Cmd+2`)
 2. Process inbox items: convert to tasks, notes, or artifacts
 3. Ask Aurora: "What should I focus on today?"
 4. Review Focus Gravity for top priorities
@@ -725,7 +725,7 @@ Import and sync your Notion databases with intelligent property mapping:
 **Setup:**
 1. Go to Settings → Integrations → Notion
 2. Click "Connect Notion Account"
-3. Authorize Cloutmate
+3. Authorize FocusOS
 4. Select databases to import
 5. Configure property mappings
 6. Enable sync schedule
@@ -821,7 +821,7 @@ Import and sync your Notion databases with intelligent property mapping:
 
 **Local-First Architecture:**
 - All data stored locally on your Mac using SwiftData
-- Database location: `~/Library/Group Containers/group.kosmicapps.cloutmate/`
+- Database location: `~/Library/Group Containers/group.kosmicapps.focusos/`
 - No data sent to external servers by default
 - CloudKit sync is optional and encrypted
 
@@ -893,32 +893,32 @@ See [Architecture](#architecture) section for detailed structure.
 ### Key Files
 
 #### Models
-- `CloutmateShared/Models/`: Shared data models
-- `Cloutmate/Models/`: App-specific models
+- `FocusOSShared/Models/`: Shared data models
+- `FocusOS/Models/`: App-specific models
 
 #### Services
-- `Cloutmate/Services/`: Core application services
-- `CloutmateShared/Services/`: Shared services
+- `FocusOS/Services/`: Core application services
+- `FocusOSShared/Services/`: Shared services
 
 #### Views
-- `Cloutmate/Views/`: SwiftUI views organized by feature
-- `CloutmateShared/UI/`: Shared UI components
+- `FocusOS/Views/`: SwiftUI views organized by feature
+- `FocusOSShared/UI/`: Shared UI components
 
 ### Building
 
 ```bash
 # Build main app
-xcodebuild -scheme Cloutmate -configuration Debug
+xcodebuild -scheme FocusOS -configuration Debug
 
 # Build all targets
-xcodebuild -workspace Cloutmate.xcworkspace -scheme Cloutmate -configuration Debug
+xcodebuild -workspace FocusOS.xcworkspace -scheme FocusOS -configuration Debug
 ```
 
 ### Testing
 
 ```bash
 # Run tests
-xcodebuild test -scheme Cloutmate -destination 'platform=macOS'
+xcodebuild test -scheme FocusOS -destination 'platform=macOS'
 ```
 
 ### Code Style
@@ -1017,7 +1017,7 @@ All rights reserved.
   1. Open Terminal
   2. Run `ollama serve`
   3. Wait for "Server started" message
-  4. Try again in Cloutmate
+  4. Try again in FocusOS
 - **Prevention**: Keep Ollama running in background or set to start on login
 
 **Model Not Found:**
@@ -1026,7 +1026,7 @@ All rights reserved.
   1. Open Terminal
   2. Run `ollama pull qwen3:1.7b`
   3. Wait for download to complete
-  4. Try again in Cloutmate
+  4. Try again in FocusOS
 
 **Timeout Errors:**
 - **Symptom**: Request times out after several minutes

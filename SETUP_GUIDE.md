@@ -1,12 +1,12 @@
-# Cloutmate Setup Guide
+# FocusOS Setup Guide
 
 ## Overview
 
-This project uses **Xcode 16's File System Synchronized Root Groups** (objectVersion 77), which means Xcode automatically detects files in folders and adds them to targets. The helper app files are already in the `CloutmateHelper` folder but need proper target configuration.
+This project uses **Xcode 16's File System Synchronized Root Groups** (objectVersion 77), which means Xcode automatically detects files in folders and adds them to targets. The helper app files are already in the `FocusOSHelper` folder but need proper target configuration.
 
 ## Quick Start
 
-1. Open `Cloutmate.xcodeproj` in Xcode 16+
+1. Open `FocusOS.xcodeproj` in Xcode 16+
 2. Add the helper target (see step 2 below)
 3. Configure the helper target settings
 4. Add Meta API credentials
@@ -16,9 +16,9 @@ This project uses **Xcode 16's File System Synchronized Root Groups** (objectVer
 
 ### 1. Open Project in Xcode
 
-Open `Cloutmate.xcodeproj` in Xcode 16 or later. Files are automatically synchronized from the file system.
+Open `FocusOS.xcodeproj` in Xcode 16 or later. Files are automatically synchronized from the file system.
 
-### 2. Add CloutmateHelper Target
+### 2. Add FocusOSHelper Target
 
 The helper folder exists but needs a proper target:
 
@@ -27,10 +27,10 @@ The helper folder exists but needs a proper target:
 2. Select **"macOS"** → **"App"**
 3. Click **"Next"**
 4. Fill in the details:
-   - **Product Name:** `CloutmateHelper`
+   - **Product Name:** `FocusOSHelper`
    - **Team:** Your development team
    - **Organization Identifier:** `com.kosmicapps`
-   - **Bundle Identifier:** `com.kosmicapps.Cloutmate.Helper`
+   - **Bundle Identifier:** `com.kosmicapps.FocusOS.Helper`
    - **Language:** Swift
    - **Interface:** None (or SwiftUI)
 5. Click **"Finish"**
@@ -40,11 +40,11 @@ The helper folder exists but needs a proper target:
 2. Select **"macOS"** → **"App"** or **"XPC Service"**
 3. Configure as above
 4. After creation, delete the template files Xcode creates
-5. The existing files in `CloutmateHelper` folder will be detected automatically
+5. The existing files in `FocusOSHelper` folder will be detected automatically
 
 ### 3. Configure Helper Target Info
 
-1. Select the **CloutmateHelper** target in the project navigator
+1. Select the **FocusOSHelper** target in the project navigator
 2. Go to the **Info** tab
 3. Under "Custom macOS Application Target Properties", add:
    - Key: `LSUIElement` → Type: Boolean → Value: `YES`
@@ -54,56 +54,56 @@ The helper folder exists but needs a proper target:
 
 With Xcode 16's auto-sync, files should be included automatically. Verify:
 
-1. Select `CloutmateHelper/CloutmateHelperApp.swift`
+1. Select `FocusOSHelper/FocusOSHelperApp.swift`
 2. Open the File Inspector (right panel)
-3. Under **Target Membership**, ensure **CloutmateHelper** is checked
+3. Under **Target Membership**, ensure **FocusOSHelper** is checked
 
 Repeat for all helper files:
-- `CloutmateHelperApp.swift`
+- `FocusOSHelperApp.swift`
 - `HelperXPCService.swift`
 - `BackgroundScheduler.swift`
 - `PostPublisher.swift`
 - `InsightsPoller.swift`
 - `NotificationManager.swift`
-- `CloutmateHelper.entitlements`
+- `FocusOSHelper.entitlements`
 
 ### 5. Add Shared Files to Both Targets
 
 These files need to be in **both** targets:
 
 1. Select each file below
-2. In File Inspector → Target Membership, check **both** Cloutmate and CloutmateHelper
+2. In File Inspector → Target Membership, check **both** FocusOS and FocusOSHelper
 
 **Files to share:**
-- `Cloutmate/Shared/XPCProtocol.swift`
-- `Cloutmate/Models/Platform.swift`
-- `Cloutmate/Models/APIModels.swift`
-- `Cloutmate/Services/MetaAPIService.swift`
-- `Cloutmate/Services/ThreadsService.swift`
-- `Cloutmate/Services/FacebookService.swift`
-- `Cloutmate/Services/KeychainService.swift`
-- `Cloutmate/Utilities/Logger.swift`
+- `FocusOS/Shared/XPCProtocol.swift`
+- `FocusOS/Models/Platform.swift`
+- `FocusOS/Models/APIModels.swift`
+- `FocusOS/Services/MetaAPIService.swift`
+- `FocusOS/Services/ThreadsService.swift`
+- `FocusOS/Services/FacebookService.swift`
+- `FocusOS/Services/KeychainService.swift`
+- `FocusOS/Utilities/Logger.swift`
 
 ### 6. Configure Signing & Capabilities (Helper Target)
 
-1. Select **CloutmateHelper** target
+1. Select **FocusOSHelper** target
 2. Go to **Signing & Capabilities** tab
 3. Check "Automatically manage signing"
 4. Select your development team
 5. Add capabilities:
    - **App Sandbox**
-   - **App Groups** → Add `group.com.kosmicapps.Cloutmate`
+   - **App Groups** → Add `group.com.kosmicapps.FocusOS`
    - **Keychain Sharing** → Match the main app's access group
 
-**Important:** Both Cloutmate and CloutmateHelper must use the same App Group ID.
+**Important:** Both FocusOS and FocusOSHelper must use the same App Group ID.
 
 ### 7. Verify Main App Entitlements
 
-Ensure the main app (`Cloutmate` target) has:
+Ensure the main app (`FocusOS` target) has:
 
 1. **App Sandbox** enabled
-2. **App Groups:** `group.com.kosmicapps.Cloutmate`
-3. **CloudKit:** `iCloud.com.kosmicapps.Cloutmate`
+2. **App Groups:** `group.com.kosmicapps.FocusOS`
+3. **CloudKit:** `iCloud.com.kosmicapps.FocusOS`
 4. **Keychain Access Groups:** Properly configured
 
 ### 8. Configure Meta API Credentials
@@ -112,13 +112,13 @@ Ensure the main app (`Cloutmate` target) has:
 
 #### Method 1: Add to Info.plist in Xcode (Recommended)
 
-1. In Xcode, select the **Cloutmate** target
+1. In Xcode, select the **FocusOS** target
 2. Go to the **Info** tab
 3. Under "Custom macOS Application Target Properties", click the **+** button
 4. Add these entries:
    - Key: `MetaAppID` → Type: String → Value: `YOUR_META_APP_ID`
    - Key: `MetaAppSecret` → Type: String → Value: `YOUR_META_APP_SECRET`
-   - Key: `MetaRedirectURI` → Type: String → Value: `cloutmate://oauth/callback`
+   - Key: `MetaRedirectURI` → Type: String → Value: `focusos://oauth/callback`
 
 #### Method 2: Use Environment Variables (For Development)
 
@@ -126,13 +126,13 @@ Ensure the main app (`Cloutmate` target) has:
 2. Add these environment variables:
    - `MetaAppID` = `YOUR_META_APP_ID`
    - `MetaAppSecret` = `YOUR_META_APP_SECRET`
-   - `MetaRedirectURI` = `cloutmate://oauth/callback`
+   - `MetaRedirectURI` = `focusos://oauth/callback`
 
 **Note:** Environment variables take precedence over Info.plist if both are set.
 
 ### 9. Build and Test
 
-1. Select the **Cloutmate** scheme in the toolbar
+1. Select the **FocusOS** scheme in the toolbar
 2. Build (Cmd+B)
 3. Run (Cmd+R)
 4. Test OAuth authentication in Settings
@@ -151,7 +151,7 @@ If files aren't showing up:
 
 - Verify `LSBackgroundOnly` = `YES` in Info tab
 - Check Console.app for XPC errors
-- Ensure XPC service name matches: `com.kosmicapps.Cloutmate.Helper`
+- Ensure XPC service name matches: `com.kosmicapps.FocusOS.Helper`
 
 ### OAuth Not Working
 
@@ -183,13 +183,13 @@ After setup:
 ## File Structure
 
 ```
-Cloutmate/
+FocusOS/
 ├── Models/          # SwiftData models
 ├── Views/           # SwiftUI views
 ├── Services/        # Business logic
 ├── Utilities/       # Helpers and utilities
 ├── Shared/          # Shared between targets
-└── CloutmateHelper/ # Background helper app
+└── FocusOSHelper/ # Background helper app
 ```
 
 Both targets share common files via target membership, which is the modern Xcode 16 approach.

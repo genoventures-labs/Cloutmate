@@ -4,7 +4,7 @@
 
 The widget and menu bar app can now **publish posts directly**, not just schedule them!
 
-### ✅ Added to CloutmateShared:
+### ✅ Added to FocusOSShared:
 
 1. **MetaAPIService.swift** - Meta API client (adapted for framework)
 2. **ThreadsService.swift** - Threads platform service
@@ -21,9 +21,9 @@ The widget and menu bar app can now **publish posts directly**, not just schedul
 
 ### Key Files Updated:
 
-- `CloutmateShared/Services/MetaAPIService.swift` - Now uses MetaAPIConfig instead of Bundle.main
-- `CloutmateShared/Services/PublishingService.swift` - Full implementation (no longer a stub)
-- `CloutmateMenuBar/QuickComposerView.swift` - Can publish immediately now
+- `FocusOSShared/Services/MetaAPIService.swift` - Now uses MetaAPIConfig instead of Bundle.main
+- `FocusOSShared/Services/PublishingService.swift` - Full implementation (no longer a stub)
+- `FocusOSMenuBar/QuickComposerView.swift` - Can publish immediately now
 
 ## Configuration Required
 
@@ -43,7 +43,7 @@ Add this to `MenuBarApp.swift`:
 
 ```swift
 @main
-struct CloutmateMenuBarApp: App {
+struct FocusOSMenuBarApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     init() {
@@ -70,7 +70,7 @@ struct CloutmateMenuBarApp: App {
 ## Files Structure
 
 ```
-CloutmateShared/CloutmateShared/Services/
+FocusOSShared/FocusOSShared/Services/
 ├── Logger.swift ✅
 ├── KeychainService.swift ✅
 ├── XPCService.swift ✅
@@ -85,15 +85,15 @@ CloutmateShared/CloutmateShared/Services/
 
 ## Next Steps in Xcode
 
-1. **Add new files to CloutmateShared target:**
+1. **Add new files to FocusOSShared target:**
    - `MetaAPIService.swift`
    - `ThreadsService.swift`
    - `FacebookService.swift`
    - `MetaAPIConfig.swift`
    - `APIModels.swift`
 
-2. **Add AuthenticationServices framework** to CloutmateShared:
-   - Select CloutmateShared target
+2. **Add AuthenticationServices framework** to FocusOSShared:
+   - Select FocusOSShared target
    - Go to General tab
    - Under "Frameworks, Libraries, and Embedded Content"
    - Click the + button

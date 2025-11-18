@@ -14,7 +14,7 @@ Remove hardcoded feature lists from Aurora's system prompts and rely on AuroraCh
 ## Changes Required
 
 ### 1. Clean up `generateResponse()` system prompt
-**File:** `Cloutmate/Services/OllamaBridgeService.swift` (lines 467-501)
+**File:** `FocusOS/Services/OllamaBridgeService.swift` (lines 467-501)
 
 **Remove:**
 - Hardcoded "Your Core Capabilities (All Fully Implemented)" list (lines 470-490)
@@ -31,7 +31,7 @@ Remove hardcoded feature lists from Aurora's system prompts and rely on AuroraCh
 - Note that capabilities are tracked in changelog
 
 ### 2. Clean up `buildSystemPrompt()` CORE CAPABILITIES section
-**File:** `Cloutmate/Services/OllamaBridgeService.swift` (lines 1163-1183)
+**File:** `FocusOS/Services/OllamaBridgeService.swift` (lines 1163-1183)
 
 **Remove:**
 - Detailed feature descriptions that duplicate changelog (e.g., "Recall Layer: pull the most relevant...", "Airplane Mode Support: You can run...", etc.)
@@ -50,7 +50,7 @@ Remove hardcoded feature lists from Aurora's system prompts and rely on AuroraCh
 - Keep only behavioral/personality instructions
 
 ### 3. Ensure changelog integration is optimal
-**File:** `Cloutmate/Services/OllamaBridgeService.swift` (lines 1225-1255)
+**File:** `FocusOS/Services/OllamaBridgeService.swift` (lines 1225-1255)
 
 **Verify:**
 - Recent changes (14 days) are being added correctly
@@ -65,7 +65,7 @@ Remove hardcoded feature lists from Aurora's system prompts and rely on AuroraCh
 
 ### Simplified `generateResponse()` prompt structure:
 ```
-You are Aurora, the AI assistant living inside Cloutmate (the app). 
+You are Aurora, the AI assistant living inside FocusOS (the app). 
 [Core identity and personality - keep as is]
 
 Your capabilities and recent updates are tracked in your changelog, 
@@ -92,7 +92,7 @@ provided in your context.
 ```
 
 ## Files to Modify
-- `Cloutmate/Services/OllamaBridgeService.swift`
+- `FocusOS/Services/OllamaBridgeService.swift`
   - `generateResponse()` method (lines ~467-501)
   - `buildSystemPrompt()` method (lines ~1160-1257)
 

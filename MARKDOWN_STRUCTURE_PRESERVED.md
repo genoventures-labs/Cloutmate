@@ -158,7 +158,7 @@ Separated with space
 
 ### Should Now Render As:
 
-**Cloutmate App Context** (large header, spaced)
+**FocusOS App Context** (large header, spaced)
 
 **Creative Command Center** (medium header)
 

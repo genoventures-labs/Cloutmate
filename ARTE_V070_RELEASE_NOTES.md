@@ -85,7 +85,7 @@ Aurora has evolved from understanding you to **feeling with you**. ARTE is Auror
 - GlassMotion: Animation timing multipliers
 - ContentView: Background emotional shifts
 - InsightsView: ARTE indicator
-- CloutmateApp: Initialization & schema
+- FocusOSApp: Initialization & schema
 
 **Total Changes:**
 - 252 files modified/created

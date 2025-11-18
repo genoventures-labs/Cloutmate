@@ -7,7 +7,7 @@ Redesign the Focus Gravity tab to match the visual hierarchy and usability patte
 
 ## Current State
 
-**File**: `Cloutmate/Views/Focus/FocusGravityView.swift`
+**File**: `FocusOS/Views/Focus/FocusGravityView.swift`
 
 The current implementation has:
 
@@ -312,13 +312,13 @@ VStack(spacing: 16) {
 
 ## Files to Modify
 
-1. **`Cloutmate/Views/Focus/FocusGravityView.swift`** - Main redesign
-2. **`Cloutmate/Services/PriorityEngine.swift`** - Expose `lastCacheRefresh` as computed property
-3. **`Cloutmate/Views/MainWindowView.swift`** - Pass `selectedTab` binding if needed for "Open in Focus Mode"
+1. **`FocusOS/Views/Focus/FocusGravityView.swift`** - Main redesign
+2. **`FocusOS/Services/PriorityEngine.swift`** - Expose `lastCacheRefresh` as computed property
+3. **`FocusOS/Views/MainWindowView.swift`** - Pass `selectedTab` binding if needed for "Open in Focus Mode"
 
 ## Key Implementation Details
 
-- Import `CloutmateShared` for shared models
+- Import `FocusOSShared` for shared models
 - Make `glassColorSystem` optional-aware: `@EnvironmentObject private var glassColorSystem: GlassColorSystem?`
 - Add `@State private var orbitRotation: Double = 0` for animations
 - Add `@State private var loadingRotation: Double = 0` for loading spinner

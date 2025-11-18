@@ -9,7 +9,7 @@ Transform the AI Assistant tab from a simple chat interface into an intelligent 
 
 ### 1. Pinned Conversations
 
-**File: `Cloutmate/Models/AIMessage.swift` (AIConversation)**
+**File: `FocusOS/Models/AIMessage.swift` (AIConversation)**
 
 - Add properties:
 ```swift
@@ -18,12 +18,12 @@ Transform the AI Assistant tab from a simple chat interface into an intelligent 
 ```
 
 
-**File: `Cloutmate/ViewModels/AIAssistantViewModel.swift`**
+**File: `FocusOS/ViewModels/AIAssistantViewModel.swift`**
 
 - Add method: `togglePin(_ conversation: AIConversation, modelContext: ModelContext)`
 - Update `filteredConversations` to sort pinned conversations first
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
 
 - Add star icon overlay for pinned conversations
 - Add "Pin to Top" / "Unpin" in context menu
@@ -31,7 +31,7 @@ Transform the AI Assistant tab from a simple chat interface into an intelligent 
 
 ### 2. Auto-Generated Conversation Summaries
 
-**File: `Cloutmate/Models/AIMessage.swift` (AIConversation)**
+**File: `FocusOS/Models/AIMessage.swift` (AIConversation)**
 
 - Add properties:
 ```swift
@@ -40,25 +40,25 @@ Transform the AI Assistant tab from a simple chat interface into an intelligent 
 ```
 
 
-**File: `Cloutmate/Services/GeminiService.swift`**
+**File: `FocusOS/Services/GeminiService.swift`**
 
 - Add method: `generateConversationSummary(messages: [AIMessage]) async throws -> String`
 - Prompt: "Summarize this conversation in 2-3 sentences focusing on key topics and outcomes"
 
-**File: `Cloutmate/ViewModels/AIAssistantViewModel.swift`**
+**File: `FocusOS/ViewModels/AIAssistantViewModel.swift`**
 
 - Add method: `generateSummary(for conversation: AIConversation, modelContext: ModelContext) async`
 - Auto-trigger when: conversation has 5+ messages and hasn't been updated in 24 hours
 - Add method: `refreshSummary(_ conversation: AIConversation, modelContext: ModelContext) async`
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
 
 - Display summary below title as secondary text
 - Add "Refresh Summary" button in context menu
 
 ### 3. Topic Tagging & Auto-Categorization
 
-**File: `Cloutmate/Models/AIMessage.swift` (AIConversation)**
+**File: `FocusOS/Models/AIMessage.swift` (AIConversation)**
 
 - Add property:
 ```swift
@@ -70,7 +70,7 @@ var tags: [String] {
 ```
 
 
-**File: `Cloutmate/Services/GeminiService.swift`**
+**File: `FocusOS/Services/GeminiService.swift`**
 
 - Add method: `categorizeCo
 
@@ -78,20 +78,20 @@ nversation(title: String, summary: String?) async throws -> [String]`
 
 - Return 1-3 soft categories (e.g., "Facebook strategy", "Copywriting", "Analytics")
 
-**File: `Cloutmate/ViewModels/AIAssistantViewModel.swift`**
+**File: `FocusOS/ViewModels/AIAssistantViewModel.swift`**
 
 - Add method: `autoTag(_ conversation: AIConversation, modelContext: ModelContext) async`
 - Trigger after summary generation
 - Add `selectedTags: Set<String>` property for filtering
 - Update `filteredConversations` to filter by tags
 
-**File: `Cloutmate/Views/AIAssistant/Components/ConversationSearchBar.swift`**
+**File: `FocusOS/Views/AIAssistant/Components/ConversationSearchBar.swift`**
 
 - Add tag chips filter UI below search
 - Display active tags with X to remove
 - Add "All Tags" dropdown menu
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
 
 - Display tag chips beside title using HStack with colored badges
 
@@ -99,27 +99,27 @@ nversation(title: String, summary: String?) async throws -> [String]`
 
 ### 4. Export to Drafts
 
-**File: `Cloutmate/ViewModels/AIAssistantViewModel.swift`**
+**File: `FocusOS/ViewModels/AIAssistantViewModel.swift`**
 
 - Add method: `exportToDraft(messages: [AIMessage], modelContext: ModelContext) -> Draft`
 - Extract all assistant messages as draft content
 - Include conversation title as notes
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift`**
 
 - Add "Export to Drafts" in ConversationRow context menu
 - Add "Export Current Chat" button in chat area toolbar
 - Show success toast: "Exported to Drafts"
 - Optional: Jump to Drafts tab after export
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (mainChatArea)**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (mainChatArea)**
 
 - Add floating action button: "Export Chat to Drafts"
 - Only show when messages exist
 
 ### 5. Quick Actions (Hover Menu)
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (ConversationRow)**
 
 - Add hover state: `@State private var isHovered = false`
 - On hover, show action buttons overlay:
@@ -147,18 +147,18 @@ nversation(title: String, summary: String?) async throws -> [String]`
 
 ### 6. Smart Conversation Recap
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (mainChatArea)**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift` (mainChatArea)**
 
 - Add "Summarize Chat" floating button (visible when 10+ messages)
 - Generate inline summary using Gemini
 - Insert as system message (distinct styling)
 - Make collapsible
 
-**File: `Cloutmate/Models/AIMessage.swift`**
+**File: `FocusOS/Models/AIMessage.swift`**
 
 - Add `isSystemMessage: Bool = false` to differentiate summaries
 
-**File: `Cloutmate/Services/GeminiService.swift`**
+**File: `FocusOS/Services/GeminiService.swift`**
 
 - Add method: `summarizeRecentMessages(_ messages: [AIMessage], count: Int = 15) async throws -> String`
 
@@ -179,7 +179,7 @@ nversation(title: String, summary: String?) async throws -> [String]`
 
 ### 8. Cross-Conversation Insights
 
-**File: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`**
+**File: `FocusOS/Views/AIAssistant/AIAssistantView.swift`**
 
 - Add "Reflection" panel in sidebar header
 - Weekly/monthly auto-summary of recurring topics
@@ -246,11 +246,11 @@ nversation(title: String, summary: String?) async throws -> [String]`
 
 ## Files to Modify (Phase 1)
 
-- `Cloutmate/Models/AIMessage.swift` (AIConversation model)
-- `Cloutmate/Services/GeminiService.swift` (new methods)
-- `Cloutmate/ViewModels/AIAssistantViewModel.swift` (pin, summary, tag logic)
-- `Cloutmate/Views/AIAssistant/Components/ConversationSearchBar.swift` (tag filter UI)
-- `Cloutmate/Views/AIAssistant/AIAssistantView.swift` (ConversationRow updates)
+- `FocusOS/Models/AIMessage.swift` (AIConversation model)
+- `FocusOS/Services/GeminiService.swift` (new methods)
+- `FocusOS/ViewModels/AIAssistantViewModel.swift` (pin, summary, tag logic)
+- `FocusOS/Views/AIAssistant/Components/ConversationSearchBar.swift` (tag filter UI)
+- `FocusOS/Views/AIAssistant/AIAssistantView.swift` (ConversationRow updates)
 
 ### To-dos
 

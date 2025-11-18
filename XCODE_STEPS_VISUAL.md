@@ -1,11 +1,11 @@
-# Visual Guide: Adding Files & Frameworks to CloutmateShared
+# Visual Guide: Adding Files & Frameworks to FocusOSShared
 
-## Step 1: Add Files to CloutmateShared Target
+## Step 1: Add Files to FocusOSShared Target
 
 ### Visual Steps:
 
 1. **Select the files in Finder/Xcode project navigator:**
-   - Open `CloutmateShared/CloutmateShared/Services/`
+   - Open `FocusOSShared/FocusOSShared/Services/`
    - Select these files:
      - `MetaAPIService.swift`
      - `ThreadsService.swift`
@@ -17,7 +17,7 @@
 
 3. **Choose** "Get Info" (⌘I)
 
-4. **Target Membership** section → Check **CloutmateShared**
+4. **Target Membership** section → Check **FocusOSShared**
 
 ### Alternative Method:
 
@@ -25,7 +25,7 @@
 
 2. **File Inspector** (⌥⌘1) - Right sidebar
 
-3. **Target Membership** → Check ✅ **CloutmateShared**
+3. **Target Membership** → Check ✅ **FocusOSShared**
 
 4. Repeat for all files
 
@@ -35,7 +35,7 @@
 
 ### Visual Steps:
 
-1. **Click on CloutmateShared target** in Xcode (top of project navigator)
+1. **Click on FocusOSShared target** in Xcode (top of project navigator)
 
 2. **General tab** (should be selected by default)
 
@@ -53,9 +53,9 @@
 
 ### If + Button Not Visible:
 
-1. Select **CloutmateShared** project (blue icon, not the target)
+1. Select **FocusOSShared** project (blue icon, not the target)
 
-2. Select **CloutmateShared** TARGET (under TARGETS section)
+2. Select **FocusOSShared** TARGET (under TARGETS section)
 
 3. **General tab** → Scroll to "Frameworks, Libraries, and Embedded Content"
 
@@ -63,9 +63,9 @@
 
 ## Step 3: Verify Network Capabilities
 
-### For CloutmateMenuBar Target:
+### For FocusOSMenuBar Target:
 
-1. **Select CloutmateMenuBar** target
+1. **Select FocusOSMenuBar** target
 
 2. **Signing & Capabilities** tab
 
@@ -80,14 +80,14 @@
 
 ```
 Xcode Project Structure:
-├── Cloutmate.xcodeproj
+├── FocusOS.xcodeproj
     ├── TARGETS
-    │   ├── Cloutmate (Main App)
-    │   ├── CloutmateShared ← Select this
-    │   ├── CloutmateWidget
-    │   └── CloutmateMenuBar
+    │   ├── FocusOS (Main App)
+    │   ├── FocusOSShared ← Select this
+    │   ├── FocusOSWidget
+    │   └── FocusOSMenuBar
     └── PROJECTS
-        └── Cloutmate
+        └── FocusOS
 ```
 
 **Where to find things:**
@@ -104,13 +104,13 @@ After adding files, you should see in File Inspector (⌥⌘1):
 **For each file:**
 ```
 Target Membership:
-☐ Cloutmate
-☑ CloutmateShared  ← Checked!
-☐ CloutmateWidget
-☐ CloutmateMenuBar
+☐ FocusOS
+☑ FocusOSShared  ← Checked!
+☐ FocusOSWidget
+☐ FocusOSMenuBar
 ```
 
-**In CloutmateShared General tab:**
+**In FocusOSShared General tab:**
 ```
 Frameworks, Libraries, and Embedded Content:
 + AuthenticationServices.framework (Do Not Embed)
@@ -124,9 +124,9 @@ Frameworks, Libraries, and Embedded Content:
 - Make sure you're adding the macOS version
 - Try: System Frameworks → AuthenticationServices
 
-**"File not compiling in CloutmateShared":**
+**"File not compiling in FocusOSShared":**
 - Check File Inspector → Target Membership
-- Ensure file is checked for CloutmateShared target
+- Ensure file is checked for FocusOSShared target
 
 **"Module 'AuthenticationServices' not found":**
 - Verify the framework is in "Frameworks, Libraries, and Embedded Content"

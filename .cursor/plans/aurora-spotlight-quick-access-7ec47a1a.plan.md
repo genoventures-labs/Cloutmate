@@ -29,7 +29,7 @@ Script that:
   - Tags extracted from file paths and comments
 - Merges new entries with existing `aurora_changelog.json`
 - Preserves existing entries and maintains chronological order
-- Outputs updated JSON to `Cloutmate/aurora_changelog.json`
+- Outputs updated JSON to `FocusOS/aurora_changelog.json`
 
 **Pattern Detection:**
 - New files: `git diff --cached --name-status` → detect `A` (added)
@@ -46,7 +46,7 @@ Script that:
 Hook that:
 - Runs `scripts/generate_changelog.swift` (or Python script)
 - Checks if changelog.json was updated
-- If updated, stages the updated file: `git add Cloutmate/aurora_changelog.json`
+- If updated, stages the updated file: `git add FocusOS/aurora_changelog.json`
 - Allows commit to proceed
 - After commit (via post-commit hook), updates changelog entries with commit hash
 
@@ -59,7 +59,7 @@ Hook that:
 
 ### Phase 3: Add Commit Hash to Changelog Model
 
-**File:** `Cloutmate/Models/AuroraChangelog.swift`
+**File:** `FocusOS/Models/AuroraChangelog.swift`
 
 Update `AuroraChangelogEntry` to include:
 - `commitHash: String?` - Git commit hash linking to code changes
@@ -67,7 +67,7 @@ Update `AuroraChangelogEntry` to include:
 
 ### Phase 4: Add Git Commit History Access to Aurora
 
-**File:** `Cloutmate/Services/AuroraChangelogService.swift`
+**File:** `FocusOS/Services/AuroraChangelogService.swift`
 
 Add methods:
 - `getCommitHistory(days: Int?) -> [GitCommit]` - Retrieve git commits
@@ -75,7 +75,7 @@ Add methods:
 - `getCommitDetails(_ hash: String) -> GitCommit?` - Get detailed commit info
 - `formatCommitHistory(_ commits: [GitCommit]) -> String` - Format for Aurora's context
 
-**File:** `Cloutmate/Models/GitCommit.swift` (new)
+**File:** `FocusOS/Models/GitCommit.swift` (new)
 
 Model for git commit data:
 - `hash: String` - Commit hash
@@ -87,7 +87,7 @@ Model for git commit data:
 
 ### Phase 5: Integrate Git History into Aurora's Context
 
-**File:** `Cloutmate/Services/OllamaBridgeService.swift`
+**File:** `FocusOS/Services/OllamaBridgeService.swift`
 
 Update `buildSystemPrompt()` to:
 - Query recent git commits (last 30 days) if available
@@ -99,7 +99,7 @@ Update `buildSystemPrompt()` to:
 **File:** `.changelog-config.json`
 
 Configuration for:
-- File paths to monitor (e.g., `Cloutmate/Services/`, `Cloutmate/Models/`)
+- File paths to monitor (e.g., `FocusOS/Services/`, `FocusOS/Models/`)
 - Pattern detection rules
 - Feature name extraction patterns
 - Default tags for file types
@@ -111,14 +111,14 @@ Configuration for:
 - `scripts/generate_changelog.swift` (or `scripts/generate_changelog.py`) - Main generator script
 - `.git/hooks/pre-commit` - Git pre-commit hook
 - `.git/hooks/post-commit` - Git post-commit hook (updates commit hashes)
-- `Cloutmate/Models/GitCommit.swift` - Git commit model
+- `FocusOS/Models/GitCommit.swift` - Git commit model
 - `.changelog-config.json` - Configuration file
 
 **Modified Files:**
-- `Cloutmate/Models/AuroraChangelog.swift` - Add commitHash field
-- `Cloutmate/Services/AuroraChangelogService.swift` - Add git history methods
-- `Cloutmate/Services/OllamaBridgeService.swift` - Integrate git history context
-- `Cloutmate/aurora_changelog.json` - Will be auto-updated
+- `FocusOS/Models/AuroraChangelog.swift` - Add commitHash field
+- `FocusOS/Services/AuroraChangelogService.swift` - Add git history methods
+- `FocusOS/Services/OllamaBridgeService.swift` - Integrate git history context
+- `FocusOS/aurora_changelog.json` - Will be auto-updated
 
 ## Implementation Details
 

@@ -9,7 +9,7 @@ Create a new "Tasks" tab in the ORGANIZE section that displays all tasks (especi
 
 ### 1. Add Tasks Tab to Navigation
 
-**File: `Cloutmate/Views/MainWindowView.swift`**
+**File: `FocusOS/Views/MainWindowView.swift`**
 
 - Add `case tasks = "Tasks"` to the `TabIdentifier` enum (line 18, after `projects`)
 - Add icon mapping: `case .tasks: return "checkmark.circle.fill"` (around line 44)
@@ -17,14 +17,14 @@ Create a new "Tasks" tab in the ORGANIZE section that displays all tasks (especi
 
 ### 2. Update Sidebar Navigation
 
-**File: `Cloutmate/Views/Sidebar.swift`**
+**File: `FocusOS/Views/Sidebar.swift`**
 
 - Add `.tasks` to the ORGANIZE section tabs array (line 64)
 - Change from `tabs: [.projects, .areas, .resources, .archives]` to `tabs: [.projects, .areas, .tasks, .resources, .archives]`
 
 ### 3. Create TasksView Component
 
-**New File: `Cloutmate/Views/Tasks/TasksView.swift`**
+**New File: `FocusOS/Views/Tasks/TasksView.swift`**
 
 Create a comprehensive tasks management view following the `ProjectsView.swift` pattern:
 
@@ -52,7 +52,7 @@ Create a comprehensive tasks management view following the `ProjectsView.swift` 
 
 ### 4. Create Supporting Components
 
-**New File: `Cloutmate/Views/Tasks/TasksView.swift`** (continued)
+**New File: `FocusOS/Views/Tasks/TasksView.swift`** (continued)
 
 Include these sub-components in the same file:
 
@@ -92,12 +92,12 @@ Leverage these existing components already in the codebase:
 
 ## Files to Create
 
-1. `Cloutmate/Views/Tasks/TasksView.swift` - Main tasks view with all components
+1. `FocusOS/Views/Tasks/TasksView.swift` - Main tasks view with all components
 
 ## Files to Modify
 
-1. `Cloutmate/Views/MainWindowView.swift` - Add tasks tab identifier and routing
-2. `Cloutmate/Views/Sidebar.swift` - Add tasks to ORGANIZE section
+1. `FocusOS/Views/MainWindowView.swift` - Add tasks tab identifier and routing
+2. `FocusOS/Views/Sidebar.swift` - Add tasks to ORGANIZE section
 
 ### To-dos
 

@@ -1,18 +1,18 @@
 # Fixed: SharedDataManager Duplicate Removed
 
 ## Removed
-❌ `CloutmateShared/CloutmateShared/Services/SharedDataManager.swift`
+❌ `FocusOSShared/FocusOSShared/Services/SharedDataManager.swift`
 
 ## Kept
-✅ `CloutmateShared/CloutmateShared/CloutmateShared/Services/SharedDataManager.swift`
+✅ `FocusOSShared/FocusOSShared/FocusOSShared/Services/SharedDataManager.swift`
 
 ## Why the wrong path?
 
 The file structure is:
 ```
-CloutmateShared/                    (project root)
-  CloutmateShared/                  (product name)
-    CloutmateShared/                (framework structure)
+FocusOSShared/                    (project root)
+  FocusOSShared/                  (product name)
+    FocusOSShared/                (framework structure)
       Services/
         SharedDataManager.swift ✅  (correct location)
       Models/
@@ -21,8 +21,8 @@ CloutmateShared/                    (project root)
 
 NOT:
 ```
-CloutmateShared/
-  CloutmateShared/
+FocusOSShared/
+  FocusOSShared/
     Services/ ❌                   (wrong - shorter path)
 ```
 

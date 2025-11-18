@@ -9,7 +9,7 @@ Phase 4 is now **fully implemented** and **production-ready**. Focus Mode provid
 
 ### 1. Focus Session Model
 
-**`Cloutmate/Models/FocusSession.swift`**
+**`FocusOS/Models/FocusSession.swift`**
 - SwiftData model tracking focus sessions from start to completion/abandonment
 - Fields: `objective`, `targetObjectId`, `statusRaw`, `startTime`, `endTime`, `plannedDuration`, `actualDuration`, `completed`, `notes`, `itemsCompleted`
 - Computed properties: `elapsedTime`, `remainingTime`, `isActive`, `ranOverTime`, `durationFormatted`, `completionSummary`
@@ -39,7 +39,7 @@ final class FocusSession {
 
 ### 2. Focus Session Service
 
-**`Cloutmate/Services/FocusSessionService.swift`**
+**`FocusOS/Services/FocusSessionService.swift`**
 - Main service managing focus session lifecycle
 - Integrates with CPS, CalendarAvailability, and Feedback systems
 
@@ -92,7 +92,7 @@ if let productiveHour = stats.mostProductiveTimeOfDay {
 
 ### 3. Feedback Logger Integration
 
-**`Cloutmate/Services/AIFeedbackLogger.swift`**
+**`FocusOS/Services/AIFeedbackLogger.swift`**
 - ✅ `recordFocusSession(session:modelContext:)` - Logs completed/abandoned sessions
 - ✅ Weekly summary now includes focus session stats
 - ✅ Sessions appear in "Recent Feedback Insights"
@@ -116,7 +116,7 @@ if config.featureFlags.focusModeEnabled {
 
 ### 4. Focus Mode UI
 
-**`Cloutmate/Views/Focus/FocusModeView.swift`**
+**`FocusOS/Views/Focus/FocusModeView.swift`**
 Comprehensive UI for managing focus sessions:
 
 **Features:**
@@ -163,7 +163,7 @@ Button("Abandon") { onAbandon() }
 
 ### 5. Aurora's Focus Awareness
 
-**`Cloutmate/Services/AIPayloadContext` Enhanced:**
+**`FocusOS/Services/AIPayloadContext` Enhanced:**
 ```swift
 struct FocusSessionContext: Sendable {
     let isActive: Bool
@@ -225,7 +225,7 @@ IMPORTANT BEHAVIORS:
 
 ### 6. Configuration
 
-**`Cloutmate/Config/AIConfig.plist`**
+**`FocusOS/Config/AIConfig.plist`**
 ```xml
 <key>AIFocusModeEnabled</key>
 <true/>
@@ -497,18 +497,18 @@ struct FocusSessionStats {
 ## Files Modified/Created
 
 ### New Files ✨
-- `Cloutmate/Models/FocusSession.swift`
-- `Cloutmate/Services/FocusSessionService.swift`
-- `Cloutmate/Views/Focus/FocusModeView.swift`
+- `FocusOS/Models/FocusSession.swift`
+- `FocusOS/Services/FocusSessionService.swift`
+- `FocusOS/Views/Focus/FocusModeView.swift`
 
 ### Modified Files 🔧
-- `Cloutmate/Config/AIConfig.plist`
-- `Cloutmate/Services/AIRecallService.swift` (added `FocusSessionContext`)
-- `Cloutmate/Services/AIFeedbackLogger.swift` (added `recordFocusSession`)
-- `Cloutmate/Services/GeminiService.swift` (updated prompts, added focus formatting)
-- `Cloutmate/ViewModels/AIAssistantViewModel.swift` (populates focus context)
-- `Cloutmate/Views/MainWindowView.swift` (added Focus Mode tab)
-- `Cloutmate/Views/Sidebar.swift` (added Focus Mode to TOOLS)
+- `FocusOS/Config/AIConfig.plist`
+- `FocusOS/Services/AIRecallService.swift` (added `FocusSessionContext`)
+- `FocusOS/Services/AIFeedbackLogger.swift` (added `recordFocusSession`)
+- `FocusOS/Services/GeminiService.swift` (updated prompts, added focus formatting)
+- `FocusOS/ViewModels/AIAssistantViewModel.swift` (populates focus context)
+- `FocusOS/Views/MainWindowView.swift` (added Focus Mode tab)
+- `FocusOS/Views/Sidebar.swift` (added Focus Mode to TOOLS)
 
 ---
 

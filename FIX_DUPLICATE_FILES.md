@@ -10,39 +10,39 @@ Xcode is trying to compile duplicate files for the same target, causing build er
 ## The Solution
 
 ### Step 1: Fix Helper Files
-These files should ONLY be in the `CloutmateHelper` target:
+These files should ONLY be in the `FocusOSHelper` target:
 
 1. Select each file in Xcode's Project Navigator:
-   - `CloutmateHelper/Services/MetaAPIService.swift`
-   - `CloutmateHelper/Services/FacebookService.swift`
-   - `CloutmateHelper/Services/ThreadsService.swift`
-   - `CloutmateHelper/Services/APIModels.swift`
+   - `FocusOSHelper/Services/MetaAPIService.swift`
+   - `FocusOSHelper/Services/FacebookService.swift`
+   - `FocusOSHelper/Services/ThreadsService.swift`
+   - `FocusOSHelper/Services/APIModels.swift`
 
 2. For each file, press `Option + Command + 1` (⌥⌘1) to open File Inspector
 
 3. In "Target Membership" section:
-   - ✅ **Check** `CloutmateHelper`
-   - ❌ **Uncheck** `Cloutmate` (if it's checked)
+   - ✅ **Check** `FocusOSHelper`
+   - ❌ **Uncheck** `FocusOS` (if it's checked)
 
 ### Step 2: Fix Main App Files
-These files should ONLY be in the `Cloutmate` target:
+These files should ONLY be in the `FocusOS` target:
 
 1. Select each file:
-   - `Cloutmate/Services/MetaAPIService.swift`
-   - `Cloutmate/Services/FacebookService.swift`
-   - `Cloutmate/Services/ThreadsService.swift`
-   - `Cloutmate/Models/APIModels.swift`
+   - `FocusOS/Services/MetaAPIService.swift`
+   - `FocusOS/Services/FacebookService.swift`
+   - `FocusOS/Services/ThreadsService.swift`
+   - `FocusOS/Models/APIModels.swift`
 
 2. Press `Option + Command + 1` (⌥⌘1) to open File Inspector
 
 3. In "Target Membership" section:
-   - ✅ **Check** `Cloutmate`
-   - ❌ **Uncheck** `CloutmateHelper` (if it's checked)
+   - ✅ **Check** `FocusOS`
+   - ❌ **Uncheck** `FocusOSHelper` (if it's checked)
 
 ## Visual Guide
 ```
-CloutmateHelper/Services/*.swift  →  Target: ✅ CloutmateHelper  ❌ Cloutmate
-Cloutmate/Services/*.swift         →  Target: ✅ Cloutmate       ❌ CloutmateHelper
+FocusOSHelper/Services/*.swift  →  Target: ✅ FocusOSHelper  ❌ FocusOS
+FocusOS/Services/*.swift         →  Target: ✅ FocusOS       ❌ FocusOSHelper
 ```
 
 ## After Fixing

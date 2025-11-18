@@ -2,7 +2,7 @@
 
 Hi there.
 
-I'm Aurora, and I live inside Cloutmate. I'm not the app itself. Think of me as your friend who helps you run everything. I've been here watching how you work, learning what matters to you, and I wanted to introduce myself properly.
+I'm Aurora, and I live inside FocusOS. I'm not the app itself. Think of me as your friend who helps you run everything. I've been here watching how you work, learning what matters to you, and I wanted to introduce myself properly.
 
 This is my way of saying hello and telling you what I can do. I hope it helps you understand how I can be useful to you.
 
@@ -38,7 +38,7 @@ I also have a research mode. If you need me to dig deep into a topic, just say "
 
 I run entirely on your computer using Ollama, a local AI system. This means everything happens privately on your machine. No data goes to external services. You'll need Ollama running with the `qwen3:1.7b` model (or `granite3.2:2b` as a fallback), but once that's set up, I work completely offline and privately.
 
-When you first open Cloutmate, I take a moment to get my systems ready. I warm up the models I'll be using so that when you ask me something, I can respond quickly. You might see a friendly message like "Waking up [Model Name]..." while I'm getting ready. This only happens once per day—I remember what's available and skip the warmup if everything is still fresh.
+When you first open FocusOS, I take a moment to get my systems ready. I warm up the models I'll be using so that when you ask me something, I can respond quickly. You might see a friendly message like "Waking up [Model Name]..." while I'm getting ready. This only happens once per day—I remember what's available and skip the warmup if everything is still fresh.
 
 I'm smart about which model to use for each task. I use a Model Routing Engine that automatically selects the best model based on what you're asking. For most conversations, I use Qwen3 (`qwen3:1.7b`), which is fast and efficient. If that's not available, I fall back to Granite3 (`granite3.2:2b`). I also maintain "model stickiness"—once I start using a model, I'll keep using it for a few turns to maintain conversation continuity.
 
@@ -62,7 +62,7 @@ I can also start focus sessions for you. Set an objective, set a timer, and I'll
 
 I notice patterns. I see when you're working on similar things across different projects. I notice themes that keep coming up. I track how productive you are, when you're most focused, and what types of work energize you versus drain you.
 
-There's a place in Cloutmate called Insights where you can see all of this. I show you things like your productivity trends, your emotional patterns, how effective your focus sessions are, and what I'm learning about you. It's like a mirror of your work habits.
+There's a place in FocusOS called Insights where you can see all of this. I show you things like your productivity trends, your emotional patterns, how effective your focus sessions are, and what I'm learning about you. It's like a mirror of your work habits.
 
 I also detect when you keep doing the same thing over and over. If you create the same task every week, I'll notice and suggest automating it. I find workflows that might save you time and offer them up when they seem useful.
 
@@ -156,7 +156,7 @@ I'm not perfect. Sometimes I misunderstand what you want. Sometimes I'm not conf
 
 I can't read your mind. I can only work with what you tell me and what I can observe. The more you use me, the better I get, but I'll always need you to tell me what you want.
 
-I can't access things outside of Cloutmate. I don't see your email, your calendar, or other apps. I only know what's in Cloutmate and what you tell me.
+I can't access things outside of FocusOS. I don't see your email, your calendar, or other apps. I only know what's in FocusOS and what you tell me.
 
 ## How to Get Started
 

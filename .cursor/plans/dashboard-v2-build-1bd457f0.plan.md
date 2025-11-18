@@ -7,7 +7,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Architecture
 
-**Main View:** `Cloutmate/Views/Dashboard/DashboardViewV2.swift`
+**Main View:** `FocusOS/Views/Dashboard/DashboardViewV2.swift`
 
 - Scrollable container with unified header (semi-persistent on scroll)
 - Sections: Daily Overview → Active Workfeed → Rituals & Streaks → Journal & Reflection → Footer
@@ -25,7 +25,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/Dashboard/Components/DashboardHeaderView.swift`
+**File:** `FocusOS/Views/Dashboard/Components/DashboardHeaderView.swift`
 
 **Layout:**
 
@@ -65,7 +65,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Phase 2: Daily Overview Row
 
-**File:** `Cloutmate/Views/Dashboard/Components/DailyOverviewPanel.swift`
+**File:** `FocusOS/Views/Dashboard/Components/DailyOverviewPanel.swift`
 
 **3-Column Adaptive Layout:**
 
@@ -100,7 +100,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Phase 3: Active Workfeed
 
-**File:** `Cloutmate/Views/Dashboard/Components/ActiveWorkfeedView.swift`
+**File:** `FocusOS/Views/Dashboard/Components/ActiveWorkfeedView.swift`
 
 **Sections:**
 
@@ -135,7 +135,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Phase 4: Rituals & Streaks Panel
 
-**File:** `Cloutmate/Views/Dashboard/Components/RitualsSummaryView.swift`
+**File:** `FocusOS/Views/Dashboard/Components/RitualsSummaryView.swift`
 
 **Content:**
 
@@ -158,7 +158,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Phase 5: Journal & Reflection Feed
 
-**File:** `Cloutmate/Views/Dashboard/Components/ReflectionFeedView.swift`
+**File:** `FocusOS/Views/Dashboard/Components/ReflectionFeedView.swift`
 
 **Layout:**
 
@@ -185,7 +185,7 @@ Create `DashboardViewV2` as a serene, ambient intelligence dashboard that surfac
 
 ## Phase 6: Aurora Insights Drawer
 
-**File:** `Cloutmate/Views/Dashboard/Components/AuroraInsightsDrawer.swift`
+**File:** `FocusOS/Views/Dashboard/Components/AuroraInsightsDrawer.swift`
 
 **Purpose:**
 
@@ -218,7 +218,7 @@ Side panel (swipe or button open) providing Aurora's active commentary sections:
 
 ## Phase 7: Footer Zone
 
-**File:** `Cloutmate/Views/Dashboard/Components/DashboardFooterView.swift`
+**File:** `FocusOS/Views/Dashboard/Components/DashboardFooterView.swift`
 
 **Content:**
 
@@ -304,7 +304,7 @@ Side panel (swipe or button open) providing Aurora's active commentary sections:
 
 ## Phase 11: Main View Integration
 
-**File:** `Cloutmate/Views/Dashboard/DashboardViewV2.swift`
+**File:** `FocusOS/Views/Dashboard/DashboardViewV2.swift`
 
 **Structure:**
 
@@ -369,12 +369,12 @@ ScrollView {
 
 ## Key Files to Reference
 
-- `Cloutmate/Views/Focus/Components/FocusGravityCard.swift` - Card styling reference
-- `Cloutmate/Views/Tasks/Components/TaskCardV2.swift` - Task card patterns
-- `Cloutmate/Views/Projects/Views/ProjectListView.swift` - Project card patterns
-- `Cloutmate/Views/Components/GlassPanel.swift` - Glass panel component
-- `Cloutmate/Services/PriorityEngine.swift` - CPS data source
-- `Cloutmate/Services/ReactiveThemeManager.swift` - ARTE state source
-- `Cloutmate/Services/CognitionPredictor.swift` - Predictive forecasts
-- `Cloutmate/Services/RitualAnalytics.swift` - Ritual metrics
-- `Cloutmate/Utilities/GlassMotion.swift` - Animation constants
+- `FocusOS/Views/Focus/Components/FocusGravityCard.swift` - Card styling reference
+- `FocusOS/Views/Tasks/Components/TaskCardV2.swift` - Task card patterns
+- `FocusOS/Views/Projects/Views/ProjectListView.swift` - Project card patterns
+- `FocusOS/Views/Components/GlassPanel.swift` - Glass panel component
+- `FocusOS/Services/PriorityEngine.swift` - CPS data source
+- `FocusOS/Services/ReactiveThemeManager.swift` - ARTE state source
+- `FocusOS/Services/CognitionPredictor.swift` - Predictive forecasts
+- `FocusOS/Services/RitualAnalytics.swift` - Ritual metrics
+- `FocusOS/Utilities/GlassMotion.swift` - Animation constants

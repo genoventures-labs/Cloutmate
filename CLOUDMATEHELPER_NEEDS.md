@@ -1,22 +1,22 @@
-# CloudmateHelper Needs These Files
+# FocusOSHelper Needs These Files
 
-CloudmateHelper's `PostPublisher.swift` uses:
+FocusOSHelper's `PostPublisher.swift` uses:
 - `Platform` (from Platform.swift)
 - `ThreadsService`
 - `FacebookService`
 - `KeychainService`
 
-These are all in `Cloutmate/Services/` and `Cloutmate/Models/`.
+These are all in `FocusOS/Services/` and `FocusOS/Models/`.
 
-## Add to CloudmateHelper Target
+## Add to FocusOSHelper Target
 
-In Xcode, for each file, add CloudmateHelper to Target Membership:
+In Xcode, for each file, add FocusOSHelper to Target Membership:
 
-### From Cloutmate/Models/:
+### From FocusOS/Models/:
 - ✅ Platform.swift
 - ✅ APIModels.swift (for response types)
 
-### From Cloutmate/Services/:
+### From FocusOS/Services/:
 - ✅ MetaAPIService.swift
 - ✅ ThreadsService.swift
 - ✅ FacebookService.swift
@@ -25,9 +25,9 @@ In Xcode, for each file, add CloudmateHelper to Target Membership:
 ### How to check:
 1. Select each file
 2. ⌥⌘1 (File Inspector)
-3. Ensure CloudmateHelper is CHECKED
+3. Ensure FocusOSHelper is CHECKED
 
-## Alternative: Copy Files to CloudmateHelper
+## Alternative: Copy Files to FocusOSHelper
 
-Copy these files INTO `CloutmateHelper/` directory so they're ONLY for CloudmateHelper target.
+Copy these files INTO `FocusOSHelper/` directory so they're ONLY for FocusOSHelper target.
 

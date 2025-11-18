@@ -3,7 +3,7 @@
 
 ## Overview
 
-Build a WidgetKit widget (small size) and menu bar app that allows quick post scheduling without opening the main Cloutmate app. Both will share data via the app group `group.kosmicapps.cloutmate` and use the existing background XPC service for publishing.
+Build a WidgetKit widget (small size) and menu bar app that allows quick post scheduling without opening the main FocusOS app. Both will share data via the app group `group.kosmicapps.focusos` and use the existing background XPC service for publishing.
 
 ## Architecture
 
@@ -12,13 +12,13 @@ Build a WidgetKit widget (small size) and menu bar app that allows quick post sc
 - **SwiftData with App Group**: Configure the existing SwiftData ModelContainer to use the app group container
 - **Shared Models**: Widget and menu bar app will access the same Post, Draft, and PlatformAccount models
 - **Keychain Access**: Enable keychain sharing in app group for platform authentication tokens
-- **XPC Communication**: Widget/menu bar will use the existing CloutmateHelper XPC service for background scheduling
+- **XPC Communication**: Widget/menu bar will use the existing FocusOSHelper XPC service for background scheduling
 
 ### Components to Build
 
 #### 1. WidgetKit Extension (Small Widget)
 
-**Target**: CloutmateWidget
+**Target**: FocusOSWidget
 
 - Display quick stats (scheduled posts count, next post time)
 - Tappable widget opens the menu bar app or main app
@@ -28,7 +28,7 @@ Build a WidgetKit widget (small size) and menu bar app that allows quick post sc
 
 #### 2. Menu Bar App
 
-**Target**: CloutmateMenuBar (new macOS app target)
+**Target**: FocusOSMenuBar (new macOS app target)
 
 - Menu bar icon with status indicator
 - Popover interface with glassmorphic styling
@@ -39,7 +39,7 @@ Build a WidgetKit widget (small size) and menu bar app that allows quick post sc
 
 #### 3. Shared Framework
 
-**Target**: CloutmateShared (new framework)
+**Target**: FocusOSShared (new framework)
 
 - Move core models (Post, Draft, Platform, etc.) to shared framework
 - Move services (KeychainService, XPCService, PublishingService)
@@ -50,7 +50,7 @@ Build a WidgetKit widget (small size) and menu bar app that allows quick post sc
 
 ### Phase 1: Shared Framework Setup
 
-1. Create `CloutmateShared.framework` target
+1. Create `FocusOSShared.framework` target
 2. Move models to shared framework:
 
    - `Post.swift`
@@ -85,9 +85,9 @@ Build a WidgetKit widget (small size) and menu bar app that allows quick post sc
 ```swift
 static func createSharedModelContainer() -> ModelContainer {
     let appGroupURL = FileManager.default.containerURL(
-        forSecurityApplicationGroupIdentifier: "group.kosmicapps.cloutmate"
+        forSecurityApplicationGroupIdentifier: "group.kosmicapps.focusos"
     )!
-    let storeURL = appGroupURL.appendingPathComponent("Cloutmate.sqlite")
+    let storeURL = appGroupURL.appendingPathComponent("FocusOS.sqlite")
     
     let config = ModelConfiguration(url: storeURL)
     return try! ModelContainer(for: schema, configurations: [config])
@@ -99,7 +99,7 @@ static func createSharedModelContainer() -> ModelContainer {
 
 ### Phase 3: WidgetKit Extension
 
-1. Create `CloutmateWidget` WidgetKit extension target
+1. Create `FocusOSWidget` WidgetKit extension target
 2. Add app group entitlement to widget
 3. Create widget entry model:
 
@@ -110,18 +110,18 @@ static func createSharedModelContainer() -> ModelContainer {
    - Fetch from shared SwiftData container
    - Update timeline every 15 minutes
 
-5. Create small widget view (`CloutmateWidgetView`):
+5. Create small widget view (`FocusOSWidgetView`):
 
    - Glassmorphic background using `GlassPanel`
    - Display scheduled post count
    - Display next post time
    - App icon with badge
 
-6. Add deep link support (URL scheme: `cloutmate://compose`)
+6. Add deep link support (URL scheme: `focusos://compose`)
 
 ### Phase 4: Menu Bar App
 
-1. Create `CloutmateMenuBar` macOS app target
+1. Create `FocusOSMenuBar` macOS app target
 2. Configure as menu bar app (LSUIElement = YES)
 3. Add app group entitlement
 4. Create `MenuBarApp.swift`:
@@ -169,28 +169,28 @@ static func createSharedModelContainer() -> ModelContainer {
 
 ### Shared Framework
 
-- `CloutmateShared/Models/*.swift` (moved from main app)
-- `CloutmateShared/Services/*.swift` (moved from main app)
-- `CloutmateShared/UI/*.swift` (glassmorphic components)
-- `CloutmateShared/SharedDataManager.swift`
+- `FocusOSShared/Models/*.swift` (moved from main app)
+- `FocusOSShared/Services/*.swift` (moved from main app)
+- `FocusOSShared/UI/*.swift` (glassmorphic components)
+- `FocusOSShared/SharedDataManager.swift`
 
 ### Widget Extension
 
-- `CloutmateWidget/CloutmateWidget.swift`
-- `CloutmateWidget/WidgetTimelineProvider.swift`
-- `CloutmateWidget/CloutmateWidgetView.swift`
-- `CloutmateWidget/WidgetEntry.swift`
-- `CloutmateWidget/Assets.xcassets` (widget-specific icons)
+- `FocusOSWidget/FocusOSWidget.swift`
+- `FocusOSWidget/WidgetTimelineProvider.swift`
+- `FocusOSWidget/FocusOSWidgetView.swift`
+- `FocusOSWidget/WidgetEntry.swift`
+- `FocusOSWidget/Assets.xcassets` (widget-specific icons)
 
 ### Menu Bar App
 
-- `CloutmateMenuBar/MenuBarApp.swift`
-- `CloutmateMenuBar/MenuBarPopoverView.swift`
-- `CloutmateMenuBar/QuickComposerView.swift`
-- `CloutmateMenuBar/UpcomingPostsView.swift`
-- `CloutmateMenuBar/MenuBarSettingsView.swift`
-- `CloutmateMenuBar/StatusBarController.swift`
-- `CloutmateMenuBar/Assets.xcassets` (menu bar icons)
+- `FocusOSMenuBar/MenuBarApp.swift`
+- `FocusOSMenuBar/MenuBarPopoverView.swift`
+- `FocusOSMenuBar/QuickComposerView.swift`
+- `FocusOSMenuBar/UpcomingPostsView.swift`
+- `FocusOSMenuBar/MenuBarSettingsView.swift`
+- `FocusOSMenuBar/StatusBarController.swift`
+- `FocusOSMenuBar/Assets.xcassets` (menu bar icons)
 
 ## Technical Considerations
 
@@ -220,9 +220,9 @@ All widget and menu bar UI will use the same glassmorphic components:
 
 ### URL Scheme
 
-- `cloutmate://compose` - Open quick composer
-- `cloutmate://compose?date=<timestamp>` - Open with pre-filled date
-- `cloutmate://posts` - Open main app to posts list
+- `focusos://compose` - Open quick composer
+- `focusos://compose?date=<timestamp>` - Open with pre-filled date
+- `focusos://posts` - Open main app to posts list
 
 ## Testing Strategy
 
@@ -236,7 +236,7 @@ All widget and menu bar UI will use the same glassmorphic components:
 
 ### To-dos
 
-- [ ] Create CloutmateShared framework and move shared code (models, services, UI components)
+- [ ] Create FocusOSShared framework and move shared code (models, services, UI components)
 - [ ] Configure app group and update SwiftData container to use shared storage
 - [ ] Create WidgetKit extension with small widget view and timeline provider
 - [ ] Create menu bar app target with status bar item and popover controller

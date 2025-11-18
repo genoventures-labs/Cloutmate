@@ -83,11 +83,11 @@ Apply modern iOS 18+ styling:
 
 ## Files to Modify
 
-- `Cloutmate/Views/Drafts/DraftsView.swift` - Main fixes for layout, copy functionality, draft list
-- `Cloutmate/Views/Drafts/DraftEditor.swift` - Terminology, modern styling, UX improvements
-- `Cloutmate/Views/Drafts/TemplateManagementView.swift` - Split view sizing, terminology
-- `Cloutmate/Models/Draft.swift` - Rename caption → content property
-- `Cloutmate/Models/Template.swift` - Rename caption → content property
+- `FocusOS/Views/Drafts/DraftsView.swift` - Main fixes for layout, copy functionality, draft list
+- `FocusOS/Views/Drafts/DraftEditor.swift` - Terminology, modern styling, UX improvements
+- `FocusOS/Views/Drafts/TemplateManagementView.swift` - Split view sizing, terminology
+- `FocusOS/Models/Draft.swift` - Rename caption → content property
+- `FocusOS/Models/Template.swift` - Rename caption → content property
 
 ## Key Technical Decisions
 

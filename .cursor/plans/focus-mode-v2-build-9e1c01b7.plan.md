@@ -7,15 +7,15 @@ Transform the existing Focus Mode into `FocusModeViewV2` - an adaptive, minimal,
 
 ## Architecture
 
-**Main View:** `Cloutmate/Views/FocusMode/UnifiedFocusModeView.swift` (new)
-**Components:** Modular components in `Cloutmate/Views/FocusMode/Components/`
+**Main View:** `FocusOS/Views/FocusMode/UnifiedFocusModeView.swift` (new)
+**Components:** Modular components in `FocusOS/Views/FocusMode/Components/`
 **Services:** Extend existing `FocusSessionService`, integrate with `ReactiveThemeManager`, `CognitionPredictor`, `MemoryGraphService`
 
 ---
 
 ## Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/FocusMode/Components/FocusHeaderView.swift` (new)
+**File:** `FocusOS/Views/FocusMode/Components/FocusHeaderView.swift` (new)
 
 ### Implementation Details
 
@@ -40,7 +40,7 @@ Transform the existing Focus Mode into `FocusModeViewV2` - an adaptive, minimal,
 
 ## Phase 2: Core Session Panel
 
-**File:** `Cloutmate/Views/FocusMode/Components/FocusSessionPanel.swift` (new)
+**File:** `FocusOS/Views/FocusMode/Components/FocusSessionPanel.swift` (new)
 
 ### Implementation Details
 
@@ -74,7 +74,7 @@ Transform the existing Focus Mode into `FocusModeViewV2` - an adaptive, minimal,
 
 ## Phase 3: Session Sidebar (Aurora Companion)
 
-**File:** `Cloutmate/Views/FocusMode/Components/FocusSidebar.swift` (new)
+**File:** `FocusOS/Views/FocusMode/Components/FocusSidebar.swift` (new)
 
 ### Implementation Details
 
@@ -117,7 +117,7 @@ Transform the existing Focus Mode into `FocusModeViewV2` - an adaptive, minimal,
 
 ## Phase 4: Objective Drawer
 
-**File:** `Cloutmate/Views/FocusMode/Components/FocusObjectiveDrawer.swift` (new)
+**File:** `FocusOS/Views/FocusMode/Components/FocusObjectiveDrawer.swift` (new)
 
 ### Implementation Details
 
@@ -144,7 +144,7 @@ Transform the existing Focus Mode into `FocusModeViewV2` - an adaptive, minimal,
 
 ## Phase 5: Analytics & Review Drawer
 
-**File:** `Cloutmate/Views/FocusMode/Components/FocusAnalyticsDrawer.swift` (new)
+**File:** `FocusOS/Views/FocusMode/Components/FocusAnalyticsDrawer.swift` (new)
 
 ### Implementation Details
 
@@ -294,56 +294,56 @@ Transform the existing Focus Mode into `FocusModeViewV2` - an adaptive, minimal,
 
 ### New Files
 
-1. `Cloutmate/Views/FocusMode/UnifiedFocusModeView.swift`
+1. `FocusOS/Views/FocusMode/UnifiedFocusModeView.swift`
 
 - Main container view
 - Orchestrates header, panel, sidebar
 - Manages session state
 
-2. `Cloutmate/Views/FocusMode/Components/FocusHeaderView.swift`
+2. `FocusOS/Views/FocusMode/Components/FocusHeaderView.swift`
 
 - Header component with title, controls, filters
 
-3. `Cloutmate/Views/FocusMode/Components/FocusSessionPanel.swift`
+3. `FocusOS/Views/FocusMode/Components/FocusSessionPanel.swift`
 
 - Central timer and session display
 
-4. `Cloutmate/Views/FocusMode/Components/FocusSidebar.swift`
+4. `FocusOS/Views/FocusMode/Components/FocusSidebar.swift`
 
 - Aurora companion sidebar
 
-5. `Cloutmate/Views/FocusMode/Components/FocusObjectiveDrawer.swift`
+5. `FocusOS/Views/FocusMode/Components/FocusObjectiveDrawer.swift`
 
 - Objective setting drawer
 
-6. `Cloutmate/Views/FocusMode/Components/FocusAnalyticsDrawer.swift`
+6. `FocusOS/Views/FocusMode/Components/FocusAnalyticsDrawer.swift`
 
 - Analytics and review drawer
 
 ### Modified Files
 
-1. `Cloutmate/Services/FocusSessionService.swift`
+1. `FocusOS/Services/FocusSessionService.swift`
 
 - Add `getStreakCount()` method
 - Add predictive + ARTE hooks
 - Update CPS scores on session completion
 
-2. `Cloutmate/Services/CognitionPredictor.swift`
+2. `FocusOS/Services/CognitionPredictor.swift`
 
 - Ensure `FocusForecast` includes session context
 - Add method to get latest forecast for display
 
-3. `Cloutmate/Services/MemoryGraphService.swift`
+3. `FocusOS/Services/MemoryGraphService.swift`
 
 - Add method to link FocusSession to MemoryNode
 - Store session relationships
 
-4. `Cloutmate/Extensions/Notification+Names.swift`
+4. `FocusOS/Extensions/Notification+Names.swift`
 
 - Add `.focusSessionStarted`
 - Add `.focusSessionEnded`
 
-5. `Cloutmate/Views/MainWindowView.swift`
+5. `FocusOS/Views/MainWindowView.swift`
 
 - Update tab routing to use `UnifiedFocusModeView` instead of `FocusModeView`
 

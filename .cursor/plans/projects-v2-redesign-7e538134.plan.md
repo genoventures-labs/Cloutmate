@@ -9,7 +9,7 @@ Transform the Projects view from a simple table into a multi-mode orchestration 
 
 ### 1.1 Create UnifiedProjectsView
 
-**File:** `Cloutmate/Views/Projects/UnifiedProjectsView.swift` (new, replaces `ProjectsView.swift`)
+**File:** `FocusOS/Views/Projects/UnifiedProjectsView.swift` (new, replaces `ProjectsView.swift`)
 
 **Header Zone:**
 
@@ -32,7 +32,7 @@ Transform the Projects view from a simple table into a multi-mode orchestration 
 
 ### 1.2 Create ProjectViewMode Enum
 
-**File:** `Cloutmate/Views/Projects/ProjectViewMode.swift` (new)
+**File:** `FocusOS/Views/Projects/ProjectViewMode.swift` (new)
 
 ```swift
 enum ProjectViewMode: String, CaseIterable {
@@ -57,7 +57,7 @@ enum ProjectViewMode: String, CaseIterable {
 
 ### 2.1 List View
 
-**File:** `Cloutmate/Views/Projects/Views/ProjectListView.swift` (new)
+**File:** `FocusOS/Views/Projects/Views/ProjectListView.swift` (new)
 
 **Card Structure:**
 
@@ -86,7 +86,7 @@ enum ProjectViewMode: String, CaseIterable {
 
 ### 2.2 Board View
 
-**File:** `Cloutmate/Views/Projects/Views/ProjectBoardView.swift` (new)
+**File:** `FocusOS/Views/Projects/Views/ProjectBoardView.swift` (new)
 
 **Kanban Structure:**
 
@@ -119,7 +119,7 @@ enum ProjectViewMode: String, CaseIterable {
 
 ### 2.3 Timeline View
 
-**File:** `Cloutmate/Views/Projects/Views/ProjectTimelineView.swift` (new)
+**File:** `FocusOS/Views/Projects/Views/ProjectTimelineView.swift` (new)
 
 **Timeline Structure:**
 
@@ -143,7 +143,7 @@ enum ProjectViewMode: String, CaseIterable {
 
 ### 2.4 Gallery View
 
-**File:** `Cloutmate/Views/Projects/Views/ProjectGalleryView.swift` (new)
+**File:** `FocusOS/Views/Projects/Views/ProjectGalleryView.swift` (new)
 
 **Grid Layout:**
 
@@ -170,7 +170,7 @@ enum ProjectViewMode: String, CaseIterable {
 
 ### 3.1 Create Focus Gravity Data Service
 
-**File:** `Cloutmate/Services/ProjectFocusGravityService.swift` (new)
+**File:** `FocusOS/Services/ProjectFocusGravityService.swift` (new)
 
 **Purpose:** Calculate and cache focus metrics per project
 
@@ -204,7 +204,7 @@ struct ProjectFocusMetrics {
 
 ### 3.2 Create Focus Gravity Visual Components
 
-**File:** `Cloutmate/Views/Projects/Components/FocusGravityOverlay.swift` (new)
+**File:** `FocusOS/Views/Projects/Components/FocusGravityOverlay.swift` (new)
 
 **Components:**
 
@@ -249,7 +249,7 @@ LinearGradient(
 
 ### 3.3 Integrate Focus Metrics in Project Detail View
 
-**File:** `Cloutmate/Views/Projects/ProjectDetailView.swift` (new, replaces `ProjectHubView`)
+**File:** `FocusOS/Views/Projects/ProjectDetailView.swift` (new, replaces `ProjectHubView`)
 
 **Sidebar:**
 
@@ -290,7 +290,7 @@ LinearGradient(
 
 ### 4.2 Haptic Feedback
 
-**File:** `Cloutmate/Views/Projects/Components/ProjectHaptics.swift` (new utility)
+**File:** `FocusOS/Views/Projects/Components/ProjectHaptics.swift` (new utility)
 
 **Haptic Cues:**
 
@@ -366,14 +366,14 @@ LinearGradient(
 
 ### 6.1 Update MainWindowView
 
-**File:** `Cloutmate/Views/MainWindowView.swift`
+**File:** `FocusOS/Views/MainWindowView.swift`
 
 - Replace `ProjectsView` reference with `UnifiedProjectsView`
 - Update navigation/routing if needed
 
 ### 6.2 Deprecate Old Components
 
-**File:** `Cloutmate/Views/Projects/ProjectsView.swift`
+**File:** `FocusOS/Views/Projects/ProjectsView.swift`
 
 - Keep as backup or mark for deletion
 - Move reusable components to `Components/` folder:
@@ -383,7 +383,7 @@ LinearGradient(
 
 ### 6.3 Update Project Model Extensions
 
-**File:** `Cloutmate/Models/Project+Extensions.swift` (new, if needed)
+**File:** `FocusOS/Models/Project+Extensions.swift` (new, if needed)
 
 - Add computed properties for Focus Gravity integration:
   - `var focusMetrics: ProjectFocusMetrics?`
@@ -394,32 +394,32 @@ LinearGradient(
 
 **Views:**
 
-- `Cloutmate/Views/Projects/UnifiedProjectsView.swift`
-- `Cloutmate/Views/Projects/Views/ProjectListView.swift`
-- `Cloutmate/Views/Projects/Views/ProjectBoardView.swift`
-- `Cloutmate/Views/Projects/Views/ProjectTimelineView.swift`
-- `Cloutmate/Views/Projects/Views/ProjectGalleryView.swift`
-- `Cloutmate/Views/Projects/ProjectDetailView.swift`
+- `FocusOS/Views/Projects/UnifiedProjectsView.swift`
+- `FocusOS/Views/Projects/Views/ProjectListView.swift`
+- `FocusOS/Views/Projects/Views/ProjectBoardView.swift`
+- `FocusOS/Views/Projects/Views/ProjectTimelineView.swift`
+- `FocusOS/Views/Projects/Views/ProjectGalleryView.swift`
+- `FocusOS/Views/Projects/ProjectDetailView.swift`
 
 **Components:**
 
-- `Cloutmate/Views/Projects/Components/FocusGravityOverlay.swift`
-- `Cloutmate/Views/Projects/Components/ProjectListCard.swift`
-- `Cloutmate/Views/Projects/Components/ProjectGalleryCard.swift`
-- `Cloutmate/Views/Projects/Components/ProjectHaptics.swift`
+- `FocusOS/Views/Projects/Components/FocusGravityOverlay.swift`
+- `FocusOS/Views/Projects/Components/ProjectListCard.swift`
+- `FocusOS/Views/Projects/Components/ProjectGalleryCard.swift`
+- `FocusOS/Views/Projects/Components/ProjectHaptics.swift`
 
 **Services:**
 
-- `Cloutmate/Services/ProjectFocusGravityService.swift`
+- `FocusOS/Services/ProjectFocusGravityService.swift`
 
 **Models:**
 
-- `Cloutmate/Views/Projects/ProjectViewMode.swift`
+- `FocusOS/Views/Projects/ProjectViewMode.swift`
 
 ## Key Files to Modify
 
-- `Cloutmate/Views/MainWindowView.swift` (update routing)
-- `Cloutmate/Views/Projects/ProjectsView.swift` (deprecate or refactor)
+- `FocusOS/Views/MainWindowView.swift` (update routing)
+- `FocusOS/Views/Projects/ProjectsView.swift` (deprecate or refactor)
 
 ## Dependencies
 

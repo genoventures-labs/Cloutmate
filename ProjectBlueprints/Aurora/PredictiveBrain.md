@@ -72,9 +72,9 @@ Aurora’s predictive capabilities anticipate fatigue, flow drift, and likely in
 ## 6. Enabling / Debugging
 
 - Ensure `UserDefaults` flag `predictiveModeEnabled` is set (app launch defaults it to `true`).
-- Start services at launch (`CloutmateApp.startRitualSystemsIfNeeded`) to boot `CognitionPredictor`, `DriftMonitor`, `PredictiveContextManager`, `AdaptiveScheduler`, `CalendarSyncService`, and `ContextSwitchGuard`.
+- Start services at launch (`FocusOSApp.startRitualSystemsIfNeeded`) to boot `CognitionPredictor`, `DriftMonitor`, `PredictiveContextManager`, `AdaptiveScheduler`, `CalendarSyncService`, and `ContextSwitchGuard`.
 - Use the console logs (`os_log` categories `CognitionPredictor`, `PredictiveContextManager`, `DriftMonitor`) to verify signal flow.
-- Inspect SwiftData `FocusForecast` records via `Cloutmate/Models/FocusForecast.swift` to confirm values look reasonable.
+- Inspect SwiftData `FocusForecast` records via `FocusOS/Models/FocusForecast.swift` to confirm values look reasonable.
 
 ---
 

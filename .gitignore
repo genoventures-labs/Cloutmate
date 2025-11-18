@@ -44,3 +44,5 @@ Config.plist
 # App-specific
 *.app
 
+# TESSERACT Data
+tessdata/

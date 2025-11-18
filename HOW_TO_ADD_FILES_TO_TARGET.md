@@ -1,4 +1,4 @@
-# How to Add Files to CloutmateShared Target
+# How to Add Files to FocusOSShared Target
 
 ## Quick Method - File Inspector
 
@@ -6,12 +6,12 @@
 
 1. **Open Xcode project**
    ```bash
-   open Cloutmate.xcodeproj
+   open FocusOS.xcodeproj
    ```
 
 2. **Select a file** in Project Navigator (left sidebar)
    - Example: `MetaAPIService.swift`
-   - Look for it in `CloutmateShared/CloutmateShared/Services/`
+   - Look for it in `FocusOSShared/FocusOSShared/Services/`
 
 3. **Open File Inspector** (right sidebar)
    - Press ⌥⌘1 (Option+Command+1)
@@ -20,9 +20,9 @@
 4. **Find "Target Membership" section**
    - Scroll down to see checkboxes
 
-5. **Check ✅ CloutmateShared**
+5. **Check ✅ FocusOSShared**
    - You'll see checkboxes for each target
-   - Check the box for "CloutmateShared"
+   - Check the box for "FocusOSShared"
 
 6. **Repeat for each file:**
    - `MetaAPIService.swift`
@@ -37,8 +37,8 @@
 
 ```
 Step 1: Select file
-├── CloutmateShared/
-    └── CloutmateShared/
+├── FocusOSShared/
+    └── FocusOSShared/
         └── Services/
             └── MetaAPIService.swift ← Click here
 
@@ -50,10 +50,10 @@ Right sidebar shows:
 │ Location:  path/to/file    │
 │ ...                         │
 │ Target Membership:          │
-│ ☐ Cloutmate                │
-│ ☑ CloutmateShared          │ ← Check this!
-│ ☐ CloutmateWidget          │
-│ ☐ CloutmateMenuBar         │
+│ ☐ FocusOS                │
+│ ☑ FocusOSShared          │ ← Check this!
+│ ☐ FocusOSWidget          │
+│ ☐ FocusOSMenuBar         │
 └─────────────────────────────┘
 ```
 
@@ -70,17 +70,17 @@ Right sidebar shows:
 
 2. **Open File Inspector** (⌥⌘1)
 
-3. **Check ✅ CloutmateShared** for all at once
+3. **Check ✅ FocusOSShared** for all at once
 
 ---
 
 ## Alternative: Drag to Target
 
-1. **In Project Navigator**, find the CloutmateShared TARGET (under TARGETS)
+1. **In Project Navigator**, find the FocusOSShared TARGET (under TARGETS)
 
 2. **Expand** it to see "Compile Sources"
 
-3. **Drag files** from CloutmateShared folder into "Compile Sources"
+3. **Drag files** from FocusOSShared folder into "Compile Sources"
 
 4. **Verify** they appeared in the list
 
@@ -96,10 +96,10 @@ After adding files:
 
 3. **Target Membership** should show:
    ```
-   ☐ Cloutmate
-   ☑ CloutmateShared ← Checked! ✅
-   ☐ CloutmateWidget
-   ☐ CloutmateMenuBar
+   ☐ FocusOS
+   ☑ FocusOSShared ← Checked! ✅
+   ☐ FocusOSWidget
+   ☐ FocusOSMenuBar
    ```
 
 ---
@@ -108,11 +108,11 @@ After adding files:
 
 **Can't find files in Project Navigator?**
 
-1. **Right-click** on `CloutmateShared` folder
-2. **Add Files to "Cloutmate"...**
+1. **Right-click** on `FocusOSShared` folder
+2. **Add Files to "FocusOS"...**
 3. Navigate to the files
 4. Make sure "Copy items if needed" is **unchecked**
-5. **Check "CloutmateShared"** under "Add to targets"
+5. **Check "FocusOSShared"** under "Add to targets"
 6. Click **Add**
 
 **Files show but not compiling?**
@@ -125,11 +125,11 @@ After adding files:
 
 ## Quick Checklist
 
-- [ ] Opened Cloutmate.xcodeproj
+- [ ] Opened FocusOS.xcodeproj
 - [ ] Found files in Project Navigator
 - [ ] Selected each file
 - [ ] Pressed ⌥⌘1 to open File Inspector
-- [ ] Checked ✅ CloutmateShared in Target Membership
+- [ ] Checked ✅ FocusOSShared in Target Membership
 - [ ] Repeated for all 5 files
-- [ ] Files now compile in CloutmateShared target
+- [ ] Files now compile in FocusOSShared target
 

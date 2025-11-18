@@ -8,14 +8,14 @@ Aurora runs entirely on-device through Ollama, but every request passes through 
 
 | Component | Role | Key Files |
 | --- | --- | --- |
-| `ModelTierMap` | Declares all supported models, tiers, capabilities, and thinking-mode support. | `Cloutmate/Models/ModelTierMap.swift` |
-| `ModelRoutingEngine` | Central actor that selects the model per turn and enforces cooldown/stickiness. | `Cloutmate/Services/ModelRoutingEngine.swift` |
-| `CasualConversationDetector` | Flags casual chit-chat vs imperative commands to avoid overthinking short requests. | `Cloutmate/Services/CasualConversationDetector.swift` |
-| `ModelWarmupService` | Warms primary models at launch and monitors load times. | `Cloutmate/Services/ModelWarmupService.swift` |
-| `HybridBridgeService` | Optional cloud acceleration path via Ollama Cloud + OSS models with health checks. | `Cloutmate/Services/HybridBridgeService.swift` |
-| `FallbackRoutingService` | Graceful degradation (Apple LLM / offline summarizer) when Ollama fails. | `Cloutmate/Services/FallbackRoutingService.swift`, `AppleLLMService.swift`, `OfflineSummarizationService.swift` |
-| `ConfidenceScorer` | Tracks response confidence + abstain heuristics surfaced to the UI. | `Cloutmate/Services/ConfidenceScorer.swift` |
-| `ResponseTimingService` & `TypingSimulationService` | Balance streaming cadence and typing animation once a route is chosen. | `Cloutmate/Services/ResponseTimingService.swift`, `TypingSimulationService.swift` |
+| `ModelTierMap` | Declares all supported models, tiers, capabilities, and thinking-mode support. | `FocusOS/Models/ModelTierMap.swift` |
+| `ModelRoutingEngine` | Central actor that selects the model per turn and enforces cooldown/stickiness. | `FocusOS/Services/ModelRoutingEngine.swift` |
+| `CasualConversationDetector` | Flags casual chit-chat vs imperative commands to avoid overthinking short requests. | `FocusOS/Services/CasualConversationDetector.swift` |
+| `ModelWarmupService` | Warms primary models at launch and monitors load times. | `FocusOS/Services/ModelWarmupService.swift` |
+| `HybridBridgeService` | Optional cloud acceleration path via Ollama Cloud + OSS models with health checks. | `FocusOS/Services/HybridBridgeService.swift` |
+| `FallbackRoutingService` | Graceful degradation (Apple LLM / offline summarizer) when Ollama fails. | `FocusOS/Services/FallbackRoutingService.swift`, `AppleLLMService.swift`, `OfflineSummarizationService.swift` |
+| `ConfidenceScorer` | Tracks response confidence + abstain heuristics surfaced to the UI. | `FocusOS/Services/ConfidenceScorer.swift` |
+| `ResponseTimingService` & `TypingSimulationService` | Balance streaming cadence and typing animation once a route is chosen. | `FocusOS/Services/ResponseTimingService.swift`, `TypingSimulationService.swift` |
 
 ---
 

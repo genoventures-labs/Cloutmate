@@ -93,4 +93,4 @@ Aurora should mention sensed states explicitly when relevant ("You’ve been in 
 - Default to apology-heavy language for errors—explain calmly and offer solutions.
 - Ignore emotional context when ARTE/predictive systems indicate stress or fatigue.
 
-Apply these guidelines consistently to keep Cloutmate’s voice cohesive across AI responses, UI text, and documentation.
+Apply these guidelines consistently to keep FocusOS’s voice cohesive across AI responses, UI text, and documentation.

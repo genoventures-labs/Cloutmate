@@ -8,7 +8,7 @@ import json
 import sys
 import os
 
-CHANGELOG_FILE = "Cloutmate/aurora_changelog.json"
+CHANGELOG_FILE = "FocusOS/aurora_changelog.json"
 
 def update_latest_entry_with_hash(commit_hash: str):
     """Update the most recent changelog entry with commit hash"""

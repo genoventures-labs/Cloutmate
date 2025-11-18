@@ -81,7 +81,7 @@ Successfully implemented a modular, versioned system prompt builder for Aurora t
 ## File Structure
 
 ```
-Cloutmate/
+FocusOS/
 ├── Models/
 │   └── AuroraPromptVersion.swift (NEW)
 ├── Services/

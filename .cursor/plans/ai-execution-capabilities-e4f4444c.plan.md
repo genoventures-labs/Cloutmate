@@ -25,7 +25,7 @@ Enable the AI assistant to execute actions across the app using Gemini's Functio
 
 ### 1. Add Execution Functions to GeminiService
 
-**File:** `Cloutmate/Services/GeminiService.swift`
+**File:** `FocusOS/Services/GeminiService.swift`
 
 Add Gemini Function definitions using Function Calling API:
 
@@ -36,7 +36,7 @@ Add Gemini Function definitions using Function Calling API:
 
 ### 2. Create Execution Service
 
-**New file:** `Cloutmate/Services/AIExecutionService.swift`
+**New file:** `FocusOS/Services/AIExecutionService.swift`
 
 Service with execution methods:
 
@@ -47,7 +47,7 @@ Service with execution methods:
 
 ### 3. Update AIAssistantViewModel for Function Calling
 
-**File:** `Cloutmate/ViewModels/AIAssistantViewModel.swift`
+**File:** `FocusOS/ViewModels/AIAssistantViewModel.swift`
 
 - Integrate Gemini Function Calling in processMessage()
 - Detect when Gemini calls execution functions
@@ -66,7 +66,7 @@ Service with execution methods:
 
 ### 5. Enhance App Context with More Detail
 
-**File:** `Cloutmate/Services/AppContextService.swift`
+**File:** `FocusOS/Services/AppContextService.swift`
 
 Add richer context:
 

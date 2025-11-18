@@ -40,7 +40,7 @@ Phase 8 closes the action → reflection → adaptation loop by introducing dail
 - `ReactiveThemeManager` – Public emotional state publishers
 - `SettingsView` – Ritual summary card + navigation entry
 - `ContentView` – Nudge overlay integration
-- `CloutmateApp` – Registers new models and starts ritual/nudge systems
+- `FocusOSApp` – Registers new models and starts ritual/nudge systems
 
 ---
 
@@ -90,7 +90,7 @@ FocusRitualManager → RitualAnalytics → AnalyticsEngine → InsightsView
 
 - **UserDefaults** (`RitualSettings`): ritual times, weekly review schedule, nudges on/off, intensity, quiet hours, category toggles
 - **SwiftData**: `FocusRitual`, `RitualCompletion`, `WeeklyReview`, `SmartNudge`
-- **ModelContainer** updated in `CloutmateApp` to register new models (`Cloutmate_v3.sqlite`)
+- **ModelContainer** updated in `FocusOSApp` to register new models (`FocusOS_v3.sqlite`)
 
 ---
 
@@ -144,11 +144,11 @@ FocusRitualManager → RitualAnalytics → AnalyticsEngine → InsightsView
 
 ## Files & References
 
-- Models: `Cloutmate/Models/FocusRitual.swift`, `RitualCompletion.swift`, `WeeklyReview.swift`, `SmartNudge.swift`
+- Models: `FocusOS/Models/FocusRitual.swift`, `RitualCompletion.swift`, `WeeklyReview.swift`, `SmartNudge.swift`
 - Services: `FocusRitualManager.swift`, `RitualAnalytics.swift`, `SmartNudgeService.swift`, `NudgeToneAdapter.swift`
 - UI: `MorningRitualView.swift`, `EveningRitualView.swift`, `WeeklyReviewView.swift`, `RitualSettingsView.swift`, `NudgeOverlayView.swift`
 - Utilities: `RitualSettings.swift`
-- Integrations: `AnalyticsEngine.swift`, `InsightsView.swift`, `CloutmateApp.swift`, `ContentView.swift`
+- Integrations: `AnalyticsEngine.swift`, `InsightsView.swift`, `FocusOSApp.swift`, `ContentView.swift`
 
 ---
 

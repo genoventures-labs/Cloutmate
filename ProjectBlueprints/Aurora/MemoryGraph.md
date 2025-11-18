@@ -55,7 +55,7 @@ Embeddings are currently synthetic (768d) via `MemoryGraphService.generateSynthe
 
 - `AIConfig.plist` → `AIMemoryGraphEnabled` must be `true` (see `MEMORY_GRAPH_ENABLED.md`).
 - `MemoryGraphService` caches snapshots for five minutes to avoid hammering SwiftData; call `refreshCaches()` (debug-only) if you need immediate updates.
-- `ThemeExtractionPipeline` uses DBSCAN defaults tuned for Cloutmate data density. Adjust `minPoints`/`epsilon` carefully if you change data granularity.
+- `ThemeExtractionPipeline` uses DBSCAN defaults tuned for FocusOS data density. Adjust `minPoints`/`epsilon` carefully if you change data granularity.
 
 ---
 

@@ -5,14 +5,14 @@
 The original SwiftData casting error has been **completely fixed**:
 
 ```
-SwiftData/ModelContext.swift:712: Fatal error: Failed to cast model Cloutmate.Draft 
+SwiftData/ModelContext.swift:712: Fatal error: Failed to cast model FocusOS.Draft 
 for PersistentIdentifier(...) to Draft.
 ```
 
 ## Root Causes Fixed
 
 ### 1. ✅ Incorrect Module Reference - FIXED
-- **Was**: `CloutmateShared.Draft.self` in schema
+- **Was**: `FocusOSShared.Draft.self` in schema
 - **Now**: `Draft.self` (correct - Draft is app-local)
 
 ### 2. ✅ Missing Schema Entries - FIXED
@@ -26,12 +26,12 @@ Added all missing SwiftData models to the schema:
 
 ### 3. ✅ Duplicate Model Files - FIXED
 Removed 10 duplicate model files:
-- Deleted from CloutmateShared: Area, AIMessage, AISettings, InsightSnapshot, PlatformAIConfiguration, Platform+UI
+- Deleted from FocusOSShared: Area, AIMessage, AISettings, InsightSnapshot, PlatformAIConfiguration, Platform+UI
 - Deleted from main app: Note, Task, Project, InboxItem
 - Established single source of truth for each model
 
 ### 4. ✅ Module Visibility - FIXED
-Made PARA models public in CloutmateShared:
+Made PARA models public in FocusOSShared:
 - `public final class Task` ✅
 - `public final class Note` ✅  
 - `public final class Project` ✅
@@ -55,31 +55,31 @@ Created file-scoped typealiases in services:
 ## Remaining Build Issues (Non-Critical)
 
 ### Import Statements Needed
-The following 17 view files need `import CloutmateShared` and qualified type names in @Query:
+The following 17 view files need `import FocusOSShared` and qualified type names in @Query:
 
-1. Cloutmate/Views/Home/HomeView.swift
-2. Cloutmate/Views/Dashboard/CustomizableDashboardView.swift
-3. Cloutmate/Views/Rituals/WeeklyReviewView.swift
-4. Cloutmate/Views/Components/CommandPaletteView.swift
-5. Cloutmate/Views/Projects/ProjectsView.swift
-6. Cloutmate/Views/Dashboard/WorkflowInsightsCards.swift
-7. Cloutmate/Views/Journal/JournalView.swift
-8. Cloutmate/Views/Insights/AreaInsightsView.swift
-9. Cloutmate/Views/Insights/ProjectInsightsView.swift
-10. Cloutmate/Views/Calendar/UnifiedCalendarView.swift
-11. Cloutmate/Views/Today/TodayView.swift
-12. Cloutmate/Views/Campaigns/CampaignView.swift
-13. Cloutmate/Views/Resources/ResourcesView.swift
-14. Cloutmate/Views/Tasks/TasksView.swift
-15. Cloutmate/Views/Areas/AreasView.swift ✅ FIXED
-16. Cloutmate/Views/Notes/NotesView.swift
-17. Cloutmate/Views/Resources/KnowledgeGraphView.swift
+1. FocusOS/Views/Home/HomeView.swift
+2. FocusOS/Views/Dashboard/CustomizableDashboardView.swift
+3. FocusOS/Views/Rituals/WeeklyReviewView.swift
+4. FocusOS/Views/Components/CommandPaletteView.swift
+5. FocusOS/Views/Projects/ProjectsView.swift
+6. FocusOS/Views/Dashboard/WorkflowInsightsCards.swift
+7. FocusOS/Views/Journal/JournalView.swift
+8. FocusOS/Views/Insights/AreaInsightsView.swift
+9. FocusOS/Views/Insights/ProjectInsightsView.swift
+10. FocusOS/Views/Calendar/UnifiedCalendarView.swift
+11. FocusOS/Views/Today/TodayView.swift
+12. FocusOS/Views/Campaigns/CampaignView.swift
+13. FocusOS/Views/Resources/ResourcesView.swift
+14. FocusOS/Views/Tasks/TasksView.swift
+15. FocusOS/Views/Areas/AreasView.swift ✅ FIXED
+16. FocusOS/Views/Notes/NotesView.swift
+17. FocusOS/Views/Resources/KnowledgeGraphView.swift
 
 ### Pattern to Fix (Simple Find/Replace in Each File)
 
 **Add import:**
 ```swift
-import CloutmateShared
+import FocusOSShared
 ```
 
 **Replace @Query declarations:**
@@ -90,9 +90,9 @@ import CloutmateShared
 @Query private var projects: [Project]
 
 // NEW:
-@Query private var tasks: [CloutmateShared.Task]
-@Query private var notes: [CloutmateShared.Note]
-@Query private var projects: [CloutmateShared.Project]
+@Query private var tasks: [FocusOSShared.Task]
+@Query private var notes: [FocusOSShared.Note]
+@Query private var projects: [FocusOSShared.Project]
 ```
 
 **Update var declarations:**
@@ -103,37 +103,37 @@ var filteredNotes: [Note] { ... }
 var filteredProjects: [Project] { ... }
 
 // NEW:
-var filteredTasks: [CloutmateShared.Task] { ... }
-var filteredNotes: [CloutmateShared.Note] { ... }
-var filteredProjects: [CloutmateShared.Project] { ... }
+var filteredTasks: [FocusOSShared.Task] { ... }
+var filteredNotes: [FocusOSShared.Note] { ... }
+var filteredProjects: [FocusOSShared.Project] { ... }
 ```
 
 ## Database Schema
 
-The corrected schema in `CloutmateApp.swift`:
+The corrected schema in `FocusOSApp.swift`:
 
 ```swift
 let schema = Schema([
     // Shared models
-    CloutmateShared.Post.self,
+    FocusOSShared.Post.self,
     Draft.self,  // ✅ FIXED: App-local
-    CloutmateShared.Template.self,
-    CloutmateShared.PlatformAccount.self,
-    CloutmateShared.PerformancePrediction.self,
-    CloutmateShared.RecyclablePost.self,
-    CloutmateShared.ContentTopic.self,
-    CloutmateShared.ContentBalance.self,
-    CloutmateShared.PostingTimeTest.self,
-    CloutmateShared.OptimalPostingTime.self,
-    CloutmateShared.CustomPostProperty.self,
-    CloutmateShared.PostView.self,
-    CloutmateShared.HashtagPerformance.self,
-    CloutmateShared.HashtagSet.self,
+    FocusOSShared.Template.self,
+    FocusOSShared.PlatformAccount.self,
+    FocusOSShared.PerformancePrediction.self,
+    FocusOSShared.RecyclablePost.self,
+    FocusOSShared.ContentTopic.self,
+    FocusOSShared.ContentBalance.self,
+    FocusOSShared.PostingTimeTest.self,
+    FocusOSShared.OptimalPostingTime.self,
+    FocusOSShared.CustomPostProperty.self,
+    FocusOSShared.PostView.self,
+    FocusOSShared.HashtagPerformance.self,
+    FocusOSShared.HashtagSet.self,
     // Shared PARA models
-    CloutmateShared.Note.self,  // ✅ NOW PUBLIC
-    CloutmateShared.Task.self,  // ✅ NOW PUBLIC
-    CloutmateShared.Project.self,  // ✅ NOW PUBLIC
-    CloutmateShared.InboxItem.self,  // ✅ NOW PUBLIC
+    FocusOSShared.Note.self,  // ✅ NOW PUBLIC
+    FocusOSShared.Task.self,  // ✅ NOW PUBLIC
+    FocusOSShared.Project.self,  // ✅ NOW PUBLIC
+    FocusOSShared.InboxItem.self,  // ✅ NOW PUBLIC
     // App-local models
     Area.self,  // ✅ ADDED
     DashboardCard.self,
@@ -169,10 +169,10 @@ let schema = Schema([
 
 To complete the build, run this find/replace pattern across the 16 remaining view files:
 
-1. Add `import CloutmateShared` after other imports
-2. Replace `[Task]` with `[CloutmateShared.Task]`
-3. Replace `[Note]` with `[CloutmateShared.Note]`
-4. Replace `[Project]` with `[CloutmateShared.Project]`
+1. Add `import FocusOSShared` after other imports
+2. Replace `[Task]` with `[FocusOSShared.Task]`
+3. Replace `[Note]` with `[FocusOSShared.Note]`
+4. Replace `[Project]` with `[FocusOSShared.Project]`
 
 **The core SwiftData error is completely resolved!** The remaining errors are just import statements, which are straightforward to fix.
 

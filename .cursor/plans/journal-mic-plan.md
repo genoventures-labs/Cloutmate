@@ -13,23 +13,23 @@ Add a fully in-app voice recording + live transcription experience using Appleâ€
 
 ## Files to Add
 
-- `Cloutmate/Services/VoiceTranscriptionService.swift`
+- `FocusOS/Services/VoiceTranscriptionService.swift`
   - Manages `AVAudioEngine`, `SFSpeechRecognizer`, authorization, start/stop, partial/final results, errors.
   - Exposes callbacks: `onPartial(String)`, `onFinal(String)`, `onError(Error)`, `onLevelUpdate(Float)`.
-- `Cloutmate/Views/Journal/VoiceRecordModal.swift`
+- `FocusOS/Views/Journal/VoiceRecordModal.swift`
   - SwiftUI modal with: custom mic icon, animated waveform, live text, timer, start/pause/stop, Info popover.
   - Presents in two modes: `.newEntry` and `.append(existing: Journal)`.
-- `Cloutmate/Views/Journal/WaveformView.swift`
+- `FocusOS/Views/Journal/WaveformView.swift`
   - Lightweight animated waveform using audio level updates.
-- Assets: add `CloutmateMic` symbol in `Cloutmate/Assets.xcassets` (vector PDF / SF Symbol override).
+- Assets: add `FocusOSMic` symbol in `FocusOS/Assets.xcassets` (vector PDF / SF Symbol override).
 
 ## Files to Update
 
-- `Cloutmate/Info.plist`
+- `FocusOS/Info.plist`
   - Add `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` strings.
-- `Cloutmate/Views/Journal/JournalView.swift`
+- `FocusOS/Views/Journal/JournalView.swift`
   - Toolbar: add "Record Entry" button â†’ presents `VoiceRecordModal(mode: .newEntry)`. On completion, create a new `Journal` with the transcript, type `.reflection`, mood `.none` by default.
-- `Cloutmate/Views/Journal/JournalView.swift` (detail sheet section already present)
+- `FocusOS/Views/Journal/JournalView.swift` (detail sheet section already present)
   - Inside `JournalDetailView` toolbar: add mic button to present `VoiceRecordModal(mode: .append(existing: journal))`. On completion, append transcript to `journal.content` (with timestamp divider).
 
 ## UX Details
@@ -54,7 +54,7 @@ Add a fully in-app voice recording + live transcription experience using Appleâ€
 ## Essential Integration Snippets
 
 - Presenting from `JournalView` toolbar:
-```12:24:Cloutmate/Views/Journal/JournalView.swift
+```12:24:FocusOS/Views/Journal/JournalView.swift
 .toolbar {
     ToolbarItemGroup(placement: .primaryAction) {
         Button {
@@ -72,7 +72,7 @@ Add a fully in-app voice recording + live transcription experience using Appleâ€
 ```
 
 - Appending from `JournalDetailView` toolbar:
-```498:506:Cloutmate/Views/Journal/JournalView.swift
+```498:506:FocusOS/Views/Journal/JournalView.swift
 .toolbar {
     ToolbarItemGroup(placement: .automatic) {
         Button {
@@ -109,5 +109,5 @@ Add a fully in-app voice recording + live transcription experience using Appleâ€
 - [ ] Integrate Record Entry button in JournalView to create new entry
 - [ ] Integrate mic in JournalDetailView to append transcript
 - [ ] Add mic and speech usage descriptions in Info.plist
-- [ ] Add custom CloutmateMic asset for mic icon
+- [ ] Add custom FocusOSMic asset for mic icon
 - [ ] Run manual QA for permissions, new entry, append, errors

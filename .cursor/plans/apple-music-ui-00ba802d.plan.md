@@ -9,7 +9,7 @@ Complete transformation from heavy glass effects to Apple Music's minimal, flat 
 
 ### 1. Color System Overhaul
 
-**File**: `Cloutmate/Utilities/GlassColorSystem.swift`
+**File**: `FocusOS/Utilities/GlassColorSystem.swift`
 
 Transform from dark glass palette to light, minimal palette:
 
@@ -24,7 +24,7 @@ Transform from dark glass palette to light, minimal palette:
 
 #### GlassPanel Component
 
-**File**: `Cloutmate/Views/Components/GlassPanel.swift`
+**File**: `FocusOS/Views/Components/GlassPanel.swift`
 
 - Remove blur effects, noise layers, specular highlights
 - Replace with flat white/light gray backgrounds
@@ -35,7 +35,7 @@ Transform from dark glass palette to light, minimal palette:
 
 #### GlassCard Component
 
-**File**: `Cloutmate/Views/Components/GlassCard.swift`
+**File**: `FocusOS/Views/Components/GlassCard.swift`
 
 - Remove hover shimmer effects
 - Simplify to clean white cards with subtle shadows
@@ -46,7 +46,7 @@ Transform from dark glass palette to light, minimal palette:
 
 #### GlassButton Component  
 
-**File**: `Cloutmate/Views/Components/GlassButton.swift`
+**File**: `FocusOS/Views/Components/GlassButton.swift`
 
 - Replace gradient fills with solid colors
 - Use Kosmic blue for primary buttons
@@ -66,7 +66,7 @@ Transform from dark glass palette to light, minimal palette:
 
 ### 3. Material Tiers System
 
-**File**: `Cloutmate/Utilities/GlassMaterialTiers.swift`
+**File**: `FocusOS/Utilities/GlassMaterialTiers.swift`
 
 - Reduce blur depths to 0-4px (from 12-40px)
 - Adjust light levels for light backgrounds
@@ -77,7 +77,7 @@ Transform from dark glass palette to light, minimal palette:
 
 #### ContentView Background
 
-**File**: `Cloutmate/ContentView.swift`
+**File**: `FocusOS/ContentView.swift`
 
 - Replace dark gradient with light neutral background
 - Remove aurora bloom accents and parallax animations
@@ -87,7 +87,7 @@ Transform from dark glass palette to light, minimal palette:
 
 #### Sidebar Refinement
 
-**File**: `Cloutmate/Views/Sidebar.swift`
+**File**: `FocusOS/Views/Sidebar.swift`
 
 Keep structure but refine styling:
 
@@ -151,7 +151,7 @@ Apply to all views:
 
 ### 8. Motion & Animations
 
-**File**: `Cloutmate/Utilities/GlassMotion.swift`
+**File**: `FocusOS/Utilities/GlassMotion.swift`
 
 - Reduce animation durations (faster, snappier)
 - Simplify easing curves

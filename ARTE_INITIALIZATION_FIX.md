@@ -34,7 +34,7 @@ Fixed ARTE (Phase 7) initialization issues that were causing crashes in Insights
 **Rationale:** Each phase should be self-contained and not depend on later phases. Phase 7 can be enhanced with Phase 9 features later via dependency injection, but shouldn't hard-depend on them at initialization.
 
 ### 3. Name Collision
-**Problem:** Swift's `Task` type conflicts with `CloutmateShared.Task` model.
+**Problem:** Swift's `Task` type conflicts with `FocusOSShared.Task` model.
 
 **Solution:** Always use `_Concurrency.Task` to disambiguate:
 ```swift
@@ -45,8 +45,8 @@ _Concurrency.Task { @MainActor in
 ```
 
 ## Files Modified
-- `Cloutmate/CloutmateApp.swift` - Fixed ARTE initialization timing
-- `Cloutmate/Services/ReactiveThemeManager.swift` - Removed Phase 9 dependencies
+- `FocusOS/FocusOSApp.swift` - Fixed ARTE initialization timing
+- `FocusOS/Services/ReactiveThemeManager.swift` - Removed Phase 9 dependencies
 
 ## Testing Results
 ✅ Build succeeds with no errors

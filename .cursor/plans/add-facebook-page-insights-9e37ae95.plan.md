@@ -9,13 +9,13 @@ The dashboard toggles in `DashboardSettingsView` don't work because the static `
 
 ### 1. Update MainWindowView to use CustomizableDashboardView
 
-**File**: `Cloutmate/Views/MainWindowView.swift`
+**File**: `FocusOS/Views/MainWindowView.swift`
 
 - Replace `case .home: HomeView()` routing to use `CustomizableDashboardView` instead
 
 ### 2. Expand DashboardCardType with Comprehensive Insights
 
-**File**: `Cloutmate/Models/DashboardCard.swift`
+**File**: `FocusOS/Models/DashboardCard.swift`
 
 Add new insight card types organized by category:
 
@@ -50,11 +50,11 @@ Add appropriate icons and default sizes for each
 
 ### 3. Create Comprehensive Insight Card Components
 
-**File**: `Cloutmate/Views/Dashboard/WorkflowInsightsCards.swift` (new file)
+**File**: `FocusOS/Views/Dashboard/WorkflowInsightsCards.swift` (new file)
 
-**File**: `Cloutmate/Views/Dashboard/SocialInsightsCards.swift` (new file)
+**File**: `FocusOS/Views/Dashboard/SocialInsightsCards.swift` (new file)
 
-**File**: `Cloutmate/Views/Dashboard/FacebookInsightsCards.swift` (new file)
+**File**: `FocusOS/Views/Dashboard/FacebookInsightsCards.swift` (new file)
 
 Each card should:
 
@@ -78,7 +78,7 @@ Each card should:
 
 ### 4. Implement Dynamic Card Sizing System
 
-**File**: `Cloutmate/Views/Dashboard/CustomizableDashboardView.swift`
+**File**: `FocusOS/Views/Dashboard/CustomizableDashboardView.swift`
 
 Replace fixed 2-column grid (lines 29-32) with adaptive sizing:
 
@@ -102,7 +102,7 @@ Height mapping:
 
 ### 5. Update DashboardCardView Switch Statement
 
-**File**: `Cloutmate/Views/Dashboard/CustomizableDashboardView.swift`
+**File**: `FocusOS/Views/Dashboard/CustomizableDashboardView.swift`
 
 - Add cases for all new insight card types (line 136+)
 - Pass card size to components so they adapt content
@@ -110,7 +110,7 @@ Height mapping:
 
 ### 6. Redesign DashboardSettingsView with Categories
 
-**File**: `Cloutmate/Views/Dashboard/DashboardSettingsView.swift`
+**File**: `FocusOS/Views/Dashboard/DashboardSettingsView.swift`
 
 Replace flat list with categorized sections:
 
@@ -160,7 +160,7 @@ Ensure every card adapts content based on size:
 
 ### 8. Add Default Dashboard Cards Setup
 
-**File**: `Cloutmate/Views/Dashboard/CustomizableDashboardView.swift`
+**File**: `FocusOS/Views/Dashboard/CustomizableDashboardView.swift`
 
 Update `setupDefaultCardsIfNeeded()` to include workflow insights:
 
@@ -177,7 +177,7 @@ let defaultCards = [
 
 ### 9. Archive Old DashboardView
 
-**File**: `Cloutmate/Views/Dashboard/DashboardView.swift`
+**File**: `FocusOS/Views/Dashboard/DashboardView.swift`
 
 - Remove/archive since replaced by CustomizableDashboardView
 

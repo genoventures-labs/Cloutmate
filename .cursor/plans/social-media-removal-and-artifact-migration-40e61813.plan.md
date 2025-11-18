@@ -3,13 +3,13 @@
 
 ## Overview
 
-Transform Cloutmate from a social media scheduling tool into a cognitive workspace orchestration system. Replace all social publishing functionality with artifact-based narrative output that runs locally via Ollama.
+Transform FocusOS from a social media scheduling tool into a cognitive workspace orchestration system. Replace all social publishing functionality with artifact-based narrative output that runs locally via Ollama.
 
 ## Phase 1: Model Transformation
 
 ### 1.1 Create Artifact Model
 
-**File:** `CloutmateShared/CloutmateShared/CloutmateShared/Models/Artifact.swift`
+**File:** `FocusOSShared/FocusOSShared/FocusOSShared/Models/Artifact.swift`
 
 - Replace `Post` model with `Artifact`
 - Fields: `id`, `title`, `content`, `outputFormat` (replaces platforms), `state` (idea/draft/final/published/archived), `publishedAt`, `createdAt`, `updatedAt`, `tags`, `mediaURLs`, `projectId`, `areaId`
@@ -17,14 +17,14 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 1.2 Create OutputFormat Enum
 
-**File:** `CloutmateShared/CloutmateShared/CloutmateShared/Models/OutputFormat.swift`
+**File:** `FocusOSShared/FocusOSShared/FocusOSShared/Models/OutputFormat.swift`
 
 - Replace `Platform` enum with `OutputFormat`: `brief`, `summary`, `reflection`, `report`, `releaseNote`, `lessonLearned`
 - Add `displayName` and `colorName` properties
 
 ### 1.3 Create ArtifactState Enum
 
-**File:** `CloutmateShared/CloutmateShared/CloutmateShared/Models/ArtifactState.swift`
+**File:** `FocusOSShared/FocusOSShared/FocusOSShared/Models/ArtifactState.swift`
 
 - Replace `PostStatus` with `ArtifactState`: `idea`, `draft`, `final`, `published`, `archived`
 - Merge Draft states into this enum
@@ -45,7 +45,7 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 2.1 Create Migration Service
 
-**File:** `Cloutmate/Services/ArtifactMigrationService.swift`
+**File:** `FocusOS/Services/ArtifactMigrationService.swift`
 
 - Migrate existing Posts → Artifacts:
 - `caption` → `title` (first line) + `content` (rest)
@@ -64,23 +64,23 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 3.1 Delete Social Media Services
 
-- **Delete:** `Cloutmate/Services/MetaAPIService.swift`
-- **Delete:** `Cloutmate/Services/ThreadsService.swift`
-- **Delete:** `Cloutmate/Services/FacebookService.swift`
-- **Delete:** `Cloutmate/Services/PublishingService.swift` (or repurpose for local artifact generation)
-- **Delete:** `CloutmateHelper/Services/MetaAPIService.swift`
-- **Delete:** `CloutmateHelper/Services/ThreadsService.swift`
-- **Delete:** `CloutmateHelper/Services/FacebookService.swift`
-- **Delete:** `CloutmateHelper/PostPublisher.swift`
-- **Delete:** `CloutmateHelper/InsightsPoller.swift`
+- **Delete:** `FocusOS/Services/MetaAPIService.swift`
+- **Delete:** `FocusOS/Services/ThreadsService.swift`
+- **Delete:** `FocusOS/Services/FacebookService.swift`
+- **Delete:** `FocusOS/Services/PublishingService.swift` (or repurpose for local artifact generation)
+- **Delete:** `FocusOSHelper/Services/MetaAPIService.swift`
+- **Delete:** `FocusOSHelper/Services/ThreadsService.swift`
+- **Delete:** `FocusOSHelper/Services/FacebookService.swift`
+- **Delete:** `FocusOSHelper/PostPublisher.swift`
+- **Delete:** `FocusOSHelper/InsightsPoller.swift`
 
 ### 3.2 Delete Social Media Analytics Services
 
-- **Delete:** `Cloutmate/Services/BestTimeOptimizerService.swift`
-- **Delete:** `Cloutmate/Services/HashtagPerformanceService.swift`
-- **Delete:** `Cloutmate/Services/ContentGapAnalyzerService.swift`
-- **Delete:** `Cloutmate/Services/ContentRecyclingService.swift`
-- **Delete:** `Cloutmate/Services/PerformancePredictionService.swift`
+- **Delete:** `FocusOS/Services/BestTimeOptimizerService.swift`
+- **Delete:** `FocusOS/Services/HashtagPerformanceService.swift`
+- **Delete:** `FocusOS/Services/ContentGapAnalyzerService.swift`
+- **Delete:** `FocusOS/Services/ContentRecyclingService.swift`
+- **Delete:** `FocusOS/Services/PerformancePredictionService.swift`
 
 ### 3.3 Update Remaining Services
 
@@ -93,7 +93,7 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 4.1 Transform Composer
 
-**File:** `Cloutmate/Views/Composer/ComposerWindow.swift` → `ArtifactComposerView.swift`
+**File:** `FocusOS/Views/Composer/ComposerWindow.swift` → `ArtifactComposerView.swift`
 
 - Replace platform selector with format selector (Brief, Summary, Reflection, Report, Release Note, Lesson Learned)
 - Add Capture/Craft mode toggle
@@ -103,7 +103,7 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 4.2 Update Menu Bar Composer
 
-**File:** `CloutmateMenuBar/QuickComposerView.swift`
+**File:** `FocusOSMenuBar/QuickComposerView.swift`
 
 - Remove platform selection
 - Remove scheduling
@@ -111,51 +111,51 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 4.3 Remove Social Settings
 
-- **Delete:** `Cloutmate/Views/Settings/AccountsSection.swift`
-- **Delete:** `Cloutmate/Views/Settings/BackgroundPostingSection.swift`
-- **Delete:** `Cloutmate/Views/Settings/PlatformConnectButton.swift`
+- **Delete:** `FocusOS/Views/Settings/AccountsSection.swift`
+- **Delete:** `FocusOS/Views/Settings/BackgroundPostingSection.swift`
+- **Delete:** `FocusOS/Views/Settings/PlatformConnectButton.swift`
 - Update `SettingsView.swift` to remove social sections
 
 ### 4.4 Update Dashboard
 
-**File:** `Cloutmate/Views/Dashboard/DashboardView.swift`
+**File:** `FocusOS/Views/Dashboard/DashboardView.swift`
 
 - Remove "Social" section entirely
 - Remove social insights cards
 - Update `DashboardCard.swift` - Remove social card types: `scheduledPosts`, `draftCount`, `recentInsights`, `postingStreak`, `topPerformingPost`, `socialOverview`, `contentPerformance`, `platformComparison`, all Facebook insight cards
-- **Delete:** `Cloutmate/Views/Dashboard/SocialInsightsCards.swift`
-- **Delete:** `Cloutmate/Views/Dashboard/FacebookInsightsCards.swift`
-- **Delete:** `Cloutmate/Views/Dashboard/PostSummaryCard.swift`
-- **Delete:** `Cloutmate/Views/Dashboard/ContentRecyclingCard.swift`
+- **Delete:** `FocusOS/Views/Dashboard/SocialInsightsCards.swift`
+- **Delete:** `FocusOS/Views/Dashboard/FacebookInsightsCards.swift`
+- **Delete:** `FocusOS/Views/Dashboard/PostSummaryCard.swift`
+- **Delete:** `FocusOS/Views/Dashboard/ContentRecyclingCard.swift`
 
 ### 4.5 Update Insights Views
 
-- **Delete:** `Cloutmate/Views/Insights/PlatformComparisonView.swift`
-- **Delete:** `Cloutmate/Views/Insights/PlatformComparisonChart.swift`
-- **Delete:** `Cloutmate/Views/Insights/HashtagPerformanceView.swift`
-- **Delete:** `Cloutmate/Views/Insights/ContentGapAnalyzerView.swift`
-- **Delete:** `Cloutmate/Views/Insights/BestTimeOptimizerView.swift`
-- **Delete:** `Cloutmate/Views/Insights/ContentAnalyticsView.swift`
-- **Update:** `Cloutmate/Views/Insights/ReflectionSummary.swift` - Remove Post/platform references
-- **Update:** `Cloutmate/Views/Insights/InsightsView.swift` - Remove social insights tabs
+- **Delete:** `FocusOS/Views/Insights/PlatformComparisonView.swift`
+- **Delete:** `FocusOS/Views/Insights/PlatformComparisonChart.swift`
+- **Delete:** `FocusOS/Views/Insights/HashtagPerformanceView.swift`
+- **Delete:** `FocusOS/Views/Insights/ContentGapAnalyzerView.swift`
+- **Delete:** `FocusOS/Views/Insights/BestTimeOptimizerView.swift`
+- **Delete:** `FocusOS/Views/Insights/ContentAnalyticsView.swift`
+- **Update:** `FocusOS/Views/Insights/ReflectionSummary.swift` - Remove Post/platform references
+- **Update:** `FocusOS/Views/Insights/InsightsView.swift` - Remove social insights tabs
 
 ### 4.6 Update Calendar Views
 
-- **Update:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift` - Replace Post with Artifact
-- **Update:** `Cloutmate/Views/Calendar/MonthlyCalendarView.swift` - Replace Post with Artifact
-- **Update:** `Cloutmate/Views/Calendar/PostPreviewSheet.swift` → `ArtifactPreviewSheet.swift`
-- **Update:** `Cloutmate/Views/Calendar/PostDropDelegate.swift` → `ArtifactDropDelegate.swift`
-- **Update:** `Cloutmate/Views/Calendar/CalendarPostListSheet.swift` → `CalendarArtifactListSheet.swift`
+- **Update:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift` - Replace Post with Artifact
+- **Update:** `FocusOS/Views/Calendar/MonthlyCalendarView.swift` - Replace Post with Artifact
+- **Update:** `FocusOS/Views/Calendar/PostPreviewSheet.swift` → `ArtifactPreviewSheet.swift`
+- **Update:** `FocusOS/Views/Calendar/PostDropDelegate.swift` → `ArtifactDropDelegate.swift`
+- **Update:** `FocusOS/Views/Calendar/CalendarPostListSheet.swift` → `CalendarArtifactListSheet.swift`
 
 ### 4.7 Update List Views
 
-- **Update:** `Cloutmate/Views/List/ListTableView.swift` - Replace Post with Artifact
-- **Update:** `Cloutmate/Views/List/DatabaseViews.swift` - Replace Post with Artifact
+- **Update:** `FocusOS/Views/List/ListTableView.swift` - Replace Post with Artifact
+- **Update:** `FocusOS/Views/List/DatabaseViews.swift` - Replace Post with Artifact
 
 ### 4.8 Update Drafts View
 
-- **Update:** `Cloutmate/Views/Drafts/DraftsView.swift` - Show Artifacts with state="draft"
-- **Update:** `Cloutmate/Views/Drafts/DraftEditor.swift` - Update to use Artifact model
+- **Update:** `FocusOS/Views/Drafts/DraftsView.swift` - Show Artifacts with state="draft"
+- **Update:** `FocusOS/Views/Drafts/DraftEditor.swift` - Update to use Artifact model
 
 ## Phase 5: Update References
 
@@ -171,19 +171,19 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 5.2 Update Helper App
 
-- **Delete:** `CloutmateHelper/PostPublisher.swift`
-- **Delete:** `CloutmateHelper/InsightsPoller.swift`
-- **Update:** `CloutmateHelper/BackgroundScheduler.swift` - Remove scheduled posting logic
-- **Update:** `CloutmateHelper/HelperXPCService.swift` - Remove publishing-related methods
+- **Delete:** `FocusOSHelper/PostPublisher.swift`
+- **Delete:** `FocusOSHelper/InsightsPoller.swift`
+- **Update:** `FocusOSHelper/BackgroundScheduler.swift` - Remove scheduled posting logic
+- **Update:** `FocusOSHelper/HelperXPCService.swift` - Remove publishing-related methods
 
 ### 5.3 Update Widget
 
-- **Update:** `CloutmateWidget/WidgetTimelineProvider.swift` - Replace Post with Artifact
-- **Update:** `CloutmateWidget/CloutmateWidgetView.swift` - Show artifacts instead of posts
+- **Update:** `FocusOSWidget/WidgetTimelineProvider.swift` - Replace Post with Artifact
+- **Update:** `FocusOSWidget/FocusOSWidgetView.swift` - Show artifacts instead of posts
 
 ### 5.4 Update XPC Protocol
 
-- **Update:** `CloutmateShared/CloutmateShared/CloutmateShared/Services/XPCProtocol.swift`
+- **Update:** `FocusOSShared/FocusOSShared/FocusOSShared/Services/XPCProtocol.swift`
 - Remove publishing-related methods
 - Keep only data sync methods
 
@@ -197,8 +197,8 @@ Transform Cloutmate from a social media scheduling tool into a cognitive workspa
 
 ### 6.2 Remove API Models
 
-- **Delete:** `Cloutmate/Models/APIModels.swift`
-- **Delete:** `CloutmateHelper/Services/APIModels.swift`
+- **Delete:** `FocusOS/Models/APIModels.swift`
+- **Delete:** `FocusOSHelper/Services/APIModels.swift`
 - Keep only local models
 
 ### 6.3 Update README

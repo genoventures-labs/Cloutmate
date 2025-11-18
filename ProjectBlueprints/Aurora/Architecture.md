@@ -1,6 +1,6 @@
 # Aurora Architecture Guide
 
-Aurora is an on-device cognitive operating system layered on top of the Cloutmate workspace. The runtime lives entirely inside the macOS target under `Cloutmate/Services` and `Cloutmate/Models`, with SwiftData providing the long-term memory substrate. This document describes how a single message flows through the system and how each phase contributes to the final response.
+Aurora is an on-device cognitive operating system layered on top of the FocusOS workspace. The runtime lives entirely inside the macOS target under `FocusOS/Services` and `FocusOS/Models`, with SwiftData providing the long-term memory substrate. This document describes how a single message flows through the system and how each phase contributes to the final response.
 
 ---
 

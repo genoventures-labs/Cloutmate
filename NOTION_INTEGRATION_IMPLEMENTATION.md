@@ -1,7 +1,7 @@
 # Notion Integration Implementation Summary
 
 ## Overview
-Successfully implemented Notion OAuth integration for Cloutmate, allowing users to import and sync their databases (projects, tasks, notes, areas) from Notion into the app with intelligent property mapping and relationship preservation.
+Successfully implemented Notion OAuth integration for FocusOS, allowing users to import and sync their databases (projects, tasks, notes, areas) from Notion into the app with intelligent property mapping and relationship preservation.
 
 ## Implementation Status
 
@@ -46,7 +46,7 @@ Successfully implemented Notion OAuth integration for Cloutmate, allowing users 
 - **NotionDatabaseSelectorView.swift** - Database selection
   - List of user's Notion databases
   - Multi-select for batch import
-  - Auto-detection of Cloutmate type
+  - Auto-detection of FocusOS type
   - Configure and import actions
 
 - **NotionIntegrationSection.swift** - Settings integration
@@ -59,17 +59,17 @@ Successfully implemented Notion OAuth integration for Cloutmate, allowing users 
 #### 4. Background Sync
 - **Note**: Background periodic sync is not yet implemented in the helper app
 - Manual sync can be triggered from Settings
-- Future enhancement: Add NotionSyncScheduler to CloutmateHelper target
+- Future enhancement: Add NotionSyncScheduler to FocusOSHelper target
 
 #### 5. Infrastructure Updates
 - **Logger.swift** - Added notion category
-- **CloutmateApp.swift** - Added NotionSyncConfig to schema
+- **FocusOSApp.swift** - Added NotionSyncConfig to schema
 - **SettingsView.swift** - Integrated Notion settings section
 
 ## Key Features
 
 ### Smart Property Matching
-Automatically matches Notion properties to Cloutmate fields based on:
+Automatically matches Notion properties to FocusOS fields based on:
 - Property names (e.g., "Name" → title, "Due Date" → dueDate)
 - Property types
 - Context (project vs task vs note)
@@ -133,7 +133,7 @@ The app uses the same callback URI as Facebook/Meta:
 1. User sees list of their Notion databases
 2. Selects databases to import
 3. For each database:
-   - Auto-detects Cloutmate type (Project/Task/Note/Area)
+   - Auto-detects FocusOS type (Project/Task/Note/Area)
    - Shows property mapping sheet
    - Smart matching pre-filled
    - User adjusts mappings as needed
@@ -154,24 +154,24 @@ The app uses the same callback URI as Facebook/Meta:
 ## Property Mapping Examples
 
 ### Projects
-- Notion: "Name" → Cloutmate: `title`
-- Notion: "Status" (select) → Cloutmate: `statusRaw`
-- Notion: "Goal" (text) → Cloutmate: `goal`
-- Notion: "Due Date" → Cloutmate: `dueDate`
-- Notion: "Tags" (multi-select) → Cloutmate: `tags`
+- Notion: "Name" → FocusOS: `title`
+- Notion: "Status" (select) → FocusOS: `statusRaw`
+- Notion: "Goal" (text) → FocusOS: `goal`
+- Notion: "Due Date" → FocusOS: `dueDate`
+- Notion: "Tags" (multi-select) → FocusOS: `tags`
 
 ### Tasks
-- Notion: "Task" → Cloutmate: `title`
-- Notion: "Project" (relation) → Cloutmate: `projectId`
-- Notion: "Status" → Cloutmate: `statusRaw`
-- Notion: "Priority" → Cloutmate: `priorityRaw`
-- Notion: "Notes" (text) → Cloutmate: `notes`
-- Notion: "Due Date" → Cloutmate: `dueDate`
+- Notion: "Task" → FocusOS: `title`
+- Notion: "Project" (relation) → FocusOS: `projectId`
+- Notion: "Status" → FocusOS: `statusRaw`
+- Notion: "Priority" → FocusOS: `priorityRaw`
+- Notion: "Notes" (text) → FocusOS: `notes`
+- Notion: "Due Date" → FocusOS: `dueDate`
 
 ### Status Mapping
-- Notion "active" → Cloutmate `active`
-- Notion "in progress" → Cloutmate `inProgress`
-- Notion "done" → Cloutmate `done`
+- Notion "active" → FocusOS `active`
+- Notion "in progress" → FocusOS `inProgress`
+- Notion "done" → FocusOS `done`
 - Case-insensitive matching
 
 ## Architecture Notes
@@ -179,7 +179,7 @@ The app uses the same callback URI as Facebook/Meta:
 ### Import Process
 1. Fetch Notion database structure
 2. Query all pages from database
-3. Convert each page to Cloutmate model based on mappings
+3. Convert each page to FocusOS model based on mappings
 4. Build relationships after all items imported
 5. Save sync configuration
 
@@ -211,26 +211,26 @@ Potential improvements for future iterations:
 ## Files Created/Modified
 
 ### New Files
-- `Cloutmate/Services/NotionService.swift`
-- `Cloutmate/Services/NotionSyncService.swift`
-- `Cloutmate/Models/NotionModels.swift`
-- `Cloutmate/Models/NotionSyncConfig.swift`
-- `Cloutmate/Views/Notion/NotionMappingSheet.swift`
-- `Cloutmate/Views/Notion/NotionDatabaseSelectorView.swift`
-- `Cloutmate/Views/Settings/NotionIntegrationSection.swift`
-- `CloutmateHelper/NotionSyncScheduler.swift`
+- `FocusOS/Services/NotionService.swift`
+- `FocusOS/Services/NotionSyncService.swift`
+- `FocusOS/Models/NotionModels.swift`
+- `FocusOS/Models/NotionSyncConfig.swift`
+- `FocusOS/Views/Notion/NotionMappingSheet.swift`
+- `FocusOS/Views/Notion/NotionDatabaseSelectorView.swift`
+- `FocusOS/Views/Settings/NotionIntegrationSection.swift`
+- `FocusOSHelper/NotionSyncScheduler.swift`
 
 ### Modified Files
-- `Cloutmate/Utilities/Logger.swift` - Added notion logger
-- `Cloutmate/CloutmateApp.swift` - Added NotionSyncConfig to schema
-- `Cloutmate/Views/Settings/SettingsView.swift` - Added Notion integration section
+- `FocusOS/Utilities/Logger.swift` - Added notion logger
+- `FocusOS/FocusOSApp.swift` - Added NotionSyncConfig to schema
+- `FocusOS/Views/Settings/SettingsView.swift` - Added Notion integration section
 
 ## Testing Checklist
 
 - [ ] OAuth flow completes successfully
 - [ ] Database list loads correctly
 - [ ] Property mappings work accurately
-- [ ] Imports create correct Cloutmate models
+- [ ] Imports create correct FocusOS models
 - [ ] Relationships are properly established
 - [ ] Periodic sync runs on schedule
 - [ ] Manual sync works

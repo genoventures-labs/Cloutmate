@@ -94,7 +94,7 @@
 ---
 
 ### Option C: **Integration Hub** 🔗
-**Goal:** Connect Cloutmate with external services
+**Goal:** Connect FocusOS with external services
 
 **Features:**
 1. **Calendar Integration**

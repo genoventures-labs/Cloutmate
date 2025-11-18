@@ -1,11 +1,11 @@
-# Cloutmate Project Blueprint
+# FocusOS Project Blueprint
 
-This folder is the canonical briefing for anyone who needs to understand or extend Cloutmate—an AI-first macOS workspace that fuses the PARA methodology, Aurora's cognitive systems, and multiple companion surfaces (menu bar, widget, helper).
+This folder is the canonical briefing for anyone who needs to understand or extend FocusOS—an AI-first macOS workspace that fuses the PARA methodology, Aurora's cognitive systems, and multiple companion surfaces (menu bar, widget, helper).
 
 ## How to Read This Blueprint
 - **Start here** for an end-to-end mental model of the application and repository layout.
 - **Dive into `/Aurora`** for subsystem deep dives (architecture, model routing, ARTE, Memory Graph, predictive brain, flow companion, narrative engine, onboarding).
-- **Use `/Cloutmate`** for workspace-specific specs (structure, dashboard, sidebar, intent clusters, command system).
+- **Use `/FocusOS`** for workspace-specific specs (structure, dashboard, sidebar, intent clusters, command system).
 - **Check `/Voice`** for tone guidance and `/Build` for release history + phase tracking.
 
 ---
@@ -14,19 +14,19 @@ This folder is the canonical briefing for anyone who needs to understand or exte
 
 | Layer | What Lives Here | Key Paths |
 | --- | --- | --- |
-| **macOS App** | SwiftUI/SwiftData workspace implementing Capture → Organize (PARA) → Express → Tools. | `Cloutmate/` (Views, ViewModels, Services, Models, Utilities)
-| **Shared Framework** | SwiftData models + shared services consumed by the app, widget, helper, and menu bar. | `CloutmateShared/CloutmateShared`
-| **Companions** | Menu bar quick capture + upcoming posts, Widget timeline, Helper background publisher. | `CloutmateMenuBar/`, `CloutmateWidget/`, `CloudmateHelper/` & `CloutmateHelper/`
-| **AI Subsystems** | Aurora runtime (phases 1-10), ARTE, Memory Graph, Predictive Cognition, Flow Companion. | `Cloutmate/Services`, `Cloutmate/Models`, docs prefixed with `AURORA_`, `PHASE*`
+| **macOS App** | SwiftUI/SwiftData workspace implementing Capture → Organize (PARA) → Express → Tools. | `FocusOS/` (Views, ViewModels, Services, Models, Utilities)
+| **Shared Framework** | SwiftData models + shared services consumed by the app, widget, helper, and menu bar. | `FocusOSShared/FocusOSShared`
+| **Companions** | Menu bar quick capture + upcoming posts, Widget timeline, Helper background publisher. | `FocusOSMenuBar/`, `FocusOSWidget/`, `FocusOSHelper/` & `FocusOSHelper/`
+| **AI Subsystems** | Aurora runtime (phases 1-10), ARTE, Memory Graph, Predictive Cognition, Flow Companion. | `FocusOS/Services`, `FocusOS/Models`, docs prefixed with `AURORA_`, `PHASE*`
 | **Automation & Scripts** | Release helpers and changelog tooling. | `scripts/generate_changelog.py`, `scripts/update_commit_hash.py`
 | **Build Outputs** | Derived artifacts from Xcode builds (safe to clean). | `build/`
 
 ### Targets & Schemes
-- `Cloutmate` (main app, SwiftUI) – entry: `Cloutmate/CloutmateApp.swift`.
-- `CloutmateShared` (framework) – models like `CloutmateShared/CloutmateShared/Models/Post.swift`.
-- `CloutmateMenuBar` – lightweight status item defined in `CloutmateMenuBar/MenuBarApp.swift`.
-- `CloutmateWidget` – WidgetKit surface pulling from shared data.
-- `CloutmateHelper` – background helper for scheduling/publishing (see `SETUP_GUIDE.md`).
+- `FocusOS` (main app, SwiftUI) – entry: `FocusOS/FocusOSApp.swift`.
+- `FocusOSShared` (framework) – models like `FocusOSShared/FocusOSShared/Models/Post.swift`.
+- `FocusOSMenuBar` – lightweight status item defined in `FocusOSMenuBar/MenuBarApp.swift`.
+- `FocusOSWidget` – WidgetKit surface pulling from shared data.
+- `FocusOSHelper` – background helper for scheduling/publishing (see `SETUP_GUIDE.md`).
 
 All persistence is SwiftData backed by `SharedDataManager.createSharedModelContainer()` so the macOS app, menu bar utility, widget, and helper read/write the same Core Data store via the shared app group.
 
@@ -34,20 +34,20 @@ All persistence is SwiftData backed by `SharedDataManager.createSharedModelConta
 
 ## 2. Workspace Surfaces & Tabs
 
-Cloutmate's primary window (see `Cloutmate/Views/MainWindowView.swift`) organizes workflows via tabs mapped to the PARA method:
+FocusOS's primary window (see `FocusOS/Views/MainWindowView.swift`) organizes workflows via tabs mapped to the PARA method:
 
 - **Capture:** Inbox, Notes, Journal, Quick Capture drawers, Voice Memo drawer.
-- **Organize:** Projects, Tasks, Areas, Resources, Archives – all SwiftData-backed models in `CloutmateShared/…/Models`.
+- **Organize:** Projects, Tasks, Areas, Resources, Archives – all SwiftData-backed models in `FocusOSShared/…/Models`.
 - **Express:** Drafts, Calendar, Artifacts (Posts) with the Artifact Composer and templates.
 - **Tools:** AI Assistant, Focus Mode, Focus Gravity, Rituals, Insights, Settings.
 
-Each tab has dedicated view folders (e.g., `Cloutmate/Views/Projects`, `Cloutmate/Views/Focus`). Context-aware creation (`ContextualCreateDrawer`), slash commands, and global search (⌘K `CommandPaletteView.swift`) keep navigation fluid across tabs.
+Each tab has dedicated view folders (e.g., `FocusOS/Views/Projects`, `FocusOS/Views/Focus`). Context-aware creation (`ContextualCreateDrawer`), slash commands, and global search (⌘K `CommandPaletteView.swift`) keep navigation fluid across tabs.
 
 ---
 
 ## 3. Aurora Cognitive Operating System
 
-Aurora runs entirely on-device via Ollama. The command pipeline in `Cloutmate/ViewModels/AIAssistantViewModel.swift` orchestrates:
+Aurora runs entirely on-device via Ollama. The command pipeline in `FocusOS/ViewModels/AIAssistantViewModel.swift` orchestrates:
 
 1. **Intent detection** → distinguishes reflection vs execution (see `AIReflectionService.swift`, `AIActionRouter.swift`).
 2. **Payload building** → `AnalyticsEngine`, `MemoryGraphService`, `ConversationArchive`, `PriorityEngine` feed `AIPayloadContext`.
@@ -72,7 +72,7 @@ Phases 1–10 are fully implemented (see `AURORA_README.md` + `AURORA_IMPLEMENTA
 
 ## 4. Data & Intelligence Infrastructure
 
-- **SwiftData Models:** Located in `Cloutmate/Models` and `CloutmateShared/…/Models`. Highlights: `FocusSession`, `StoryToken`, `MemoryNode`, `PriorityScore`, `FlowCompanionState`, `IntentCluster`.
+- **SwiftData Models:** Located in `FocusOS/Models` and `FocusOSShared/…/Models`. Highlights: `FocusSession`, `StoryToken`, `MemoryNode`, `PriorityScore`, `FlowCompanionState`, `IntentCluster`.
 - **Analytics Layer:** `AnalyticsEngine` aggregates productivity, emotional, focus, and learning metrics that drive Insights tabs and AI reflections.
 - **Memory Graph:** `MemoryGraphService` + `ThemeExtractionPipeline` maintain embeddings, DBSCAN clusters, and predictive hooks.
 - **Predictive Systems:** `CognitionPredictor`, `DriftMonitor`, `MomentumMetrics`, `PredictiveContextManager`, `ToneForecastService` anticipate energy windows and drift risk.
@@ -82,17 +82,17 @@ Phases 1–10 are fully implemented (see `AURORA_README.md` + `AURORA_IMPLEMENTA
 
 ## 5. Supporting Surfaces
 
-- **Menu Bar (`CloutmateMenuBar/`)** – `MenuBarApp.swift` renders `MenuBarPopoverView` with quick capture, upcoming posts, tasks, reminders, and uses `NotificationService` for updates.
-- **Widget (`CloutmateWidget/`)** – SwiftUI widget timeline summarizing scheduled artifacts/tasks via shared models.
-- **Helper Apps (`CloudmateHelper/`, `CloutmateHelper/`)** – background daemons controlling publishing, scheduling, and login item registration (see `BUILD_AND_SIGN_MENUBAR.md`, `SIGN_MENUBAR_APP.sh`).
+- **Menu Bar (`FocusOSMenuBar/`)** – `MenuBarApp.swift` renders `MenuBarPopoverView` with quick capture, upcoming posts, tasks, reminders, and uses `NotificationService` for updates.
+- **Widget (`FocusOSWidget/`)** – SwiftUI widget timeline summarizing scheduled artifacts/tasks via shared models.
+- **Helper Apps (`FocusOSHelper/`, `FocusOSHelper/`)** – background daemons controlling publishing, scheduling, and login item registration (see `BUILD_AND_SIGN_MENUBAR.md`, `SIGN_MENUBAR_APP.sh`).
 
-All companions rely on `CloutmateShared` and must share the app group + entitlements (see `SETUP_GUIDE.md`).
+All companions rely on `FocusOSShared` and must share the app group + entitlements (see `SETUP_GUIDE.md`).
 
 ---
 
 ## 6. Tooling, Scripts, and Configuration
 
-- **Config:** `Cloutmate/Config/AIConfig.plist` (feature flags), `Config.plist` (API keys), `ReflectionPrompts.plist` (Flow Companion prompts) feed runtime services.
+- **Config:** `FocusOS/Config/AIConfig.plist` (feature flags), `Config.plist` (API keys), `ReflectionPrompts.plist` (Flow Companion prompts) feed runtime services.
 - **Scripts:**
   - `scripts/update_commit_hash.py` – keeps prompt metadata aware of git revisions.
   - `scripts/generate_changelog.py` – compiles deployment changelogs.
@@ -104,7 +104,7 @@ All companions rely on `CloutmateShared` and must share the app group + entitlem
 
 1. **Prereqs:** Xcode 16+, Swift 5.10 toolchain, Ollama installed with `qwen3:1.7b`, `granite3.2:2b`, `gemma3:4b`, `gwen2.5-coder:1.5b`, `deepseek-r1:1.5b`, and `qwen3-vl:2b` pulled.
 2. **Config:** Populate `Config/Config.plist` with API keys (Notion, Google Vision, etc.), set Info.plist Meta keys, optional Ollama Cloud key via env var.
-3. **Targets:** Ensure `CloutmateShared` is added to app/menu bar/widget/helper. Confirm entitlements share `group.com.kosmicapps.Cloutmate`.
+3. **Targets:** Ensure `FocusOSShared` is added to app/menu bar/widget/helper. Confirm entitlements share `group.com.kosmicapps.FocusOS`.
 4. **Datastore:** Run once to initialize SwiftData/Flow Companion records (FlowCompanionState, ARTEConfiguration). Use `MigrationRunner` if schema changes appear in build logs.
 5. **Aurora Smoke Test:**
    - Run `Cmd+Shift+A` (Aurora Spotlight) and issue: "Create a task called test" (execution), "What patterns do you see?" (reflection), `/research future of PARA` (research mode), and attach a PDF/image to confirm `DocumentAttachmentService` + `ImageAttachmentService` + `ModelRoutingEngine`.
@@ -124,10 +124,10 @@ Use the remaining files in this folder for deep dives:
 - `Aurora/FlowEngine.md` – Flow Companion bubble + triggers.
 - `Aurora/NarrativeEngine.md` – story token pipeline.
 - `Aurora/Onboarding.md` – enabling Aurora on fresh machines.
-- `Cloutmate/Structure.md` – repo anatomy + feature inventory.
-- `Cloutmate/DashboardSpec.md` & `SidebarSpec.md` – UI surface breakdowns.
-- `Cloutmate/IntentClusters.md` – predictive conversation clustering.
-- `Cloutmate/CommandSystem.md` – search, commands, contextual create.
+- `FocusOS/Structure.md` – repo anatomy + feature inventory.
+- `FocusOS/DashboardSpec.md` & `SidebarSpec.md` – UI surface breakdowns.
+- `FocusOS/IntentClusters.md` – predictive conversation clustering.
+- `FocusOS/CommandSystem.md` – search, commands, contextual create.
 - `Voice/ToneGuidelines.md` – copy + assistant voice direction.
 - `Build/UpgradeHistory.md` & `Build/PhaseLog.md` – timeline + phase tracking.
 

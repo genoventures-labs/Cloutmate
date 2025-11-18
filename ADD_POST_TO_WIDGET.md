@@ -1,19 +1,19 @@
-# Add Post Model to CloutmateWidget Target
+# Add Post Model to FocusOSWidget Target
 
 ## Problem
-Widget can't find Post type even though it imports CloutmateShared.
+Widget can't find Post type even though it imports FocusOSShared.
 
 ## Solution
 
-The Post model files need to be in the CloutmateWidget target.
+The Post model files need to be in the FocusOSWidget target.
 
 ### In Xcode:
 
-1. **Select** `CloutmateShared/CloutmateShared/CloutmateShared/Models/Post.swift`
+1. **Select** `FocusOSShared/FocusOSShared/FocusOSShared/Models/Post.swift`
 2. Press **⌥⌘1** (File Inspector)  
 3. **Target Membership**:
-   - ✅ **CHECK CloutmateShared** (already there)
-   - ✅ **CHECK CloutmateWidget** (ADD THIS!)
+   - ✅ **CHECK FocusOSShared** (already there)
+   - ✅ **CHECK FocusOSWidget** (ADD THIS!)
 
 4. **Repeat for other model files:**
    - AIMessage.swift
@@ -24,7 +24,7 @@ The Post model files need to be in the CloutmateWidget target.
    - PlatformAccount.swift
    - Template.swift
 
-All models in `CloutmateShared/CloutmateShared/CloutmateShared/Models/` need CloutmateWidget checked in their target membership.
+All models in `FocusOSShared/FocusOSShared/FocusOSShared/Models/` need FocusOSWidget checked in their target membership.
 
 ## After Adding
 

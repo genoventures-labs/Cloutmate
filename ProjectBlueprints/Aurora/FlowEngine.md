@@ -8,14 +8,14 @@ Phase 10 introduced the Flow Companion—Aurora’s clarity coach that surfaces 
 
 | Component | Role | Key Files |
 | --- | --- | --- |
-| `FlowCompanionEngine` | Controls the floating reflection bubble, prompt selection, persistence, and panel expansion. | `Cloutmate/Services/FlowCompanionEngine.swift` |
-| `FlowTriggersService` | Monitors drift, rituals, idle detection, manual triggers, and broadcasts when to show prompts. | `Cloutmate/Services/FlowTriggersService.swift` |
+| `FlowCompanionEngine` | Controls the floating reflection bubble, prompt selection, persistence, and panel expansion. | `FocusOS/Services/FlowCompanionEngine.swift` |
+| `FlowTriggersService` | Monitors drift, rituals, idle detection, manual triggers, and broadcasts when to show prompts. | `FocusOS/Services/FlowTriggersService.swift` |
 | `FlowCompanionSettings` | Stores enablement, trigger toggles (drift/evening/idle), idle timeout, reflection tone, and bubble duration. | Inside `FlowTriggersService.swift` |
-| `MetaReflectionProcessor` | Analyzes responses, updates CPS weights, syncs ARTE state, and records analytics. | `Cloutmate/Services/MetaReflectionProcessor.swift` |
-| `FlowCompanionState` | SwiftData model tracking Flow Companion personality, interaction history, total nudges. | `Cloutmate/Models/FlowCompanionState.swift` |
-| `AIFlowCompanion` | Generates longer-form insights/nudges with a distinct "clarity coach" tone. | `Cloutmate/Services/AIFlowCompanion.swift` |
-| `AIFlowCompanionView` | Settings + insight log for the coach. | `Cloutmate/Views/AIFlowCompanion/AIFlowCompanionView.swift` |
-| `FlowHoldService` | Temporarily blocks notifications during deep work windows. | `Cloutmate/Services/FlowHoldService.swift` |
+| `MetaReflectionProcessor` | Analyzes responses, updates CPS weights, syncs ARTE state, and records analytics. | `FocusOS/Services/MetaReflectionProcessor.swift` |
+| `FlowCompanionState` | SwiftData model tracking Flow Companion personality, interaction history, total nudges. | `FocusOS/Models/FlowCompanionState.swift` |
+| `AIFlowCompanion` | Generates longer-form insights/nudges with a distinct "clarity coach" tone. | `FocusOS/Services/AIFlowCompanion.swift` |
+| `AIFlowCompanionView` | Settings + insight log for the coach. | `FocusOS/Views/AIFlowCompanion/AIFlowCompanionView.swift` |
+| `FlowHoldService` | Temporarily blocks notifications during deep work windows. | `FocusOS/Services/FlowHoldService.swift` |
 
 ---
 

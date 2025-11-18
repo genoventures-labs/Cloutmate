@@ -764,7 +764,7 @@ Aurora should now be able to:
 **Aurora (New):** "I'll do a deep research dive on content marketing best practices. This will take a moment—I'm searching from multiple angles, analyzing with different models, and gathering sources. [Progress: 'Searched for: content marketing best practices... - 5 sources'] [Progress: 'Analyzing with DeepSeek R1...'] [Progress: 'Analyzing with cloud model...'] Here's my comprehensive research report: [synthesized findings with citations]. Sources: [source pills with titles and URLs]"
 
 **User:** "Why did you take so long to respond?"  
-**Aurora (New):** "I was warming up my models when you first opened Cloutmate—that's the 'Waking up [Model Name]...' message you might have seen. I do this once per day to ensure I can respond quickly when you need me. Once warmed up, I remember what's available and skip the warmup on subsequent launches. If you see that message, it means I'm getting ready to help you faster!"
+**Aurora (New):** "I was warming up my models when you first opened FocusOS—that's the 'Waking up [Model Name]...' message you might have seen. I do this once per day to ensure I can respond quickly when you need me. Once warmed up, I remember what's available and skip the warmup on subsequent launches. If you see that message, it means I'm getting ready to help you faster!"
 
 **User:** "What patterns do you see in my work?"  
 **Aurora (New):** "💭 **Reflection on your patterns and progress**
@@ -788,11 +788,11 @@ Check **Insights → Focus Analytics** for detailed charts and trends."
 ## Documentation Files
 
 **Updated:**
-- `Cloutmate/Services/OllamaBridgeService.swift` - All system prompts
-- `Cloutmate/Services/CoreResponseService.swift` - Response generation abstraction
-- `Cloutmate/Services/HybridBridgeService.swift` - Local/cloud routing
-- `Cloutmate/Services/WebSearchService.swift` - Web search capabilities
-- `Cloutmate/Services/ModelWarmupService.swift` - Model warmup protocol
+- `FocusOS/Services/OllamaBridgeService.swift` - All system prompts
+- `FocusOS/Services/CoreResponseService.swift` - Response generation abstraction
+- `FocusOS/Services/HybridBridgeService.swift` - Local/cloud routing
+- `FocusOS/Services/WebSearchService.swift` - Web search capabilities
+- `FocusOS/Services/ModelWarmupService.swift` - Model warmup protocol
 - `AURORA_README.md` - Complete feature documentation
 - `AURORA_INTRO.md` - User-facing introduction
 
@@ -848,5 +848,5 @@ She can:
 - Route intelligently between local and cloud models
 - Acknowledge development roadmap honestly
 
-**Aurora's knowledge base is now synchronized with the complete Cloutmate intelligence system, including all 10 phases, research capabilities, response architecture, and advanced tone services.** 🧠✨
+**Aurora's knowledge base is now synchronized with the complete FocusOS intelligence system, including all 10 phases, research capabilities, response architecture, and advanced tone services.** 🧠✨
 

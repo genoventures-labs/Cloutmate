@@ -1,13 +1,13 @@
-# Remove Services from CloutmateShared Target
+# Remove Services from FocusOSShared Target
 
 ## Problem
-Files in `Cloutmate/Services/` are being compiled by BOTH:
-- ✅ Cloutmate target (correct)
-- ❌ CloutmateShared target (WRONG)
+Files in `FocusOS/Services/` are being compiled by BOTH:
+- ✅ FocusOS target (correct)
+- ❌ FocusOSShared target (WRONG)
 
 ## Solution
 
-In Xcode, for these files in `Cloutmate/Services/`:
+In Xcode, for these files in `FocusOS/Services/`:
 
 1. **MetaAPIService.swift**
 2. **ThreadsService.swift**
@@ -18,9 +18,9 @@ In Xcode, for these files in `Cloutmate/Services/`:
 1. **Select the file** in Xcode
 2. Press **⌥⌘1** (File Inspector)
 3. **Target Membership**:
-   - ✅ **CHECK Cloutmate** (keep)
-   - ✅ **CHECK CloudmateHelper** (if needed)
-   - ❌ **UNCHECK CloutmateShared** (remove)
+   - ✅ **CHECK FocusOS** (keep)
+   - ✅ **CHECK FocusOSHelper** (if needed)
+   - ❌ **UNCHECK FocusOSShared** (remove)
 
 These files belong to the main app, NOT the shared framework.
 

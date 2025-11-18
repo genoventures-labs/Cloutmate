@@ -7,13 +7,13 @@ Replace the standard ThinkingIndicator with a simple updating card when Aurora i
 
 ## Files to Modify
 
-### 1. `Cloutmate/ViewModels/AIAssistantViewModel.swift`
+### 1. `FocusOS/ViewModels/AIAssistantViewModel.swift`
 
 - Add `currentResearchAction: String?` to track current action text (e.g., "Searched for: [query]")
 - Add `currentResearchSourceCount: Int` to track number of sources
 - Add methods: `updateResearchProgress(action: String, sourceCount: Int)`, `clearResearchProgress()`
 
-### 2. `Cloutmate/Services/CoreResponseService.swift`
+### 2. `FocusOS/Services/CoreResponseService.swift`
 
 - Modify `generateResearchResponse` to emit progress updates via MainActor
 - Add progress updates at key stages:
@@ -22,13 +22,13 @@ Replace the standard ThinkingIndicator with a simple updating card when Aurora i
 - Cloud analysis: "Analyzing with cloud model..." (no source count)
 - Reading sources: "Read: [Page Title] ([source])" with source count as each source is processed
 
-### 3. `Cloutmate/Services/HybridBridgeService.swift`
+### 3. `FocusOS/Services/HybridBridgeService.swift`
 
 - Update `generateCloudResponseWithAppContextAndWebSearch` to emit web search progress
 - Emit progress when web search completes with query and result count
 - Emit progress for each source being read/analyzed
 
-### 4. `Cloutmate/Views/AIAssistant/Components/ResearchProgressIndicator.swift` (NEW)
+### 4. `FocusOS/Views/AIAssistant/Components/ResearchProgressIndicator.swift` (NEW)
 
 - Create new component to replace ThinkingIndicator during research mode
 - Simple compact card design matching image reference:
@@ -44,12 +44,12 @@ Replace the standard ThinkingIndicator with a simple updating card when Aurora i
 - No progress bar - clean, minimal design
 - Optional subtle icon (magnifyingglass for search, book.open for read)
 
-### 5. `Cloutmate/Views/AIAssistant/AIAssistantView.swift` or `AuroraChatContainer.swift`
+### 5. `FocusOS/Views/AIAssistant/AIAssistantView.swift` or `AuroraChatContainer.swift`
 
 - Conditionally show `ResearchProgressIndicator` instead of `ThinkingIndicator` when `viewModel.isResearchMode && viewModel.isLoading`
 - Pass `viewModel.currentResearchAction` and `viewModel.currentResearchSourceCount` to the indicator
 
-### 6. `Cloutmate/ViewModels/AIAssistantViewModel.swift` (continued)
+### 6. `FocusOS/ViewModels/AIAssistantViewModel.swift` (continued)
 
 - In `sendMessage`, initialize research progress tracking when research mode is detected
 - Clear research progress after response completes

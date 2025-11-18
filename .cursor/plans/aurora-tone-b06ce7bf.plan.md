@@ -8,7 +8,7 @@ Enable Aurora to receive, analyze, and remember images from users. Images can be
 ## Implementation Steps
 
 ### 1. Extend AIMessage Model for Images
-**File**: `Cloutmate/Models/AIMessage.swift`
+**File**: `FocusOS/Models/AIMessage.swift`
 
 Add image support to AIMessage:
 ```swift
@@ -21,7 +21,7 @@ Add image support to AIMessage:
 Update initializer to accept optional image parameters.
 
 ### 2. Create Image Attachment Service
-**File**: `Cloutmate/Services/ImageAttachmentService.swift` (NEW)
+**File**: `FocusOS/Services/ImageAttachmentService.swift` (NEW)
 
 Create a service to handle image operations:
 - Load images from file picker
@@ -47,7 +47,7 @@ actor ImageAttachmentService {
 ```
 
 ### 3. Update GeminiService for Image Analysis
-**File**: `Cloutmate/Services/GeminiService.swift`
+**File**: `FocusOS/Services/GeminiService.swift`
 
 Add method to send images with text prompts:
 ```swift
@@ -73,7 +73,7 @@ Update system prompt when images are present:
 - Maintain Aurora's intimate friend personality while being analytical
 
 ### 4. Store Image Analysis in Recall System
-**File**: `Cloutmate/Services/AIRecallService.swift`
+**File**: `FocusOS/Services/AIRecallService.swift`
 
 Extend recall to handle image messages:
 - When an image message is processed, create RecallIndexEntry
@@ -83,7 +83,7 @@ Extend recall to handle image messages:
 - Emotional context: User's accompanying message emotion
 
 ### 5. Update AIAssistantViewModel for Image Messages
-**File**: `Cloutmate/ViewModels/AIAssistantViewModel.swift`
+**File**: `FocusOS/ViewModels/AIAssistantViewModel.swift`
 
 Add image handling:
 ```swift
@@ -138,7 +138,7 @@ func sendMessage(_ text: String, modelContext: ModelContext, image: ImageAttachm
 ```
 
 ### 6. Update UI - Add Attach Button
-**File**: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`
+**File**: `FocusOS/Views/AIAssistant/AIAssistantView.swift`
 
 In `inputArea`, add image attachment button before send button:
 
@@ -200,7 +200,7 @@ Add state variables:
 ```
 
 ### 7. Add Clipboard Paste Support
-**File**: `Cloutmate/Views/AIAssistant/AIAssistantView.swift`
+**File**: `FocusOS/Views/AIAssistant/AIAssistantView.swift`
 
 Update ChatTextEditor coordinator to handle paste:
 ```swift
@@ -219,7 +219,7 @@ func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> 
 ```
 
 ### 8. Display Images in Message Bubbles
-**File**: `Cloutmate/Views/AIAssistant/Components/MessageBubble.swift` or inline in AIAssistantView
+**File**: `FocusOS/Views/AIAssistant/Components/MessageBubble.swift` or inline in AIAssistantView
 
 Update message display to show images:
 ```swift
@@ -253,7 +253,7 @@ VStack(alignment: message.role == "user" ? .trailing : .leading) {
 ```
 
 ### 9. Update System Prompt for Image Context
-**File**: `Cloutmate/Services/GeminiService.swift`
+**File**: `FocusOS/Services/GeminiService.swift`
 
 When images are present, enhance system prompt:
 ```swift
@@ -271,14 +271,14 @@ let imageInstructions = """
 ```
 
 ## Files to Create
-1. `Cloutmate/Services/ImageAttachmentService.swift` - New service for image handling
+1. `FocusOS/Services/ImageAttachmentService.swift` - New service for image handling
 
 ## Files to Modify
-1. `Cloutmate/Models/AIMessage.swift` - Add image fields
-2. `Cloutmate/Services/GeminiService.swift` - Add image analysis method
-3. `Cloutmate/Services/AIRecallService.swift` - Index image analysis
-4. `Cloutmate/ViewModels/AIAssistantViewModel.swift` - Handle image messages
-5. `Cloutmate/Views/AIAssistant/AIAssistantView.swift` - Add UI for attach button, clipboard paste, image preview, display
+1. `FocusOS/Models/AIMessage.swift` - Add image fields
+2. `FocusOS/Services/GeminiService.swift` - Add image analysis method
+3. `FocusOS/Services/AIRecallService.swift` - Index image analysis
+4. `FocusOS/ViewModels/AIAssistantViewModel.swift` - Handle image messages
+5. `FocusOS/Views/AIAssistant/AIAssistantView.swift` - Add UI for attach button, clipboard paste, image preview, display
 
 ## Technical Notes
 

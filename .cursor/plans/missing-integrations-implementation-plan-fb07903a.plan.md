@@ -15,7 +15,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Arc View Timeline Component**
 
-- File: `Cloutmate/Views/Story/ArcViewTimeline.swift`
+- File: `FocusOS/Views/Story/ArcViewTimeline.swift`
 - Features:
 - Scrollable horizontal timeline with smooth transitions
 - Chapter markers (weeks/months based on user rhythm)
@@ -47,7 +47,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Mood Trends Visualization**
 
-- File: `Cloutmate/Views/Story/MoodTrendsView.swift`
+- File: `FocusOS/Views/Story/MoodTrendsView.swift`
 - Features:
 - Time-based chart (line/area chart)
 - Color-coded mood entries (calm, ambitious, drained, inspired)
@@ -76,7 +76,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Enhanced Adaptive Journal View**
 
-- File: `Cloutmate/Views/Journal/AdaptiveJournalView.swift`
+- File: `FocusOS/Views/Journal/AdaptiveJournalView.swift`
 - Features:
 - Weekly auto-entry display (from `AdaptiveJournalService`)
 - Editable journal entries (user can rewrite story)
@@ -105,7 +105,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Auto-Block Allocation UI**
 
-- File: `Cloutmate/Views/FocusMode/AutoBlockAllocationView.swift`
+- File: `FocusOS/Views/FocusMode/AutoBlockAllocationView.swift`
 - Features:
 - Display top 3 priorities with suggested time slots
 - Show energy alignment scores
@@ -142,7 +142,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Interactive Knowledge Map View**
 
-- File: `Cloutmate/Views/Insights/VisualKnowledgeMapView.swift`
+- File: `FocusOS/Views/Insights/VisualKnowledgeMapView.swift`
 - Features:
 - Center node representing "Self Graph" (current focus)
 - Connected clusters (Projects, Notes, Reflections, Posts)
@@ -184,7 +184,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Memory Compression Service**
 
-- File: `Cloutmate/Services/MemoryCompressionService.swift`
+- File: `FocusOS/Services/MemoryCompressionService.swift`
 - Features:
 - Identify old/inactive data (>90 days)
 - Generate summaries instead of full entries
@@ -194,7 +194,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 2. **Create Compression Models**
 
-- File: `Cloutmate/Models/MemorySummary.swift`
+- File: `FocusOS/Models/MemorySummary.swift`
 - Store compressed summaries with vector embeddings
 - Link to original data for full recall when needed
 
@@ -255,7 +255,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 1. **Create Self-Reflection Diagnostic Service**
 
-   - File: `Cloutmate/Services/AuroraSelfReflectionService.swift`
+   - File: `FocusOS/Services/AuroraSelfReflectionService.swift`
    - Features:
      - Aggregates memory statistics (total memories, compressed themes, active nodes)
      - Identifies recurring motifs across time periods (quarterly, monthly)
@@ -265,7 +265,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 2. **Create Diagnostic Model**
 
-   - File: `Cloutmate/Models/AuroraSelfDiagnostic.swift`
+   - File: `FocusOS/Models/AuroraSelfDiagnostic.swift`
    - Fields:
      - `memorySummary`: Total memories summarized, compressed themes count
      - `recurringMotifs`: Array of top motifs with frequency and time range
@@ -277,7 +277,7 @@ This plan completes the remaining missing integrations identified in the phase s
 
 3. **Create Self-Reflection View**
 
-   - File: `Cloutmate/Views/AIAssistant/AuroraSelfReflectionView.swift`
+   - File: `FocusOS/Views/AIAssistant/AuroraSelfReflectionView.swift`
    - Features:
      - Natural language summary display
      - Example output: "I've summarized 183 memories and compressed 42 inactive themes. My most recurring motif this quarter is 'clarity through structure.'"
@@ -363,10 +363,10 @@ Graph Health:
 
 ### Files to Modify
 
-- `Cloutmate/Views/Insights/InsightsView.swift` - Add new tabs/sections
-- `Cloutmate/Views/MainWindowView.swift` - Add navigation entries if needed
-- `Cloutmate/Services/NarrativeEngine.swift` - Already has `detectArcs()` and `weaveMemory()`
-- `Cloutmate/CloutmateApp.swift` - Register new models if needed
+- `FocusOS/Views/Insights/InsightsView.swift` - Add new tabs/sections
+- `FocusOS/Views/MainWindowView.swift` - Add navigation entries if needed
+- `FocusOS/Services/NarrativeEngine.swift` - Already has `detectArcs()` and `weaveMemory()`
+- `FocusOS/FocusOSApp.swift` - Register new models if needed
 
 ### Models Already Exist
 

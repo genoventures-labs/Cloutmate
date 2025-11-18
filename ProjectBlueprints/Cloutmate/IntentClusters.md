@@ -62,8 +62,8 @@ Aurora analyzes recent conversations to predict what the user is likely to focus
 
 ## 5. Testing & Validation
 
-- Use `/ProjectBlueprints/Cloutmate/CommandSystem.md` to trigger conversation activity, then call Aurora: "Based on our recent conversations, what do you think I'm about to focus on?" Ensure she references the predicted clusters and confidence.
+- Use `/ProjectBlueprints/FocusOS/CommandSystem.md` to trigger conversation activity, then call Aurora: "Based on our recent conversations, what do you think I'm about to focus on?" Ensure she references the predicted clusters and confidence.
 - Check logs (`os_log` category `ConversationArchive`) for JSON parsing failures.
-- Add unit tests in `CloutmateTests` to mock digests and verify confidence/abstention logic.
+- Add unit tests in `FocusOSTests` to mock digests and verify confidence/abstention logic.
 
 Intent clusters are the bridge between conversation history and predictive posture—keep them well-fed with digested conversations to maintain accuracy.

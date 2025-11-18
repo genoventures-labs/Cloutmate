@@ -110,7 +110,7 @@ After systematically auditing the codebase against `AURORA_KNOWLEDGE_BASE_UPDATE
   - ✅ **AuroraSpotlightWindowController** - Window controller (`AuroraSpotlightWindowController.swift`)
   - ✅ **AuroraSpotlightView** - UI implementation (`AuroraSpotlightView.swift`)
   - ✅ **AuroraSpotlightViewModel** - View model (`AuroraSpotlightViewModel.swift`)
-  - ✅ **Keyboard Shortcut** - Cmd+Shift+A registered (`CloutmateApp.swift` lines 276-305)
+  - ✅ **Keyboard Shortcut** - Cmd+Shift+A registered (`FocusOSApp.swift` lines 276-305)
 
 #### @ Mention Linking
 - ✅ **MentionParser** - Parses @ mentions (`MentionParser.swift`)

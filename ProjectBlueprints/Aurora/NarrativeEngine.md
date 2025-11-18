@@ -67,7 +67,7 @@ Aurora’s Narrative Engine turns productivity metrics and conceptual themes int
 | Issue | Fix |
 | --- | --- |
 | Empty narratives | Ensure focus sessions, tasks, or reflections exist during the selected week; check `ConceptTracker` for alive concepts. |
-| Missing StoryTokens | Verify the model is added to the schema in `CloutmateApp.sharedModelContainer`. |
+| Missing StoryTokens | Verify the model is added to the schema in `FocusOSApp.sharedModelContainer`. |
 | Export failures | Confirm `StoryTokenExportService` has file permissions and that Markdown is well-formed.
 
-Narratives turn analytics into meaning—keep the storytelling voice consistent with Cloutmate’s supportive, insightful tone.
+Narratives turn analytics into meaning—keep the storytelling voice consistent with FocusOS’s supportive, insightful tone.

@@ -9,7 +9,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 1.1 Redesign Header Layout
 
-**File:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift`
+**File:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift`
 
 - Move month title to center with smooth fade transitions between months
 - Update arrow buttons to use GlassButton with iconOnly style
@@ -26,7 +26,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 1.2 Create Pill-Style Toggle
 
-**File:** `Cloutmate/Views/Calendar/Components/CalendarViewToggle.swift` (new)
+**File:** `FocusOS/Views/Calendar/Components/CalendarViewToggle.swift` (new)
 
 - Replace segment control with rounded capsule toggle
 - Use GlassPanel background with `.overlay` tier
@@ -46,7 +46,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 2.1 Enhance Day Cell Design
 
-**File:** `Cloutmate/Views/Calendar/Components/CalendarDayCellV2.swift` (new)
+**File:** `FocusOS/Views/Calendar/Components/CalendarDayCellV2.swift` (new)
 
 **Day Cell Features:**
 
@@ -67,7 +67,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 2.2 Update Monthly Grid Layout
 
-**File:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift` (UnifiedMonthlyCalendarView)
+**File:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift` (UnifiedMonthlyCalendarView)
 
 - Replace `UnifiedCalendarDayCell` with new `CalendarDayCellV2`
 - Update grid spacing: 8pt between cells
@@ -78,7 +78,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 3.1 Create Daily Snapshot Drawer
 
-**File:** `Cloutmate/Views/Calendar/Components/DailySnapshotDrawer.swift` (new)
+**File:** `FocusOS/Views/Calendar/Components/DailySnapshotDrawer.swift` (new)
 
 **Drawer Features:**
 
@@ -105,7 +105,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 3.2 Integrate Drawer into Calendar
 
-**File:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift`
+**File:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift`
 
 - Add `@State private var showDrawer = false`
 - Add `@State private var drawerDate: Date?`
@@ -123,7 +123,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 4.1 Add Quick Actions Button
 
-**File:** `Cloutmate/Views/Calendar/Components/CalendarHeaderView.swift`
+**File:** `FocusOS/Views/Calendar/Components/CalendarHeaderView.swift`
 
 - Add small "+" button in top-right corner of header
 - Use GlassButton with iconOnly style (28x28)
@@ -140,7 +140,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 4.2 Update ContextualCreateSheet for Calendar
 
-**File:** `Cloutmate/Views/Components/ContextualCreateSheet.swift`
+**File:** `FocusOS/Views/Components/ContextualCreateSheet.swift`
 
 - Add `.calendar` case to `actionsForTab`
 - Calendar actions:
@@ -153,7 +153,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 5.1 Add Focus Gravity Background Gradients
 
-**File:** `Cloutmate/Views/Calendar/Components/CalendarDayCellV2.swift`
+**File:** `FocusOS/Views/Calendar/Components/CalendarDayCellV2.swift`
 
 - Query Focus Gravity metrics for each day
 - Render subtle background gradients behind day cells
@@ -173,7 +173,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 6.1 Enhance Weekly View Header
 
-**File:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift` (UnifiedWeeklyCalendarView)
+**File:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift` (UnifiedWeeklyCalendarView)
 
 - Apply same header design as monthly view
 - Use centered week range text (e.g., "Nov 10 - Nov 16, 2025")
@@ -182,7 +182,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 6.2 Update Weekly Day Columns
 
-**File:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift` (UnifiedDayColumn)
+**File:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift` (UnifiedDayColumn)
 
 - Apply minimalist design matching new day cells
 - Add Daily Snapshot drawer integration
@@ -193,7 +193,7 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 ### 7.1 Keyboard Navigation
 
-**File:** `Cloutmate/Views/Calendar/UnifiedCalendarView.swift`
+**File:** `FocusOS/Views/Calendar/UnifiedCalendarView.swift`
 
 - Arrow keys: Navigate between dates
 - Enter: Open drawer for selected date
@@ -219,16 +219,16 @@ Transform the Calendar view from a static utility into a calm, expressive moment
 
 **New Files:**
 
-- `Cloutmate/Views/Calendar/Components/CalendarHeaderView.swift`
-- `Cloutmate/Views/Calendar/Components/CalendarViewToggle.swift`
-- `Cloutmate/Views/Calendar/Components/CalendarDayCellV2.swift`
-- `Cloutmate/Views/Calendar/Components/DailySnapshotDrawer.swift`
+- `FocusOS/Views/Calendar/Components/CalendarHeaderView.swift`
+- `FocusOS/Views/Calendar/Components/CalendarViewToggle.swift`
+- `FocusOS/Views/Calendar/Components/CalendarDayCellV2.swift`
+- `FocusOS/Views/Calendar/Components/DailySnapshotDrawer.swift`
 
 **Modified Files:**
 
-- `Cloutmate/Views/Calendar/UnifiedCalendarView.swift` - Main calendar view
-- `Cloutmate/Views/Components/ContextualCreateSheet.swift` - Add calendar actions
-- `Cloutmate/Extensions/Notification+Names.swift` - Add calendar date context notification
+- `FocusOS/Views/Calendar/UnifiedCalendarView.swift` - Main calendar view
+- `FocusOS/Views/Components/ContextualCreateSheet.swift` - Add calendar actions
+- `FocusOS/Extensions/Notification+Names.swift` - Add calendar date context notification
 
 ## Design Tokens
 

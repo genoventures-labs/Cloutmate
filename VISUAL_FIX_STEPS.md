@@ -4,8 +4,8 @@
 
 The Target Membership shows which targets will compile this file. For the problem files, you need to:
 
-✅ KEEP: CloutmateShared (checked)  
-❌ REMOVE: Cloutmate (unchecked)
+✅ KEEP: FocusOSShared (checked)  
+❌ REMOVE: FocusOS (unchecked)
 
 ---
 
@@ -18,15 +18,15 @@ The Target Membership shows which targets will compile this file. For the proble
 2. **The checkboxes are at the bottom of each target** (not visible in your screenshot)
 
 3. **Do this:**
-   - Look for checkbox next to "Cloutmate" → **UNCHECK IT** ❌
-   - Look for checkbox next to "CloutmateShared" → **KEEP CHECKED** ✅
-   - Checkbox next to "CloudmateHelper" → Leave as is
+   - Look for checkbox next to "FocusOS" → **UNCHECK IT** ❌
+   - Look for checkbox next to "FocusOSShared" → **KEEP CHECKED** ✅
+   - Checkbox next to "FocusOSHelper" → Leave as is
 
 4. **The interface shows:**
    ```
-   ☐ Cloutmate           ← UNCHECK THIS
-   ☐ CloudmateHelper     ← Leave alone
-   ☑ CloutmateShared     ← KEEP CHECKED
+   ☐ FocusOS           ← UNCHECK THIS
+   ☐ FocusOSHelper     ← Leave alone
+   ☑ FocusOSShared     ← KEEP CHECKED
    ```
 
 ---
@@ -39,13 +39,13 @@ Do the unchecking for:
 - `ThreadsService.swift`
 - `FacebookService.swift`
 
-Each file should only have CloutmateShared checked ✅
+Each file should only have FocusOSShared checked ✅
 
 ---
 
 ## Why?
 
-These files are now part of the CloutmateShared **framework** which all other targets (Cloutmate, Widget, MenuBar) will **import**. The main Cloutmate app shouldn't compile them directly anymore - it should import them from the framework.
+These files are now part of the FocusOSShared **framework** which all other targets (FocusOS, Widget, MenuBar) will **import**. The main FocusOS app shouldn't compile them directly anymore - it should import them from the framework.
 
 ---
 

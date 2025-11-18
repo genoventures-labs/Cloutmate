@@ -1,19 +1,19 @@
 # Check Post.swift Target Membership
 
 ## Current Status
-✅ SharedDataManager.swift exists: `/CloutmateShared/CloutmateShared/Services/`
-✅ Post.swift exists: `/CloutmateShared/CloutmateShared/Models/`
+✅ SharedDataManager.swift exists: `/FocusOSShared/FocusOSShared/Services/`
+✅ Post.swift exists: `/FocusOSShared/FocusOSShared/Models/`
 
 ## But widget can't see Post type
 
-This means Post.swift is NOT in the CloutmateShared target.
+This means Post.swift is NOT in the FocusOSShared target.
 
 ## Fix in Xcode:
 
-1. Select `CloutmateShared/CloutmateShared/Models/Post.swift`
+1. Select `FocusOSShared/FocusOSShared/Models/Post.swift`
 2. Press ⌥⌘1 (File Inspector)
 3. Check **Target Membership**:
-   - ✅ **CloutmateShared** - should be CHECKED
+   - ✅ **FocusOSShared** - should be CHECKED
    - ❌ Other targets - should be UNCHECKED
 
 Do this for ALL model files in that directory:

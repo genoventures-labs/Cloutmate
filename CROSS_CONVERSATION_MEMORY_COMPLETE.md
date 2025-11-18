@@ -6,7 +6,7 @@ Successfully implemented a **Cross-Conversation Memory System** that enables Aur
 
 ## What We Built
 
-### 1. ConversationDigest Model (`Cloutmate/Models/ConversationDigest.swift`)
+### 1. ConversationDigest Model (`FocusOS/Models/ConversationDigest.swift`)
 
 A SwiftData model that stores AI-generated summaries of past conversations:
 
@@ -31,7 +31,7 @@ A SwiftData model that stores AI-generated summaries of past conversations:
 - `searchableContent`: Full text for searching
 - `isDigested`: Flag indicating if AI has processed it
 
-### 2. ConversationArchive Service (`Cloutmate/Services/ConversationArchive.swift`)
+### 2. ConversationArchive Service (`FocusOS/Services/ConversationArchive.swift`)
 
 A service managing conversation digestion and retrieval:
 
@@ -136,7 +136,7 @@ Added to `ExecutionOperation` enum:
 
 ### 6. Schema Integration
 
-Updated `CloutmateApp.swift` to include:
+Updated `FocusOSApp.swift` to include:
 - `ConversationDigest.self` in SwiftData schema
 - All Phase 3-5 models properly registered
 
@@ -257,15 +257,15 @@ Topics: content strategy, video content, batching, Q4 planning"
 ## Files Modified/Created
 
 ### Created
-1. `Cloutmate/Models/ConversationDigest.swift` - Digest model
-2. `Cloutmate/Services/ConversationArchive.swift` - Archive service
+1. `FocusOS/Models/ConversationDigest.swift` - Digest model
+2. `FocusOS/Services/ConversationArchive.swift` - Archive service
 
 ### Modified
-1. `Cloutmate/Services/AIRecallService.swift` - Added `pastConversations` to AIPayloadContext
-2. `Cloutmate/ViewModels/AIAssistantViewModel.swift` - Fetch past conversations for context
-3. `Cloutmate/Services/GeminiService.swift` - Prompt updates, ExecutionIntent additions
-4. `Cloutmate/Services/AIActionRouter.swift` - Conversation operations routing
-5. `Cloutmate/CloutmateApp.swift` - Schema registration
+1. `FocusOS/Services/AIRecallService.swift` - Added `pastConversations` to AIPayloadContext
+2. `FocusOS/ViewModels/AIAssistantViewModel.swift` - Fetch past conversations for context
+3. `FocusOS/Services/GeminiService.swift` - Prompt updates, ExecutionIntent additions
+4. `FocusOS/Services/AIActionRouter.swift` - Conversation operations routing
+5. `FocusOS/FocusOSApp.swift` - Schema registration
 
 ## Testing Recommendations
 

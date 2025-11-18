@@ -33,7 +33,7 @@ enum ExecutionError: LocalizedError {
 }
 ```
 
-**File:** `Cloutmate/Services/AIExecutionService.swift`
+**File:** `FocusOS/Services/AIExecutionService.swift`
 
 ---
 
@@ -74,7 +74,7 @@ func isPlatformReady(_ platform: Platform) -> Bool {
 }
 ```
 
-**File:** `Cloutmate/Services/PublishingService.swift`
+**File:** `FocusOS/Services/PublishingService.swift`
 
 ---
 
@@ -112,7 +112,7 @@ let descriptor = FetchDescriptor<Draft>(
 
 **Result:** Aurora can now create drafts freely without them being auto-archived.
 
-**File:** `Cloutmate/Services/MigrationService.swift`
+**File:** `FocusOS/Services/MigrationService.swift`
 
 ---
 
@@ -149,7 +149,7 @@ CAPABILITIES IN DEVELOPMENT (acknowledge limitations):
 - Clear distinction between what works now vs. roadmap
 
 **Files:**
-- `Cloutmate/Services/GeminiService.swift` (both main and fallback prompts)
+- `FocusOS/Services/GeminiService.swift` (both main and fallback prompts)
 
 ---
 

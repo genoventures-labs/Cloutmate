@@ -1,8 +1,8 @@
-# Cloutmate AI Creative Assistant - User Brief
+# FocusOS AI Creative Assistant - User Brief
 
 ## Overview
 
-Cloutmate's AI Creative Assistant is your intelligent content creation partner, designed to transform the way social media creators brainstorm, develop, and refine their content. Rather than just a chatbot, this is a creative workspace that learns from your work, organizes your ideas, and helps you maintain consistency across all your content.
+FocusOS's AI Creative Assistant is your intelligent content creation partner, designed to transform the way social media creators brainstorm, develop, and refine their content. Rather than just a chatbot, this is a creative workspace that learns from your work, organizes your ideas, and helps you maintain consistency across all your content.
 
 ---
 
@@ -15,7 +15,7 @@ As a content creator, you likely face these challenges:
 - **Time Waste:** Manually refining and improving content repeatedly
 - **Lost Context:** Forgetting what you discussed or decided in previous sessions
 
-Cloutmate's AI Assistant solves all of this.
+FocusOS's AI Assistant solves all of this.
 
 ---
 
@@ -23,7 +23,7 @@ Cloutmate's AI Assistant solves all of this.
 
 ### Your AI Creative Workspace
 
-Think of it as having a creative strategist who never forgets, never gets tired, and always has fresh ideas. The AI Assistant lives in a dedicated tab in Cloutmate where you can have ongoing conversations about your content strategy, get instant help with drafting, and access your entire creative history at a glance.
+Think of it as having a creative strategist who never forgets, never gets tired, and always has fresh ideas. The AI Assistant lives in a dedicated tab in FocusOS where you can have ongoing conversations about your content strategy, get instant help with drafting, and access your entire creative history at a glance.
 
 ### Three Ways to Access AI Help
 
@@ -59,7 +59,7 @@ No more hunting through dozens of conversations to find your core strategy docum
 ### 2. Auto-Generated Summaries
 
 **What It Does:**
-After you have 5+ messages in a conversation, Cloutmate automatically generates a 2-3 sentence summary of what you discussed and the key outcomes.
+After you have 5+ messages in a conversation, FocusOS automatically generates a 2-3 sentence summary of what you discussed and the key outcomes.
 
 **Use Cases:**
 - Quick scanning: See at a glance what you brainstormed in "Instagram Growth Ideas" without opening it
@@ -154,7 +154,7 @@ Never lose context in long creative sessions. Stay oriented in complex discussio
 ### 8. Global Search (⌘K Command)
 
 **What It Does:**
-Press ⌘+K anywhere in Cloutmate to open a universal search that finds content across conversations, drafts, and published posts.
+Press ⌘+K anywhere in FocusOS to open a universal search that finds content across conversations, drafts, and published posts.
 
 **Use Cases:**
 - **Find That Idea:** Search "productivity tips" to instantly find the post where you discussed this topic
@@ -241,7 +241,7 @@ Your entire creative output becomes a searchable knowledge base. Find any idea, 
 - Search only finds exact text matches
 - No cross-document insights
 
-### Cloutmate's AI Assistant
+### FocusOS's AI Assistant
 - Dynamic, intelligent workspace
 - Auto-organization and categorization
 - Real-time content generation
@@ -250,7 +250,7 @@ Your entire creative output becomes a searchable knowledge base. Find any idea, 
 - Cross-conversation analytics
 
 ### The Bottom Line
-While competitors require you to organize your own content, Cloutmate's AI organizes FOR you. While others give you a blank page, Cloutmate gives you a creative partner who remembers everything and suggests what you should create next.
+While competitors require you to organize your own content, FocusOS's AI organizes FOR you. While others give you a blank page, FocusOS gives you a creative partner who remembers everything and suggests what you should create next.
 
 ---
 
@@ -316,6 +316,6 @@ All AI interactions use enterprise-grade encryption. Your content ideas remain c
 
 ## Conclusion
 
-Cloutmate's AI Creative Assistant isn't just a feature—it's your creative infrastructure. It transforms content creation from a time-consuming, repetitive chore into an organized, strategic, and efficient process. Whether you're managing one brand or multiple client accounts, the AI Assistant scales with you, learning your style, remembering your strategies, and helping you maintain consistency while sparking new creative directions.
+FocusOS's AI Creative Assistant isn't just a feature—it's your creative infrastructure. It transforms content creation from a time-consuming, repetitive chore into an organized, strategic, and efficient process. Whether you're managing one brand or multiple client accounts, the AI Assistant scales with you, learning your style, remembering your strategies, and helping you maintain consistency while sparking new creative directions.
 
 **It's not AI that replaces your creativity—it's AI that amplifies it.**

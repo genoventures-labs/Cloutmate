@@ -24,7 +24,7 @@ Transform Inbox from a table-based list into a modern card system matching Tasks
 
 ## Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/Inbox/Components/InboxHeaderView.swift`
+**File:** `FocusOS/Views/Inbox/Components/InboxHeaderView.swift`
 
 **Implementation:**
 
@@ -49,7 +49,7 @@ enum InboxFilter: String {
 
 ## Phase 2: Capture Card System
 
-**File:** `Cloutmate/Views/Inbox/Components/InboxCardV2.swift`
+**File:** `FocusOS/Views/Inbox/Components/InboxCardV2.swift`
 
 **Card Structure:**
 
@@ -79,7 +79,7 @@ enum InboxFilter: String {
 
 ## Phase 3: Capture Drawer
 
-**File:** `Cloutmate/Views/Inbox/Components/InboxCaptureDrawer.swift`
+**File:** `FocusOS/Views/Inbox/Components/InboxCaptureDrawer.swift`
 
 **Drawer Behavior:**
 
@@ -109,7 +109,7 @@ enum InboxFilter: String {
 
 ## Phase 4: Quick Capture Sheet
 
-**File:** `Cloutmate/Views/Inbox/Components/QuickCaptureSheet.swift`
+**File:** `FocusOS/Views/Inbox/Components/QuickCaptureSheet.swift`
 
 **Entry Modes (Tabbed Interface):**
 
@@ -258,7 +258,7 @@ enum InboxFilter: String {
 ## File Structure
 
 ```
-Cloutmate/Views/Inbox/
+FocusOS/Views/Inbox/
 ├── InboxView.swift (modified)
 └── Components/
     ├── InboxHeaderView.swift (new)

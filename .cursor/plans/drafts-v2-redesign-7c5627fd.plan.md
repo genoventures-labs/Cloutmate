@@ -7,7 +7,7 @@ Transform the Drafts tab into a smart creative workspace that syncs with AI Assi
 
 ## Phase 1: Unified Header Zone
 
-**File: `Cloutmate/Views/Drafts/Components/DraftsHeaderView.swift`** (NEW)
+**File: `FocusOS/Views/Drafts/Components/DraftsHeaderView.swift`** (NEW)
 
 - Create header component following `NotesHeaderView.swift` pattern
 - Title: "Drafts" using `.system(.title3, design: .rounded)` with kosmicBlue → kosmicPurple gradient
@@ -20,7 +20,7 @@ Transform the Drafts tab into a smart creative workspace that syncs with AI Assi
 
 ## Phase 2: Draft Card System
 
-**File: `Cloutmate/Views/Drafts/Components/DraftCardV2.swift`** (NEW)
+**File: `FocusOS/Views/Drafts/Components/DraftCardV2.swift`** (NEW)
 
 - Create card component following `NoteCardV2.swift` pattern
 - Base: `GlassPanel(tier: .contentCard, cornerRadius: 12)`
@@ -35,7 +35,7 @@ Transform the Drafts tab into a smart creative workspace that syncs with AI Assi
 
 ## Phase 3: Draft Editor Drawer
 
-**File: `Cloutmate/Views/Drafts/Components/DraftEditorDrawer.swift`** (NEW)
+**File: `FocusOS/Views/Drafts/Components/DraftEditorDrawer.swift`** (NEW)
 
 - Slide-in panel (400-500px width) following `NoteDetailDrawer.swift` pattern
 - `.ultraThinMaterial` background with frosted glass
@@ -54,7 +54,7 @@ Transform the Drafts tab into a smart creative workspace that syncs with AI Assi
 
 ## Phase 4: Draft Model Extensions
 
-**File: `Cloutmate/Models/Draft+Extensions.swift`** (NEW)
+**File: `FocusOS/Models/Draft+Extensions.swift`** (NEW)
 
 Add new attributes to `Draft` model:
 
@@ -75,7 +75,7 @@ Behavior:
 
 ## Phase 5: Publishing Flow
 
-**File: `Cloutmate/Views/Drafts/Components/DraftPublishingSheet.swift`** (NEW)
+**File: `FocusOS/Views/Drafts/Components/DraftPublishingSheet.swift`** (NEW)
 
 - Options: Export to Notes, Resources, AI Assistant, or External (Markdown/PDF)
 - Optional caption generator for social posts
@@ -84,7 +84,7 @@ Behavior:
 - Calls `DraftPublisherService.publish(draft:)` (NEW service)
 - If published to Notes or Resources, moves draft to "Archived" state
 
-**File: `Cloutmate/Services/DraftPublisherService.swift`** (NEW)
+**File: `FocusOS/Services/DraftPublisherService.swift`** (NEW)
 
 - `publish(draft: Draft, to: PublishingDestination, modelContext: ModelContext) async throws`
 - Handles conversion to Note, Artifact, or external export
@@ -92,7 +92,7 @@ Behavior:
 
 ## Phase 6: Unified Drafts View
 
-**File: `Cloutmate/Views/Drafts/UnifiedDraftsView.swift`** (NEW)
+**File: `FocusOS/Views/Drafts/UnifiedDraftsView.swift`** (NEW)
 
 - Replace current `DraftsView.swift` table layout with card grid
 - Use `DraftsHeaderView` at top
@@ -103,7 +103,7 @@ Behavior:
 
 ## Phase 7: Aurora & Intelligence Integration
 
-**File: `Cloutmate/Services/DraftEnhancementService.swift`** (NEW)
+**File: `FocusOS/Services/DraftEnhancementService.swift`** (NEW)
 
 - AI Enhancements: Aurora provides "Improve / Rephrase / Expand" actions inline
 - Uses `OllamaBridgeService.generateResponse()` with draft context
@@ -115,12 +115,12 @@ Behavior:
 
 ## Phase 8: Integration Points
 
-**File: `Cloutmate/Views/Components/ContextualCreateSheet.swift`** (MODIFY)
+**File: `FocusOS/Views/Components/ContextualCreateSheet.swift`** (MODIFY)
 
 - Add Drafts quick actions when `currentTab == .drafts`
 - Actions: "New Draft", "From AI Conversation", "From Note"
 
-**File: `Cloutmate/ViewModels/AIAssistantViewModel.swift`** (MODIFY)
+**File: `FocusOS/ViewModels/AIAssistantViewModel.swift`** (MODIFY)
 
 - Enhance `exportToDraft()` method:
 - Set `draft.source = "AI Assistant"`
@@ -128,7 +128,7 @@ Behavior:
 - Set `draft.lastEditedAt = Date()`
 - Calculate `draft.wordCount`
 
-**File: `Cloutmate/Extensions/Notification+Names.swift`** (MODIFY)
+**File: `FocusOS/Extensions/Notification+Names.swift`** (MODIFY)
 
 - Add `.openDraftEditor` notification name
 - Add `.draftPublished` notification name

@@ -9,21 +9,21 @@ Transform the existing table-based ArchivesView into a unified, emotionally-awar
 
 **New Files:**
 
-- `Cloutmate/Views/Archives/Components/ArchivesHeaderView.swift`
-- `Cloutmate/Views/Archives/Components/ArchiveCardV2.swift`
-- `Cloutmate/Views/Archives/Components/ArchiveDetailDrawer.swift`
-- `Cloutmate/Views/Archives/Components/ArchiveReviewSheet.swift`
-- `Cloutmate/Views/Archives/Components/ArchivesSidebar.swift`
-- `Cloutmate/Views/Archives/UnifiedArchivesView.swift`
-- `Cloutmate/Services/ArchiveReflectionService.swift` (AI reflection generation)
-- `Cloutmate/Services/ArchiveReintegrationService.swift` (restore logic)
+- `FocusOS/Views/Archives/Components/ArchivesHeaderView.swift`
+- `FocusOS/Views/Archives/Components/ArchiveCardV2.swift`
+- `FocusOS/Views/Archives/Components/ArchiveDetailDrawer.swift`
+- `FocusOS/Views/Archives/Components/ArchiveReviewSheet.swift`
+- `FocusOS/Views/Archives/Components/ArchivesSidebar.swift`
+- `FocusOS/Views/Archives/UnifiedArchivesView.swift`
+- `FocusOS/Services/ArchiveReflectionService.swift` (AI reflection generation)
+- `FocusOS/Services/ArchiveReintegrationService.swift` (restore logic)
 
 **Modified Files:**
 
-- `Cloutmate/Views/Archives/ArchivesView.swift` → Replace with UnifiedArchivesView
-- `Cloutmate/Services/ProjectFocusGravityService.swift` → Add `reintegrate()` method
-- `Cloutmate/Services/MemoryGraphService.swift` → Add `retrieveArchivedRelationships()` method
-- `Cloutmate/Services/ReactiveThemeManager.swift` → Add tone timeline query API
+- `FocusOS/Views/Archives/ArchivesView.swift` → Replace with UnifiedArchivesView
+- `FocusOS/Services/ProjectFocusGravityService.swift` → Add `reintegrate()` method
+- `FocusOS/Services/MemoryGraphService.swift` → Add `retrieveArchivedRelationships()` method
+- `FocusOS/Services/ReactiveThemeManager.swift` → Add tone timeline query API
 
 **Models:**
 
@@ -34,7 +34,7 @@ Transform the existing table-based ArchivesView into a unified, emotionally-awar
 
 ## Phase 1: Unified Header Zone
 
-**File:** `Cloutmate/Views/Archives/Components/ArchivesHeaderView.swift`
+**File:** `FocusOS/Views/Archives/Components/ArchivesHeaderView.swift`
 
 **Components:**
 
@@ -74,7 +74,7 @@ Transform the existing table-based ArchivesView into a unified, emotionally-awar
 
 ## Phase 2: Archive Card System
 
-**File:** `Cloutmate/Views/Archives/Components/ArchiveCardV2.swift`
+**File:** `FocusOS/Views/Archives/Components/ArchiveCardV2.swift`
 
 **Card Structure:**
 
@@ -130,7 +130,7 @@ struct ArchiveCardV2: View {
 
 ## Phase 3: Archive Detail Drawer
 
-**File:** `Cloutmate/Views/Archives/Components/ArchiveDetailDrawer.swift`
+**File:** `FocusOS/Views/Archives/Components/ArchiveDetailDrawer.swift`
 
 **Layout:**
 
@@ -184,7 +184,7 @@ struct ArchiveCardV2: View {
 
 ## Phase 4: Review Summary Mode
 
-**File:** `Cloutmate/Views/Archives/Components/ArchiveReviewSheet.swift`
+**File:** `FocusOS/Views/Archives/Components/ArchiveReviewSheet.swift`
 
 **Function:**
 
@@ -238,7 +238,7 @@ struct ArchiveCardV2: View {
 
 ## Phase 5: Sidebar
 
-**File:** `Cloutmate/Views/Archives/Components/ArchivesSidebar.swift`
+**File:** `FocusOS/Views/Archives/Components/ArchivesSidebar.swift`
 
 **Sections:**
 
@@ -281,7 +281,7 @@ struct ArchiveCardV2: View {
 
 ### 6.1 Archive Reflection Service
 
-**File:** `Cloutmate/Services/ArchiveReflectionService.swift`
+**File:** `FocusOS/Services/ArchiveReflectionService.swift`
 
 **Purpose:** Generate AI reflections when items are archived
 
@@ -319,7 +319,7 @@ final class ArchiveReflectionService {
 
 ### 6.2 Archive Reintegration Service
 
-**File:** `Cloutmate/Services/ArchiveReintegrationService.swift`
+**File:** `FocusOS/Services/ArchiveReintegrationService.swift`
 
 **Purpose:** Handle restoration of archived items
 
@@ -347,7 +347,7 @@ final class ArchiveReintegrationService {
 
 ### 6.3 Focus Gravity Integration
 
-**File:** `Cloutmate/Services/ProjectFocusGravityService.swift`
+**File:** `FocusOS/Services/ProjectFocusGravityService.swift`
 
 **Add Method:**
 
@@ -362,7 +362,7 @@ func reintegrate(project: Project, modelContext: ModelContext) {
 
 ### 6.4 Memory Graph Integration
 
-**File:** `Cloutmate/Services/MemoryGraphService.swift`
+**File:** `FocusOS/Services/MemoryGraphService.swift`
 
 **Add Method:**
 
@@ -379,7 +379,7 @@ func retrieveArchivedRelationships(
 
 ### 6.5 ARTE Tone Timeline
 
-**File:** `Cloutmate/Services/ReactiveThemeManager.swift`
+**File:** `FocusOS/Services/ReactiveThemeManager.swift`
 
 **Add Method:**
 
@@ -482,7 +482,7 @@ struct ToneSnapshot {
 
 ### ArchiveReflection Model
 
-**File:** `Cloutmate/Models/ArchiveReflection.swift`
+**File:** `FocusOS/Models/ArchiveReflection.swift`
 
 ```swift
 @Model
@@ -503,11 +503,11 @@ final class ArchiveReflection {
 
 Add `archivedAt: Date?` to:
 
-- `CloutmateShared/Project.swift`
-- `CloutmateShared/Area.swift`
-- `CloutmateShared/Note.swift`
-- `CloutmateShared/Artifact.swift`
-- `Cloutmate/Models/Draft.swift`
+- `FocusOSShared/Project.swift`
+- `FocusOSShared/Area.swift`
+- `FocusOSShared/Note.swift`
+- `FocusOSShared/Artifact.swift`
+- `FocusOS/Models/Draft.swift`
 
 **Migration:** Set `archivedAt = updatedAt` for existing archived items on first launch.
 

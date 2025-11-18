@@ -552,21 +552,21 @@ Track how themes evolve:
 ## Files Created
 
 ### Models
-1. `Cloutmate/Models/MemoryGraph/MemoryNode.swift`
-2. `Cloutmate/Models/MemoryGraph/MemoryEdge.swift`
-3. `Cloutmate/Models/MemoryGraph/ThemeNode.swift`
+1. `FocusOS/Models/MemoryGraph/MemoryNode.swift`
+2. `FocusOS/Models/MemoryGraph/MemoryEdge.swift`
+3. `FocusOS/Models/MemoryGraph/ThemeNode.swift`
 
 ### Services
-4. `Cloutmate/Services/MemoryGraphService.swift`
-5. `Cloutmate/Services/ThemeExtractionPipeline.swift`
-6. `Cloutmate/Services/MemoryGraphTelemetry.swift`
-7. `Cloutmate/Services/MemoryGraphDebug.swift`
+4. `FocusOS/Services/MemoryGraphService.swift`
+5. `FocusOS/Services/ThemeExtractionPipeline.swift`
+6. `FocusOS/Services/MemoryGraphTelemetry.swift`
+7. `FocusOS/Services/MemoryGraphDebug.swift`
 
 ### Modified
-8. `Cloutmate/CloutmateApp.swift` - Registered graph models in schema
-9. `Cloutmate/Services/AIRecallService.swift` - Added `memoryThemes` to AIPayloadContext
-10. `Cloutmate/ViewModels/AIAssistantViewModel.swift` - Populated memory themes
-11. `Cloutmate/Services/GeminiService.swift` - Formatted graph themes in payload, updated Aurora's knowledge
+8. `FocusOS/FocusOSApp.swift` - Registered graph models in schema
+9. `FocusOS/Services/AIRecallService.swift` - Added `memoryThemes` to AIPayloadContext
+10. `FocusOS/ViewModels/AIAssistantViewModel.swift` - Populated memory themes
+11. `FocusOS/Services/GeminiService.swift` - Formatted graph themes in payload, updated Aurora's knowledge
 
 ---
 

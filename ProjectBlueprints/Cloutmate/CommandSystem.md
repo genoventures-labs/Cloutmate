@@ -1,6 +1,6 @@
 # Command & Creation System
 
-Cloutmate provides multiple layers of command surfaces so users (or automation) can act from anywhere: global search, contextual create, slash commands, voice, and Aurora toolbar actions. This document catalogs each layer so you can extend them consistently.
+FocusOS provides multiple layers of command surfaces so users (or automation) can act from anywhere: global search, contextual create, slash commands, voice, and Aurora toolbar actions. This document catalogs each layer so you can extend them consistently.
 
 ---
 
@@ -37,7 +37,7 @@ Cloutmate provides multiple layers of command surfaces so users (or automation) 
 
 ## 4. Aurora Toolbar Actions
 
-- Defined in `CloutmateApp.commands` (⌘⇧1–6) to instantly fire AI actions:
+- Defined in `FocusOSApp.commands` (⌘⇧1–6) to instantly fire AI actions:
   1. Create Task
   2. Create Project
   3. Create Note
@@ -71,4 +71,4 @@ Cloutmate provides multiple layers of command surfaces so users (or automation) 
 3. **AI integration** – Document new commands in `AuroraSystemPromptBuilder` so the assistant knows they exist.
 4. **Testing** – Validate keyboard shortcuts, overlay stacking (only one overlay visible at a time), and Flow Companion idle resets.
 
-These layers make Cloutmate feel like a responsive command console; treat new actions as first-class citizens across all entry points.
+These layers make FocusOS feel like a responsive command console; treat new actions as first-class citizens across all entry points.

@@ -4,7 +4,7 @@
 
 ### 1. ✅ "Multiple commands produce" error
 **Cause:** Files existed in both main app and shared framework  
-**Fix:** Removed duplicate files from CloutmateShared
+**Fix:** Removed duplicate files from FocusOSShared
 
 ### 2. ✅ "Cannot find type 'AITool'" error
 **Cause:** PlatformAIConfiguration referenced AI-specific types  
@@ -16,10 +16,10 @@
 
 ---
 
-## Current CloutmateShared Structure
+## Current FocusOSShared Structure
 
 ```
-CloutmateShared/CloutmateShared/
+FocusOSShared/FocusOSShared/
 ├── Models/
 │   ├── Post.swift ✅
 │   ├── Draft.swift ✅
@@ -48,7 +48,7 @@ CloutmateShared/CloutmateShared/
 ✅ All errors resolved!
 
 1. **Clean build:** Product → Clean Build Folder (⇧⌘K)
-2. **Build CloutmateShared:** ⌘B
+2. **Build FocusOSShared:** ⌘B
 3. Should compile successfully!
 
 The framework is now ready to use in Widget and MenuBar apps. 🎉

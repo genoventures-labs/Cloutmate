@@ -11,7 +11,7 @@ User asked Aurora:
 > "Analyze my current Memory Graph and Intelligence Dashboard. Tell me which conceptual themes are most active this week..."
 
 Aurora's response:
-> "However, after checking Cloutmate's current system configuration, I see that the Memory Graph feature is not currently enabled."
+> "However, after checking FocusOS's current system configuration, I see that the Memory Graph feature is not currently enabled."
 
 **Root Cause:** Memory Graph feature flag was set to `false` in `AIConfig.plist` from the Phase 6 research/testing period.
 
@@ -19,7 +19,7 @@ Aurora's response:
 
 ## Fix Applied
 
-**File:** `Cloutmate/Config/AIConfig.plist`
+**File:** `FocusOS/Config/AIConfig.plist`
 
 ```xml
 <key>AIMemoryGraphEnabled</key>

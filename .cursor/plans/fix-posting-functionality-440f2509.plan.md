@@ -199,8 +199,8 @@ if let data = KeychainService.shared.retrieve(key: "facebook_user_token_data"),
 
 ## Key Files
 
-- `Cloutmate/Views/Settings/AccountsSection.swift` - Main implementation
-- `Cloutmate/Services/KeychainService.swift` - Token caching
+- `FocusOS/Views/Settings/AccountsSection.swift` - Main implementation
+- `FocusOS/Services/KeychainService.swift` - Token caching
 
 ## Benefits
 

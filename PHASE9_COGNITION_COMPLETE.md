@@ -29,7 +29,7 @@ Key loop:
 | `FocusForecast` | Persists predicted cognitive states: fatigue risk, focus stability, energy trend, recommended tone, and optional next focus window intervals. Stores metadata for diagnostics and accuracy auditing. |
 | `DriftEvent` | Captures runtime drift detections with severity, expected vs. actual metrics, trigger identifiers, and linkage to focus sessions. |
 
-Both models are registered with the app-wide `ModelContainer` and participate in the shared app group store (`Cloutmate_v3.sqlite`).
+Both models are registered with the app-wide `ModelContainer` and participate in the shared app group store (`FocusOS_v3.sqlite`).
 
 ## Services
 
@@ -45,7 +45,7 @@ Additional updates:
 
 - `SmartNudgeService` exposes `deliverPredictiveNudge` for immediate delivery of forecast-driven nudges.
 - `AnalyticsEngine` now enriches `AnalyticsSnapshot` with latest forecast metadata, drift counts, accuracy averages, and tone adaptation totals.
-- `CloutmateApp` bootstraps the predictor/monitor/context manager when predictive mode is enabled.
+- `FocusOSApp` bootstraps the predictor/monitor/context manager when predictive mode is enabled.
 
 ## UI Enhancements
 
@@ -68,7 +68,7 @@ Tone data (`ToneProfileCache`) automatically persists tone weights, suppression 
 ## Testing & Validation
 
 - **Static validation:** `read_lints` executed on all new/modified files; no linter issues reported.
-- **Runtime wiring:** `CloutmateApp` ensures predictor stack starts only when predictive mode is on.
+- **Runtime wiring:** `FocusOSApp` ensures predictor stack starts only when predictive mode is on.
 - **Threshold overrides:** Drift monitor respects the configured detection sensitivity; tone adaptation respects the user toggle.
 - **Command-line tests:** `swift test` is not available for this Xcode-based project (no `Package.swift`). Manual build via Xcode is required.
 

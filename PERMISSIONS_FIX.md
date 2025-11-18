@@ -3,11 +3,11 @@
 ## Issues Fixed
 
 ### 1. ❌ CRITICAL: Missing Microphone Entitlement
-**Problem:** Cloutmate would NEVER appear in System Settings → Microphone, no matter what.
+**Problem:** FocusOS would NEVER appear in System Settings → Microphone, no matter what.
 
-**Root Cause:** The `Cloutmate.entitlements` file was missing the **microphone entitlement**. Without this, macOS won't even list the app in System Settings, even if you request permission!
+**Root Cause:** The `FocusOS.entitlements` file was missing the **microphone entitlement**. Without this, macOS won't even list the app in System Settings, even if you request permission!
 
-**Fix:** Added to `Cloutmate.entitlements`:
+**Fix:** Added to `FocusOS.entitlements`:
 ```xml
 <key>com.apple.security.device.audio-input</key>
 <true/>
@@ -16,7 +16,7 @@
 ⚠️ **IMPORTANT:** You MUST rebuild the app after this change for it to take effect!
 
 ### 2. ❌ Microphone Permission Bug
-**Problem:** Cloutmate showed microphone as "Granted" but the permission was never actually checked.
+**Problem:** FocusOS showed microphone as "Granted" but the permission was never actually checked.
 
 **Root Cause:** The `checkMicrophonePermission()` function was hardcoded to always return `.authorized` without actually checking the permission status:
 ```swift
@@ -74,7 +74,7 @@ private func requestMicrophonePermission() {
 
 - Added "Reset All Permissions" button
 - Opens System Settings with instructions
-- Guides user through removing Cloutmate from permission lists
+- Guides user through removing FocusOS from permission lists
 - Prompts them to restart the app
 
 ## How to Use
@@ -88,12 +88,12 @@ private func requestMicrophonePermission() {
 3. Click "Enable" on Microphone
 4. System dialog will appear asking for permission
 5. Grant permission
-6. ✅ **NOW Cloutmate appears in System Settings → Microphone!**
+6. ✅ **NOW FocusOS appears in System Settings → Microphone!**
 
 ### If Permissions Get Stuck
 1. Click "Reset All Permissions"
-2. Follow the instructions to remove Cloutmate from System Settings
-3. Restart Cloutmate
+2. Follow the instructions to remove FocusOS from System Settings
+3. Restart FocusOS
 4. Re-grant permissions when prompted
 
 ## Technical Details
@@ -104,10 +104,10 @@ private func requestMicrophonePermission() {
 ### Info.plist Entries (Already Present)
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>Cloutmate uses the microphone to record and transcribe your voice into journal entries.</string>
+<string>FocusOS uses the microphone to record and transcribe your voice into journal entries.</string>
 
 <key>NSSpeechRecognitionUsageDescription</key>
-<string>Cloutmate uses on-device speech recognition to transcribe your voice. Audio is not stored.</string>
+<string>FocusOS uses on-device speech recognition to transcribe your voice. Audio is not stored.</string>
 ```
 
 ### UI Improvements
@@ -120,7 +120,7 @@ private func requestMicrophonePermission() {
 
 - [x] Microphone permission shows "Not Set" when never requested
 - [x] Clicking "Enable" triggers system permission dialog
-- [x] After granting, Cloutmate appears in System Settings → Microphone
+- [x] After granting, FocusOS appears in System Settings → Microphone
 - [x] Status correctly updates after granting/denying
 - [x] Reset button opens System Settings
 - [x] Instructions are clear and helpful

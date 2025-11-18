@@ -1,179 +1,250 @@
-<!-- 518b446e-4c31-4c41-96ce-ff2f5ea9383c a2125384-207f-42a7-8353-4b2f893680ad -->
-# Aurora Model Routing Fix
+<!-- 518b446e-4c31-4c41-96ce-ff2f5ea9383c 07b84f3a-1e9c-43ee-8745-c5eb9f94d561 -->
+# Vision Pipeline Architecture Implementation Plan
 
 ## Overview
-Fix Aurora's routing to assign models correctly. DeepSeek should only be used in research mode, not as the default. Implement the complete model hierarchy with proper fallbacks.
 
-## Files to Modify
+Replace the current OCR-first image processing with a three-layer vision pipeline:
 
-### 1. `Cloutmate/Models/ModelTierMap.swift`
-**Current Issue:** Missing models and incorrect default/fallback assignments.
+1. **QwenVisionLayer** (qwen3-vl:2b local) - Primary semantic vision intelligence
+2. **OCRLayer** (SwiftyTesseract) - Fallback when Qwen fails
+3. **GemmaInterpretationLayer** (gemma3:4b) - Cognitive reasoning that merges all outputs
 
-**Changes:**
-- Add missing models to `localModels` array:
-  - `gemma3:1b` - Casual conversations (primary)
-  - `qwen3:1.7b` - Casual fallback, tasks with thinking
-  - `qwen3-vl:2b` - Image processing (primary)
-  - `granite3.2-vision` - Image processing (secondary)
-  - `gemma3:4b` - Document analysis (primary), image fallback
-  - `deepseek-r1:1.5b` - Document analysis fallback, research mode only
-  - `gwen2.5-coder:1.5b` - Coding and secondary reasoning
-- Update `defaultModel()` to return `"gemma3:1b"` (casual primary)
-- Update `fallbackModel()` to return `"qwen3:1.7b"` (casual fallback)
-- Add helper methods:
-  - `casualModel()` → `"gemma3:1b"`
-  - `casualFallbackModel()` → `"qwen3:1.7b"`
-  - `taskModel()` → `"qwen3:1.7b"` (with thinking enabled)
-  - `imageModel()` → `"qwen3-vl:2b"`
-  - `imageSecondaryModel()` → `"granite3.2-vision"`
-  - `imageFallbackModel()` → `"gemma3:4b"`
-  - `documentModel()` → `"gemma3:4b"`
-  - `documentFallbackModel()` → `"deepseek-r1:1.5b"`
-  - `codingModel()` → `"gwen2.5-coder:1.5b"`
-  - `reasoningModel()` → `"gwen2.5-coder:1.5b"`
-  - `researchModels()` → `["deepseek-r1:1.5b", "gpt-oss:20b"]` (cloud models)
-- Update `thinkingModel()` to return `"qwen3:1.7b"` (not Gwen3:8b)
-- Update `supportsThinking` flags appropriately
-- Update `displayName(for:)` to handle all new models
+**CRITICAL:** All layers run in detached Tasks to prevent UI thread blocking that caused previous crashes.
 
-### 2. `Cloutmate/Services/ModelRoutingEngine.swift`
-**Current Issue:** Incorrectly routing to DeepSeek for regular conversations. No research mode detection.
+## Architecture Flow
 
-**Changes:**
-- Update `selectModel()` method:
-  - Remove DeepSeek from regular routing logic
-  - Casual conversations: Use `gemma3:1b`, fallback to `qwen3:1.7b`
-  - Non-casual (tasks): Use `qwen3:1.7b` with thinking enabled
-  - Reasoning tasks: Use `gwen2.5-coder:1.5b` as secondary reasoning model
-  - **Universal fallback:** If all fallbacks fail, default to `gemma3:1b` as global safe fallback
-- Add research mode parameter: `isResearchMode: Bool = false`
-- In `selectModel()`, if `isResearchMode` is true:
-  - Return DeepSeek-R1 or OpenAI-OSS (only accessible via research mode)
-  - Never route to DeepSeek for non-research requests
-- Update cooldown logic to respect research mode (don't apply research model cooldown to casual queries)
-- Add method `selectImageModel()` → returns `qwen3-vl:2b` with fallback chain
-  - **Safety guard:** Force `isResearchMode = false` in this method regardless of conversation mode
-- Add method `selectDocumentModel()` → returns `gemma3:4b` with `deepseek-r1:1.5b` fallback
-  - **Safety guard:** Force `isResearchMode = false` in this method regardless of conversation mode
-- **Add verbose routing logs** (only when DebugMode is enabled):
-  - Log selected model, fallback triggers, research mode activation, tool usage
-  - Use conditional logging: `#if DEBUG` or check for DebugMode flag
+```
+Image Input → QwenVisionLayer (detached Task) → (confidence check) 
+    → Good? → GemmaInterpretationLayer (detached Task) → Final Output
+    → Bad? → OCRLayer (detached Task) → GemmaInterpretationLayer (detached Task) → Final Output
+```
 
-### 3. `Cloutmate/Services/OllamaBridgeService.swift`
-**Current Issue:** Image/document processing may not use correct models.
+## Implementation Steps
 
-**Changes:**
-- In `analyzeImage()` method:
-  - Use `ModelTierMap.imageModel()` (qwen3-vl:2b) as primary
-  - Fallback chain: granite3.2-vision → gemma3:4b
-  - Update to use routing engine's `selectImageModel()` if available
-- In `analyzeDocument()` method:
-  - Use `ModelTierMap.documentModel()` (gemma3:4b) as primary
-  - Fallback to `ModelTierMap.documentFallbackModel()` (deepseek-r1:1.5b) only on failure
-  - Ensure DeepSeek is never primary, only fallback for documents
-- Update `generateResponseWithAppContext()`:
-  - Check for research mode flag (if passed via payload context or conversation mode)
-  - Route to research models only when research mode is active
-  - Default to casual/task routing otherwise
+### 1. Add qwen3-vl:2b to ModelTierMap
 
-### 4. `Cloutmate/ViewModels/AIAssistantViewModel.swift`
-**Current Issue:** Research mode may not be properly communicated to routing engine.
+**File:** `FocusOS/Models/ModelTierMap.swift`
 
-**Changes:**
-- In `handleImageMessage()`:
-  - Ensure it uses image model routing from `ModelRoutingEngine` or `ModelTierMap`
-- In `handleDocumentMessage()`:
-  - Ensure it uses document model routing with proper fallback
-- In `processMessage()`:
-  - Detect research mode via `/research` command or `researchModeActive` flag
-  - Pass `isResearchMode: true` to routing engine when research mode is active
-  - Ensure research mode flag is passed to `CoreResponseService.generateResponseWithAppContext()`
+- Add `qwen3-vl:2b` back to `localModels` array with capabilities: `["vision", "image-processing", "multimodal"]`
+- Update `imageModel()` to return `"qwen3-vl:2b"` as primary
+- Keep `imageSecondaryModel()` and `imageFallbackModel()` methods for compatibility
 
-### 5. `Cloutmate/Services/CoreResponseService.swift`
-**Current Issue:** May not pass research mode flag to routing engine.
+### 2. Create VisionPipelineService
 
-**Changes:**
-- Update `generateResponseWithAppContext()`:
-  - Check for research mode in payload context or conversation mode
-  - Pass `isResearchMode` flag to `ModelRoutingEngine.selectModel()` when research mode is active
-- Ensure research mode routing bypasses casual detection
+**New File:** `FocusOS/Services/VisionPipelineService.swift`
 
-### 6. `Cloutmate/Services/HybridBridgeService.swift`
-**Current Issue:** May route to cloud models incorrectly.
+**Data Structures:**
 
-**Changes:**
-- In `generateResponseWithAppContext()`:
-  - Only use cloud models (OpenAI-OSS, DeepSeek) when research mode is active
-  - For regular requests, use local Ollama routing only
-- Update cloud model selection to check research mode flag
+- `VisionOutput` struct (rawVisionText, structuredItems, layoutNotes, visionConfidence)
+- `OCROutput` struct (fullText, lines, regions, ocrConfidence)
+- `PipelineContext` struct (qwenUsed, ocrUsed, fallbackTriggered, finalConfidence, processingPath)
+- `VisionPipelineResult` struct (tasks, summary, detectedIntent, insights, finalConfidence, context: PipelineContext)
+- `VisionConfidence` enum (high, medium, low, failed)
 
-### 7. `Cloutmate/Services/ModelWarmupService.swift`
-**Current Issue:** Missing new models in warmup list.
+**Core Methods:**
 
-**Changes:**
-- Update `startWarmup()` to include all new models:
-  - `gemma3:1b` (casual primary)
-  - `qwen3:1.7b` (casual fallback, tasks)
-  - `qwen3-vl:2b` (image processing)
-  - `granite3.2-vision` (image secondary)
-  - `gemma3:4b` (documents, image fallback)
-  - `gwen2.5-coder:1.5b` (coding, reasoning)
-  - `deepseek-r1:1.5b` (research mode, document fallback)
-- Ensure `granite3.2:2b` is still warmed up (background layer)
-- Update `allLocalModels` reference to use `ModelTierMap.allLocalModels()`
+- `processImage()` - Main entry point (all async, never blocks UI)
+- `qwenVisionLayer()` - Layer 1: Local qwen3-vl:2b vision analysis (detached Task)
+- `ocrLayer()` - Layer 2: SwiftyTesseract fallback (detached Task)
+- `gemmaInterpretationLayer()` - Layer 3: Merge and interpret with gemma3:4b (detached Task)
+- `evaluateQwenConfidence()` - Confidence scoring (0-100)
+- `evaluateOCRQuality()` - OCR quality scoring (0-100)
+- `mergeSignals()` - Combine qwen + OCR outputs
+- `shouldFallbackToOCR()` - Determines when to trigger OCR fallback
 
-### 8. `Cloutmate/Services/CasualConversationDetector.swift`
-**No changes needed** - This is working correctly for casual detection.
+### 3. QwenVisionLayer Implementation
 
-## Research Mode Implementation
+**Method:** `qwenVisionLayer(imageData:prompt:modelContext:context:) async -> VisionOutput`
 
-Research mode should be fully implemented following the research-mode-implementation-e70b680d.plan.md specifications:
+- **MUST run in detached Task:** `Task.detached { await ... }` - prevents UI blocking
+- Use local Ollama with `qwen3-vl:2b` model via `OllamaBridgeService.makeOllamaRequestWithImages()`
+- Extract structured output: rawVisionText, structuredItems, layoutNotes
+- Calculate visionConfidence using `evaluateQwenConfidence()`
+- Update PipelineContext: `qwenUsed = true`, append "QwenVisionLayer" to processingPath
+- Return `VisionOutput` struct
 
-### Research Mode Detection & Activation
-- Detect `/research [topic]` command in user input
-- Set `researchModeActive` flag in `AIAssistantViewModel`
-- Pass `isResearchMode: true` through the routing chain
-- Only use DeepSeek-R1, OpenAI-OSS, and Ollama Search (via WebSearchService) when research mode is active
+**Confidence Evaluation Criteria:**
 
-### Research Mode Flow (using WebSearchService)
-1. User triggers `/research [topic]` command
-2. `AIAssistantViewModel` detects and sets `researchModeActive = true`
-3. `CoreResponseService.generateResearchResponse()` is called (create if doesn't exist)
-4. Research flow:
-   - Use `WebSearchService.deepResearch()` to perform multi-query web searches
-   - Emit progress updates: "Searched for: [query]" with source count
-   - Analyze results with local model (DeepSeek-R1) first
-   - Then analyze with cloud model (OpenAI-OSS/gpt-oss:20b) if available
-   - Emit progress: "Analyzing with DeepSeek R1...", "Analyzing with cloud model..."
-   - Synthesize comprehensive report from all sources
+- Output length (>100 chars = +20, <50 = -30)
+- Noun/verb presence (+20 if contains both)
+- Hallucination detection (checks for generic summaries when tasks expected)
+- Task extraction success (+30 if tasks found)
+- Error handling (timeout = -40, empty = -50)
 
-### Research Progress Tracking
-- Add `currentResearchAction: String?` and `currentResearchSourceCount: Int` to `AIAssistantViewModel`
-- Add `updateResearchProgress(action: String, sourceCount: Int)` method
-- Add `clearResearchProgress()` method
-- Progress updates emitted via MainActor from WebSearchService callbacks
-- Use `ResearchProgressIndicator` component (already exists) instead of ThinkingIndicator during research mode
+### 4. OCRLayer Implementation
 
-## Model Usage Summary
+**Method:** `ocrLayer(imageData:context:) async -> OCROutput`
 
-- **Background Layer:** `granite3.2:2b` only
-- **Casual Conversations:** `gemma3:1b` → `qwen3:1.7b` (fallback)
-- **Tasks (Non-casual):** `qwen3:1.7b` with thinking enabled
-- **Coding/Reasoning:** `gwen2.5-coder:1.5b`
-- **Image Processing:** `qwen3-vl:2b` → `granite3.2-vision` → `gemma3:4b` (fallback)
-- **Document Analysis:** `gemma3:4b` → `deepseek-r1:1.5b` (fallback)
-- **Research Mode:** `deepseek-r1:1.5b`, `gpt-oss:20b`, Ollama Search (cloud models only)
-- **Web Requests:** Route through standard routing (no special "Ollama Web" model needed - web search is a tool, not a model)
+- **MUST run in detached Task:** `Task.detached { await ... }` - prevents UI blocking
+- Reuse existing SwiftyTesseract OCR from `ImageAnalysisService`
+- Extract: fullText, lines (split by newlines), regions (placeholder for bounding boxes)
+- Calculate ocrQualityScore (text length, character variety, line structure)
+- Update PipelineContext: `ocrUsed = true`, append "OCRLayer" to processingPath
+- Return `OCROutput` struct
 
-## Testing Checklist
+### 5. GemmaInterpretationLayer Implementation
 
-- [ ] Casual conversations use Gemma3:1b
-- [ ] Casual fallback uses Qwen3:1.7b
-- [ ] Tasks use Qwen3:1.7b with thinking
-- [ ] Research mode uses DeepSeek/OpenAI-OSS only
-- [ ] DeepSeek never used outside research mode
-- [ ] Images use qwen3-vl:2b with proper fallbacks
-- [ ] Documents use gemma3:4b with DeepSeek fallback
-- [ ] Coding uses gwen2.5-coder:1.5b
-- [ ] All models are warmed up correctly
-- [ ] Background layer uses Granite only
+**Method:** `gemmaInterpretationLayer(qwenOutput:ocrOutput:userPrompt:appContext:modelContext:context:) async -> VisionPipelineResult`
+
+- **MUST run in detached Task:** `Task.detached { await ... }` - prevents UI blocking
+- Use `gemma3:4b` via `OllamaBridgeService.generateResponse()`
+- Build prompt that includes:
+  - Qwen's vision output (if available)
+  - OCR raw text (always included as fallback)
+  - Original user prompt
+  - Instructions to merge, normalize, and structure output
+- Parse gemma response to extract: tasks, summary, detectedIntent, insights
+- Calculate finalConfidence (weighted average of all scores)
+- Update PipelineContext: append "GemmaInterpretationLayer" to processingPath, set finalConfidence
+- Return `VisionPipelineResult` struct with populated PipelineContext
+
+**Prompt Structure:**
+
+```
+You are interpreting vision analysis results. Combine the following:
+
+Vision Intelligence (if available):
+[Qwen output]
+
+OCR Text (always available):
+[OCR output]
+
+User Request: [userPrompt]
+
+Extract:
+- Tasks: [structured list]
+- Summary: [brief description]
+- Intent: [detected intent]
+- Insights: [key observations]
+```
+
+### 6. Confidence Engine Implementation
+
+**Methods:**
+
+- `evaluateQwenConfidence(output:) -> Int` - Scores 0-100 based on quality metrics
+- `evaluateOCRQuality(output:) -> Int` - Scores 0-100 based on readability
+- `calculateFinalConfidence(qwen:ocr:gemma:) -> Int` - Weighted average
+
+**Scoring Logic:**
+
+- qwenVisionScore: Output quality, structure, task detection
+- ocrQualityScore: Text readability, line structure
+- gemmaInterpretationScore: Reasoning quality (parsed from gemma response)
+
+### 7. Multi-Signal Merging Logic
+
+**Method:** `mergeSignals(qwen:ocr:) -> String`
+
+- Start with qwen's structuredItems if available
+- Patch missing pieces using OCR lines
+- Remove duplicates (fuzzy matching)
+- Normalize structure (task formatting, list ordering)
+- Return merged text for Gemma to interpret
+
+### 8. Failure-Proofing
+
+**Method:** `handleFailure(qwen:ocr:gemma:context:) -> VisionPipelineResult`
+
+- If all layers fail, return minimal summary with UX-friendly message:
+  - **Aurora response:** "I wasn't able to understand the full image, but here's what I can say..."
+  - What's visible (if anything)
+  - Why parts are missing
+  - Suggestions for better screenshot
+- Never throw errors to UI - always return some result
+- Log failures for debugging but gracefully degrade
+- Update PipelineContext: `fallbackTriggered = true`, append "FailureFallback" to processingPath
+
+### 9. Update CoreResponseService
+
+**File:** `FocusOS/Services/CoreResponseService.swift`
+
+- Update `analyzeImage()` to call `VisionPipelineService.shared.processImage()` (already async)
+- Convert `VisionPipelineResult` to `DocumentAnalysisResult`
+- Map confidence scores appropriately
+- Extract PipelineContext for transparency messages
+
+### 10. UI State Updates
+
+**File:** `FocusOS/ViewModels/AIAssistantViewModel.swift`
+
+- Add state tracking: `.processingVision`, `.processingOCR`, `.interpreting`
+- Update `handleImageMessage()` to show processing states with context tags:
+  - **"Scanning image... Using on-device vision"** (blue shimmer) during Qwen
+  - **"Extracting text... Using fallback OCR"** (if OCR fallback triggered)
+  - **"Understanding what's shown..."** (purple shimmer) during Gemma
+- After processing completes, use PipelineContext to generate user-friendly explanation:
+  - If OCR was used: "I used OCR because the vision output was incomplete."
+  - If both used: "I combined what I saw visually with the extracted text."
+  - If fallback triggered: "Qwen didn't give enough detail, so I filled in the gaps."
+- These explanations boost UX trust and show intentional transparency
+
+### 11. Integration Points
+
+**Files to update:**
+
+- `FocusOS/Services/OllamaBridgeService.swift` - Ensure `makeOllamaRequestWithImages()` supports qwen3-vl:2b
+- `FocusOS/Services/ModelWarmupService.swift` - Add qwen3-vl:2b to warmup list
+- `FocusOS/Models/ModelTierMap.swift` - Already covered in step 1
+
+### 12. Async Task Management (CRITICAL)
+
+**All pipeline methods MUST:**
+
+- Run in `Task.detached { await ... }` to prevent UI thread blocking
+- Pipeline awaits tasks asynchronously, NOT the UI thread
+- UI only updates on MainActor after results complete
+- This prevents Aurora's chat from freezing during Ollama processing
+- Use `await MainActor.run { ... }` only for final UI updates
+
+### 13. PipelineContext Integration
+
+**Purpose:** Track which layers were used so Aurora can explain her process transparently
+
+**Implementation:**
+
+- Initialize `PipelineContext` in `processImage()` with all flags = false
+- Update context as each layer is used:
+  - `qwenUsed = true` when QwenVisionLayer succeeds
+  - `ocrUsed = true` when OCRLayer is called (fallback or intentional)
+  - `fallbackTriggered = true` when fallback chain is activated
+  - `processingPath` tracks order: ["QwenVisionLayer", "OCRLayer", "GemmaInterpretationLayer"]
+- Pass context through all layers
+- Include context in VisionPipelineResult
+- Use context in UI to generate transparent explanations
+
+## Success Criteria
+
+- All images return structured output (tasks/summary)
+- Qwen layer attempts first, OCR only on failure
+- Gemma merges and normalizes all outputs
+- Confidence scores guide fallback decisions
+- UI shows clear processing states with context tags
+- Zero hard failures - always returns something
+- **No UI blocking - all processing in detached Tasks**
+- **Aurora explains her process transparently using PipelineContext**
+
+## Testing Considerations
+
+- Test with screenshots, handwritten notes, diagrams, UI mockups
+- Verify confidence scoring triggers correct fallbacks
+- Ensure graceful degradation when models unavailable
+- Test multi-signal merging with both qwen + OCR outputs
+- **Verify UI remains responsive during processing (no freezing)**
+- Test PipelineContext explanations appear correctly
+
+### To-dos
+
+- [ ] Add qwen3-vl:2b to ModelTierMap.localModels with vision capabilities
+- [ ] Create VisionPipelineService.swift with data structures (VisionOutput, OCROutput, PipelineContext, VisionPipelineResult)
+- [ ] Implement QwenVisionLayer using local Ollama qwen3-vl:2b model in detached Task
+- [ ] Implement confidence scoring methods (evaluateQwenConfidence, evaluateOCRQuality, calculateFinalConfidence)
+- [ ] Implement OCRLayer wrapping SwiftyTesseract in detached Task with structured output
+- [ ] Implement PipelineContext tracking (qwenUsed, ocrUsed, fallbackTriggered, processingPath)
+- [ ] Implement GemmaInterpretationLayer using gemma3:4b in detached Task to merge and interpret outputs
+- [ ] Implement mergeSignals() to combine qwen + OCR outputs before Gemma interpretation
+- [ ] Implement handleFailure() with graceful degradation and UX-friendly message: "I wasn't able to understand the full image, but here's what I can say..."
+- [ ] Update CoreResponseService.analyzeImage() to use VisionPipelineService with async Task management
+- [ ] Add processing states to AIAssistantViewModel with context tags ("Using on-device vision", "Using fallback OCR") and PipelineContext explanations
+- [ ] Add qwen3-vl:2b to ModelWarmupService warmup list
+- [ ] Test pipeline with various image types and verify UI remains responsive (no freezing)

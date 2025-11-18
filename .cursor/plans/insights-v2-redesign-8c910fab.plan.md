@@ -9,7 +9,7 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ## Phase 1: Unified Header Component
 
-**File:** `Cloutmate/Views/Insights/Components/InsightsHeaderView.swift`
+**File:** `FocusOS/Views/Insights/Components/InsightsHeaderView.swift`
 
 ### Implementation Details
 
@@ -43,7 +43,7 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ## Phase 2: Unified Dashboard Layout
 
-**File:** `Cloutmate/Views/Insights/UnifiedInsightsView.swift`
+**File:** `FocusOS/Views/Insights/UnifiedInsightsView.swift`
 
 ### Implementation Details
 
@@ -76,7 +76,7 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ## Phase 3: Focus Analytics Panel
 
-**File:** `Cloutmate/Views/Insights/Components/FocusAnalyticsView.swift`
+**File:** `FocusOS/Views/Insights/Components/FocusAnalyticsView.swift`
 
 ### Implementation Details
 
@@ -112,7 +112,7 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ## Phase 4: Emotional Continuity Panel
 
-**File:** `Cloutmate/Views/Insights/Components/EmotionAnalyticsView.swift`
+**File:** `FocusOS/Views/Insights/Components/EmotionAnalyticsView.swift`
 
 ### Implementation Details
 
@@ -162,7 +162,7 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ## Phase 5: Habit & Completion Panel
 
-**File:** `Cloutmate/Views/Insights/Components/HabitMetricsView.swift`
+**File:** `FocusOS/Views/Insights/Components/HabitMetricsView.swift`
 
 ### Implementation Details
 
@@ -207,7 +207,7 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ## Phase 6: Cognitive Forecast Panel
 
-**File:** `Cloutmate/Views/Insights/Components/CognitiveForecastView.swift`
+**File:** `FocusOS/Views/Insights/Components/CognitiveForecastView.swift`
 
 ### Implementation Details
 
@@ -346,18 +346,18 @@ Redesign Insights from tab-based navigation to a unified cognitive dashboard wit
 
 ### New Files
 
-1. `Cloutmate/Views/Insights/Components/InsightsHeaderView.swift`
-2. `Cloutmate/Views/Insights/Components/FocusAnalyticsView.swift`
-3. `Cloutmate/Views/Insights/Components/EmotionAnalyticsView.swift`
-4. `Cloutmate/Views/Insights/Components/HabitMetricsView.swift`
-5. `Cloutmate/Views/Insights/Components/CognitiveForecastView.swift`
-6. `Cloutmate/Views/Insights/UnifiedInsightsView.swift`
+1. `FocusOS/Views/Insights/Components/InsightsHeaderView.swift`
+2. `FocusOS/Views/Insights/Components/FocusAnalyticsView.swift`
+3. `FocusOS/Views/Insights/Components/EmotionAnalyticsView.swift`
+4. `FocusOS/Views/Insights/Components/HabitMetricsView.swift`
+5. `FocusOS/Views/Insights/Components/CognitiveForecastView.swift`
+6. `FocusOS/Views/Insights/UnifiedInsightsView.swift`
 
 ### Modified Files
 
-1. `Cloutmate/Views/Insights/InsightsView.swift` - Replace body with `UnifiedInsightsView`, keep data loading
-2. `Cloutmate/Services/CognitionPredictor.swift` - Ensure `forecastPublisher` is accessible
-3. `Cloutmate/Services/MemoryGraphService.swift` - Add correlation stats helper if needed
+1. `FocusOS/Views/Insights/InsightsView.swift` - Replace body with `UnifiedInsightsView`, keep data loading
+2. `FocusOS/Services/CognitionPredictor.swift` - Ensure `forecastPublisher` is accessible
+3. `FocusOS/Services/MemoryGraphService.swift` - Add correlation stats helper if needed
 
 ---
 

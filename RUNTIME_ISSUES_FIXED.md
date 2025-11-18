@@ -43,7 +43,7 @@ if period == .lifetime {
 - Added documentation explaining which metrics work with which periods
 
 **Files Modified:**
-- `Cloutmate/Services/MetaAPIService.swift`
+- `FocusOS/Services/MetaAPIService.swift`
 
 ---
 
@@ -72,15 +72,15 @@ if cacheCount == 0 {
 ```
 
 **Additional Fixes:**
-Fixed model references in `fetchObjectDetails` method to use `CloutmateShared` namespace:
-- `Task` → `CloutmateShared.Task`
-- `Project` → `CloutmateShared.Project`
-- `Note` → `CloutmateShared.Note`
-- `Post` → `CloutmateShared.Post`
-- `InboxItem` → `CloutmateShared.InboxItem`
+Fixed model references in `fetchObjectDetails` method to use `FocusOSShared` namespace:
+- `Task` → `FocusOSShared.Task`
+- `Project` → `FocusOSShared.Project`
+- `Note` → `FocusOSShared.Note`
+- `Post` → `FocusOSShared.Post`
+- `InboxItem` → `FocusOSShared.InboxItem`
 
 **Files Modified:**
-- `Cloutmate/Services/PriorityEngine.swift`
+- `FocusOS/Services/PriorityEngine.swift`
 
 ---
 
@@ -108,7 +108,7 @@ The empty cache on first launch is **expected behavior**.
 
 ### Build Test
 ```bash
-xcodebuild -project Cloutmate.xcodeproj -scheme Cloutmate -configuration Debug build
+xcodebuild -project FocusOS.xcodeproj -scheme FocusOS -configuration Debug build
 ```
 **Result:** ✅ BUILD SUCCEEDED
 
